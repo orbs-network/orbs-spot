@@ -1,0 +1,56 @@
+import type { PartnerConfig } from "./types";
+
+export const efficientFrontierPartner: PartnerConfig = {
+  id: "efficient-frontier",
+  appId: "efficient-frontier-swap",
+  brand: {
+    name: "Efficient Frontier",
+    logoSrc: "/efficient-frontier-logo-mark-dark.png",
+    logoAlt: "Efficient Frontier",
+    externalUrl: "https://efficientfrontier.io/",
+    metadata: {
+      title: "Efficient Frontier",
+      description:
+        "Raising the standard of high-frequency trading technology that empowers the digital asset markets.",
+      url: "https://efficientfrontier.io/",
+    },
+  },
+  styles: {
+    radius: "0.5rem",
+    fontFamily:
+      'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    colors: {
+      background: "#161924",
+      foreground: "#f4f4f4",
+      card: "#05070d",
+      cardForeground: "#f4f4f4",
+      popover: "#070a12",
+      popoverForeground: "#f4f4f4",
+      primary: "#0e67ff",
+      primaryForeground: "#ffffff",
+      secondary: "#101827",
+      secondaryForeground: "#e8ecf6",
+      muted: "#1b2230",
+      mutedForeground: "#b6bfd0",
+      accent: "#0e67ff",
+      accentForeground: "#ffffff",
+      destructive: "#ff5c7a",
+      border: "rgba(182, 191, 208, 0.18)",
+      input: "rgba(182, 191, 208, 0.24)",
+      ring: "#337eff",
+      chart1: "#0e67ff",
+      chart2: "#32e5e1",
+      chart3: "#b6bfd0",
+      chart4: "#f4f4f4",
+      chart5: "#60c860",
+      sidebar: "#05070d",
+      sidebarForeground: "#f4f4f4",
+      sidebarPrimary: "#0e67ff",
+      sidebarPrimaryForeground: "#ffffff",
+      sidebarAccent: "#101827",
+      sidebarAccentForeground: "#e8ecf6",
+      sidebarBorder: "rgba(182, 191, 208, 0.18)",
+      sidebarRing: "#337eff",
+    },
+  },
+};

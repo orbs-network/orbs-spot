@@ -1,0 +1,90 @@
+name: Frontend Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_project:
+        description: "Vercel frontend project to deploy"
+        required: true
+        type: choice
+        default: default
+        options:
+          - default
+          - efficient-frontier
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-deploy-${{ inputs.frontend_project }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & Deploy ${{ inputs.frontend_project }} to Vercel
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: yarn.lock
+
+      - name: Enable Yarn
+        run: |
+          corepack enable
+          corepack prepare yarn@1.22.22 --activate
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Resolve deploy target
+        env:
+          FRONTEND_PROJECT: ${{ inputs.frontend_project }}
+          VERCEL_PROJECT_ID_DEFAULT: ${{ secrets.VERCEL_PROJECT_ID_DEFAULT || secrets.VERCEL_PROJECT_ID }}
+          VERCEL_PROJECT_ID_EFFICIENT_FRONTIER: ${{ secrets.VERCEL_PROJECT_ID_EFFICIENT_FRONTIER }}
+        run: |
+          set -euo pipefail
+
+          case "$FRONTEND_PROJECT" in
+            default)
+              next_partner="default"
+              project_id="$VERCEL_PROJECT_ID_DEFAULT"
+              ;;
+            efficient-frontier)
+              next_partner="efficient-frontier"
+              project_id="$VERCEL_PROJECT_ID_EFFICIENT_FRONTIER"
+              ;;
+            *)
+              echo "Unknown frontend project: $FRONTEND_PROJECT" >&2
+              exit 1
+              ;;
+          esac
+
+          if [ -z "$project_id" ]; then
+            echo "Missing Vercel project id secret for frontend project: $FRONTEND_PROJECT" >&2
+            exit 1
+          fi
+
+          {
+            echo "NEXT_PARTNER=$next_partner"
+            echo "VERCEL_PROJECT_ID=$project_id"
+          } >> "$GITHUB_ENV"
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_PROJECT_ID }}
+          RPC_URL: ${{ secrets.RPC_URL }}
+        run: yarn build
+
+      - name: Deploy to Vercel
+        run: |
+          set -euo pipefail
+          npx vercel --prod --yes \
+            --build-env NEXT_PARTNER="$NEXT_PARTNER" \
+            --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
