@@ -78,13 +78,33 @@ jobs:
         env:
           NEXT_PUBLIC_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_PROJECT_ID }}
           RPC_URL: ${{ secrets.RPC_URL }}
-        run: yarn build
+        run: |
+          set -euo pipefail
+
+          if [ -z "$NEXT_PUBLIC_PROJECT_ID" ]; then
+            echo "Missing NEXT_PUBLIC_PROJECT_ID secret" >&2
+            exit 1
+          fi
+
+          if [ -z "$RPC_URL" ]; then
+            echo "Missing RPC_URL secret" >&2
+            exit 1
+          fi
+
+          yarn build
 
       - name: Deploy to Vercel
         run: |
           set -euo pipefail
           npx vercel --prod --yes \
             --build-env NEXT_PARTNER="$NEXT_PARTNER" \
+            --build-env NEXT_PUBLIC_PROJECT_ID="$NEXT_PUBLIC_PROJECT_ID" \
+            --build-env RPC_URL="$RPC_URL" \
+            --env NEXT_PARTNER="$NEXT_PARTNER" \
+            --env NEXT_PUBLIC_PROJECT_ID="$NEXT_PUBLIC_PROJECT_ID" \
+            --env RPC_URL="$RPC_URL" \
             --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          NEXT_PUBLIC_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_PROJECT_ID }}
+          RPC_URL: ${{ secrets.RPC_URL }}
