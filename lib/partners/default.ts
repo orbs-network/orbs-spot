@@ -5,6 +5,8 @@ export const defaultPartner: PartnerConfig = {
   appId: "agent-swap",
   brand: {
     name: "Agent Swap",
+    iconSrc: "/favicon.ico",
+    appleIconSrc: "/icon.png",
     logoAlt: "Agent Swap",
     externalUrl: "https://www.orbs.com/",
     metadata: {

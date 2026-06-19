@@ -92,16 +92,20 @@ export const useSwapStore = create<SwapStore>((set) => ({
 }));
 
 type FormTabStore = {
+  orderHistoryOpen: boolean;
   pendingTab?: FormTab;
   selectedTab: FormTab;
   clearPendingTab: () => void;
+  setOrderHistoryOpen: (open: boolean) => void;
   setPendingTab: (tab: FormTab) => void;
   setSelectedTab: (tab: FormTab) => void;
 };
 
 export const useFormTabStore = create<FormTabStore>((set) => ({
+  orderHistoryOpen: false,
   selectedTab: FormTab.SWAP,
   clearPendingTab: () => set({ pendingTab: undefined }),
+  setOrderHistoryOpen: (open: boolean) => set({ orderHistoryOpen: open }),
   setPendingTab: (tab: FormTab) => set({ pendingTab: tab }),
   setSelectedTab: (tab: FormTab) => set({ selectedTab: tab }),
 }));

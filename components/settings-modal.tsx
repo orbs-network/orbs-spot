@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useIsSpotTab } from "@/lib/hooks/use-form-tab";
 import type { PercentSettingMode } from "@/lib/hooks/store";
 import { SegmentedTabs } from "./ui/tabs";
-import { InfoTooltip } from "./ui/form-label";
+import { FormLabel, InfoTooltip } from "./ui/form-label";
 import { FormNumberField } from "./ui/form-number-field";
 
 const SLIPPAGE_PRESETS = [0.1, 0.5, 1] as const;
@@ -111,7 +111,7 @@ const PercentSettings = ({
           indicatorClassName="rounded-[10px] bg-primary"
           tabClassName="rounded-[10px] px-2 text-sm font-semibold transition-colors"
           selectedTabClassName="text-primary-foreground hover:text-primary-foreground"
-          unselectedTabClassName="text-muted-foreground hover:bg-white/3 hover:text-foreground"
+          unselectedTabClassName="text-muted-foreground hover:bg-accent/45 hover:text-foreground"
         />
         <FormNumberField className="h-full w-full rounded-[12px] px-3 sm:w-[114px]">
           <NumericInput
@@ -188,22 +188,20 @@ const SettingsInlineTrigger = ({
           : "min-h-[46px] rounded-[18px] border border-border/70 bg-secondary/35 px-4 transition-colors hover:border-primary/25 hover:bg-secondary/40",
       )}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <span
-          className={cn(
-            "text-base font-semibold leading-none text-muted-foreground",
-          )}
-        >
-          {label}
-        </span>
-        <InfoTooltip tooltip={tooltip} ariaLabel={`${label} info`} />
-      </div>
+      <FormLabel
+        className="min-w-0"
+        tooltip={tooltip}
+        tooltipAriaLabel={`${label} info`}
+      >
+        {label}
+      </FormLabel>
       <DialogTrigger asChild>
         <button
           type="button"
+          data-settings-trigger
           aria-label={`Open ${label} settings`}
           className={cn(
-            "inline-flex shrink-0 items-center gap-2 rounded-[14px] bg-primary/14 font-semibold leading-none text-primary transition-colors hover:bg-primary/16 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none",
+            "inline-flex shrink-0 items-center gap-2 rounded-[14px] font-semibold leading-none text-[var(--settings-trigger-foreground)] [background:var(--settings-trigger-background)] transition-colors hover:[background:var(--settings-trigger-hover-background)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none",
             isActionVariant ? "h-10 px-3.5" : "h-10 px-4",
             "text-sm",
           )}

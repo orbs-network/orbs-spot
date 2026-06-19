@@ -5,6 +5,9 @@ export const htDigitalPartner: PartnerConfig = {
   appId: "ht-digital-swap",
   brand: {
     name: "HT Digital",
+    logoSrc: "/ht-digital-logo-mark.svg",
+    iconSrc: "/ht-digital-logo-mark.svg",
+    appleIconSrc: "/ht-digital-logo-mark.svg",
     logoAlt: "HT Digital",
     externalUrl: "https://www.ht.digital/",
     metadata: {
@@ -18,6 +21,13 @@ export const htDigitalPartner: PartnerConfig = {
     radius: "0.75rem",
     fontFamily:
       'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    selectedTabBackground:
+      "radial-gradient(circle, #f3f7dc 0%, #d9e69e 100%)",
+    settingsTriggerBackground:
+      "radial-gradient(circle, #f3f7dc 0%, #d9e69e 100%)",
+    settingsTriggerHoverBackground:
+      "radial-gradient(circle, #f3f7dc 0%, #d9e69e 100%)",
+    settingsTriggerForeground: "#161540",
     colors: {
       background: "#fbfcff",
       foreground: "#161540",

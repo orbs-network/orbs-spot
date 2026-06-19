@@ -1,6 +1,10 @@
 export type PartnerStyles = {
   radius: string;
   fontFamily: string;
+  selectedTabBackground?: string;
+  settingsTriggerBackground?: string;
+  settingsTriggerHoverBackground?: string;
+  settingsTriggerForeground?: string;
   colors: {
     background: string;
     foreground: string;
@@ -39,6 +43,8 @@ export type PartnerStyles = {
 export type PartnerBrand = {
   name: string;
   logoSrc?: string;
+  iconSrc?: string;
+  appleIconSrc?: string;
   logoAlt: string;
   externalUrl?: string;
   metadata: {

@@ -38,7 +38,7 @@ export function StyledSelect<TValue extends string | number>({
       }}
     >
       <SelectTrigger
-        className="h-full min-h-11 w-full self-stretch rounded-[14px] border-border/80 bg-secondary/35 px-3 text-sm font-medium text-foreground transition-colors hover:border-primary/35 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
+        className="h-full min-h-11 w-full self-stretch rounded-[14px] border-border/80 bg-transparent px-3 text-sm font-medium text-foreground transition-colors hover:border-primary/35 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25"
       >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>

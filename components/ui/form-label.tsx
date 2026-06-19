@@ -48,12 +48,14 @@ export function FormLabel({
   hint,
   textClassName,
   tooltip,
+  tooltipAriaLabel,
 }: {
   children: ReactNode;
   className?: string;
   hint?: ReactNode;
   textClassName?: string;
   tooltip?: string;
+  tooltipAriaLabel?: string;
 }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
@@ -65,7 +67,7 @@ export function FormLabel({
       >
         {children}
       </p>
-      <InfoTooltip tooltip={tooltip} />
+      <InfoTooltip tooltip={tooltip} ariaLabel={tooltipAriaLabel} />
       {hint && <span className="text-sm text-muted-foreground">{hint}</span>}
     </div>
   );

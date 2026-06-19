@@ -33,6 +33,7 @@ const SubmitButtonBase = ({
   if (!address) {
     return (
       <Button
+        data-submit-button
         className="h-12 w-full rounded-[14px] text-base"
         onClick={() => {
           openConnectModal?.();
@@ -46,6 +47,7 @@ const SubmitButtonBase = ({
   if (chainId && currentChainId && currentChainId !== chainId) {
     return (
       <Button
+        data-submit-button
         className="h-12 w-full rounded-[14px] text-base"
         onClick={() => {
           switchChain.mutate({ chainId });
@@ -58,6 +60,7 @@ const SubmitButtonBase = ({
 
   return (
     <Button
+      data-submit-button
       className="h-12 w-full rounded-[14px] text-base"
       onClick={onClick}
       isLoading={isLoading}

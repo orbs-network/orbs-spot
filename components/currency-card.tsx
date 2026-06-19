@@ -149,7 +149,7 @@ export function CurrencyCard({
           value={amount}
           onChange={onAmountChange ?? (() => {})}
           isLoading={isLoading}
-          className="min-w-0 text-[36px] font-medium leading-none"
+          className="min-w-0 text-[30px] font-medium leading-none"
         />
         <CurrencySelector
           onCurrencyChange={(currency: Currency) =>

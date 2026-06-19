@@ -7,6 +7,34 @@ import "@rainbow-me/rainbowkit/styles.css";
 import { Toaster } from "@/components/ui/sonner";
 import { getActivePartnerConfig } from "@/lib/partners/server";
 import { getPartnerStyleVariables } from "@/lib/partners/styles";
+import type { PartnerBrand } from "@/lib/partners/types";
+
+function getIconType(url: string) {
+  const pathname = url.split("?")[0]?.toLowerCase() ?? "";
+
+  if (pathname.endsWith(".svg")) return "image/svg+xml";
+  if (pathname.endsWith(".png")) return "image/png";
+  if (pathname.endsWith(".ico")) return "image/x-icon";
+
+  return undefined;
+}
+
+function getPartnerIcons(brand: PartnerBrand): Metadata["icons"] {
+  const iconUrl = brand.iconSrc ?? "/favicon.ico";
+  const appleIconUrl = brand.appleIconSrc ?? brand.iconSrc ?? "/icon.png";
+  const iconType = getIconType(iconUrl);
+
+  return {
+    icon: [
+      {
+        url: iconUrl,
+        ...(iconType ? { type: iconType } : {}),
+      },
+    ],
+    shortcut: iconUrl,
+    apple: appleIconUrl,
+  };
+}
 
 export function generateMetadata(): Metadata {
   const partner = getActivePartnerConfig();
@@ -28,14 +56,7 @@ export function generateMetadata(): Metadata {
       title: metadata.title,
       description: metadata.description,
     },
-    icons: {
-      icon: [
-        { url: "/favicon.ico" },
-        { url: "/icon.png", type: "image/png" },
-      ],
-      shortcut: "/favicon.ico",
-      apple: "/icon.png",
-    },
+    icons: getPartnerIcons(partner.brand),
   };
 }
 

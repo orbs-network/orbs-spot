@@ -336,14 +336,14 @@ const NavWalletControls = () => {
 
 export function Navigation({ brand }: { brand: PartnerBrand }) {
   return (
-    <nav className="fixed left-0 right-0 top-0 z-50 w-full border-b border-border/80 bg-background/88 px-4 py-3 backdrop-blur-xl">
+    <nav className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 bg-background/88 px-4 py-3 shadow-none backdrop-blur-xl">
       <div className="flex w-full flex-wrap items-center gap-3">
         <Link
           href="/"
-          className="flex min-h-8 shrink-0 items-center no-underline"
+          className="flex min-h-8 shrink-0 items-center gap-2.5 no-underline"
           aria-label={`${brand.name} trading`}
         >
-          {brand.logoSrc ? (
+          {brand.logoSrc && (
             <Image
               src={brand.logoSrc}
               alt={brand.logoAlt}
@@ -352,11 +352,10 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
               priority
               className="h-7 w-auto object-contain sm:h-8"
             />
-          ) : (
-            <span className="text-lg font-semibold tracking-normal text-foreground">
-              {brand.name}
-            </span>
           )}
+          <span className="text-lg font-semibold tracking-normal text-foreground">
+            {brand.name}
+          </span>
         </Link>
         <div className="order-1 flex w-full shrink-0 items-center justify-start gap-2 sm:order-none sm:ml-auto sm:w-auto">
           <NavWalletControls />

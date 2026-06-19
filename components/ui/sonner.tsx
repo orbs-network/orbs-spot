@@ -15,11 +15,12 @@ const TOAST_Z_INDEX = 100
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
-      theme="dark"
+      theme="light"
       className="toaster group"
       position="top-right"
       closeButton
       expand={false}
+      richColors
       visibleToasts={3}
       icons={{
         success: <CircleCheckIcon className="size-4" />,
@@ -31,8 +32,24 @@ const Toaster = ({ ...props }: ToasterProps) => {
       style={
         {
           "--normal-bg": "var(--popover)",
+          "--normal-bg-hover": "var(--secondary)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
+          "--normal-border-hover": "color-mix(in srgb, var(--foreground) 18%, var(--border))",
+          "--success-bg": "color-mix(in srgb, var(--primary) 10%, var(--popover))",
+          "--success-border": "color-mix(in srgb, var(--primary) 30%, var(--border))",
+          "--success-text": "var(--primary)",
+          "--info-bg": "color-mix(in srgb, var(--accent) 45%, var(--popover))",
+          "--info-border": "color-mix(in srgb, var(--accent) 70%, var(--border))",
+          "--info-text": "var(--accent-foreground)",
+          "--warning-bg": "color-mix(in srgb, var(--ring) 14%, var(--popover))",
+          "--warning-border": "color-mix(in srgb, var(--ring) 42%, var(--border))",
+          "--warning-text": "var(--foreground)",
+          "--error-bg": "color-mix(in srgb, var(--destructive) 10%, var(--popover))",
+          "--error-border": "color-mix(in srgb, var(--destructive) 32%, var(--border))",
+          "--error-text": "var(--destructive)",
+          "--toast-title-color": "var(--popover-foreground)",
+          "--toast-description-color": "var(--muted-foreground)",
           "--border-radius": "18px",
           zIndex: TOAST_Z_INDEX,
         } as CSSProperties
@@ -41,8 +58,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
         classNames: {
           toast:
             "border-border/80 bg-popover/95 text-popover-foreground backdrop-blur-xl",
-          title: "font-semibold",
-          description: "text-muted-foreground",
+          title: "font-semibold !text-[var(--toast-title-color)]",
+          description: "!text-[var(--toast-description-color)]",
           actionButton:
             "rounded-xl bg-primary px-3 py-1.5 text-primary-foreground",
           cancelButton:

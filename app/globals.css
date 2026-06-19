@@ -131,6 +131,15 @@
   background: var(--app-shell-background);
 }
 
+html[data-partner="ht-digital"] [data-submit-button] {
+  background-color: #161440 !important;
+  color: #ffffff !important;
+}
+
+html[data-partner="ht-digital"] [data-submit-button]:hover {
+  background-color: #161440 !important;
+}
+
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;

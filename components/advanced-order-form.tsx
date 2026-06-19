@@ -36,6 +36,7 @@ import { useFormatNumber } from "@/lib/hooks/common";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useSettings } from "@/lib/hooks/use-settings";
+import { useFormTabStore } from "@/lib/hooks/store";
 import {
   isUserRejectedError,
   showTransactionRejectedToast,
@@ -618,7 +619,7 @@ function TradesPanel() {
       <>
         {amountPerTrade} {fromToken.symbol} per trade{" "}
         {amountPerTradeUsd && (
-          <span className="text-foreground/50">
+          <span className="text-xs text-foreground/50">
             (${amountPerTradeUsdFormatted})
           </span>
         )}
@@ -785,7 +786,7 @@ function SpotPriceInput({
             onChange={onChange}
             className="text-right text-[20px] font-semibold text-foreground"
           />
-          <p className="mt-1 min-h-4 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             ${usdFormatted || "0"}
           </p>
         </div>
@@ -1241,7 +1242,7 @@ function OrderFlowMain({
               href={DISCLAIMER_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="border-b border-muted-foreground/60 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
             >
               Accept Disclaimer
             </a>
@@ -1252,6 +1253,7 @@ function OrderFlowMain({
             />
           </div>
           <Button
+            data-submit-button
             className="h-12 w-full rounded-[14px] text-base"
             disabled={!accepted || isSubmitting}
             isLoading={Boolean(isSubmitting)}
@@ -1388,7 +1390,7 @@ function SubmitOrder({ orderModule }: { orderModule: Module }) {
       />
       <DialogContent
         presentation="center"
-        className="w-[calc(100vw-1rem)] sm:max-w-[560px]"
+        className="w-[calc(100vw-1rem)] sm:max-w-[460px]"
       >
         <DialogHeader>
           <DialogTitle>
@@ -1406,34 +1408,42 @@ function SubmitOrder({ orderModule }: { orderModule: Module }) {
 }
 
 function AdvancedOrderContent({
-  orderHistoryOpen,
-  onOrderHistoryOpenChange,
+  hidden,
   orderModule,
 }: {
-  orderHistoryOpen: boolean;
-  onOrderHistoryOpenChange: (open: boolean) => void;
+  hidden?: boolean;
   orderModule: Module;
 }) {
+  const orderHistoryOpen = useFormTabStore((state) => state.orderHistoryOpen);
+  const setOrderHistoryOpen = useFormTabStore(
+    (state) => state.setOrderHistoryOpen,
+  );
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1.5">
-        <TokenPanel isSource />
-        <ToggleCurrencies />
-        <TokenPanel isSource={false} />
+    <>
+      <div
+        aria-hidden={hidden}
+        className={cn("flex flex-col gap-3", hidden && "hidden")}
+      >
+        <div className="flex flex-col gap-1.5">
+          <TokenPanel isSource />
+          <ToggleCurrencies />
+          <TokenPanel isSource={false} />
+        </div>
+        <PricesPanel orderModule={orderModule} />
+        <ModuleInputs orderModule={orderModule} />
+        <InputErrorPanel />
+        <FormActionPanel>
+          <SettingsModal triggerVariant="action" />
+          <SubmitOrder orderModule={orderModule} />
+        </FormActionPanel>
+        <DisclaimerPanel />
       </div>
-      <PricesPanel orderModule={orderModule} />
-      <ModuleInputs orderModule={orderModule} />
-      <InputErrorPanel />
-      <FormActionPanel>
-        <SettingsModal triggerVariant="action" />
-        <SubmitOrder orderModule={orderModule} />
-      </FormActionPanel>
-      <DisclaimerPanel />
       <OrderHistoryModal
         open={orderHistoryOpen}
-        onOpenChange={onOrderHistoryOpenChange}
+        onOpenChange={setOrderHistoryOpen}
       />
-    </div>
+    </>
   );
 }
 
@@ -1487,36 +1497,19 @@ function SpotProviderShell({
   );
 }
 
-export function SpotOrderHistoryModal({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  return (
-    <SpotProviderShell orderModule={Module.LIMIT}>
-      <OrderHistoryModal open={open} onOpenChange={onOpenChange} />
-    </SpotProviderShell>
-  );
-}
-
 export function AdvancedOrderForm({
-  orderHistoryOpen,
-  onOrderHistoryOpenChange,
-  tab,
+  hidden,
 }: {
-  orderHistoryOpen: boolean;
-  onOrderHistoryOpenChange: (open: boolean) => void;
-  tab: FormTab;
+  hidden?: boolean;
 }) {
+  const selectedTab = useFormTabStore((state) => state.selectedTab);
+  const tab = selectedTab === FormTab.SWAP ? FormTab.TWAP : selectedTab;
   const orderModule = useMemo(() => getModule(tab), [tab]);
 
   return (
     <SpotProviderShell orderModule={orderModule}>
       <AdvancedOrderContent
-        orderHistoryOpen={orderHistoryOpen}
-        onOrderHistoryOpenChange={onOrderHistoryOpenChange}
+        hidden={hidden}
         orderModule={orderModule}
       />
     </SpotProviderShell>

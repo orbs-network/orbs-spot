@@ -108,8 +108,8 @@ function getFallbackLogoUrls(symbol?: string, name?: string) {
   ];
 
   return lookupSymbols.flatMap((lookupSymbol) => [
-    `https://intentx-cdn.fra1.cdn.digitaloceanspaces.com/coins/${lookupSymbol.toLowerCase()}.png`,
     `https://assets.coincap.io/assets/icons/${lookupSymbol.toLowerCase()}@2x.png`,
+    `https://intentx-cdn.fra1.cdn.digitaloceanspaces.com/coins/${lookupSymbol.toLowerCase()}.png`,
     `https://cdn.jsdelivr.net/npm/cryptocurrency-icons@0.18.1/svg/color/${lookupSymbol.toLowerCase()}.svg`,
     `https://app.hyperliquid.xyz/coins/${lookupSymbol}.svg`,
   ]);

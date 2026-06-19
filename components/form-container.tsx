@@ -2,8 +2,7 @@
 import React from "react";
 import { FORM_TABS } from "@/lib/consts";
 import { useSelectedFormTab } from "@/lib/hooks/use-form-tab";
-import { FormTab } from "@/lib/types";
-import { SpotOrderHistoryModal } from "./advanced-order-form";
+import { useFormTabStore } from "@/lib/hooks/store";
 import { OrderHistoryTrigger } from "./order-history-trigger";
 import { StyledSelect } from "./ui/styled-select";
 import { SegmentedTabs } from "./ui/tabs";
@@ -75,19 +74,16 @@ const PoweredBy = () => {
 
 export function FormContainer({
   children,
-  orderHistoryOpen,
-  onOrderHistoryOpenChange,
 }: {
   children: React.ReactNode;
-  orderHistoryOpen: boolean;
-  onOrderHistoryOpenChange: (open: boolean) => void;
 }) {
   const { selectedTab } = useSelectedFormTab();
+  const setOrderHistoryOpen = useFormTabStore(
+    (state) => state.setOrderHistoryOpen,
+  );
   const openOrderHistory = React.useCallback(() => {
-    onOrderHistoryOpenChange(true);
-  }, [onOrderHistoryOpenChange]);
-
-
+    setOrderHistoryOpen(true);
+  }, [setOrderHistoryOpen]);
 
   return (
     <div className="mx-auto mb-[80px] mt-4 flex w-full min-w-0 max-w-[calc(100vw-2rem)] flex-col gap-4 sm:max-w-[480px]">
@@ -98,12 +94,6 @@ export function FormContainer({
           onOpenOrderHistory={openOrderHistory}
         />
         {children}
-        {selectedTab.value === FormTab.SWAP && (
-          <SpotOrderHistoryModal
-            open={orderHistoryOpen}
-            onOpenChange={onOrderHistoryOpenChange}
-          />
-        )}
       </div>
       <PoweredBy />
     </div>

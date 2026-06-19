@@ -10,6 +10,11 @@ export function getPartnerStyleVariables(
   styles: PartnerStyles,
 ): PartnerCssVariables {
   const { colors } = styles;
+  const selectedTabBackground = styles.selectedTabBackground ?? colors.primary;
+  const settingsTriggerBackground =
+    styles.settingsTriggerBackground ?? transparentMix(colors.primary, 14);
+  const settingsTriggerHoverBackground =
+    styles.settingsTriggerHoverBackground ?? transparentMix(colors.primary, 16);
 
   return {
     "--radius": styles.radius,
@@ -48,5 +53,10 @@ export function getPartnerStyleVariables(
     "--app-shell-background": colors.background,
     "--nav-pill-background": transparentMix(colors.secondary, 86),
     "--nav-pill-hover-background": transparentMix(colors.accent, 48),
+    "--selected-tab-background": selectedTabBackground,
+    "--settings-trigger-background": settingsTriggerBackground,
+    "--settings-trigger-hover-background": settingsTriggerHoverBackground,
+    "--settings-trigger-foreground":
+      styles.settingsTriggerForeground ?? colors.primary,
   };
 }
