@@ -120,10 +120,10 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
       </DetailRow>
       <DetailRow
         label={t("fees", { value: `(${order.feesPercentage}%)` })}
-        hidden={!feesUsd}
+        hidden={order.feesUsd === undefined || order.feesUsd === null}
         align="start"
       >
-        ${feesUsd}
+        ${feesUsd || "0"}
       </DetailRow>
     </div>
   );

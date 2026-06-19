@@ -61,7 +61,7 @@ export function SpotProviderShell({
       marketReferencePrice={marketReferencePrice}
       minChunkSizeUsd={10}
       callbacks={callbacks}
-      fees={0.25}
+      fees={0}
       isDev={false}
       appId={getActiveClientPartnerConfig().id}
       enableQueryParams={false}
