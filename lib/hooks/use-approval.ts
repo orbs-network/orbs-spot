@@ -1,34 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { erc20Abi } from "viem";
-import { useConnection, usePublicClient, useWalletClient } from "wagmi";
-import { useGetTransactionReceiptCallback } from "./use-get-transaction-receipt";
-import BN from "bignumber.js";
+import { useConnection, usePublicClient } from "wagmi";
 import { useMemo } from "react";
 import { useParseNativeCurrencyAddress } from "./common";
-
-const useGetAllowance = (
-  spender: string,
-  tokenAddress?: string,
-  amount?: string
-) => {
-  const publicClient = usePublicClient();
-  const account = useConnection().address;
-  return useMutation({
-    mutationFn: async () => {
-      if (!publicClient || !tokenAddress || !amount) {
-        throw new Error("Missing required parameters");
-      }
-      const allowance = await publicClient!.readContract({
-        address: tokenAddress as `0x${string}`,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [account as `0x${string}`, spender as `0x${string}`],
-      });
-      
-      return BN(allowance).gte(BN(amount ?? "0"));
-    },
-  });
-};
+import { useApproveToken } from "./use-token-approval";
+import { useHasTokenAllowance } from "./use-token-allowance";
 
 export const useApproval = (
   spender: string,
@@ -36,51 +11,49 @@ export const useApproval = (
   amount?: string
 ) => {
   const currencyAddress = useParseNativeCurrencyAddress(_currencyAddress);
-  const { data: walletClient } = useWalletClient();
+  const { address: account } = useConnection();
   const publicClient = usePublicClient();
-  const { mutateAsync: getTransactionReceiptCallback } =
-    useGetTransactionReceiptCallback();
-  const { mutateAsync: getAllowance } = useGetAllowance(
-    spender,
-    currencyAddress,
-    amount
-  );
+  const { mutateAsync: approveToken } = useApproveToken();
+  const { mutateAsync: hasTokenAllowance } = useHasTokenAllowance();
   const queryClient = useQueryClient();
   const allowanceKey = useMemo(
-    () => ["allowance", spender, currencyAddress, amount],
-    [spender, currencyAddress, amount]
+    () => ["allowance", account, spender, currencyAddress, amount],
+    [account, spender, currencyAddress, amount]
   );
 
   const { data: hasAllowance, isLoading: isLoadingHasAllowance } = useQuery({
     queryKey: allowanceKey,
     queryFn: async () => {
-      return getAllowance();
+      return hasTokenAllowance({
+        tokenAddress: currencyAddress,
+        spenderAddress: spender,
+        amount,
+      });
     },
     enabled:
-      !!publicClient && !!spender && !!currencyAddress && !!amount && !!amount,
+      !!publicClient && !!account && !!spender && !!currencyAddress && !!amount,
   });
 
   const { mutateAsync: approveCallback, isPending: isPendingApproval } =
     useMutation({
       mutationFn: async () => {
-        if (!walletClient) {
-          throw new Error("Wallet client not found");
-        }
-
-        const hash = await walletClient.writeContract({
-          address: currencyAddress as `0x${string}`,
-          abi: erc20Abi,
-          functionName: "approve",
-          args: [spender as `0x${string}`, BigInt(amount ?? "0")],
+        const { receipt } = await approveToken({
+          tokenAddress: currencyAddress,
+          spenderAddress: spender,
+          amount,
         });
 
-        const receipt = await getTransactionReceiptCallback(hash);
-        const hasAllowance = await getAllowance();
+        const hasAllowance = await hasTokenAllowance({
+          tokenAddress: currencyAddress,
+          spenderAddress: spender,
+          amount,
+        });
 
         if (!hasAllowance) {
           throw new Error("Approval failed");
         }
 
+        queryClient.setQueryData(allowanceKey, true);
         return receipt;
       },
     });
@@ -90,7 +63,11 @@ export const useApproval = (
       return queryClient.ensureQueryData({
         queryKey: allowanceKey,
         queryFn: async () => {
-          return getAllowance();
+          return hasTokenAllowance({
+            tokenAddress: currencyAddress,
+            spenderAddress: spender,
+            amount,
+          });
         },
       });
     },

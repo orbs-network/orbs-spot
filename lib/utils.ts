@@ -327,7 +327,7 @@ function normalizeDecimalString(value?: string) {
 
 export function dynamicDecimals(
   value?: string | number,
-  scale = 4,
+  scale = 3,
   maxDecimals = 12
 ): string {
   return formatDecimals(normalizeDecimalString(value?.toString()), scale, maxDecimals);

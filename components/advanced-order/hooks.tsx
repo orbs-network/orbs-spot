@@ -15,8 +15,12 @@ import {
   getExplorerUrl,
   getWrappedNativeCurrency,
 } from "@/lib/utils";
+import { useGetTransactionReceiptCallback } from "@/lib/hooks/use-get-transaction-receipt";
+import { useSignTypedDataPayload } from "@/lib/hooks/use-sign-typed-data";
+import { useApproveToken } from "@/lib/hooks/use-token-approval";
+import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
+import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
 import {
-  getNetwork,
   isNativeAddress,
   type ApproveTokenProps,
   type Callbacks,
@@ -33,8 +37,8 @@ import {
 } from "@orbs-network/spot-react";
 import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { type Abi, erc20Abi, maxUint256 } from "viem";
-import { useConnection, usePublicClient, useWalletClient } from "wagmi";
+import { type Abi, maxUint256 } from "viem";
+import { useConnection, useWalletClient } from "wagmi";
 import {
   APPROVE_TOAST_ID,
   CANCEL_ORDER_TOAST_ID,
@@ -70,65 +74,19 @@ export function useSpotMarketReferencePrice() {
 
 export function useWalletInteractions() {
   const { data: walletClient } = useWalletClient();
-  const publicClient = usePublicClient();
-  const { chainId } = useConnection();
-
-  const waitForTx = useCallback(
-    async (hash: `0x${string}`) => {
-      if (!chainId) {
-        throw new Error("Chain is not connected");
-      }
-
-      const result = await fetch(
-        `/api/transaction-receipt?chainId=${chainId}&hash=${hash}`,
-      );
-
-      if (!result.ok) {
-        throw new Error("Failed to get transaction receipt");
-      }
-
-      const receipt = await result.json();
-      if (receipt?.status === "reverted") {
-        throw new Error("Transaction reverted");
-      }
-
-      return hash;
-    },
-    [chainId],
-  );
+  const { mutateAsync: waitForTransactionReceipt } =
+    useGetTransactionReceiptCallback();
+  const { mutateAsync: signTypedData } = useSignTypedDataPayload();
+  const { mutateAsync: approveToken } = useApproveToken();
+  const { mutateAsync: getTokenAllowance } = useGetTokenAllowance();
+  const { mutateAsync: wrapNativeToken } = useWrapNativeToken();
 
   return useMemo((): WalletInteractions => {
-    const network = getNetwork(chainId);
-
     return {
       wrapNativeToken: async (amount: string) => {
-        if (!walletClient) {
-          throw new Error("Wallet client not found");
-        }
-        if (!network?.wToken?.address) {
-          throw new Error("Wrapped native token not found for chain");
-        }
-
         try {
-          const hash = await walletClient.writeContract({
-            abi: [
-              {
-                name: "deposit",
-                type: "function",
-                stateMutability: "payable",
-                inputs: [],
-                outputs: [],
-              },
-            ],
-            functionName: "deposit",
-            address: network.wToken.address as `0x${string}`,
-            args: [],
-            value: BigInt(amount),
-            chain: walletClient.chain,
-            account: walletClient.account!,
-          });
-
-          return waitForTx(hash);
+          const { hash } = await wrapNativeToken(amount);
+          return hash;
         } catch (error) {
           if (isUserRejectedError(error)) {
             showTransactionRejectedToast({ id: WRAP_TOAST_ID });
@@ -138,21 +96,13 @@ export function useWalletInteractions() {
         }
       },
       approveToken: async (props: ApproveTokenProps) => {
-        if (!walletClient) {
-          throw new Error("Wallet client not found");
-        }
-
         try {
-          const hash = await walletClient.writeContract({
-            abi: erc20Abi,
-            functionName: "approve",
-            address: props.tokenAddress as `0x${string}`,
-            args: [props.spenderAddress as `0x${string}`, maxUint256],
-            chain: walletClient.chain,
-            account: walletClient.account!,
+          const { hash } = await approveToken({
+            tokenAddress: props.tokenAddress,
+            spenderAddress: props.spenderAddress,
+            amount: maxUint256.toString(),
           });
-
-          return waitForTx(hash);
+          return hash;
         } catch (error) {
           if (isUserRejectedError(error)) {
             showTransactionRejectedToast({ id: APPROVE_TOAST_ID });
@@ -176,7 +126,8 @@ export function useWalletInteractions() {
             account: walletClient.account!,
           } as any);
 
-          return waitForTx(hash);
+          await waitForTransactionReceipt(hash);
+          return hash;
         } catch (error) {
           if (isUserRejectedError(error)) {
             showTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
@@ -191,7 +142,7 @@ export function useWalletInteractions() {
         }
 
         try {
-          return await walletClient.signTypedData({
+          return await signTypedData({
             domain: props.domain as any,
             types: props.types as any,
             primaryType: props.primaryType,
@@ -207,27 +158,20 @@ export function useWalletInteractions() {
         }
       },
       getAllowance: async (props: GetAllowanceProps) => {
-        if (!publicClient) {
-          throw new Error("Public client not found");
-        }
-        if (!walletClient?.account?.address) {
-          throw new Error("Wallet account not found");
-        }
-
-        const result = await publicClient.readContract({
-          address: props.tokenAddress as `0x${string}`,
-          abi: erc20Abi,
-          functionName: "allowance",
-          args: [
-            walletClient.account.address as `0x${string}`,
-            props.spenderAddress as `0x${string}`,
-          ],
+        return getTokenAllowance({
+          tokenAddress: props.tokenAddress,
+          spenderAddress: props.spenderAddress,
         });
-
-        return String(result);
       },
     };
-  }, [chainId, publicClient, waitForTx, walletClient]);
+  }, [
+    approveToken,
+    getTokenAllowance,
+    signTypedData,
+    waitForTransactionReceipt,
+    walletClient,
+    wrapNativeToken,
+  ]);
 }
 
 export function useSpotCallbacks() {
@@ -263,8 +207,7 @@ export function useSpotCallbacks() {
         );
       },
       onWrapSuccess: async ({ txHash }: OnWrapSuccessCallback) => {
-        const network = getNetwork(chainId);
-        const wrappedAddress = network?.wToken?.address;
+        const wrappedAddress = getWrappedNativeCurrency(chainId)?.address;
 
         if (wrappedAddress) {
           handleCurrencyChange(wrappedAddress, Field.INPUT);
@@ -315,25 +258,10 @@ export function useSpotCallbacks() {
           { id: CREATE_ORDER_TOAST_ID, description: t("proceedInWallet") },
         );
       },
-      onOrderCreated: (order: Order) => {
-        toast.success(
-          <TokensPair
-            prefix={t("Completed")}
-            srcTokenAddress={order.srcTokenAddress}
-            dstTokenAddress={order.dstTokenAddress}
-          />,
-          {
-            id: CREATE_ORDER_TOAST_ID,
-            duration: 10_000,
-            closeButton: true,
-          },
-        );
-        refetchBalances();
-      },
       onOrderFilled: (order: Order) => {
         toast.success(
           <TokensPair
-            prefix={t("Completed")}
+            prefix={t("orderFilled")}
             srcTokenAddress={order.srcTokenAddress}
             dstTokenAddress={order.dstTokenAddress}
           />,
@@ -406,4 +334,3 @@ export function useSpotCallbacks() {
 
   return callbacks;
 }
-

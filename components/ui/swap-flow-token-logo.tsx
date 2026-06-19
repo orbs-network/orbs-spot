@@ -18,9 +18,9 @@ export function SwapFlowTokenLogo({
   return (
     <CurrencyLogo
       currency={currency}
-      name={token?.name ?? currency?.name}
-      symbol={token?.symbol}
-      logoUrl={token?.logoUrl}
+      name={currency?.name ?? token?.name}
+      symbol={currency?.symbol ?? token?.symbol}
+      logoUrl={currency?.logoUrl ?? token?.logoUrl}
       className={cn("token-logo", className)}
     />
   );

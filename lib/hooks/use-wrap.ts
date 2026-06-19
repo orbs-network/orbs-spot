@@ -3,8 +3,9 @@ import { useConnection, useWalletClient } from "wagmi";
 import { getWrappedNativeCurrency } from "../utils";
 import wethAbi from "../abi/wethAbi.json";
 import { useGetTransactionReceiptCallback } from "./use-get-transaction-receipt";
+import type { TransactionResult } from "./use-token-approval";
 
-export const useWrap = () => {
+export const useWrapNativeToken = () => {
   const { data: walletClient } = useWalletClient();
   const { address: account, chainId } = useConnection();
   const { mutateAsync: getTransactionReceiptCallback } =
@@ -12,7 +13,7 @@ export const useWrap = () => {
 
   const address = getWrappedNativeCurrency(chainId)?.address ?? "";
   return useMutation({
-    mutationFn: async (amount: string) => {
+    mutationFn: async (amount: string): Promise<TransactionResult> => {
       if (!walletClient) {
         throw new Error("Wallet client not found");
       }
@@ -27,7 +28,19 @@ export const useWrap = () => {
         value: BigInt(amount),
         chain: walletClient.chain,
       });
-      return getTransactionReceiptCallback(hash);
+      const receipt = await getTransactionReceiptCallback(hash);
+      return { hash, receipt };
+    },
+  });
+};
+
+export const useWrap = () => {
+  const { mutateAsync: wrapNativeToken } = useWrapNativeToken();
+
+  return useMutation({
+    mutationFn: async (amount: string) => {
+      const { receipt } = await wrapNativeToken(amount);
+      return receipt;
     },
   });
 };

@@ -570,11 +570,9 @@ function OrderFillsView({
 
 function SelectedOrderDetails({
   onBack,
-  onCancelSuccess,
   rawOrder,
 }: {
   onBack: () => void;
-  onCancelSuccess: () => void;
   rawOrder: Order;
 }) {
   const t = useTranslations();
@@ -587,12 +585,6 @@ function SelectedOrderDetails({
   const isOpenOrder = order?.original.status === OrderStatus.Open;
   const { cancelOrder, isLoading: isCancelling, isSuccess } =
     useCancelOrder(isOpenOrder ? order?.original : undefined);
-
-  useEffect(() => {
-    if (isSuccess) {
-      onCancelSuccess();
-    }
-  }, [isSuccess, onCancelSuccess]);
 
   if (!order) return null;
 
@@ -751,13 +743,14 @@ function SelectedOrderDetails({
           onClick={() => setView("fills")}
         />
 
-        {isOpenOrder && (
+        {isOpenOrder && !isSuccess && (
           <Button
+            data-submit-button
             type="button"
             onClick={() => void cancelOrder()}
             isLoading={isCancelling}
             disabled={isCancelling}
-            className="mt-1 h-12 w-full rounded-[6px] border border-red-400/30 bg-red-500/15 text-base font-semibold text-red-200 transition-colors hover:bg-red-500/20"
+            className="mt-1 h-12 w-full rounded-[14px] text-base"
           >
             {t("cancelOrder")}
           </Button>
@@ -858,7 +851,6 @@ export function OrderHistoryModal({
             key={`${selectedOrder.id}-${selectedOrder.createdAt}`}
             rawOrder={selectedOrder}
             onBack={() => setSelectedOrder(undefined)}
-            onCancelSuccess={() => setSelectedOrder(undefined)}
           />
         ) : (
           <>

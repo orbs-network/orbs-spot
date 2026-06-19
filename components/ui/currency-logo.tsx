@@ -20,6 +20,7 @@ const FAILED_LOGO_SOURCES = new Set<string>();
 const LOADED_LOGO_SOURCES = new Set<string>();
 
 const TOKEN_LOGO_SYMBOL_ALIASES: Record<string, string> = {
+  BSCUSD: "USDT",
   WBTC: "BTC",
   WBNB: "BNB",
   WETH: "ETH",
@@ -96,8 +97,8 @@ function uniqueLogoSymbols(symbols: Array<string | undefined>) {
 function getFallbackLogoUrls(symbol?: string, name?: string) {
   const normalizedSymbols = uniqueLogoSymbols([
     getNameLogoHint(name),
-    stripSymbolPrefix(symbol),
     symbol,
+    stripSymbolPrefix(symbol),
   ]);
   const lookupSymbols = [
     ...new Set(

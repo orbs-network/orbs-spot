@@ -30,9 +30,10 @@ import {
 } from "@orbs-network/spot-react";
 import { Step, SwapFlow } from "@orbs-network/swap-ui";
 import BN from "bignumber.js";
-import { AlertTriangleIcon } from "lucide-react";
+import { AlertTriangleIcon, ArrowRightIcon, CheckIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useConnection } from "wagmi";
+import type { Currency } from "@/lib/types";
 import { formatDeadline, formatDuration, getOrderTitle } from "./utils";
 
 function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
@@ -147,7 +148,7 @@ function TxError({ error }: { error?: ParsedError }) {
   );
 }
 
-function useOrderStep(srcToken?: Token): Step | undefined {
+function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
   const t = useTranslations();
   const { step, wrapTxHash, approveTxHash, status } =
     useSpot().orderExecutionPanel;
@@ -178,12 +179,13 @@ function useOrderStep(srcToken?: Token): Step | undefined {
       };
     }
     return {
-      title: t("createOrder"),
+      title: t("createOrderAction", { name: orderTitle }),
       footerText:
         status === SwapStatus.LOADING ? t("proceedInWallet") : undefined,
     };
   }, [
     approveExplorerUrl,
+    orderTitle,
     status,
     step,
     symbol,
@@ -254,12 +256,82 @@ function OrderUsd({ kind }: { kind: "src" | "dst" }) {
   return <p className="text-sm text-muted-foreground">${formatted || "0"}</p>;
 }
 
-function OrderFlowSuccess({ orderTitle }: { orderTitle: string }) {
+function OrderSuccessIcon() {
+  return (
+    <div className="flex size-14 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-primary">
+      <CheckIcon className="size-7" strokeWidth={2.4} />
+    </div>
+  );
+}
+
+function OrderSuccessToken({
+  amount,
+  className,
+  currency,
+  token,
+}: {
+  amount?: string;
+  className?: string;
+  currency?: Currency;
+  token?: Token;
+}) {
+  const symbol = currency?.symbol ?? token?.symbol;
+
+  return (
+    <div className={`flex min-w-0 items-center gap-2 ${className ?? ""}`}>
+      <SwapFlowTokenLogo
+        currency={currency}
+        token={token}
+        className="size-[26px]"
+      />
+      <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+        {amount || "0"} {symbol}
+      </span>
+    </div>
+  );
+}
+
+function OrderFlowSuccess({
+  dstAmount,
+  dstCurrency,
+  dstToken,
+  orderTitle,
+  srcAmount,
+  srcCurrency,
+  srcToken,
+}: {
+  dstAmount?: string;
+  dstCurrency?: Currency;
+  dstToken?: Token;
+  orderTitle: string;
+  srcAmount?: string;
+  srcCurrency?: Currency;
+  srcToken?: Token;
+}) {
   const t = useTranslations();
 
   return (
-    <SwapFlow.Success
+    <SwapFlow.StepLayout
+      className="orbs_Success"
       title={t("createOrderActionSuccess", { name: orderTitle })}
+      body={
+        <div className="flex w-full flex-col items-center gap-3">
+          <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
+            <OrderSuccessToken
+              amount={srcAmount}
+              currency={srcCurrency}
+              token={srcToken}
+            />
+            <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
+            <OrderSuccessToken
+              amount={dstAmount}
+              className="justify-end"
+              currency={dstCurrency}
+              token={dstToken}
+            />
+          </div>
+        </div>
+      }
     />
   );
 }
@@ -278,13 +350,11 @@ function SubmitOrderPanel({
   const order = useSpot().derivedFormData;
   const srcAmount = useFormatNumber({
     value: order.srcAmountUI,
-    decimalScale: 4,
   });
   const dstAmount = useFormatNumber({
     value: order.dstAmountUI,
-    decimalScale: 4,
   });
-  const currentStep = useOrderStep(srcToken);
+  const currentStep = useOrderStep(orderTitle, srcToken);
   const inToken = useMemo(
     () => ({ symbol: srcToken?.symbol, logoUrl: srcToken?.logoUrl }),
     [srcToken],
@@ -323,7 +393,18 @@ function SubmitOrderPanel({
           />
         ),
         Failed: <SwapFlow.Failed error={<TxError error={parsedError} />} />,
-        Success: <OrderFlowSuccess orderTitle={orderTitle} />,
+        Success: (
+          <OrderFlowSuccess
+            dstAmount={dstAmount}
+            dstCurrency={dstCurrency}
+            dstToken={dstToken}
+            orderTitle={orderTitle}
+            srcAmount={srcAmount}
+            srcCurrency={srcCurrency}
+            srcToken={srcToken}
+          />
+        ),
+        SuccessIcon: <OrderSuccessIcon />,
         Main: (
           <OrderFlowMain
             orderTitle={orderTitle}

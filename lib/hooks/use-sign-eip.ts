@@ -1,10 +1,10 @@
 import { Quote } from "@orbs-network/liquidity-hub-sdk";
 import { useMutation } from "@tanstack/react-query";
-import { useSignTypedData } from "wagmi";
 import { _TypedDataEncoder } from "@ethersproject/hash";
+import { useSignTypedDataPayload } from "./use-sign-typed-data";
 
 export const useSignEip = () => {
-  const { signTypedDataAsync } = useSignTypedData();
+  const { mutateAsync: signTypedData } = useSignTypedDataPayload();
 
   return useMutation({
     mutationFn: async (quote: Quote) => {
@@ -21,7 +21,7 @@ export const useSignEip = () => {
             populated.value
           );
 
-      const signature = await signTypedDataAsync(payload);
+      const signature = await signTypedData(payload);
       return signature;
     },
   });

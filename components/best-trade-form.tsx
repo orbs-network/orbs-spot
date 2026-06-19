@@ -9,11 +9,11 @@ import { Step, SwapFlow, SwapStatus, Token } from "@orbs-network/swap-ui";
 import { useCallback, useMemo, useState } from "react";
 import { useFormatNumber, useToAmountUI } from "@/lib/hooks/common";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
-import { Field, SwapStep } from "@/lib/types";
+import { Field, SwapStep, type Currency } from "@/lib/types";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import BN from "bignumber.js";
-import { dynamicDecimals, getExplorerUrl } from "@/lib/utils";
+import { cn, dynamicDecimals, getExplorerUrl } from "@/lib/utils";
 import { useConnection } from "wagmi";
 import { useTranslations } from "@/lib/use-translations";
 import { SettingsModal } from "./settings-modal";
@@ -21,28 +21,36 @@ import { FormActionPanel } from "./form-action-panel";
 import { SwapFlowLoader } from "./swap-flow-loader";
 import { DetailRow } from "./ui/detail-row";
 import { SwapFlowTokenLogo } from "./ui/swap-flow-token-logo";
+import { ArrowRightIcon, CheckIcon } from "lucide-react";
 
 const useStep = () => {
+  const t = useTranslations();
   const currentStep = useBestTradeSwapStore((state) => state.currentStep);
+  const txHash = useBestTradeSwapStore((state) => state.txHash);
+  const { inputCurrency } = useDerivedSwap();
+  const { chainId } = useConnection();
+  const explorerUrl = getExplorerUrl(chainId, txHash);
+
   return useMemo((): Step | undefined => {
     if (currentStep === SwapStep.WRAP) {
       return {
-        title: "Wrap",
-        footerText: "Wrap your tokens",
+        title: `Wrap ${inputCurrency?.symbol ?? "token"}`,
+        footerText: t("proceedInWallet"),
       };
     } else if (currentStep === SwapStep.APPROVE) {
       return {
-        title: "Approve",
-        footerText: "Approve your tokens",
+        title: `Approve ${inputCurrency?.symbol ?? "token"}`,
+        footerText: t("proceedInWallet"),
       };
     } else if (currentStep === SwapStep.SWAP) {
       return {
         title: "Swap",
-        footerText: "Swap your tokens",
+        footerLink: explorerUrl,
+        footerText: explorerUrl ? t("viewOnExplorer") : t("proceedInWallet"),
       };
     }
     return undefined;
-  }, [currentStep]);
+  }, [currentStep, explorerUrl, inputCurrency?.symbol, t]);
 };
 
 const formatSafeFixed = (value: BN, decimals = 2) => {
@@ -146,7 +154,7 @@ const MinimumAmountOut = () => {
 };
 const Details = () => {
   return (
-    <div className="flex flex-col gap-2 w-full mt-4 rounded-xl border border-primary/25 bg-primary/12 p-3">
+    <div className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
       <NetworkCost />
       <PriceImpact />
       <MinimumAmountOut />
@@ -155,15 +163,68 @@ const Details = () => {
   );
 };
 
-const Success = () => {
+function SwapSuccessIcon() {
+  return (
+    <div className="flex size-14 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-primary">
+      <CheckIcon className="size-7" strokeWidth={2.4} />
+    </div>
+  );
+}
+
+function SwapSuccessToken({
+  amount,
+  className,
+  currency,
+}: {
+  amount?: string;
+  className?: string;
+  currency?: Currency;
+}) {
+  return (
+    <div className={cn("flex min-w-0 items-center gap-2", className)}>
+      <SwapFlowTokenLogo currency={currency} className="size-[26px]" />
+      <span className="min-w-0 truncate text-sm font-semibold text-foreground">
+        {amount || "0"} {currency?.symbol}
+      </span>
+    </div>
+  );
+}
+
+const Success = ({
+  inputAmountF,
+  outputAmountF,
+  inputCurrency,
+  outputCurrency,
+}: {
+  inputAmountF?: string;
+  outputAmountF?: string;
+  inputCurrency?: Currency;
+  outputCurrency?: Currency;
+}) => {
   const t = useTranslations();
-  const { txHash } = useSwapBestTrade();
+  const txHash = useBestTradeSwapStore((state) => state.txHash);
   const { chainId } = useConnection();
+  const explorerUrl = getExplorerUrl(chainId, txHash);
 
   return (
-    <SwapFlow.Success
-      footerLink={getExplorerUrl(chainId, txHash)}
-      footerText={t("viewOnExplorer")}
+    <SwapFlow.StepLayout
+      className="orbs_Success"
+      title="Swap completed"
+      body={
+        <div className="flex w-full flex-col items-center gap-3">
+          <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
+            <SwapSuccessToken amount={inputAmountF} currency={inputCurrency} />
+            <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
+            <SwapSuccessToken
+              amount={outputAmountF}
+              className="justify-end"
+              currency={outputCurrency}
+            />
+          </div>
+        </div>
+      }
+      footerLink={explorerUrl}
+      footerText={explorerUrl ? t("viewOnExplorer") : undefined}
     />
   );
 };
@@ -174,6 +235,8 @@ const SwapReviewContent = ({
   currentStepIndex,
   inputAmountF,
   outputAmountF,
+  inputCurrency,
+  outputCurrency,
   inToken,
   outToken,
 }: {
@@ -182,9 +245,13 @@ const SwapReviewContent = ({
   currentStepIndex?: number;
   inputAmountF?: string;
   outputAmountF?: string;
+  inputCurrency?: Currency;
+  outputCurrency?: Currency;
   inToken: Token;
   outToken: Token;
 }) => {
+  const tokenLogoClassName = status ? "size-[26px]" : "size-10";
+
   return (
     <DialogContent presentation="center">
       <DialogHeader>
@@ -200,10 +267,30 @@ const SwapReviewContent = ({
         inToken={inToken}
         outToken={outToken}
         components={{
-          SrcTokenLogo: <SwapFlowTokenLogo token={inToken} />,
-          DstTokenLogo: <SwapFlowTokenLogo token={outToken} />,
+          SrcTokenLogo: (
+            <SwapFlowTokenLogo
+              currency={inputCurrency}
+              token={inToken}
+              className={tokenLogoClassName}
+            />
+          ),
+          DstTokenLogo: (
+            <SwapFlowTokenLogo
+              currency={outputCurrency}
+              token={outToken}
+              className={tokenLogoClassName}
+            />
+          ),
           Failed: <SwapFlow.Failed />,
-          Success: <Success />,
+          Success: (
+            <Success
+              inputAmountF={inputAmountF}
+              outputAmountF={outputAmountF}
+              inputCurrency={inputCurrency}
+              outputCurrency={outputCurrency}
+            />
+          ),
+          SuccessIcon: <SwapSuccessIcon />,
           Main: <Main />,
           Loader: <SwapFlowLoader />,
         }}
@@ -279,6 +366,8 @@ const SubmitSwap = () => {
         currentStepIndex={currentStepIndex}
         inputAmountF={inputAmountF}
         outputAmountF={outputAmountF}
+        inputCurrency={inputCurrency}
+        outputCurrency={outputCurrency}
         inToken={inToken}
         outToken={outToken}
       />
@@ -314,7 +403,7 @@ const Main = () => {
         }
       />
       {!status && (
-        <div className="flex flex-col gap-2 w-full mt-3">
+        <div className="mt-3 flex w-full flex-col gap-3">
           <Details />
           <SubmitSwapButton
             onClick={onSwapBestTrade}

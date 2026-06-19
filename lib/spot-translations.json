@@ -20,6 +20,7 @@
   "to": "To",
   "Open": "Open",
   "Completed": "Completed",
+  "orderFilled": "Order filled",
   "Expired": "Expired",
   "Cancelled": "Cancelled",
   "cancelOrder": "Cancel Order",

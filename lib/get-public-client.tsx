@@ -5,6 +5,10 @@ import { getRpcUrl } from "./rpc-url";
 export function getPublicClient(chainId: number) {
   const chain = SUPPORTED_CHAINS.find((supportedChain) => supportedChain.id === chainId);
 
+  if (!chain) {
+    throw new Error(`Unsupported chain: ${chainId}`);
+  }
+
   return createPublicClient({
     chain,
     transport: http(getRpcUrl(chainId)),
