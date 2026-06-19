@@ -2,7 +2,6 @@
 
 import { type ComponentProps, forwardRef, useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon } from "lucide-react";
 import { useDisconnect, useSwitchChain } from "wagmi";
@@ -59,31 +58,16 @@ function PopoverMenuButton({
   );
 }
 
-const CHAIN_LABELS: Record<number, string> = {
-  1: "Ethereum",
-  56: "BNB Chain",
-  137: "Polygon",
-  8453: "Base",
-  42161: "Arbitrum One",
-  59144: "Linea",
-  146: "Sonic",
-  1329: "Sei",
-  80094: "Berachain",
-  14: "Flare",
-  43114: "Avalanche",
-  747474: "Katana",
-  10: "Optimism",
-  5000: "Mantle",
-  999: "HyperEVM",
-  130: "Unichain",
-  196: "X Layer",
-  4326: "MegaETH",
-  10143: "Monad",
-};
+const CHAIN_LABELS = new Map(
+  [...MAIN_CHAINS, ...SPOT_CHAINS].map((chain) => [chain.id, chain.name]),
+);
+
+const formatChainSelectorLabel = (label: string) =>
+  label.replace(/\bchain\b/gi, "").replace(/\s{2,}/g, " ").trim() || label;
 
 const getChainLabel = (chainId?: number, fallback?: string) => {
-  if (!chainId) return fallback ?? "Network";
-  return CHAIN_LABELS[chainId] ?? fallback ?? "Network";
+  const label = chainId ? (CHAIN_LABELS.get(chainId) ?? fallback) : fallback;
+  return formatChainSelectorLabel(label ?? "Network");
 };
 
 const getChainIconUrl = (chainId?: number) => {
@@ -177,7 +161,7 @@ const ChainSelectorPopover = ({
       <PopoverContent
         align="end"
         drawerTitle="Select chain"
-        className="max-h-[min(520px,calc(100vh-96px))] w-[174px] overflow-y-auto rounded-[14px] border-primary/35 bg-popover/98 p-2"
+        className="max-h-[min(520px,calc(100vh-96px))] w-[224px] overflow-y-auto rounded-[14px] border-primary/35 bg-popover/98 p-2"
       >
         <div className="flex flex-col gap-1">
           {chainOptions.map((option) => {
@@ -195,7 +179,7 @@ const ChainSelectorPopover = ({
                 className={cn(selected && "text-primary")}
               >
                 <ChainIcon iconUrl={option.iconUrl} name={option.label} />
-                <span className="min-w-0 truncate">{option.label}</span>
+                <span className="whitespace-nowrap">{option.label}</span>
               </PopoverMenuButton>
             );
           })}
@@ -344,18 +328,18 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
           aria-label={`${brand.name} trading`}
         >
           {brand.logoSrc && (
-            <Image
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
               src={brand.logoSrc}
               alt={brand.logoAlt}
-              width={150}
-              height={50}
-              priority
-              className="h-7 w-auto object-contain sm:h-8"
+              className="h-7 w-auto object-contain sm:h-10"
             />
           )}
-          <span className="text-lg font-semibold tracking-normal text-foreground">
-            {brand.name}
-          </span>
+          {!brand.logoSrc && (
+            <span className="text-lg font-semibold tracking-normal text-foreground">
+              {brand.name}
+            </span>
+          )}
         </Link>
         <div className="order-1 flex w-full shrink-0 items-center justify-start gap-2 sm:order-none sm:ml-auto sm:w-auto">
           <NavWalletControls />

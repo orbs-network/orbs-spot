@@ -3,14 +3,14 @@ import type { PartnerConfig } from "./types";
 export const htDigitalPartner: PartnerConfig = {
   id: "ht-digital",
   brand: {
-    name: "HT Digital",
-    logoSrc: "/ht-digital-logo-mark.svg",
-    iconSrc: "/ht-digital-logo-mark.svg",
-    appleIconSrc: "/ht-digital-logo-mark.svg",
+    name: "ht.digital",
+    logoSrc: "/ht-digital.svg",
+    iconSrc: "/ht-digital-favicon.png",
+    appleIconSrc: "/ht-digital-favicon.png",
     logoAlt: "HT Digital",
     externalUrl: "https://www.ht.digital/",
     metadata: {
-      title: "HT Digital",
+      title: "ht.digital",
       description:
         "HT Digital is the leading onchain provider of financial audit, accounting, tax, advisory and operational services.",
       url: "https://www.ht.digital/",

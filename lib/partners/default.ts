@@ -7,6 +7,7 @@ export const defaultPartner: PartnerConfig = {
     iconSrc: "/favicon.ico",
     appleIconSrc: "/icon.png",
     logoAlt: "Agent Swap",
+    logoSrc:'https://www.orbs.com/assets/img/common/logo.svg',
     externalUrl: "https://www.orbs.com/",
     metadata: {
       title: "Agent Swap",

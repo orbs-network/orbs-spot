@@ -1,0 +1,403 @@
+"use client";
+
+import { SubmitSwapButton } from "@/components/submit-swap-button";
+import { SwapFlowLoader } from "@/components/swap-flow-loader";
+import { Button } from "@/components/ui/button";
+import { DetailRow } from "@/components/ui/detail-row";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { SwapFlowTokenLogo } from "@/components/ui/swap-flow-token-logo";
+import { Switch } from "@/components/ui/switch";
+import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
+import { useFormatNumber } from "@/lib/hooks/common";
+import { useCurrency } from "@/lib/hooks/use-currencies";
+import { useTranslations } from "@/lib/use-translations";
+import {
+  DISCLAIMER_URL,
+  isNativeAddress,
+  Module,
+  Steps,
+  SwapStatus,
+  useExplorerLink,
+  useNetwork,
+  useSpot,
+  type ParsedError,
+  type Token,
+} from "@orbs-network/spot-react";
+import { Step, SwapFlow } from "@orbs-network/swap-ui";
+import BN from "bignumber.js";
+import { AlertTriangleIcon } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useConnection } from "wagmi";
+import { formatDeadline, formatDuration, getOrderTitle } from "./utils";
+
+function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
+  const t = useTranslations();
+  const order = useSpot().derivedFormData;
+  const srcToken = order.srcToken;
+  const dstToken = order.dstToken;
+  const minReceived = useFormatNumber({
+    value: order.minDestAmountPerTradeUI,
+    decimalScale: 4,
+  });
+  const sizePerTrade = useFormatNumber({
+    value: order.sizePerTradeUI,
+  });
+  const triggerPrice = useFormatNumber({
+    value: order.triggerPriceUI,
+  });
+  const limitPrice = useFormatNumber({
+    value: order.limitPriceUI,
+  });
+  const feesUsd = useFormatNumber({ value: order.feesUsd, decimalScale: 2 });
+
+  return (
+    <div className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
+      <DetailRow label={t("orderType")} align="start">
+        {orderTitle}
+      </DetailRow>
+      <DetailRow
+        label={t("expirationLabel")}
+        tooltip={t("expirationTooltip")}
+        align="start"
+      >
+        {formatDeadline(order.deadline)}
+      </DetailRow>
+      <DetailRow
+        label={t("triggerPrice")}
+        tooltip={t("triggerPriceTooltip")}
+        hidden={BN(order.triggerPriceUI || 0).isZero()}
+        align="start"
+      >
+        1 {srcToken?.symbol} = {triggerPrice || "-"} {dstToken?.symbol}
+      </DetailRow>
+      <DetailRow
+        label={t("limitPrice")}
+        tooltip={t("limitPriceTooltip")}
+        hidden={BN(order.limitPriceUI || 0).isZero()}
+        align="start"
+      >
+        1 {srcToken?.symbol} = {limitPrice || "-"} {dstToken?.symbol}
+      </DetailRow>
+      <DetailRow
+        label={
+          order.totalTrades > 1 ? t("minReceivedPerTrade") : t("minReceived")
+        }
+        tooltip={t("minDstAmountTooltip")}
+        hidden={BN(order.minDestAmountPerTradeUI || 0).isZero()}
+        align="start"
+      >
+        {minReceived || "-"} {dstToken?.symbol}
+      </DetailRow>
+      <DetailRow
+        label={t("individualTradeSize")}
+        tooltip={t("tradeSizeTooltip")}
+        hidden={order.totalTrades <= 1}
+        align="start"
+      >
+        {sizePerTrade || "-"} {srcToken?.symbol}
+      </DetailRow>
+      <DetailRow
+        label={t("numberOfTrades")}
+        tooltip={t("totalTradesTooltip")}
+        hidden={order.totalTrades <= 1}
+        align="start"
+      >
+        {order.totalTrades}
+      </DetailRow>
+      <DetailRow
+        label={t("tradeIntervalLabel")}
+        tooltip={t("tradeIntervalTooltip")}
+        hidden={order.totalTrades <= 1}
+        align="start"
+      >
+        {formatDuration(order.tradeInterval)}
+      </DetailRow>
+      <DetailRow
+        label={t("fees", { value: `(${order.feesPercentage}%)` })}
+        hidden={!feesUsd}
+        align="start"
+      >
+        ${feesUsd}
+      </DetailRow>
+    </div>
+  );
+}
+
+function TxError({ error }: { error?: ParsedError }) {
+  return (
+    <div className="flex flex-col items-center gap-2 text-center">
+      <AlertTriangleIcon className="size-8 text-destructive" />
+      <h3 className="text-lg font-semibold">Transaction failed</h3>
+      {error?.code ? (
+        <p className="text-sm text-muted-foreground">
+          Error code: {error.code}
+        </p>
+      ) : null}
+      {error?.message ? (
+        <p className="max-h-28 overflow-auto text-sm text-muted-foreground">
+          {error.message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function useOrderStep(srcToken?: Token): Step | undefined {
+  const t = useTranslations();
+  const { step, wrapTxHash, approveTxHash, status } =
+    useSpot().orderExecutionPanel;
+  const network = useNetwork();
+  const wrapExplorerUrl = useExplorerLink(wrapTxHash);
+  const approveExplorerUrl = useExplorerLink(approveTxHash);
+  const symbol = isNativeAddress(srcToken?.address ?? "")
+    ? (network?.native?.symbol ?? srcToken?.symbol ?? "")
+    : (srcToken?.symbol ?? "");
+
+  return useMemo(() => {
+    if (step === Steps.WRAP) {
+      return {
+        title: t("wrapAction", { symbol }),
+        footerLink: wrapExplorerUrl,
+        footerText: wrapExplorerUrl
+          ? t("viewOnExplorer")
+          : t("proceedInWallet"),
+      };
+    }
+    if (step === Steps.APPROVE) {
+      return {
+        title: t("approveAction", { symbol }),
+        footerLink: approveExplorerUrl,
+        footerText: approveExplorerUrl
+          ? t("viewOnExplorer")
+          : t("proceedInWallet"),
+      };
+    }
+    return {
+      title: t("createOrder"),
+      footerText:
+        status === SwapStatus.LOADING ? t("proceedInWallet") : undefined,
+    };
+  }, [
+    approveExplorerUrl,
+    status,
+    step,
+    symbol,
+    t,
+    wrapExplorerUrl,
+  ]);
+}
+
+function OrderFlowMain({
+  orderTitle,
+  onSubmit,
+  isSubmitting,
+}: {
+  orderTitle: string;
+  onSubmit: () => void;
+  isSubmitting?: boolean;
+}) {
+  const t = useTranslations();
+  const [accepted, setAccepted] = useState(true);
+  const { status } = useSpot().orderExecutionPanel;
+  const isSubmitted = Boolean(status);
+
+  return (
+    <>
+      <SwapFlow.Main
+        fromTitle={t("from")}
+        toTitle={t("to")}
+        inUsd={<OrderUsd kind="src" />}
+        outUsd={<OrderUsd kind="dst" />}
+      />
+      {!isSubmitted && (
+        <div className="mt-3 flex w-full flex-col gap-3">
+          <OrderReviewDetails orderTitle={orderTitle} />
+          <div className="flex w-full items-center justify-between gap-3 rounded-[14px] bg-secondary/55 p-3">
+            <a
+              href={DISCLAIMER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="border-b border-muted-foreground/60 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+            >
+              Accept Disclaimer
+            </a>
+            <Switch
+              checked={accepted}
+              onCheckedChange={setAccepted}
+              aria-label="Accept order disclaimer"
+            />
+          </div>
+          <Button
+            data-submit-button
+            className="h-12 w-full rounded-[14px] text-base"
+            disabled={!accepted || isSubmitting}
+            isLoading={Boolean(isSubmitting)}
+            onClick={onSubmit}
+          >
+            Submit order
+          </Button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function OrderUsd({ kind }: { kind: "src" | "dst" }) {
+  const order = useSpot().derivedFormData;
+  const value = kind === "src" ? order.srcAmountUsd : order.dstAmountUsd;
+  const formatted = useFormatNumber({ value, decimalScale: 2 });
+  return <p className="text-sm text-muted-foreground">${formatted || "0"}</p>;
+}
+
+function OrderFlowSuccess({ orderTitle }: { orderTitle: string }) {
+  const t = useTranslations();
+
+  return (
+    <SwapFlow.Success
+      title={t("createOrderActionSuccess", { name: orderTitle })}
+    />
+  );
+}
+
+function SubmitOrderPanel({
+  orderTitle,
+  onSubmit,
+  isSubmitting,
+}: {
+  orderTitle: string;
+  onSubmit: () => void;
+  isSubmitting?: boolean;
+}) {
+  const { status, stepIndex, totalSteps, parsedError, srcToken, dstToken } =
+    useSpot().orderExecutionPanel;
+  const order = useSpot().derivedFormData;
+  const srcAmount = useFormatNumber({
+    value: order.srcAmountUI,
+    decimalScale: 4,
+  });
+  const dstAmount = useFormatNumber({
+    value: order.dstAmountUI,
+    decimalScale: 4,
+  });
+  const currentStep = useOrderStep(srcToken);
+  const inToken = useMemo(
+    () => ({ symbol: srcToken?.symbol, logoUrl: srcToken?.logoUrl }),
+    [srcToken],
+  );
+  const outToken = useMemo(
+    () => ({ symbol: dstToken?.symbol, logoUrl: dstToken?.logoUrl }),
+    [dstToken],
+  );
+  const srcCurrency = useCurrency(srcToken?.address);
+  const dstCurrency = useCurrency(dstToken?.address);
+  const tokenLogoClassName = status ? "size-[26px]" : "size-10";
+
+  return (
+    <SwapFlow
+      inAmount={srcAmount}
+      outAmount={dstAmount}
+      swapStatus={status}
+      totalSteps={totalSteps}
+      currentStep={currentStep}
+      currentStepIndex={stepIndex}
+      inToken={inToken}
+      outToken={outToken}
+      components={{
+        SrcTokenLogo: (
+          <SwapFlowTokenLogo
+            token={srcToken}
+            currency={srcCurrency}
+            className={tokenLogoClassName}
+          />
+        ),
+        DstTokenLogo: (
+          <SwapFlowTokenLogo
+            token={dstToken}
+            currency={dstCurrency}
+            className={tokenLogoClassName}
+          />
+        ),
+        Failed: <SwapFlow.Failed error={<TxError error={parsedError} />} />,
+        Success: <OrderFlowSuccess orderTitle={orderTitle} />,
+        Main: (
+          <OrderFlowMain
+            orderTitle={orderTitle}
+            onSubmit={onSubmit}
+            isSubmitting={isSubmitting}
+          />
+        ),
+        Loader: <SwapFlowLoader />,
+      }}
+    />
+  );
+}
+
+export function SubmitOrder({ orderModule }: { orderModule: Module }) {
+  const t = useTranslations();
+  const {
+    onSubmit,
+    status,
+    resetState,
+    resetCurrentSwap,
+    parsedError,
+    confirmButtonLoading,
+  } = useSpot().orderExecutionPanel;
+  const { disabled, loading } = useSpot().submitOrderButton;
+  const { setInputAmount } = useActionHandlers();
+  const { chainId } = useConnection();
+  const [open, setOpen] = useState(false);
+  const orderTitle = getOrderTitle(orderModule, t);
+
+  const onOpen = useCallback(() => {
+    setOpen(true);
+    if (status !== SwapStatus.LOADING) {
+      resetCurrentSwap();
+    }
+  }, [resetCurrentSwap, setOpen, status]);
+
+  const closeReview = useCallback(() => {
+    setOpen(false);
+    if (status === SwapStatus.SUCCESS) {
+      setInputAmount("");
+      window.setTimeout(resetState, 400);
+    } else if (status) {
+      window.setTimeout(resetCurrentSwap, 400);
+    }
+  }, [resetCurrentSwap, resetState, setInputAmount, setOpen, status]);
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => (nextOpen ? onOpen() : closeReview())}
+    >
+      <SubmitSwapButton
+        onClick={onOpen}
+        disabled={disabled}
+        isLoading={loading}
+        text={loading ? t("fetchingQuote") : t("placeOrder")}
+        validateSwap={false}
+        chainId={chainId}
+      />
+      <DialogContent
+        presentation="center"
+        className="w-[calc(100vw-1rem)] sm:max-w-[460px]"
+      >
+        <DialogHeader>
+          <DialogTitle>
+            {parsedError ? "Error Creating Order" : !status ? t("orderReview") : ''}
+          </DialogTitle>
+        </DialogHeader>
+        <SubmitOrderPanel
+          orderTitle={orderTitle}
+          onSubmit={onSubmit}
+          isSubmitting={confirmButtonLoading}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}

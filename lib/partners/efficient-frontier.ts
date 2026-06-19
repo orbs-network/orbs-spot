@@ -4,9 +4,9 @@ export const efficientFrontierPartner: PartnerConfig = {
   id: "efficient-frontier",
   brand: {
     name: "Efficient Frontier",
-    logoSrc: "/efficient-frontier-logo-mark-dark.png",
-    iconSrc: "/efficient-frontier-mark.png",
-    appleIconSrc: "/efficient-frontier-mark.png",
+    logoSrc: "/efficient-frontier-logo.avif",
+    iconSrc: "/efficient-frontier-favicon.png",
+    appleIconSrc: "/efficient-frontier-favicon.png",
     logoAlt: "Efficient Frontier",
     externalUrl: "https://efficientfrontier.io/",
     metadata: {
