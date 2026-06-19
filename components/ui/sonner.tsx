@@ -1,5 +1,6 @@
 "use client"
 
+import type { CSSProperties } from "react"
 import {
   CircleCheckIcon,
   InfoIcon,
@@ -8,6 +9,8 @@ import {
   TriangleAlertIcon,
 } from "lucide-react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+
+const TOAST_Z_INDEX = 100
 
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
@@ -31,12 +34,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "18px",
-        } as React.CSSProperties
+          zIndex: TOAST_Z_INDEX,
+        } as CSSProperties
       }
       toastOptions={{
         classNames: {
           toast:
-            "border-border/80 bg-popover/95 text-popover-foreground shadow-[0_18px_70px_rgba(0,0,0,0.46)] backdrop-blur-xl",
+            "border-border/80 bg-popover/95 text-popover-foreground backdrop-blur-xl",
           title: "font-semibold",
           description: "text-muted-foreground",
           actionButton:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { type ComponentProps, forwardRef, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -14,7 +14,50 @@ import type { PartnerBrand } from "@/lib/partners/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 const navPillClass =
-  "inline-flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3 text-sm font-semibold text-foreground shadow-[var(--nav-pill-shadow)] transition-colors hover:border-primary/30 hover:bg-[var(--nav-pill-hover-background)] focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:outline-none";
+  "inline-flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-[var(--nav-pill-hover-background)] focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:outline-none";
+
+const NavPillButton = forwardRef<HTMLButtonElement, ComponentProps<"button">>(
+  function NavPillButton({ children, className, ...props }, ref) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        className={cn(navPillClass, className)}
+        {...props}
+      >
+        {children}
+      </button>
+    );
+  },
+);
+
+function PopoverMenuButton({
+  children,
+  className,
+  size = "default",
+  tone = "default",
+  ...props
+}: ComponentProps<"button"> & {
+  size?: "default" | "large";
+  tone?: "default" | "destructive";
+}) {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex w-full items-center gap-3 rounded-[11px] px-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none",
+        size === "large" ? "h-12" : "h-11",
+        tone === "destructive"
+          ? "text-destructive hover:bg-destructive/8 focus-visible:bg-destructive/8"
+          : "text-foreground hover:bg-secondary/55 focus-visible:bg-secondary/55",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
 
 const CHAIN_LABELS: Record<number, string> = {
   1: "Ethereum",
@@ -109,10 +152,8 @@ const ChainSelectorPopover = ({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
+        <NavPillButton
           className={cn(
-            navPillClass,
             "pr-2.5",
             isWrongNetwork && "border-destructive/60 text-destructive",
           )}
@@ -131,34 +172,31 @@ const ChainSelectorPopover = ({
               open && "rotate-180",
             )}
           />
-        </button>
+        </NavPillButton>
       </PopoverTrigger>
       <PopoverContent
         align="end"
         drawerTitle="Select chain"
-        className="max-h-[min(520px,calc(100vh-96px))] w-[174px] overflow-y-auto rounded-[14px] border-primary/35 bg-popover/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.04)]"
+        className="max-h-[min(520px,calc(100vh-96px))] w-[174px] overflow-y-auto rounded-[14px] border-primary/35 bg-popover/98 p-2"
       >
         <div className="flex flex-col gap-1">
           {chainOptions.map((option) => {
             const selected = currentChainId === option.id && !isWrongNetwork;
             return (
-              <button
+              <PopoverMenuButton
                 key={option.id}
-                type="button"
+                size="large"
                 onClick={() => {
                   setOpen(false);
                   if (!selected) {
                     switchChain.mutate({ chainId: option.id });
                   }
                 }}
-                className={cn(
-                  "flex h-12 w-full items-center gap-3 rounded-[11px] px-3 text-left text-[12px] font-semibold text-foreground transition-colors hover:bg-secondary/55 focus-visible:bg-secondary/55 focus-visible:outline-none",
-                  selected && "text-primary",
-                )}
+                className={cn(selected && "text-primary")}
               >
                 <ChainIcon iconUrl={option.iconUrl} name={option.label} />
                 <span className="min-w-0 truncate">{option.label}</span>
-              </button>
+              </PopoverMenuButton>
             );
           })}
         </div>
@@ -169,7 +207,7 @@ const ChainSelectorPopover = ({
 
 const WalletAvatar = ({ label }: { label?: string }) => {
   return (
-    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--wallet-avatar-shadow)]">
+    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
       <WalletIcon className="size-3.5" />
       <span className="sr-only">{label ?? "Wallet"}</span>
     </span>
@@ -204,10 +242,7 @@ const WalletAccountPopover = ({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(navPillClass, "max-w-[138px] pr-2.5")}
-        >
+        <NavPillButton className="max-w-[138px] pr-2.5">
           <WalletAvatar label={displayName} />
           <span className="min-w-0 truncate">{displayName}</span>
           <ChevronDownIcon
@@ -216,30 +251,22 @@ const WalletAccountPopover = ({
               open && "rotate-180",
             )}
           />
-        </button>
+        </NavPillButton>
       </PopoverTrigger>
       <PopoverContent
         align="end"
         drawerTitle="Wallet menu"
-        className="w-[176px] rounded-[14px] border-primary/60 bg-popover/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.04)]"
+        className="w-[176px] rounded-[14px] border-primary/60 bg-popover/98 p-2"
       >
         <div className="flex flex-col gap-1">
-          <button
-            type="button"
-            onClick={() => void copyAddress()}
-            className="flex h-11 w-full items-center gap-3 rounded-[11px] px-3 text-left text-[11px] font-semibold text-foreground transition-colors hover:bg-secondary/55 focus-visible:bg-secondary/55 focus-visible:outline-none"
-          >
+          <PopoverMenuButton onClick={() => void copyAddress()}>
             <CopyIcon className="size-4 text-muted-foreground" />
             <span>Copy address</span>
-          </button>
-          <button
-            type="button"
-            onClick={disconnectWallet}
-            className="flex h-11 w-full items-center gap-3 rounded-[11px] px-3 text-left text-[11px] font-semibold text-destructive transition-colors hover:bg-destructive/8 focus-visible:bg-destructive/8 focus-visible:outline-none"
-          >
+          </PopoverMenuButton>
+          <PopoverMenuButton onClick={disconnectWallet} tone="destructive">
             <LogOutIcon className="size-4" />
             <span>Disconnect</span>
-          </button>
+          </PopoverMenuButton>
         </div>
       </PopoverContent>
     </Popover>
@@ -275,16 +302,12 @@ const NavWalletControls = () => {
 
         if (!connected) {
           return (
-            <button
-              type="button"
+            <NavPillButton
               onClick={openConnectModal}
-              className={cn(
-                navPillClass,
-                "bg-primary px-4 text-primary-foreground hover:bg-primary/74"
-              )}
+              className="bg-primary px-4 text-primary-foreground hover:bg-primary/74"
             >
               Connect Wallet
-            </button>
+            </NavPillButton>
           );
         }
 

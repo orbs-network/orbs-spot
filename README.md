@@ -18,6 +18,7 @@ Supported values:
 
 - `default`
 - `efficient-frontier`
+- `ht-digital`
 
 ## Build
 
@@ -28,7 +29,7 @@ yarn build
 ## Deploy
 
 The manual GitHub Actions workflow `.github/workflows/frontend-deploy.yml`
-deploys either `default` or `efficient-frontier` to Vercel.
+deploys `default`, `efficient-frontier`, `ht-digital`, or `all` to Vercel.
 
 Required repository/environment secrets:
 
@@ -36,5 +37,6 @@ Required repository/environment secrets:
 - `VERCEL_ORG_ID`
 - `VERCEL_PROJECT_ID_DEFAULT` or fallback `VERCEL_PROJECT_ID`
 - `VERCEL_PROJECT_ID_EFFICIENT_FRONTIER`
+- `VERCEL_PROJECT_ID_HT_DIGITAL`
 - `NEXT_PUBLIC_PROJECT_ID`
 - `RPC_URL`

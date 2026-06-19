@@ -1,15 +1,18 @@
 import { defaultPartner } from "./default";
 import { efficientFrontierPartner } from "./efficient-frontier";
+import { htDigitalPartner } from "./ht-digital";
 import type { PartnerConfig } from "./types";
 
 export type { PartnerConfig, PartnerStyles } from "./types";
 
 export const DEFAULT_PARTNER = "default";
 export const EFFICIENT_FRONTIER_PARTNER = "efficient-frontier";
+export const HT_DIGITAL_PARTNER = "ht-digital";
 
 export const PARTNERS = {
   [DEFAULT_PARTNER]: defaultPartner,
   [EFFICIENT_FRONTIER_PARTNER]: efficientFrontierPartner,
+  [HT_DIGITAL_PARTNER]: htDigitalPartner,
 } as const satisfies Record<string, PartnerConfig>;
 
 export type PartnerId = keyof typeof PARTNERS;
@@ -20,6 +23,10 @@ const PARTNER_ALIASES = {
   ef: EFFICIENT_FRONTIER_PARTNER,
   efficientfrontier: EFFICIENT_FRONTIER_PARTNER,
   "efficient-frontier": EFFICIENT_FRONTIER_PARTNER,
+  ht: HT_DIGITAL_PARTNER,
+  "ht.digital": HT_DIGITAL_PARTNER,
+  htdigital: HT_DIGITAL_PARTNER,
+  "ht-digital": HT_DIGITAL_PARTNER,
 } as const satisfies Record<string, PartnerId>;
 
 export function normalizePartnerId(value?: string) {

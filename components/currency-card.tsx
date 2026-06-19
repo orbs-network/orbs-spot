@@ -1,7 +1,6 @@
 "use client";
 import { Currency } from "@/lib/types";
 import { CurrencySelector } from "./currency-selector";
-import { ChevronDownIcon } from "lucide-react";
 import { NumericInput } from "./ui/numeric-input";
 import { useBalance } from "@/lib/hooks/use-balances";
 import { useCallback, useRef } from "react";
@@ -9,7 +8,8 @@ import BN from "bignumber.js";
 import { formatDecimals } from "@/lib/utils";
 import { USD } from "./ui/usd";
 import { Balance } from "./ui/balance";
-import { CurrencyLogo } from "./ui/currency-logo";
+import { TokenSelectorTrigger } from "./ui/token-selector-trigger";
+import { FormPanel } from "./ui/form-panel";
 
 type Props = {
   currency?: Currency;
@@ -24,13 +24,13 @@ type Props = {
 
 const CurrencySelectorTrigger = ({ currency }: { currency?: Currency }) => {
   return (
-    <div className="flex cursor-pointer items-center gap-1 rounded-full border border-border/80 bg-card px-2 py-1.5 shadow-[0_6px_20px_rgba(0,0,0,0.16)] transition-colors hover:border-primary/25 hover:bg-secondary/45">
-      <CurrencyLogo currency={currency} className="size-7 shrink-0" />
-      <p className="min-w-0 flex-1 truncate text-sm font-medium">
-        {currency?.symbol}
-      </p>
-      <ChevronDownIcon className="size-4 shrink-0" />
-    </div>
+    <TokenSelectorTrigger
+      currency={currency}
+      showChevron
+      className="gap-1 border border-border/80 bg-card px-2 py-1.5 hover:border-primary/25 hover:bg-secondary/45"
+      logoClassName="size-5"
+      symbolClassName="flex-1 text-[14px] font-medium"
+    />
   );
 };
 
@@ -79,7 +79,7 @@ const PercentageButtons = ({
       {PERCENTAGE_BUTTONS.map((button) => (
         <div
           key={button.value}
-          className="flex cursor-pointer items-center gap-1 rounded-xl border border-border/80 bg-card/80 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-primary/10 hover:text-foreground sm:text-xs"
+          className="flex cursor-pointer items-center gap-1 rounded-xl border border-border/80 bg-card/80 px-2.5 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-primary/10 hover:text-foreground sm:text-sm"
           onClick={() => onPercentageClick(button.value)}
         >
           {button.label}
@@ -125,8 +125,8 @@ export function CurrencyCard({
   );
   
   return (
-    <div
-      className="group relative flex min-w-0 flex-col gap-2 rounded-[18px] border border-border/70 bg-secondary/55 p-4 transition-colors hover:border-primary/35"
+    <FormPanel
+      className="group relative flex min-w-0 flex-col gap-2 bg-secondary/55 transition-colors hover:border-primary/35"
       onClick={focusAmountInputFromCardClick}
       onMouseEnter={focusAmountInput}
       onPointerEnter={focusAmountInput}
@@ -149,7 +149,7 @@ export function CurrencyCard({
           value={amount}
           onChange={onAmountChange ?? (() => {})}
           isLoading={isLoading}
-          className="min-w-0 text-[27px] font-medium"
+          className="min-w-0 text-[36px] font-medium leading-none"
         />
         <CurrencySelector
           onCurrencyChange={(currency: Currency) =>
@@ -171,6 +171,6 @@ export function CurrencyCard({
           onAmountChange={onAmountChange ?? (() => {})}
         />
       </div>
-    </div>
+    </FormPanel>
   );
 }

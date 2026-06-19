@@ -8,14 +8,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { DetailRow } from "@/components/ui/detail-row";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Spinner } from "@/components/ui/spinner";
+import { StyledSelect } from "@/components/ui/styled-select";
 import {
   Tooltip,
   TooltipContent,
@@ -45,7 +41,6 @@ import {
   ChevronRightIcon,
   ChevronUpIcon,
   CopyIcon,
-  InfoIcon,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
@@ -58,9 +53,7 @@ const ORDER_HISTORY_CLOSE_RESET_DELAY = 180;
 const ORDER_LIST_ITEM_ESTIMATED_HEIGHT = 92;
 const ORDER_LIST_MAX_HEIGHT = 560;
 const ORDER_LIST_MIN_HEIGHT = 118;
-const FILL_LIST_ITEM_ESTIMATED_HEIGHT = 132;
-const FILL_LIST_MAX_HEIGHT = 520;
-const FILL_LIST_MIN_HEIGHT = 140;
+const FILL_LIST_HEIGHT = "min(520px, 66dvh)";
 
 const ORDER_FILTER_OPTIONS = [
   OrderFilter.All,
@@ -300,7 +293,7 @@ function OrderListItem({
   );
 }
 
-function DetailRow({
+function OrderDetailRow({
   label,
   tooltip,
   value,
@@ -310,28 +303,14 @@ function DetailRow({
   value: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 text-sm">
-      <span className="flex min-w-0 items-center gap-1.5 text-foreground">
-        <span className="truncate">{label}</span>
-        {tooltip ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                aria-label={`${label} info`}
-                className="flex size-4 shrink-0 cursor-pointer items-center justify-center text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-              >
-                <InfoIcon className="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{tooltip}</TooltipContent>
-          </Tooltip>
-        ) : null}
-      </span>
-      <span className="min-w-0 truncate text-right font-medium text-foreground">
-        {value}
-      </span>
-    </div>
+    <DetailRow
+      label={label}
+      tooltip={tooltip}
+      value={value}
+      tone="foreground"
+      truncateLabel
+      truncateValue
+    />
   );
 }
 
@@ -461,19 +440,19 @@ function FillDetailCard({ fill }: { fill: DerivedHistoryFill }) {
 
   return (
     <div className="flex flex-col gap-1.5 rounded-[13px] border border-border/70 bg-secondary/30 px-4 py-3">
-      <DetailRow
+      <OrderDetailRow
         label={t("fillTimestamp")}
         value={formatDetailDate(fill.timestamp)}
       />
-      <DetailRow
+      <OrderDetailRow
         label={t("fillAmountOut")}
         value={formatTokenValue(fill.srcAmount, fill.srcToken?.symbol)}
       />
-      <DetailRow
+      <OrderDetailRow
         label={t("fillAmountReceived")}
         value={formatTokenValue(fill.dstAmount, fill.dstToken?.symbol)}
       />
-      <DetailRow
+      <OrderDetailRow
         label={t("fillTransactionHash")}
         value={
           explorerUrl && fill.txHash ? (
@@ -523,6 +502,25 @@ function DetailNavigationRow({
   );
 }
 
+function HistoryBackButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-border/70 bg-secondary/35 text-foreground transition-colors hover:border-primary/25 hover:bg-secondary/55"
+    >
+      <ArrowLeftIcon className="size-4" />
+    </button>
+  );
+}
+
 function OrderFillsView({
   onBack,
   order,
@@ -531,24 +529,11 @@ function OrderFillsView({
   order: DerivedHistoryOrder;
 }) {
   const t = useTranslations();
-  const fillsHeight = getVirtualListHeight(
-    order.fills.length,
-    FILL_LIST_ITEM_ESTIMATED_HEIGHT,
-    FILL_LIST_MAX_HEIGHT,
-    FILL_LIST_MIN_HEIGHT,
-  );
 
   return (
     <div className="flex flex-col px-5 pb-5 pt-5">
       <div className="mb-6 flex items-center gap-4 pr-8">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to order details"
-          className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-border/70 bg-secondary/35 text-foreground transition-colors hover:border-primary/25 hover:bg-secondary/55"
-        >
-          <ArrowLeftIcon className="size-4" />
-        </button>
+        <HistoryBackButton label="Back to order details" onClick={onBack} />
         <DialogTitle className="truncate text-[16px] font-semibold leading-none">
           {getOrderTypeLabel(order.orderType)} order fills
         </DialogTitle>
@@ -559,7 +544,7 @@ function OrderFillsView({
       {order.fills.length ? (
         <div
           className="overflow-hidden pr-1"
-          style={{ height: fillsHeight, maxHeight: "66dvh" }}
+          style={{ height: FILL_LIST_HEIGHT }}
         >
           <Virtuoso
             style={{ height: "100%" }}
@@ -575,9 +560,9 @@ function OrderFillsView({
           />
         </div>
       ) : (
-        <div className="flex min-h-[140px] items-center justify-center rounded-[13px] border border-dashed border-border/80 bg-secondary/20 px-4 text-center text-sm text-muted-foreground">
+        <EmptyState className="min-h-[140px] rounded-[13px] px-4 text-sm text-muted-foreground">
           {t("noFills")}
-        </div>
+        </EmptyState>
       )}
     </div>
   );
@@ -620,14 +605,7 @@ function SelectedOrderDetails({
   return (
     <div className="px-5 pb-5 pt-5">
       <div className="mb-6 flex items-center gap-4 pr-8">
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label="Back to orders"
-          className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-border/70 bg-secondary/35 text-foreground transition-colors hover:border-primary/25 hover:bg-secondary/55"
-        >
-          <ArrowLeftIcon className="size-4" />
-        </button>
+        <HistoryBackButton label="Back to orders" onClick={onBack} />
         <DialogTitle className="truncate text-[16px] font-semibold leading-none">
           {t("orderDetails")}
         </DialogTitle>
@@ -646,11 +624,11 @@ function SelectedOrderDetails({
           }
           title="Execution summary"
         >
-          <DetailRow
+          <OrderDetailRow
             label={t("status")}
             value={getOrderStatusTitle(order.original.status)}
           />
-          <DetailRow
+          <OrderDetailRow
             label={t("amountOut")}
             value={formatTokenValue(
               order.amountInFilledUI,
@@ -658,7 +636,7 @@ function SelectedOrderDetails({
             )}
           />
           {order.amountOutFilled ? (
-            <DetailRow
+            <OrderDetailRow
               label={t("amountReceived")}
               value={formatTokenValue(
                 order.amountOutFilledUI,
@@ -666,12 +644,12 @@ function SelectedOrderDetails({
               )}
             />
           ) : null}
-          <DetailRow
+          <OrderDetailRow
             label={t("progress")}
             value={`${formatDisplayNumber(progress, 2)}%`}
           />
           {order.executionPrice ? (
-            <DetailRow
+            <OrderDetailRow
               label={t(
                 order.original.totalTradesAmount === 1
                   ? "finalExecutionPrice"
@@ -693,26 +671,26 @@ function SelectedOrderDetails({
           }
           title={t("orderInfo")}
         >
-          <DetailRow
+          <OrderDetailRow
             label={t("orderType")}
             value={getOrderTypeLabel(order.orderType)}
           />
           <OrderIdRow id={order.id} />
-          <DetailRow
+          <OrderDetailRow
             label={t("createdAt")}
             value={formatDetailDate(order.createdAt)}
           />
-          <DetailRow
+          <OrderDetailRow
             label={t("expirationLabel")}
             tooltip={t("expirationTooltip")}
             value={formatDetailDate(order.deadline)}
           />
-          <DetailRow
+          <OrderDetailRow
             label={t("amountOut")}
             value={formatTokenValue(order.srcAmountUI, order.srcToken?.symbol)}
           />
           {!isZeroValue(order.minDestAmountPerTradeUI) ? (
-            <DetailRow
+            <OrderDetailRow
               label={t("minReceivedPerTrade")}
               tooltip={t("minDstAmountTooltip")}
               value={formatTokenValue(
@@ -723,12 +701,12 @@ function SelectedOrderDetails({
           ) : null}
           {(order.totalTrades || 1) > 1 ? (
             <>
-              <DetailRow
+              <OrderDetailRow
                 label={t("numberOfTrades")}
                 tooltip={t("totalTradesTooltip")}
                 value={String(order.totalTrades)}
               />
-              <DetailRow
+              <OrderDetailRow
                 label={t("individualTradeSize")}
                 tooltip={t("tradeSizeTooltip")}
                 value={formatTokenValue(
@@ -736,7 +714,7 @@ function SelectedOrderDetails({
                   order.srcToken?.symbol,
                 )}
               />
-              <DetailRow
+              <OrderDetailRow
                 label={t("tradeIntervalLabel")}
                 tooltip={t("tradeIntervalTooltip")}
                 value={formatDuration(order.tradeInterval)}
@@ -744,7 +722,7 @@ function SelectedOrderDetails({
             </>
           ) : null}
           {!isZeroValue(order.triggerPriceUI) ? (
-            <DetailRow
+            <OrderDetailRow
               label={t("triggerPrice")}
               tooltip={t("triggerPriceTooltip")}
               value={formatPriceValue(
@@ -755,7 +733,7 @@ function SelectedOrderDetails({
             />
           ) : null}
           {order.limitPriceUI ? (
-            <DetailRow
+            <OrderDetailRow
               label={t("limitPrice")}
               tooltip={t("limitPriceTooltip")}
               value={formatPriceValue(
@@ -779,7 +757,7 @@ function SelectedOrderDetails({
             onClick={() => void cancelOrder()}
             isLoading={isCancelling}
             disabled={isCancelling}
-            className="mt-1 h-12 w-full rounded-[6px] border border-red-400/30 bg-red-500/15 text-base font-semibold text-red-200 shadow-none transition-colors hover:bg-red-500/20"
+            className="mt-1 h-12 w-full rounded-[6px] border border-red-400/30 bg-red-500/15 text-base font-semibold text-red-200 transition-colors hover:bg-red-500/20"
           >
             {t("cancelOrder")}
           </Button>
@@ -797,18 +775,18 @@ function OrderHistoryEmpty({
   selectedFilter: OrderFilter;
 }) {
   return (
-    <div className="flex min-h-[320px] flex-col items-center justify-center rounded-[18px] border border-dashed border-border/80 bg-secondary/20 px-6 text-center">
-      <p className="text-base font-semibold text-foreground">
-        {hasWallet
+    <EmptyState
+      title={
+        hasWallet
           ? `No ${getOrderFilterLabel(selectedFilter).toLowerCase()} orders`
-          : "Connect wallet to view orders"}
-      </p>
-      <p className="mt-2 max-w-[256px] text-sm text-muted-foreground">
-        {hasWallet
+          : "Connect wallet to view orders"
+      }
+      description={
+        hasWallet
           ? "Your order history will appear here after you create an order."
-          : "Order history is loaded from the connected wallet on the selected network."}
-      </p>
-    </div>
+          : "Order history is loaded from the connected wallet on the selected network."
+      }
+    />
   );
 }
 
@@ -873,7 +851,7 @@ export function OrderHistoryModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         presentation="center"
-        className="w-[calc(100vw-1.5rem)] max-w-[560px] gap-0 overflow-y-auto rounded-[22px] border-border/80 p-0 shadow-[0_24px_90px_rgba(0,0,0,0.5)]"
+        className="w-[calc(100vw-1.5rem)] max-w-[560px] gap-0 overflow-y-auto rounded-[22px] border-border/80 p-0"
       >
         {selectedOrder ? (
           <SelectedOrderDetails
@@ -891,27 +869,16 @@ export function OrderHistoryModal({
             </DialogHeader>
 
             <div className="flex flex-col gap-4 px-5 pb-5">
-              <Select
-                value={selectedFilter}
-                onValueChange={(value) =>
-                  setSelectedFilter(value as OrderFilter)
-                }
-              >
-                <SelectTrigger className="h-10 w-full rounded-[13px] border-border/70 bg-secondary/35 px-3 text-sm font-medium text-foreground shadow-none transition-colors hover:border-primary/35 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 sm:w-[144px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-[14px] border-border/80 bg-popover p-1 shadow-[0_18px_70px_rgba(0,0,0,0.45)]">
-                  {ORDER_FILTER_OPTIONS.map((filter) => (
-                    <SelectItem
-                      key={filter}
-                      value={filter}
-                      className="h-10 rounded-[11px] text-muted-foreground hover:bg-secondary/45 hover:text-foreground focus:bg-secondary/45 focus:text-foreground data-[state=checked]:bg-primary/14 data-[state=checked]:text-foreground"
-                    >
-                      {getOrderFilterLabel(filter)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="sm:w-[144px]">
+                <StyledSelect
+                  value={selectedFilter}
+                  onValueChange={setSelectedFilter}
+                  options={ORDER_FILTER_OPTIONS.map((filter) => ({
+                    label: getOrderFilterLabel(filter),
+                    value: filter,
+                  }))}
+                />
+              </div>
 
               {loading && !filteredOrders.length ? (
                 <div className="flex min-h-[320px] items-center justify-center">

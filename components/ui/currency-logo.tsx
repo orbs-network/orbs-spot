@@ -25,8 +25,31 @@ const TOKEN_LOGO_SYMBOL_ALIASES: Record<string, string> = {
   WMATIC: "MATIC",
 };
 
+const TOKEN_LOGO_NAME_HINTS = [
+  "USDT",
+  "USDC",
+  "DAI",
+  "WETH",
+  "WBTC",
+  "WBNB",
+  "ETH",
+  "BTC",
+  "BNB",
+  "MATIC",
+  "POL",
+  "AVAX",
+  "SOL",
+] as const;
+
 function normalizeLogoSymbol(symbol?: string) {
   return (symbol ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+function stripSymbolPrefix(symbol?: string) {
+  const text = symbol?.trim() ?? "";
+  const [, ...withoutPrefix] = text.split("-");
+
+  return withoutPrefix.length ? withoutPrefix.join("-") : text;
 }
 
 function getLogoAlias(symbol: string) {
@@ -37,16 +60,52 @@ function getLogoAlias(symbol: string) {
   return multiplierMatch?.[1];
 }
 
-function uniqueLogoUrls(urls: Array<string | undefined>) {
-  return [...new Set(urls.filter((url): url is string => Boolean(url)))];
+function getNameLogoHint(name?: string) {
+  const normalizedName = normalizeLogoSymbol(name);
+
+  return TOKEN_LOGO_NAME_HINTS.find((hint) => normalizedName.includes(hint));
 }
 
-function getFallbackLogoUrls(symbol?: string) {
-  const normalizedSymbol = normalizeLogoSymbol(symbol);
-  if (!normalizedSymbol) return [];
+function isCoinGeckoLogoUrl(url?: string) {
+  if (!url) return false;
 
-  const alias = getLogoAlias(normalizedSymbol);
-  const lookupSymbols = alias ? [alias, normalizedSymbol] : [normalizedSymbol];
+  try {
+    return new URL(url).hostname.toLowerCase().includes("coingecko");
+  } catch {
+    return url.toLowerCase().includes("coingecko");
+  }
+}
+
+function uniqueLogoUrls(urls: Array<string | undefined>) {
+  return [
+    ...new Set(
+      urls.filter(
+        (url): url is string => Boolean(url) && !isCoinGeckoLogoUrl(url),
+      ),
+    ),
+  ];
+}
+
+function uniqueLogoSymbols(symbols: Array<string | undefined>) {
+  return [
+    ...new Set(symbols.map(normalizeLogoSymbol).filter(Boolean)),
+  ];
+}
+
+function getFallbackLogoUrls(symbol?: string, name?: string) {
+  const normalizedSymbols = uniqueLogoSymbols([
+    getNameLogoHint(name),
+    stripSymbolPrefix(symbol),
+    symbol,
+  ]);
+  const lookupSymbols = [
+    ...new Set(
+      normalizedSymbols.flatMap((lookupSymbol) => {
+        const alias = getLogoAlias(lookupSymbol);
+        return alias ? [alias, lookupSymbol] : [lookupSymbol];
+      }),
+    ),
+  ];
 
   return lookupSymbols.flatMap((lookupSymbol) => [
     `https://intentx-cdn.fra1.cdn.digitaloceanspaces.com/coins/${lookupSymbol.toLowerCase()}.png`,
@@ -97,8 +156,12 @@ export function CurrencyLogo({
   const displaySymbol = symbol ?? currency?.symbol ?? "";
   const displayName = name ?? currency?.name ?? displaySymbol;
   const logoSources = useMemo(
-    () => uniqueLogoUrls([logoUrl ?? currency?.logoUrl, ...getFallbackLogoUrls(displaySymbol)]),
-    [currency?.logoUrl, displaySymbol, logoUrl]
+    () =>
+      uniqueLogoUrls([
+        logoUrl ?? currency?.logoUrl,
+        ...getFallbackLogoUrls(displaySymbol, displayName),
+      ]),
+    [currency?.logoUrl, displayName, displaySymbol, logoUrl]
   );
   const logoSourcesKey = logoSources.join("\n");
   const [failedState, setFailedState] = useState<{

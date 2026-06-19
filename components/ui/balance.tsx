@@ -20,7 +20,7 @@ export const Balance = ({
         {isLoading ? (
           <Skeleton className="h-4 w-[40px]" />
         ) : (
-          <p className="max-w-full truncate text-right text-[12px] font-medium text-muted-foreground">
+          <p className="max-w-full truncate text-right text-sm font-medium text-muted-foreground">
             {formatted} {currency?.symbol}
           </p>
         )}

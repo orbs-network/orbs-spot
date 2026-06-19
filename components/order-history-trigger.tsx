@@ -15,12 +15,12 @@ export function OrderHistoryTrigger({ onOpen }: { onOpen: () => void }) {
         <Button
           type="button"
           variant="outline"
-          size="icon"
           aria-label="Open order history"
           onClick={onOpen}
-          className="size-11 shrink-0 rounded-[12px] border-border/70 bg-secondary/35 text-muted-foreground shadow-none transition-colors hover:border-primary/25 hover:bg-secondary/40 hover:text-foreground"
+          className="h-10 shrink-0 gap-2 rounded-[12px] border-border/70 bg-secondary/35 px-3 text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/25 hover:bg-secondary/40 hover:text-foreground"
         >
           <HistoryIcon className="size-4" />
+          <span>Orders</span>
         </Button>
       </TooltipTrigger>
       <TooltipContent>View order history</TooltipContent>

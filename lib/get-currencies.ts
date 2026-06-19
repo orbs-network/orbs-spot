@@ -89,7 +89,7 @@ export const getCurrencies = async (
           address: getAddress(token.address!),
           symbol: token.symbol!,
           decimals: token.decimals!,
-          logoUrl: token.logoURI ?? "",
+          logoUrl: "",
           name: token.name!,
         }))
     );

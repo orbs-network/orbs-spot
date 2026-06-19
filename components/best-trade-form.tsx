@@ -6,7 +6,7 @@ import { SubmitSwapButton } from "./submit-swap-button";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { Step, SwapFlow, SwapStatus, Token } from "@orbs-network/swap-ui";
-import { ReactNode, useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useFormatNumber, useToAmountUI } from "@/lib/hooks/common";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
 import { Field, SwapStep } from "@/lib/types";
@@ -15,11 +15,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import BN from "bignumber.js";
 import { dynamicDecimals, getExplorerUrl } from "@/lib/utils";
 import { useConnection } from "wagmi";
-import { CurrencyLogo } from "./ui/currency-logo";
 import { useTranslations } from "@/lib/use-translations";
 import { SettingsModal } from "./settings-modal";
 import { FormActionPanel } from "./form-action-panel";
 import { SwapFlowLoader } from "./swap-flow-loader";
+import { DetailRow } from "./ui/detail-row";
+import { SwapFlowTokenLogo } from "./ui/swap-flow-token-logo";
 
 const useStep = () => {
   const currentStep = useBestTradeSwapStore((state) => state.currentStep);
@@ -44,25 +45,6 @@ const useStep = () => {
   }, [currentStep]);
 };
 
-const TokenLogo = ({ token }: { token: Token }) => {
-  return (
-    <CurrencyLogo
-      symbol={token.symbol}
-      logoUrl={token.logoUrl}
-      className="token-logo"
-    />
-  );
-};
-
-const Detail = ({ title, value }: { title: string; value: ReactNode }) => {
-  return (
-    <div className="flex  gap-2 items-center justify-between w-full">
-      <p className="text-sm font-medium">{title}</p>
-      <div className="text-sm">{value}</div>
-    </div>
-  );
-};
-
 const formatSafeFixed = (value: BN, decimals = 2) => {
   if (!value.isFinite() || value.isNaN()) return "0.00";
   return value.toFixed(decimals);
@@ -80,7 +62,14 @@ const NetworkCost = () => {
     token: outputCurrency?.address,
     amount: amount,
   });
-  return <Detail title="Network Cost" value={`$${usd.formatted ?? "0"}`} />;
+  return (
+    <DetailRow
+      label="Network Cost"
+      value={`$${usd.formatted ?? "0"}`}
+      labelClassName="font-medium text-foreground"
+      valueClassName="font-normal text-foreground"
+    />
+  );
 };
 
 const PriceImpact = () => {
@@ -107,7 +96,14 @@ const PriceImpact = () => {
     );
   }, [outputUsd.data, inputUsd.data]);
 
-  return <Detail title="Price Impact" value={`${priceImpactText}%`} />;
+  return (
+    <DetailRow
+      label="Price Impact"
+      value={`${priceImpactText}%`}
+      labelClassName="font-medium text-foreground"
+      valueClassName="font-normal text-foreground"
+    />
+  );
 };
 
 const Rate = () => {
@@ -126,11 +122,11 @@ const Rate = () => {
   }, [outputAmount, inputAmount]);
 
   return (
-    <Detail
-      title="Rate"
-      value={`1 ${inputCurrency?.symbol} = ${rateText} ${
-        outputCurrency?.symbol
-      }`}
+    <DetailRow
+      label="Rate"
+      value={`1 ${inputCurrency?.symbol} = ${rateText} ${outputCurrency?.symbol}`}
+      labelClassName="font-medium text-foreground"
+      valueClassName="font-normal text-foreground"
     />
   );
 };
@@ -140,9 +136,11 @@ const MinimumAmountOut = () => {
   const amount = useToAmountUI(outputCurrency?.decimals, trade?.minAmountOut);
   const formatted = useFormatNumber({ value: amount });
   return (
-    <Detail
-      title="Minimum Amount Out"
+    <DetailRow
+      label="Minimum Amount Out"
       value={`${formatted ?? "0"} ${outputCurrency?.symbol}`}
+      labelClassName="font-medium text-foreground"
+      valueClassName="font-normal text-foreground"
     />
   );
 };
@@ -202,8 +200,8 @@ const SwapReviewContent = ({
         inToken={inToken}
         outToken={outToken}
         components={{
-          SrcTokenLogo: <TokenLogo token={inToken} />,
-          DstTokenLogo: <TokenLogo token={outToken} />,
+          SrcTokenLogo: <SwapFlowTokenLogo token={inToken} />,
+          DstTokenLogo: <SwapFlowTokenLogo token={outToken} />,
           Failed: <SwapFlow.Failed />,
           Success: <Success />,
           Main: <Main />,

@@ -11,19 +11,24 @@ on:
         options:
           - default
           - efficient-frontier
+          - ht-digital
+          - all
 
 permissions:
   contents: read
 
-concurrency:
-  group: frontend-deploy-${{ inputs.frontend_project }}
-  cancel-in-progress: false
-
 jobs:
   deploy:
-    name: Build & Deploy ${{ inputs.frontend_project }} to Vercel
+    name: Build & Deploy ${{ matrix.frontend_project }} to Vercel
     runs-on: ubuntu-latest
     environment: production
+    concurrency:
+      group: frontend-deploy-${{ matrix.frontend_project }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        frontend_project: ${{ fromJSON(inputs.frontend_project == 'all' && '["default","efficient-frontier","ht-digital"]' || format('["{0}"]', inputs.frontend_project)) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -43,9 +48,10 @@ jobs:
 
       - name: Resolve deploy target
         env:
-          FRONTEND_PROJECT: ${{ inputs.frontend_project }}
+          FRONTEND_PROJECT: ${{ matrix.frontend_project }}
           VERCEL_PROJECT_ID_DEFAULT: ${{ secrets.VERCEL_PROJECT_ID_DEFAULT || secrets.VERCEL_PROJECT_ID }}
           VERCEL_PROJECT_ID_EFFICIENT_FRONTIER: ${{ secrets.VERCEL_PROJECT_ID_EFFICIENT_FRONTIER }}
+          VERCEL_PROJECT_ID_HT_DIGITAL: ${{ secrets.VERCEL_PROJECT_ID_HT_DIGITAL }}
         run: |
           set -euo pipefail
 
@@ -57,6 +63,10 @@ jobs:
             efficient-frontier)
               next_partner="efficient-frontier"
               project_id="$VERCEL_PROJECT_ID_EFFICIENT_FRONTIER"
+              ;;
+            ht-digital)
+              next_partner="ht-digital"
+              project_id="$VERCEL_PROJECT_ID_HT_DIGITAL"
               ;;
             *)
               echo "Unknown frontend project: $FRONTEND_PROJECT" >&2

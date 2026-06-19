@@ -7,14 +7,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
-import { InfoIcon, PencilIcon, XIcon } from "lucide-react";
+import { PencilIcon, XIcon } from "lucide-react";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { NumericInput } from "./ui/numeric-input";
 import { DEFAULT_PRICE_PROTECTION, DEFAULT_SLIPPAGE } from "@/lib/consts";
 import { cn } from "@/lib/utils";
 import { useIsSpotTab } from "@/lib/hooks/use-form-tab";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import type { PercentSettingMode } from "@/lib/hooks/store";
+import { SegmentedTabs } from "./ui/tabs";
+import { InfoTooltip } from "./ui/form-label";
+import { FormNumberField } from "./ui/form-number-field";
 
 const SLIPPAGE_PRESETS = [0.1, 0.5, 1] as const;
 const PRICE_PROTECTION_PRESETS = [1, 3, 5] as const;
@@ -36,20 +38,7 @@ const SettingsHeader = ({
         <DialogTitle className="text-[16px] font-semibold leading-none tracking-normal sm:text-[18px]">
           {title}
         </DialogTitle>
-        {tooltip && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                type="button"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-                aria-label={`${title} info`}
-              >
-                <InfoIcon className="size-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>{tooltip}</TooltipContent>
-          </Tooltip>
-        )}
+        <InfoTooltip tooltip={tooltip} ariaLabel={`${title} info`} />
       </div>
       <DialogClose asChild>
         <button
@@ -73,6 +62,7 @@ const formatInlinePercent = (value: number) => {
   if (Number.isInteger(value)) return value.toString();
   return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 };
+type PercentTabValue = "auto" | number;
 
 const PercentSettings = ({
   defaultValue,
@@ -89,60 +79,45 @@ const PercentSettings = ({
 }) => {
   const isAuto = mode === "auto";
   const selectedPresetIndex = presets.findIndex((preset) => value === preset);
-  const activeIndex = isAuto
-    ? 0
+  const selectedTabValue: PercentTabValue | undefined = isAuto
+    ? "auto"
     : selectedPresetIndex >= 0
-      ? selectedPresetIndex + 1
-      : -1;
+      ? presets[selectedPresetIndex]
+      : undefined;
+  const tabOptions: Array<{ value: PercentTabValue; label: string }> = [
+    { value: "auto", label: "Auto" },
+    ...presets.map((preset) => ({
+      value: preset,
+      label: `${formatPreset(preset)}%`,
+    })),
+  ];
 
   return (
     <div className="px-5 py-5 sm:px-6">
-      <div className="flex min-h-[46px] w-full flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative grid flex-1 grid-cols-4 overflow-hidden rounded-[12px] border border-border/45 bg-secondary/25 p-1">
-          <div
-            aria-hidden="true"
-            className={cn(
-              "absolute inset-y-1 left-1 z-0 rounded-[10px] bg-primary shadow-[var(--button-primary-shadow)] transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-              activeIndex < 0 && "opacity-0",
-            )}
-            style={{
-              width: "calc((100% - 0.5rem) / 4)",
-              transform: `translateX(${Math.max(activeIndex, 0) * 100}%)`,
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => onChange(defaultValue, "auto")}
-            className={cn(
-              "relative z-10 h-10 rounded-[10px] px-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-white/3 hover:text-foreground sm:text-[12px]",
-              isAuto && "text-primary-foreground hover:text-primary-foreground",
-            )}
-          >
-            Auto
-          </button>
-          {presets.map((preset) => {
-            const selected = !isAuto && value === preset;
-            return (
-              <button
-                key={preset}
-                type="button"
-                onClick={() => onChange(preset, "custom")}
-                className={cn(
-                  "relative z-10 h-10 rounded-[10px] px-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-white/3 hover:text-foreground sm:text-[12px]",
-                  selected &&
-                    "text-primary-foreground hover:text-primary-foreground",
-                )}
-              >
-                {formatPreset(preset)}%
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex h-10 w-full items-center rounded-[12px] border border-border/80 px-3 transition-colors focus-within:border-primary sm:w-[114px]">
+      <div className="flex h-[42px] w-full flex-col gap-3 sm:flex-row sm:items-center">
+        <SegmentedTabs
+          aria-label="Preset percentage"
+          value={selectedTabValue}
+          options={tabOptions}
+          onValueChange={(nextValue) => {
+            if (nextValue === "auto") {
+              onChange(defaultValue, "auto");
+              return;
+            }
+
+            onChange(nextValue, "custom");
+          }}
+          className="h-full flex-1 rounded-[12px] border border-border/45 bg-secondary/25 p-1"
+          indicatorClassName="rounded-[10px] bg-primary"
+          tabClassName="rounded-[10px] px-2 text-sm font-semibold transition-colors"
+          selectedTabClassName="text-primary-foreground hover:text-primary-foreground"
+          unselectedTabClassName="text-muted-foreground hover:bg-white/3 hover:text-foreground"
+        />
+        <FormNumberField className="h-full w-full rounded-[12px] px-3 sm:w-[114px]">
           <NumericInput
             value={value ? value.toString() : ""}
             onChange={(nextValue) => onChange(Number(nextValue), "custom")}
-            className="text-center text-lg font-semibold"
+            className="text-center text-[16px] font-semibold"
             placeholder={formatPlaceholder(defaultValue)}
             decimalScale={2}
           />
@@ -150,7 +125,7 @@ const PercentSettings = ({
           <span className="text-sm font-semibold text-muted-foreground">
             %
           </span>
-        </div>
+        </FormNumberField>
       </div>
     </div>
   );
@@ -216,23 +191,12 @@ const SettingsInlineTrigger = ({
       <div className="flex min-w-0 items-center gap-2">
         <span
           className={cn(
-            "font-semibold leading-none text-muted-foreground text-[14px]",
+            "text-base font-semibold leading-none text-muted-foreground",
           )}
         >
           {label}
         </span>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              className="text-muted-foreground transition-colors hover:text-foreground"
-              aria-label={`${label} info`}
-            >
-              <InfoIcon className="size-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{tooltip}</TooltipContent>
-        </Tooltip>
+        <InfoTooltip tooltip={tooltip} ariaLabel={`${label} info`} />
       </div>
       <DialogTrigger asChild>
         <button
@@ -241,7 +205,7 @@ const SettingsInlineTrigger = ({
           className={cn(
             "inline-flex shrink-0 items-center gap-2 rounded-[14px] bg-primary/14 font-semibold leading-none text-primary transition-colors hover:bg-primary/16 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none",
             isActionVariant ? "h-10 px-3.5" : "h-10 px-4",
-            isActionVariant ? "text-[12px]" : "text-[12px]",
+            "text-sm",
           )}
         >
           {displayValue}

@@ -2,6 +2,7 @@
 "use client";
 
 import { CurrencyCard } from "@/components/currency-card";
+import { CurrencySelector } from "@/components/currency-selector";
 import { FormActionPanel } from "@/components/form-action-panel";
 import { SubmitSwapButton } from "@/components/submit-swap-button";
 import { SettingsModal } from "@/components/settings-modal";
@@ -9,27 +10,22 @@ import { ToggleCurrencies } from "@/components/toggle-currencies";
 import { OrderHistoryModal } from "@/components/order-history-modal";
 import { SwapFlowLoader } from "@/components/swap-flow-loader";
 import { Button } from "@/components/ui/button";
-import { CurrencyLogo } from "@/components/ui/currency-logo";
+import { DetailRow } from "@/components/ui/detail-row";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FormLabel } from "@/components/ui/form-label";
+import { FormNumberField } from "@/components/ui/form-number-field";
+import { FormPanel } from "@/components/ui/form-panel";
+import { InlineMessage } from "@/components/ui/inline-message";
 import { NumericInput } from "@/components/ui/numeric-input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { StyledSelect } from "@/components/ui/styled-select";
+import { SwapFlowTokenLogo } from "@/components/ui/swap-flow-token-logo";
 import { Switch } from "@/components/ui/switch";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { TokenSelectorTrigger } from "@/components/ui/token-selector-trigger";
 import TokensPair from "@/components/tokens-pair";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import {
@@ -503,115 +499,6 @@ function useSpotCallbacks() {
   return callbacks;
 }
 
-function Panel({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-[18px] border border-border/70 bg-secondary/45 p-4",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}
-
-function Label({
-  children,
-  hint,
-  tooltip,
-}: {
-  children: ReactNode;
-  hint?: ReactNode;
-  tooltip?: string;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <p className="text-[14px] font-medium text-muted-foreground">{children}</p>
-      <SpotTooltip tooltipText={tooltip} />
-      {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
-    </div>
-  );
-}
-
-function SpotTooltip({
-  children,
-  tooltipText,
-}: {
-  children?: ReactNode;
-  tooltipText?: string;
-}) {
-  if (!tooltipText) return null;
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          className="text-muted-foreground transition-colors hover:text-foreground"
-          aria-label="More information"
-        >
-          {children ?? <InfoIcon className="size-4" />}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{tooltipText}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-function AppSelect<T extends number>({
-  value,
-  onChange,
-  items,
-  triggerClassName,
-}: {
-  value: T;
-  onChange: (value: T) => void;
-  items: readonly { text: string; value: T }[];
-  triggerClassName?: string;
-}) {
-  return (
-    <Select
-      value={String(value)}
-      onValueChange={(nextValue) => {
-        const item = items.find(
-          (option) => String(option.value) === nextValue,
-        );
-
-        if (item) {
-          onChange(item.value);
-        }
-      }}
-    >
-      <SelectTrigger
-        className={cn(
-          "h-11 min-w-[93px] rounded-[14px] border-border/80 bg-transparent px-3 text-[13px] font-medium text-foreground shadow-none transition-colors hover:border-primary/50 hover:bg-transparent focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 dark:bg-transparent dark:hover:bg-transparent",
-          triggerClassName,
-        )}
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent className="rounded-[14px] border-border/80 bg-popover p-1 gap-1">
-        {items.map((item) => (
-          <SelectItem
-            key={item.value}
-            value={String(item.value)}
-            className="h-10 rounded-[11px] text-muted-foreground hover:bg-secondary/45 hover:text-foreground focus:bg-secondary/45 focus:text-foreground data-[state=checked]:bg-primary/14 data-[state=checked]:text-foreground"
-          >
-            {item.text}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
 function TokenPanel({ isSource }: { isSource: boolean }) {
   const t = useTranslations();
   const { inputCurrency, outputCurrency, inputAmount } = useDerivedSwap();
@@ -666,41 +553,46 @@ function OrderNumericInputPanel<TUnit extends number>({
   const hasUnitSelect = unit !== undefined && unitOptions && onUnitChange;
 
   return (
-    <Panel
+    <FormPanel
+      variant="muted"
       className={cn(
-        "flex flex-col justify-between gap-3 bg-secondary/35",
+        "flex flex-col justify-between gap-3",
         Boolean(error) && "border-destructive/70",
       )}
     >
       <div className="flex items-start justify-between gap-4">
-        <Label tooltip={tooltip}>{title}</Label>
+        <FormLabel tooltip={tooltip}>{title}</FormLabel>
         {rightHint ? (
-          <p className="text-right text-[11px] font-medium text-foreground/80">
+          <p className="text-right text-sm font-medium text-foreground/80">
             {rightHint}
           </p>
         ) : null}
       </div>
       <div className="flex items-stretch gap-3">
-        <BorderedNumberField className="h-13 flex-1">
+        <FormNumberField className="h-13 min-w-0 flex-1">
           <NumericInput
             value={value ?? ""}
             onChange={onChange}
             decimalScale={decimalScale}
-            className="text-[18px] font-semibold"
+            className="text-[20px] font-semibold"
           />
-        </BorderedNumberField>
+        </FormNumberField>
         {hasUnitSelect ? (
-          <AppSelect
-            value={unit}
-            items={unitOptions}
-            onChange={onUnitChange}
-            triggerClassName="h-auto self-stretch"
-          />
+          <div className="w-[132px] shrink-0 self-stretch">
+            <StyledSelect
+              value={unit}
+              options={unitOptions.map((option) => ({
+                label: option.text,
+                value: option.value,
+              }))}
+              onValueChange={onUnitChange}
+            />
+          </div>
         ) : staticUnitLabel ? (
-          <p className="text-sm font-medium text-muted-foreground mt-auto mb-2">{staticUnitLabel}</p>
+          <p className="mt-auto mb-2 text-sm font-medium text-muted-foreground">{staticUnitLabel}</p>
         ) : null}
       </div>
-    </Panel>
+    </FormPanel>
   );
 }
 
@@ -750,25 +642,6 @@ function TradesPanel() {
       staticUnitLabel="Trades"
       error={error}
     />
-  );
-}
-
-function BorderedNumberField({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex min-w-0 cursor-text items-center rounded-[14px] border border-border/80 bg-transparent px-4 transition-colors focus-within:border-primary",
-        className,
-      )}
-    >
-      {children}
-    </div>
   );
 }
 
@@ -822,8 +695,47 @@ function ModuleInputs({ orderModule }: { orderModule: Module }) {
   return <TimeInputPanel kind="duration" />;
 }
 
+function PriceTokenSelector({
+  className,
+  fallbackClassName,
+  field,
+  logoClassName,
+  token,
+}: {
+  className?: string;
+  fallbackClassName: string;
+  field: Field;
+  logoClassName: string;
+  token?: Token;
+}) {
+  const { handleCurrencyChange } = useActionHandlers();
+  const onCurrencyChange = useCallback(
+    (currency: Currency) => handleCurrencyChange(currency.address, field),
+    [field, handleCurrencyChange],
+  );
+
+  return (
+    <CurrencySelector
+      onCurrencyChange={onCurrencyChange}
+      trigger={
+        <TokenSelectorTrigger
+          symbol={token?.symbol}
+          logoUrl={token?.logoUrl}
+          className={cn(
+            "-mx-1 gap-1.5 px-1 py-0.5 hover:bg-primary/8 hover:text-foreground",
+            className,
+          )}
+          logoClassName={logoClassName}
+          fallbackClassName={fallbackClassName}
+        />
+      }
+    />
+  );
+}
+
 function SpotPriceInput({
-  symbol,
+  token,
+  tokenField,
   value,
   onChange,
   percentage,
@@ -831,7 +743,8 @@ function SpotPriceInput({
   isLoading,
   usd,
 }: {
-  symbol?: string;
+  token?: Token;
+  tokenField: Field;
   value: string;
   onChange: (value: string) => void;
   percentage: string;
@@ -853,27 +766,31 @@ function SpotPriceInput({
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_90px] gap-2">
-      <div
+      <FormNumberField
         className="flex min-w-0 items-center gap-3 rounded-[12px] border border-border/80 bg-transparent px-3 py-2 text-foreground transition-colors focus-within:border-primary"
         onClick={focusValueInput}
       >
-        <span className="min-w-0 truncate text-sm font-semibold text-foreground">
-          {symbol}
-        </span>
+        <PriceTokenSelector
+          token={token}
+          field={tokenField}
+          logoClassName="size-5"
+          fallbackClassName="text-[8px]"
+          className="text-base font-semibold text-foreground"
+        />
         <div className="min-w-0 flex-1 text-right">
           <NumericInput
             ref={valueInputRef}
             isLoading={isLoading}
             value={value}
             onChange={onChange}
-            className="text-right text-[18px] font-semibold text-foreground"
+            className="text-right text-[20px] font-semibold text-foreground"
           />
-          <p className="mt-1 min-h-4 text-xs text-muted-foreground">
+          <p className="mt-1 min-h-4 text-sm text-muted-foreground">
             ${usdFormatted || "0"}
           </p>
         </div>
-      </div>
-      <div
+      </FormNumberField>
+      <FormNumberField
         className="cursor-pointer rounded-[12px] border border-border/80 bg-transparent px-2 py-2 text-foreground transition-colors focus-within:border-primary"
         onClick={focusPercentageInput}
       >
@@ -881,12 +798,12 @@ function SpotPriceInput({
           ref={percentageInputRef}
           value={percentage}
           onChange={onPercentageChange}
-          className="text-center text-[16px] font-semibold text-foreground"
+          className="text-center text-[18px] font-semibold text-foreground"
           placeholder="0.0%"
           suffix="%"
           allowNegative
         />
-      </div>
+      </FormNumberField>
     </div>
   );
 }
@@ -896,7 +813,7 @@ function PriceResetButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="text-[12px] font-semibold text-muted-foreground transition-colors hover:text-primary"
+      className="text-sm font-semibold text-muted-foreground transition-colors hover:text-primary"
     >
       Set to default
     </button>
@@ -905,6 +822,7 @@ function PriceResetButton({ onClick }: { onClick: () => void }) {
 
 function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
   const t = useTranslations();
+  const { isInverted } = useSpot().pricePanel;
   const {
     priceUI: price,
     onInputChange,
@@ -924,7 +842,7 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
-        <Label
+        <FormLabel
           tooltip={t(
             orderModule === Module.STOP_LOSS
               ? "stopLossTooltip"
@@ -932,11 +850,12 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
           )}
         >
           {t("stopLossLabel")}
-        </Label>
+        </FormLabel>
         <PriceResetButton onClick={onReset} />
       </div>
       <SpotPriceInput
-        symbol={invertedDstToken?.symbol}
+        token={invertedDstToken}
+        tokenField={isInverted ? Field.INPUT : Field.OUTPUT}
         value={isTypedValue ? price : formatDecimals(price, 6)}
         onChange={(value) => onInputChange(value)}
         percentage={percentage}
@@ -950,6 +869,7 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
 
 function LimitPricePanel({ orderModule }: { orderModule: Module }) {
   const t = useTranslations();
+  const { isInverted } = useSpot().pricePanel;
   const {
     onInputChange,
     priceUI,
@@ -975,13 +895,16 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
           />
         )}
         <div className="flex flex-1 items-center justify-between gap-3">
-          <Label tooltip={t("limitPriceTooltip")}>{t("limitPrice")}</Label>
+          <FormLabel tooltip={t("limitPriceTooltip")}>
+            {t("limitPrice")}
+          </FormLabel>
           {isLimitPrice && <PriceResetButton onClick={onReset} />}
         </div>
       </div>
       {isLimitPrice && (
         <SpotPriceInput
-          symbol={invertedDstToken?.symbol}
+          token={invertedDstToken}
+          tokenField={isInverted ? Field.INPUT : Field.OUTPUT}
           value={isTypedValue ? priceUI : formatDecimals(priceUI, 6)}
           onChange={(value) => onInputChange(value)}
           percentage={percentage}
@@ -997,13 +920,22 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
 function PricesHeader() {
   const { onInvert, isInverted, fromToken, isMarketPrice } =
     useSpot().pricePanel;
+  const fromTokenField = isInverted ? Field.OUTPUT : Field.INPUT;
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <p className="text-[13px] font-semibold text-muted-foreground">
-        {isInverted ? "Buy" : "Sell"} {fromToken?.symbol}{" "}
-        {isMarketPrice ? "at best rate" : "at rate"}
-      </p>
+      <div className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-muted-foreground">
+        <span>{isInverted ? "Buy" : "Sell"}</span>
+        <PriceTokenSelector
+          token={fromToken}
+          field={fromTokenField}
+          logoClassName="size-4"
+          fallbackClassName="text-[7px]"
+        />
+        <span className="shrink-0">
+          {isMarketPrice ? "at best rate" : "at rate"}
+        </span>
+      </div>
       {!isMarketPrice && (
         <Button
           variant="secondary"
@@ -1021,11 +953,11 @@ function PricesHeader() {
 
 function PricesPanel({ orderModule }: { orderModule: Module }) {
   return (
-    <Panel className="flex flex-col gap-4">
+    <FormPanel className="flex flex-col gap-4">
       <PricesHeader />
       <TriggerPricePanel orderModule={orderModule} />
       <LimitPricePanel orderModule={orderModule} />
-    </Panel>
+    </FormPanel>
   );
 }
 
@@ -1055,10 +987,14 @@ function InputErrorPanel() {
   }
 
   return (
-    <div className="flex gap-2 rounded-[14px] border border-destructive/60 bg-destructive/12 p-3 text-sm font-medium text-foreground">
-      <AlertTriangleIcon className="relative top-0.5 size-4 shrink-0 text-destructive" />
+    <InlineMessage
+      variant="error"
+      icon={
+        <AlertTriangleIcon className="relative top-0.5 size-4 shrink-0 text-destructive" />
+      }
+    >
       <p className="flex-1">{message}</p>
-    </div>
+    </InlineMessage>
   );
 }
 
@@ -1071,8 +1007,11 @@ function DisclaimerPanel() {
   }
 
   return (
-    <div className="flex gap-2 rounded-[14px] border border-border/60 bg-card/65 p-3">
-      <InfoIcon className="relative top-1 size-4 shrink-0 text-muted-foreground" />
+    <InlineMessage
+      icon={
+        <InfoIcon className="relative top-1 size-4 shrink-0 text-muted-foreground" />
+      }
+    >
       <p className="flex-1 text-[14px] text-muted-foreground">
         {t(disclaimer)}{" "}
         <a
@@ -1084,31 +1023,7 @@ function DisclaimerPanel() {
           Learn more
         </a>
       </p>
-    </div>
-  );
-}
-
-function ReviewRow({
-  label,
-  children,
-  hidden,
-  tooltip,
-}: {
-  label: string;
-  children: ReactNode;
-  hidden?: boolean;
-  tooltip?: string;
-}) {
-  if (hidden) return null;
-
-  return (
-    <div className="flex items-start justify-between gap-4 text-sm">
-      <span className="flex items-center gap-1.5 text-muted-foreground">
-        {label}
-        <SpotTooltip tooltipText={tooltip} />
-      </span>
-      <span className="text-right font-medium">{children}</span>
-    </div>
+    </InlineMessage>
   );
 }
 
@@ -1136,16 +1051,6 @@ function formatDeadline(deadline?: number) {
   }).format(new Date(deadline));
 }
 
-function TokenLogo({ token }: { token?: Token }) {
-  return (
-    <CurrencyLogo
-      symbol={token?.symbol}
-      logoUrl={token?.logoUrl}
-      className="token-logo"
-    />
-  );
-}
-
 function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
   const t = useTranslations();
   const order = useSpot().derivedFormData;
@@ -1171,60 +1076,73 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
 
   return (
     <div className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
-      <ReviewRow label={t("orderType")}>{orderTitle}</ReviewRow>
-      <ReviewRow label={t("expirationLabel")} tooltip={t("expirationTooltip")}>
+      <DetailRow label={t("orderType")} align="start">
+        {orderTitle}
+      </DetailRow>
+      <DetailRow
+        label={t("expirationLabel")}
+        tooltip={t("expirationTooltip")}
+        align="start"
+      >
         {formatDeadline(order.deadline)}
-      </ReviewRow>
-      <ReviewRow
+      </DetailRow>
+      <DetailRow
         label={t("triggerPrice")}
         tooltip={t("triggerPriceTooltip")}
         hidden={BN(order.triggerPriceUI || 0).isZero()}
+        align="start"
       >
         1 {srcToken?.symbol} = {triggerPrice || "-"} {dstToken?.symbol}
-      </ReviewRow>
-      <ReviewRow
+      </DetailRow>
+      <DetailRow
         label={t("limitPrice")}
         tooltip={t("limitPriceTooltip")}
         hidden={BN(order.limitPriceUI || 0).isZero()}
+        align="start"
       >
         1 {srcToken?.symbol} = {limitPrice || "-"} {dstToken?.symbol}
-      </ReviewRow>
-      <ReviewRow
+      </DetailRow>
+      <DetailRow
         label={
           order.totalTrades > 1 ? t("minReceivedPerTrade") : t("minReceived")
         }
         tooltip={t("minDstAmountTooltip")}
         hidden={BN(order.minDestAmountPerTradeUI || 0).isZero()}
+        align="start"
       >
         {minReceived || "-"} {dstToken?.symbol}
-      </ReviewRow>
-      <ReviewRow
+      </DetailRow>
+      <DetailRow
         label={t("individualTradeSize")}
         tooltip={t("tradeSizeTooltip")}
         hidden={order.totalTrades <= 1}
+        align="start"
       >
         {sizePerTrade || "-"} {srcToken?.symbol}
-      </ReviewRow>
-      <ReviewRow
+      </DetailRow>
+      <DetailRow
         label={t("numberOfTrades")}
         tooltip={t("totalTradesTooltip")}
         hidden={order.totalTrades <= 1}
+        align="start"
       >
         {order.totalTrades}
-      </ReviewRow>
-      <ReviewRow
+      </DetailRow>
+      <DetailRow
         label={t("tradeIntervalLabel")}
         tooltip={t("tradeIntervalTooltip")}
         hidden={order.totalTrades <= 1}
+        align="start"
       >
         {formatDuration(order.tradeInterval)}
-      </ReviewRow>
-      <ReviewRow
+      </DetailRow>
+      <DetailRow
         label={t("fees", { value: `(${order.feesPercentage}%)` })}
         hidden={!feesUsd}
+        align="start"
       >
         ${feesUsd}
-      </ReviewRow>
+      </DetailRow>
     </div>
   );
 }
@@ -1405,8 +1323,8 @@ function SubmitOrderPanel({
       inToken={inToken}
       outToken={outToken}
       components={{
-        SrcTokenLogo: <TokenLogo token={srcToken} />,
-        DstTokenLogo: <TokenLogo token={dstToken} />,
+        SrcTokenLogo: <SwapFlowTokenLogo token={srcToken} />,
+        DstTokenLogo: <SwapFlowTokenLogo token={dstToken} />,
         Failed: <SwapFlow.Failed error={<TxError error={parsedError} />} />,
         Success: <OrderFlowSuccess orderTitle={orderTitle} />,
         Main: (

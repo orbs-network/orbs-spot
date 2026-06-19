@@ -40,6 +40,24 @@ type Props = {
   trigger?: React.ReactNode;
 };
 
+const formatTokenSymbol = (symbol?: string) => {
+  switch (symbol?.toLowerCase()) {
+    case 'bsc-usd':
+      return 'USDT';
+
+  
+    default:
+      return symbol;
+  }
+};
+
+const formatTokenName = (name?: string) => {
+  return (name ?? "")
+    .replace(/\s*\([^)]*\)/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
 const PopularTokens = ({
   onCurrencyChange,
   currencies,
@@ -61,11 +79,13 @@ const PopularTokens = ({
           >
             <CurrencyLogo
               currency={c}
+              name={formatTokenName(c.name)}
+              symbol={formatTokenSymbol(c.symbol)}
               className="size-6"
-              fallbackClassName="text-[9px]"
+              fallbackClassName="text-[10px]"
             />
-            <p className="text-[10px] font-semibold text-ellipsis whitespace-nowrap overflow-hidden max-w-[44px] cursor-pointer">
-              {c.symbol}
+            <p className="max-w-full cursor-pointer truncate text-center text-xs font-semibold leading-tight">
+              {formatTokenSymbol(c.symbol)}
             </p>
           </div>
         </DialogClose>
@@ -132,14 +152,22 @@ export function CurrencySelector({ onCurrencyChange, trigger }: Props) {
     setOpen(nextOpen);
   }, [setOpen]);
 
+  const openSelectorFromTrigger = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      event.stopPropagation();
+      openSelector();
+    },
+    [openSelector],
+  );
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       {trigger ? (
         <div
           role="button"
           tabIndex={0}
-          className="cursor-pointer"
-          onClick={openSelector}
+          className="min-w-0 cursor-pointer"
+          onClick={openSelectorFromTrigger}
         >
           {trigger}
         </div>
@@ -173,7 +201,7 @@ const CurrencySelectorContent = ({
     <DialogContent
       mobilePresentation="fullscreen"
       presentation="center"
-      className="!flex max-h-[88dvh] flex-col gap-2 overflow-hidden p-0 sm:!max-w-[620px]"
+      className="!flex max-h-[88dvh] flex-col gap-2 overflow-hidden p-0 sm:!max-w-[440px]"
     >
       <DialogHeader className="p-3 pt-5 pb-2">
         <DialogTitle>Select a token</DialogTitle>
@@ -296,6 +324,8 @@ const CurrencyItem = memo(function CurrencyItem({
   balanceWei: string;
   usdPrice: number;
 }) {
+  const displayName = formatTokenName(currency.name);
+  const displaySymbol = formatTokenSymbol(currency.symbol);
   const balance = useMemo(
     () => toAmountUI(balanceWei, currency.decimals),
     [balanceWei, currency.decimals],
@@ -321,15 +351,19 @@ const CurrencyItem = memo(function CurrencyItem({
         onClick={() => onCurrencyChange(currency)}
       >
         <div className="flex items-center gap-3 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
-          <CurrencyLogo currency={currency} />
+          <CurrencyLogo
+            currency={currency}
+            name={displayName}
+            symbol={displaySymbol}
+          />
           <div className="flex flex-col items-start flex-1">
-            <p className="text-[15px] font-medium overflow-hidden text-ellipsis whitespace-nowrap max-w-[calc(100%-16px)]">
-              {currency.name}
+            <p className="text-base font-medium overflow-hidden text-ellipsis whitespace-nowrap max-w-[calc(100%-16px)]">
+              {displayName || displaySymbol}
             </p>
-            <p className="text-[12px] text-muted-foreground font-medium">
-              {currency.symbol}
+            <p className="text-sm text-muted-foreground font-medium">
+              {displaySymbol}
               {!isNativeAddress(currency.address) && (
-                <span className="text-[11px] text-muted-foreground/80 ml-1">
+                <span className="text-xs text-muted-foreground/80 ml-1">
                   {makeEllipsisAddress(currency.address, { start: 6, end: 4 })}
                 </span>
               )}
@@ -338,11 +372,11 @@ const CurrencyItem = memo(function CurrencyItem({
         </div>
         {hasBalance && (
           <div className="flex flex-col items-end gap-0">
-            <p className="text-[15px] font-semibold">
+            <p className="text-base font-semibold">
               ${formattedUsdValue || "0"}
             </p>
 
-            <p className="text-[12px] text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {formattedBalance}
             </p>
           </div>

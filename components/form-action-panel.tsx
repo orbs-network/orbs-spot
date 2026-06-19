@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { FormPanel } from "./ui/form-panel";
 
 export function FormActionPanel({
   children,
@@ -9,13 +10,14 @@ export function FormActionPanel({
   className?: string;
 }) {
   return (
-    <div
+    <FormPanel
+      variant="muted"
       className={cn(
-        "flex w-full flex-col gap-3 rounded-[18px] border border-border/70 bg-secondary/35 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+        "flex w-full flex-col gap-3",
         className,
       )}
     >
       {children}
-    </div>
+    </FormPanel>
   );
 }

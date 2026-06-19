@@ -100,9 +100,9 @@ function DialogContent({
 }) {
   const { isDrawer } = React.useContext(ResponsiveDialogContext)
   const drawerClasses =
-    "inset-x-0 bottom-0 max-h-[92dvh] w-full rounded-t-[22px] border-b-0 p-6 shadow-[0_-24px_90px_rgba(0,0,0,0.5)] sm:top-[50%] sm:left-[50%] sm:bottom-auto sm:max-w-[calc(100%-2rem)] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl sm:border sm:p-6 sm:shadow-[0_24px_90px_rgba(0,0,0,0.48)] sm:max-w-lg";
+    "inset-x-0 bottom-0 max-h-[92dvh] w-full rounded-t-[22px] border-b-0 p-6 sm:top-[50%] sm:left-[50%] sm:bottom-auto sm:max-w-[calc(100%-2rem)] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-xl sm:border sm:p-6 sm:max-w-lg";
   const centerClasses =
-    "top-[50%] left-[50%] max-h-[88dvh] w-[calc(100vw-1.5rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] rounded-[22px] p-6 shadow-[0_24px_90px_rgba(0,0,0,0.5)]";
+    "top-[50%] left-[50%] max-h-[88dvh] w-[calc(100vw-1.5rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] rounded-[22px] p-6";
   const drawerMotionClasses =
     "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom data-[state=open]:duration-200 data-[state=closed]:duration-150 data-[state=open]:ease-out data-[state=closed]:ease-in sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:zoom-out-95"
   const centerMotionClasses =
