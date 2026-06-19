@@ -24,7 +24,7 @@ type Props = {
 
 const CurrencySelectorTrigger = ({ currency }: { currency?: Currency }) => {
   return (
-    <div className="flex w-full cursor-pointer items-center gap-1 rounded-full border border-border/80 bg-card px-2 py-1.5 shadow-[0_6px_20px_rgba(0,0,0,0.16)] transition-colors hover:border-primary/70 hover:bg-secondary sm:w-[136px]">
+    <div className="flex cursor-pointer items-center gap-1 rounded-full border border-border/80 bg-card px-2 py-1.5 shadow-[0_6px_20px_rgba(0,0,0,0.16)] transition-colors hover:border-primary/25 hover:bg-secondary/45">
       <CurrencyLogo currency={currency} className="size-7 shrink-0" />
       <p className="min-w-0 flex-1 truncate text-sm font-medium">
         {currency?.symbol}
@@ -75,11 +75,11 @@ const PercentageButtons = ({
   );
   
   return (
-    <div className="mb-1 flex cursor-pointer flex-wrap items-center justify-start gap-1 sm:absolute sm:right-4 sm:top-4 sm:mb-0 sm:justify-end">
+    <div className="absolute right-4 top-4 flex cursor-pointer flex-wrap items-center justify-end gap-1">
       {PERCENTAGE_BUTTONS.map((button) => (
         <div
           key={button.value}
-          className="flex cursor-pointer items-center gap-1 rounded-xl border border-border/80 bg-card/80 px-2 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/70 hover:bg-primary hover:text-primary-foreground sm:text-[12px]"
+          className="flex cursor-pointer items-center gap-1 rounded-xl border border-border/80 bg-card/80 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-primary/10 hover:text-foreground sm:text-xs"
           onClick={() => onPercentageClick(button.value)}
         >
           {button.label}
@@ -126,7 +126,7 @@ export function CurrencyCard({
   
   return (
     <div
-      className="group relative flex min-w-0 flex-col gap-2 rounded-[22px] border border-border/70 bg-secondary/55 p-4 transition-colors hover:border-primary/35"
+      className="group relative flex min-w-0 flex-col gap-2 rounded-[18px] border border-border/70 bg-secondary/55 p-4 transition-colors hover:border-primary/35"
       onClick={focusAmountInputFromCardClick}
       onMouseEnter={focusAmountInput}
       onPointerEnter={focusAmountInput}
@@ -139,7 +139,7 @@ export function CurrencyCard({
       )}
       <p className="text-sm font-medium text-muted-foreground">{title}</p>
       <div
-        className={`grid min-w-0 grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto] ${
+        className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${
           disabled ? "" : "mt-2 sm:mt-3"
         }`}
       >
@@ -149,7 +149,7 @@ export function CurrencyCard({
           value={amount}
           onChange={onAmountChange ?? (() => {})}
           isLoading={isLoading}
-          className="min-w-0 text-[34px] font-medium"
+          className="min-w-0 text-[27px] font-medium"
         />
         <CurrencySelector
           onCurrencyChange={(currency: Currency) =>
@@ -158,7 +158,7 @@ export function CurrencyCard({
           trigger={<CurrencySelectorTrigger currency={currency} />}
         />
       </div>
-      <div className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
+      <div className="flex min-w-0 items-center justify-between gap-2">
         {statusText ? (
           <p className="truncate text-sm font-medium text-muted-foreground">
             {statusText}

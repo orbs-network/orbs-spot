@@ -56,15 +56,15 @@ const PopularTokens = ({
       {currencies.map((c) => (
         <DialogClose key={c.address}>
           <div
-            className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-border/60 bg-secondary p-3 transition-colors hover:border-primary/70 hover:bg-muted"
+            className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-border/60 bg-secondary p-3 transition-colors hover:border-primary/25 hover:bg-muted/45"
             onClick={() => onCurrencyChange(c)}
           >
             <CurrencyLogo
               currency={c}
               className="size-6"
-              fallbackClassName="text-[10px]"
+              fallbackClassName="text-[9px]"
             />
-            <p className="text-[11px] font-semibold text-ellipsis whitespace-nowrap overflow-hidden max-w-[50px] cursor-pointer">
+            <p className="text-[10px] font-semibold text-ellipsis whitespace-nowrap overflow-hidden max-w-[44px] cursor-pointer">
               {c.symbol}
             </p>
           </div>
@@ -100,8 +100,8 @@ const Loader = () => {
         <div key={index} className="flex items-center gap-2 justify-start">
           <Skeleton className="size-10 rounded-full" />
           <div className="flex flex-col gap-2">
-            <Skeleton className="w-[50px] h-4" />
-            <Skeleton className="w-[150px] h-4" />
+            <Skeleton className="w-[40px] h-4" />
+            <Skeleton className="w-[120px] h-4" />
           </div>
         </div>
       ))}
@@ -171,10 +171,11 @@ const CurrencySelectorContent = ({
 
   return (
     <DialogContent
+      mobilePresentation="fullscreen"
       presentation="center"
-      className="flex max-h-[88dvh] flex-col gap-2 overflow-hidden p-0 sm:max-w-md"
+      className="!flex max-h-[88dvh] flex-col gap-2 overflow-hidden p-0 sm:!max-w-[620px]"
     >
-      <DialogHeader className="p-3">
+      <DialogHeader className="p-3 pt-5 pb-2">
         <DialogTitle>Select a token</DialogTitle>
       </DialogHeader>
       <SearchInput onChange={setSearch} value={search} />
@@ -202,7 +203,7 @@ const TokenListShell = ({
   return (
     <div
       data-token-list={status}
-      className="flex h-[55dvh] min-h-[300px] max-h-[500px] flex-col gap-2 overflow-hidden sm:h-[80vh]"
+      className="flex min-h-[300px] flex-1 flex-col gap-2 overflow-hidden sm:h-[80vh] sm:max-h-[520px] sm:flex-none"
     >
       {children}
     </div>
@@ -276,7 +277,7 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
           itemContent={itemContent}
           components={virtuosoComponents}
           computeItemKey={computeItemKey}
-          defaultItemHeight={72}
+          defaultItemHeight={66}
           increaseViewportBy={240}
         />
       )}
@@ -316,19 +317,19 @@ const CurrencyItem = memo(function CurrencyItem({
   return (
     <DialogClose className="w-full px-2">
       <div
-        className="mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-[16px] border border-transparent px-3 py-2.5 transition-colors hover:border-primary/20 hover:bg-primary/10 data-[highlighted]:bg-primary/10"
+        className="mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 transition-colors hover:border-primary/14 hover:bg-primary/6 data-[highlighted]:bg-primary/6"
         onClick={() => onCurrencyChange(currency)}
       >
         <div className="flex items-center gap-3 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
           <CurrencyLogo currency={currency} />
           <div className="flex flex-col items-start flex-1">
-            <p className="text-[16px] font-medium overflow-hidden text-ellipsis whitespace-nowrap max-w-[calc(100%-20px)]">
+            <p className="text-[15px] font-medium overflow-hidden text-ellipsis whitespace-nowrap max-w-[calc(100%-16px)]">
               {currency.name}
             </p>
-            <p className="text-[13px] text-muted-foreground font-medium">
+            <p className="text-[12px] text-muted-foreground font-medium">
               {currency.symbol}
               {!isNativeAddress(currency.address) && (
-                <span className="text-[12px] text-muted-foreground/80 ml-1">
+                <span className="text-[11px] text-muted-foreground/80 ml-1">
                   {makeEllipsisAddress(currency.address, { start: 6, end: 4 })}
                 </span>
               )}
@@ -337,11 +338,11 @@ const CurrencyItem = memo(function CurrencyItem({
         </div>
         {hasBalance && (
           <div className="flex flex-col items-end gap-0">
-            <p className="text-[17px] font-semibold">
+            <p className="text-[15px] font-semibold">
               ${formattedUsdValue || "0"}
             </p>
 
-            <p className="text-[13px] text-muted-foreground">
+            <p className="text-[12px] text-muted-foreground">
               {formattedBalance}
             </p>
           </div>

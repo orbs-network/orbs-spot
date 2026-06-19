@@ -2,10 +2,12 @@
 "use client";
 
 import { CurrencyCard } from "@/components/currency-card";
+import { FormActionPanel } from "@/components/form-action-panel";
 import { SubmitSwapButton } from "@/components/submit-swap-button";
 import { SettingsModal } from "@/components/settings-modal";
 import { ToggleCurrencies } from "@/components/toggle-currencies";
 import { OrderHistoryModal } from "@/components/order-history-modal";
+import { SwapFlowLoader } from "@/components/swap-flow-loader";
 import { Button } from "@/components/ui/button";
 import { CurrencyLogo } from "@/components/ui/currency-logo";
 import {
@@ -22,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
+import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
@@ -35,8 +37,13 @@ import {
   useRefetchSelectedCurrenciesBalances,
 } from "@/lib/hooks/use-balances";
 import { useFormatNumber } from "@/lib/hooks/common";
+import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useSettings } from "@/lib/hooks/use-settings";
+import {
+  isUserRejectedError,
+  showTransactionRejectedToast,
+} from "@/lib/tx-rejection";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { useTranslations } from "@/lib/use-translations";
 import { Currency, Field, FormTab } from "@/lib/types";
@@ -109,6 +116,7 @@ const MODULE_META = {
 const WRAP_TOAST_ID = "spot-wrap-token";
 const APPROVE_TOAST_ID = "spot-approve-token";
 const CREATE_ORDER_TOAST_ID = "spot-create-order";
+const CANCEL_ORDER_TOAST_ID = "spot-cancel-order";
 
 function getModule(tab: FormTab) {
   switch (tab) {
@@ -197,70 +205,102 @@ function useWalletInteractions() {
           throw new Error("Wrapped native token not found for chain");
         }
 
-        const hash = await walletClient.writeContract({
-          abi: [
-            {
-              name: "deposit",
-              type: "function",
-              stateMutability: "payable",
-              inputs: [],
-              outputs: [],
-            },
-          ],
-          functionName: "deposit",
-          address: network.wToken.address as `0x${string}`,
-          args: [],
-          value: BigInt(amount),
-          chain: walletClient.chain,
-          account: walletClient.account!,
-        });
+        try {
+          const hash = await walletClient.writeContract({
+            abi: [
+              {
+                name: "deposit",
+                type: "function",
+                stateMutability: "payable",
+                inputs: [],
+                outputs: [],
+              },
+            ],
+            functionName: "deposit",
+            address: network.wToken.address as `0x${string}`,
+            args: [],
+            value: BigInt(amount),
+            chain: walletClient.chain,
+            account: walletClient.account!,
+          });
 
-        return waitForTx(hash);
+          return waitForTx(hash);
+        } catch (error) {
+          if (isUserRejectedError(error)) {
+            showTransactionRejectedToast({ id: WRAP_TOAST_ID });
+          }
+
+          throw error;
+        }
       },
       approveToken: async (props: ApproveTokenProps) => {
         if (!walletClient) {
           throw new Error("Wallet client not found");
         }
 
-        const hash = await walletClient.writeContract({
-          abi: erc20Abi,
-          functionName: "approve",
-          address: props.tokenAddress as `0x${string}`,
-          args: [props.spenderAddress as `0x${string}`, maxUint256],
-          chain: walletClient.chain,
-          account: walletClient.account!,
-        });
+        try {
+          const hash = await walletClient.writeContract({
+            abi: erc20Abi,
+            functionName: "approve",
+            address: props.tokenAddress as `0x${string}`,
+            args: [props.spenderAddress as `0x${string}`, maxUint256],
+            chain: walletClient.chain,
+            account: walletClient.account!,
+          });
 
-        return waitForTx(hash);
+          return waitForTx(hash);
+        } catch (error) {
+          if (isUserRejectedError(error)) {
+            showTransactionRejectedToast({ id: APPROVE_TOAST_ID });
+          }
+
+          throw error;
+        }
       },
       cancelOrder: async (props: CancelOrderProps) => {
         if (!walletClient) {
           throw new Error("Wallet client not found");
         }
 
-        const hash = await walletClient.writeContract({
-          abi: props.abi as Abi,
-          functionName: "cancel",
-          address: props.contractAddress as `0x${string}`,
-          args: props.args as any,
-          chain: walletClient.chain,
-          account: walletClient.account!,
-        } as any);
+        try {
+          const hash = await walletClient.writeContract({
+            abi: props.abi as Abi,
+            functionName: "cancel",
+            address: props.contractAddress as `0x${string}`,
+            args: props.args as any,
+            chain: walletClient.chain,
+            account: walletClient.account!,
+          } as any);
 
-        return waitForTx(hash);
+          return waitForTx(hash);
+        } catch (error) {
+          if (isUserRejectedError(error)) {
+            showTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
+          }
+
+          throw error;
+        }
       },
       signOrder: async (props: SignOrderProps) => {
         if (!walletClient) {
           throw new Error("Wallet client not found");
         }
 
-        return walletClient.signTypedData({
-          domain: props.domain as any,
-          types: props.types as any,
-          primaryType: props.primaryType,
-          message: props.message as any,
-          account: props.account,
-        });
+        try {
+          return await walletClient.signTypedData({
+            domain: props.domain as any,
+            types: props.types as any,
+            primaryType: props.primaryType,
+            message: props.message as any,
+            account: props.account,
+          });
+        } catch (error) {
+          if (isUserRejectedError(error)) {
+            showTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
+          }
+
+          throw error;
+        }
       },
       getAllowance: async (props: GetAllowanceProps) => {
         if (!publicClient) {
@@ -397,6 +437,11 @@ function useSpotCallbacks() {
         refetchBalances();
       },
       onSubmitOrderFailed: ({ code, message }: ParsedError) => {
+        if (isUserRejectedError({ code, message })) {
+          showTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
+          return;
+        }
+
         toast.error(
           code ? `Transaction failed: ${code}` : "Transaction failed",
           {
@@ -406,17 +451,17 @@ function useSpotCallbacks() {
         );
       },
       onSubmitOrderRejected: () => {
-        toast.info("Order rejected in wallet", {
-          id: CREATE_ORDER_TOAST_ID,
-        });
+        showTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
       },
       onCancelOrderRequest: () => {
         toast.loading(`${t("cancelOrder")}...`, {
+          id: CANCEL_ORDER_TOAST_ID,
           description: t("proceedInWallet"),
         });
       },
       onCancelOrderSuccess: ({ txHash }: OnCancelOrderSuccess) => {
         toast.success(t("Cancelled"), {
+          id: CANCEL_ORDER_TOAST_ID,
           description: explorerLink(txHash) ? (
             <a href={explorerLink(txHash)} target="_blank" rel="noreferrer">
               {t("viewOnExplorer")}
@@ -426,7 +471,15 @@ function useSpotCallbacks() {
         refetchBalances();
       },
       onCancelOrderFailed: (error: Error) => {
-        toast.error("Cancel failed", { description: error.message });
+        if (isUserRejectedError(error)) {
+          showTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
+          return;
+        }
+
+        toast.error("Cancel failed", {
+          id: CANCEL_ORDER_TOAST_ID,
+          description: error.message,
+        });
       },
       onOrdersProgressUpdate: () => {
         refetchBalances();
@@ -450,37 +503,6 @@ function useSpotCallbacks() {
   return callbacks;
 }
 
-function InlineSwitch({
-  checked,
-  onCheckedChange,
-  ariaLabel,
-}: {
-  checked: boolean;
-  onCheckedChange: (checked: boolean) => void;
-  ariaLabel: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      onClick={() => onCheckedChange(!checked)}
-      className={cn(
-        "relative h-6 w-11 rounded-full border border-border/70 bg-secondary transition-colors",
-        checked && "border-primary bg-primary",
-      )}
-    >
-      <span
-        className={cn(
-          "absolute left-1 top-1 size-4 rounded-full bg-muted-foreground transition-transform",
-          checked && "translate-x-5 bg-primary-foreground",
-        )}
-      />
-    </button>
-  );
-}
-
 function Panel({
   children,
   className,
@@ -491,7 +513,7 @@ function Panel({
   return (
     <div
       className={cn(
-        "rounded-[22px] border border-border/70 bg-secondary/45 p-4",
+        "rounded-[18px] border border-border/70 bg-secondary/45 p-4",
         className,
       )}
     >
@@ -511,7 +533,7 @@ function Label({
 }) {
   return (
     <div className="flex items-center gap-2">
-      <p className="text-sm font-medium text-muted-foreground">{children}</p>
+      <p className="text-[14px] font-medium text-muted-foreground">{children}</p>
       <SpotTooltip tooltipText={tooltip} />
       {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </div>
@@ -547,10 +569,12 @@ function AppSelect<T extends number>({
   value,
   onChange,
   items,
+  triggerClassName,
 }: {
   value: T;
   onChange: (value: T) => void;
   items: readonly { text: string; value: T }[];
+  triggerClassName?: string;
 }) {
   return (
     <Select
@@ -565,15 +589,20 @@ function AppSelect<T extends number>({
         }
       }}
     >
-      <SelectTrigger className="h-11 min-w-[116px] rounded-[15px] border-border/70 bg-transparent px-3 text-sm font-medium text-foreground shadow-none transition-colors hover:border-primary/50 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25">
+      <SelectTrigger
+        className={cn(
+          "h-11 min-w-[93px] rounded-[14px] border-border/80 bg-transparent px-3 text-[13px] font-medium text-foreground shadow-none transition-colors hover:border-primary/50 hover:bg-transparent focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 dark:bg-transparent dark:hover:bg-transparent",
+          triggerClassName,
+        )}
+      >
         <SelectValue />
       </SelectTrigger>
-      <SelectContent className="rounded-[18px] border-border/80 bg-popover p-1 shadow-[0_18px_70px_rgba(0,0,0,0.45)]">
+      <SelectContent className="rounded-[14px] border-border/80 bg-popover p-1 gap-1">
         {items.map((item) => (
           <SelectItem
             key={item.value}
             value={String(item.value)}
-            className="h-10 rounded-[14px] text-muted-foreground hover:bg-secondary hover:text-foreground focus:bg-secondary focus:text-foreground data-[state=checked]:bg-primary/14 data-[state=checked]:text-foreground"
+            className="h-10 rounded-[11px] text-muted-foreground hover:bg-secondary/45 hover:text-foreground focus:bg-secondary/45 focus:text-foreground data-[state=checked]:bg-primary/14 data-[state=checked]:text-foreground"
           >
             {item.text}
           </SelectItem>
@@ -606,6 +635,72 @@ function TokenPanel({ isSource }: { isSource: boolean }) {
       disabled={!isSource}
       isLoading={!isSource && Boolean(isLoading)}
     />
+  );
+}
+
+function OrderNumericInputPanel<TUnit extends number>({
+  decimalScale = 0,
+  error,
+  onChange,
+  rightHint,
+  staticUnitLabel,
+  title,
+  tooltip,
+  unit,
+  unitOptions,
+  onUnitChange,
+  value,
+}: {
+  decimalScale?: number;
+  error?: unknown;
+  onChange: (value: string) => void;
+  rightHint?: ReactNode;
+  staticUnitLabel?: string;
+  title: ReactNode;
+  tooltip?: string;
+  unit?: TUnit;
+  unitOptions?: readonly { text: string; value: TUnit }[];
+  onUnitChange?: (value: TUnit) => void;
+  value?: string;
+}) {
+  const hasUnitSelect = unit !== undefined && unitOptions && onUnitChange;
+
+  return (
+    <Panel
+      className={cn(
+        "flex flex-col justify-between gap-3 bg-secondary/35",
+        Boolean(error) && "border-destructive/70",
+      )}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <Label tooltip={tooltip}>{title}</Label>
+        {rightHint ? (
+          <p className="text-right text-[11px] font-medium text-foreground/80">
+            {rightHint}
+          </p>
+        ) : null}
+      </div>
+      <div className="flex items-stretch gap-3">
+        <BorderedNumberField className="h-13 flex-1">
+          <NumericInput
+            value={value ?? ""}
+            onChange={onChange}
+            decimalScale={decimalScale}
+            className="text-[18px] font-semibold"
+          />
+        </BorderedNumberField>
+        {hasUnitSelect ? (
+          <AppSelect
+            value={unit}
+            items={unitOptions}
+            onChange={onUnitChange}
+            triggerClassName="h-auto self-stretch"
+          />
+        ) : staticUnitLabel ? (
+          <p className="text-sm font-medium text-muted-foreground mt-auto mb-2">{staticUnitLabel}</p>
+        ) : null}
+      </div>
+    </Panel>
   );
 }
 
@@ -646,34 +741,15 @@ function TradesPanel() {
   ]);
 
   return (
-    <Panel
-      className={cn(
-        "flex flex-col justify-between gap-4 bg-secondary/35",
-        error && "border-destructive/70",
-      )}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <Label tooltip={t("totalTradesTooltip")}>
-          {t("tradesAmountTitle")}
-        </Label>
-        <p className="text-right text-[14px] font-medium text-foreground/80">
-          {perTradeText}
-        </p>
-      </div>
-      <div className="flex items-center justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <NumericInput
-            value={totalTrades ? totalTrades.toString() : ""}
-            onChange={(value) => onChange(Number(value || 0))}
-            decimalScale={0}
-            className="text-[28px] font-medium leading-none border border-border/70 rounded-[15px] px-3 py-2"
-          />
-        </div>
-        <span className="text-right text-[16px] font-medium leading-tight text-muted-foreground">
-          Trades
-        </span>
-      </div>
-    </Panel>
+    <OrderNumericInputPanel
+      title={t("tradesAmountTitle")}
+      tooltip={t("totalTradesTooltip")}
+      value={totalTrades ? totalTrades.toString() : ""}
+      onChange={(value) => onChange(Number(value || 0))}
+      rightHint={perTradeText}
+      staticUnitLabel="Trades"
+      error={error}
+    />
   );
 }
 
@@ -687,7 +763,7 @@ function BorderedNumberField({
   return (
     <div
       className={cn(
-        "flex min-w-0 cursor-text items-center rounded-[18px] border border-border/80 bg-transparent px-4 transition-colors hover:border-primary/55 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20",
+        "flex min-w-0 cursor-text items-center rounded-[14px] border border-border/80 bg-transparent px-4 transition-colors focus-within:border-primary",
         className,
       )}
     >
@@ -700,54 +776,36 @@ function TimeInputPanel({ kind }: { kind: "duration" | "fillDelay" }) {
   const t = useTranslations();
   const durationPanel = useSpot().durationPanel;
   const fillDelayPanel = useSpot().fillDelayPanel;
-  const value =
-    kind === "duration"
-      ? durationPanel.duration.value
-      : fillDelayPanel.fillDelay.value;
-  const unit =
-    kind === "duration"
-      ? durationPanel.duration.unit
-      : fillDelayPanel.fillDelay.unit;
-  const error =
-    kind === "duration" ? durationPanel.error : fillDelayPanel.error;
-  const onInputChange =
-    kind === "duration"
-      ? durationPanel.onInputChange
-      : fillDelayPanel.onInputChange;
-  const onUnitSelect =
-    kind === "duration"
-      ? durationPanel.onUnitSelect
-      : fillDelayPanel.onUnitSelect;
 
   return (
-    <Panel
-      className={cn("flex flex-col gap-3", error && "border-destructive/70")}
-    >
-      <Label
-        tooltip={
-          kind === "duration"
-            ? t("maxDurationTooltip")
-            : t("tradeIntervalTooltip")
-        }
-      >
-        {kind === "duration" ? t("expiry") : t("tradeIntervalTitle")}
-      </Label>
-      <div className="flex items-stretch gap-3">
-        <BorderedNumberField className="h-14 flex-1">
-          <NumericInput
-            value={value ? value.toString() : ""}
-            onChange={(nextValue) => onInputChange(nextValue)}
-            decimalScale={0}
-            className="text-[28px] font-semibold"
-          />
-        </BorderedNumberField>
-        <AppSelect
-          value={unit}
-          items={DURATION_OPTIONS}
-          onChange={(nextUnit) => onUnitSelect(nextUnit)}
-        />
-      </div>
-    </Panel>
+    <OrderNumericInputPanel
+      title={kind === "duration" ? t("expiry") : t("tradeIntervalTitle")}
+      tooltip={
+        kind === "duration" ? t("maxDurationTooltip") : t("tradeIntervalTooltip")
+      }
+      value={
+        kind === "duration"
+          ? durationPanel.duration.value?.toString() || ""
+          : fillDelayPanel.fillDelay.value?.toString() || ""
+      }
+      onChange={
+        kind === "duration"
+          ? durationPanel.onInputChange
+          : fillDelayPanel.onInputChange
+      }
+      unit={
+        kind === "duration"
+          ? durationPanel.duration.unit
+          : fillDelayPanel.fillDelay.unit
+      }
+      unitOptions={DURATION_OPTIONS}
+      onUnitChange={
+        kind === "duration"
+          ? durationPanel.onUnitSelect
+          : fillDelayPanel.onUnitSelect
+      }
+      error={kind === "duration" ? durationPanel.error : fillDelayPanel.error}
+    />
   );
 }
 
@@ -794,12 +852,12 @@ function SpotPriceInput({
   }, []);
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_100px] gap-2">
+    <div className="grid grid-cols-[minmax(0,1fr)_90px] gap-2">
       <div
-        className="flex min-w-0 cursor-pointer items-center gap-3 rounded-[15px] border border-primary/45 bg-transparent px-3 py-2 text-foreground transition-colors hover:border-primary/70 focus-within:border-primary"
+        className="flex min-w-0 items-center gap-3 rounded-[12px] border border-border/80 bg-transparent px-3 py-2 text-foreground transition-colors focus-within:border-primary"
         onClick={focusValueInput}
       >
-        <span className="min-w-0 truncate text-sm font-semibold text-muted-foreground">
+        <span className="min-w-0 truncate text-sm font-semibold text-foreground">
           {symbol}
         </span>
         <div className="min-w-0 flex-1 text-right">
@@ -808,7 +866,7 @@ function SpotPriceInput({
             isLoading={isLoading}
             value={value}
             onChange={onChange}
-            className="text-right text-[20px] font-semibold text-foreground"
+            className="text-right text-[18px] font-semibold text-foreground"
           />
           <p className="mt-1 min-h-4 text-xs text-muted-foreground">
             ${usdFormatted || "0"}
@@ -816,14 +874,14 @@ function SpotPriceInput({
         </div>
       </div>
       <div
-        className="cursor-pointer rounded-[15px] border border-primary/45 bg-transparent px-2 py-2 text-foreground transition-colors hover:border-primary/70 focus-within:border-primary"
+        className="cursor-pointer rounded-[12px] border border-border/80 bg-transparent px-2 py-2 text-foreground transition-colors focus-within:border-primary"
         onClick={focusPercentageInput}
       >
         <NumericInput
           ref={percentageInputRef}
           value={percentage}
           onChange={onPercentageChange}
-          className="text-center text-[20px] font-semibold text-foreground"
+          className="text-center text-[16px] font-semibold text-foreground"
           placeholder="0.0%"
           suffix="%"
           allowNegative
@@ -838,7 +896,7 @@ function PriceResetButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="text-sm font-semibold text-muted-foreground transition-colors hover:text-primary"
+      className="text-[12px] font-semibold text-muted-foreground transition-colors hover:text-primary"
     >
       Set to default
     </button>
@@ -910,10 +968,10 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
         {orderModule !== Module.LIMIT && (
-          <InlineSwitch
+          <Switch
             checked={isLimitPrice}
             onCheckedChange={toggleLimitPrice}
-            ariaLabel="Toggle limit price"
+            aria-label="Toggle limit price"
           />
         )}
         <div className="flex flex-1 items-center justify-between gap-3">
@@ -942,7 +1000,7 @@ function PricesHeader() {
 
   return (
     <div className="flex items-center justify-between gap-3">
-      <p className="text-sm font-semibold text-muted-foreground">
+      <p className="text-[13px] font-semibold text-muted-foreground">
         {isInverted ? "Buy" : "Sell"} {fromToken?.symbol}{" "}
         {isMarketPrice ? "at best rate" : "at rate"}
       </p>
@@ -997,7 +1055,7 @@ function InputErrorPanel() {
   }
 
   return (
-    <div className="flex gap-2 rounded-[18px] border border-destructive/60 bg-destructive/12 p-3 text-sm font-medium text-foreground">
+    <div className="flex gap-2 rounded-[14px] border border-destructive/60 bg-destructive/12 p-3 text-sm font-medium text-foreground">
       <AlertTriangleIcon className="relative top-0.5 size-4 shrink-0 text-destructive" />
       <p className="flex-1">{message}</p>
     </div>
@@ -1013,9 +1071,9 @@ function DisclaimerPanel() {
   }
 
   return (
-    <div className="flex gap-2 rounded-[18px] border border-border/60 bg-card/65 p-3">
-      <InfoIcon className="relative top-0.5 size-4 shrink-0 text-muted-foreground" />
-      <p className="flex-1 text-sm text-muted-foreground">
+    <div className="flex gap-2 rounded-[14px] border border-border/60 bg-card/65 p-3">
+      <InfoIcon className="relative top-1 size-4 shrink-0 text-muted-foreground" />
+      <p className="flex-1 text-[14px] text-muted-foreground">
         {t(disclaimer)}{" "}
         <a
           href={ORBS_TWAP_FAQ_URL}
@@ -1054,14 +1112,18 @@ function ReviewRow({
   );
 }
 
+function formatDurationUnit(value: number, unit: string) {
+  return `${value} ${unit}${value === 1 ? "" : "s"}`;
+}
+
 function formatDuration(ms?: number) {
   if (!ms) return "";
   const minutes = Math.round(ms / TimeUnit.Minutes);
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 60) return formatDurationUnit(minutes, "Minute");
   const hours = Math.round(ms / TimeUnit.Hours);
-  if (hours < 48) return `${hours} hr`;
+  if (hours < 48) return formatDurationUnit(hours, "Hour");
   const days = Math.round(ms / TimeUnit.Days);
-  return `${days} days`;
+  return formatDurationUnit(days, "Day");
 }
 
 function formatDeadline(deadline?: number) {
@@ -1084,7 +1146,7 @@ function TokenLogo({ token }: { token?: Token }) {
   );
 }
 
-function OrderReviewDetails() {
+function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
   const t = useTranslations();
   const order = useSpot().derivedFormData;
   const srcToken = order.srcToken;
@@ -1105,11 +1167,11 @@ function OrderReviewDetails() {
     value: order.limitPriceUI,
     decimalScale: 5,
   });
-  const fees = useFormatNumber({ value: order.feesAmountUI, decimalScale: 4 });
   const feesUsd = useFormatNumber({ value: order.feesUsd, decimalScale: 2 });
 
   return (
-    <div className="mt-3 flex w-full flex-col gap-2 rounded-[18px] border border-primary/25 bg-primary/10 p-3">
+    <div className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
+      <ReviewRow label={t("orderType")}>{orderTitle}</ReviewRow>
       <ReviewRow label={t("expirationLabel")} tooltip={t("expirationTooltip")}>
         {formatDeadline(order.deadline)}
       </ReviewRow>
@@ -1159,10 +1221,9 @@ function OrderReviewDetails() {
       </ReviewRow>
       <ReviewRow
         label={t("fees", { value: `(${order.feesPercentage}%)` })}
-        hidden={!fees}
+        hidden={!feesUsd}
       >
-        {fees} {dstToken?.symbol}
-        {feesUsd ? ` ($${feesUsd})` : ""}
+        ${feesUsd}
       </ReviewRow>
     </div>
   );
@@ -1187,7 +1248,7 @@ function TxError({ error }: { error?: ParsedError }) {
   );
 }
 
-function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
+function useOrderStep(srcToken?: Token): Step | undefined {
   const t = useTranslations();
   const { step, wrapTxHash, approveTxHash, status } =
     useSpot().orderExecutionPanel;
@@ -1218,13 +1279,12 @@ function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
       };
     }
     return {
-      title: t("createOrderAction", { name: orderTitle }),
+      title: t("createOrder"),
       footerText:
         status === SwapStatus.LOADING ? t("proceedInWallet") : undefined,
     };
   }, [
     approveExplorerUrl,
-    orderTitle,
     status,
     step,
     symbol,
@@ -1234,13 +1294,13 @@ function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
 }
 
 function OrderFlowMain({
+  orderTitle,
   onSubmit,
   isSubmitting,
-  orderTitle,
 }: {
+  orderTitle: string;
   onSubmit: () => void;
   isSubmitting?: boolean;
-  orderTitle: string;
 }) {
   const t = useTranslations();
   const [accepted, setAccepted] = useState(true);
@@ -1257,8 +1317,8 @@ function OrderFlowMain({
       />
       {!isSubmitted && (
         <div className="mt-3 flex w-full flex-col gap-3">
-          <OrderReviewDetails />
-          <div className="flex w-full items-center justify-between gap-3 rounded-[18px] bg-secondary/55 p-3">
+          <OrderReviewDetails orderTitle={orderTitle} />
+          <div className="flex w-full items-center justify-between gap-3 rounded-[14px] bg-secondary/55 p-3">
             <a
               href={DISCLAIMER_URL}
               target="_blank"
@@ -1267,19 +1327,19 @@ function OrderFlowMain({
             >
               Accept Disclaimer
             </a>
-            <InlineSwitch
+            <Switch
               checked={accepted}
               onCheckedChange={setAccepted}
-              ariaLabel="Accept order disclaimer"
+              aria-label="Accept order disclaimer"
             />
           </div>
           <Button
-            className="h-14 w-full rounded-[18px] text-base"
+            className="h-12 w-full rounded-[14px] text-base"
             disabled={!accepted || isSubmitting}
             isLoading={Boolean(isSubmitting)}
             onClick={onSubmit}
           >
-            {t("createOrderAction", { name: orderTitle })}
+            Submit order
           </Button>
         </div>
       )}
@@ -1324,7 +1384,7 @@ function SubmitOrderPanel({
     value: order.dstAmountUI,
     decimalScale: 4,
   });
-  const currentStep = useOrderStep(orderTitle, srcToken);
+  const currentStep = useOrderStep(srcToken);
   const inToken = useMemo(
     () => ({ symbol: srcToken?.symbol, logoUrl: srcToken?.logoUrl }),
     [srcToken],
@@ -1351,12 +1411,12 @@ function SubmitOrderPanel({
         Success: <OrderFlowSuccess orderTitle={orderTitle} />,
         Main: (
           <OrderFlowMain
+            orderTitle={orderTitle}
             onSubmit={onSubmit}
             isSubmitting={isSubmitting}
-            orderTitle={orderTitle}
           />
         ),
-        Loader: <Spinner className="size-18" />,
+        Loader: <SwapFlowLoader />,
       }}
     />
   );
@@ -1414,7 +1474,7 @@ function SubmitOrder({ orderModule }: { orderModule: Module }) {
       >
         <DialogHeader>
           <DialogTitle>
-            {parsedError ? "Error Creating Order" : `${orderTitle} order`}
+            {parsedError ? "Error Creating Order" : t("orderReview")}
           </DialogTitle>
         </DialogHeader>
         <SubmitOrderPanel
@@ -1427,7 +1487,15 @@ function SubmitOrder({ orderModule }: { orderModule: Module }) {
   );
 }
 
-function AdvancedOrderContent({ orderModule }: { orderModule: Module }) {
+function AdvancedOrderContent({
+  orderHistoryOpen,
+  onOrderHistoryOpenChange,
+  orderModule,
+}: {
+  orderHistoryOpen: boolean;
+  onOrderHistoryOpenChange: (open: boolean) => void;
+  orderModule: Module;
+}) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
@@ -1438,18 +1506,31 @@ function AdvancedOrderContent({ orderModule }: { orderModule: Module }) {
       <PricesPanel orderModule={orderModule} />
       <ModuleInputs orderModule={orderModule} />
       <InputErrorPanel />
-      <SettingsModal />
-      <SubmitOrder orderModule={orderModule} />
+      <FormActionPanel>
+        <SettingsModal triggerVariant="action" />
+        <SubmitOrder orderModule={orderModule} />
+      </FormActionPanel>
       <DisclaimerPanel />
-      <OrderHistoryModal />
+      <OrderHistoryModal
+        open={orderHistoryOpen}
+        onOpenChange={onOrderHistoryOpenChange}
+      />
     </div>
   );
 }
 
-export function AdvancedOrderForm({ tab }: { tab: FormTab }) {
-  const orderModule = useMemo(() => getModule(tab), [tab]);
+function SpotProviderShell({
+  children,
+  orderModule,
+}: {
+  children: ReactNode;
+  orderModule: Module;
+}) {
   const { inputCurrency, outputCurrency, inputAmount } = useDerivedSwap();
   const { chainId, address } = useConnection();
+  const dataChainId = useDataChainId();
+  const spotChainId = chainId ?? dataChainId;
+  const spotAccount = chainId ? address : undefined;
   const walletInteractions = useWalletInteractions();
   const callbacks = useSpotCallbacks();
   const inputBalance = useBalance(inputCurrency).wei;
@@ -1463,10 +1544,10 @@ export function AdvancedOrderForm({ tab }: { tab: FormTab }) {
 
   return (
     <SpotProvider
-      chainId={chainId}
+      chainId={spotChainId}
       typedInputAmount={inputAmount}
       walletInteractions={walletInteractions}
-      account={address}
+      account={spotAccount}
       partner={Partners.Agent}
       srcBalance={inputBalance}
       dstBalance={outputBalance}
@@ -1483,7 +1564,43 @@ export function AdvancedOrderForm({ tab }: { tab: FormTab }) {
       isDev={false}
       enableQueryParams={false}
     >
-      <AdvancedOrderContent orderModule={orderModule} />
+      {children}
     </SpotProvider>
+  );
+}
+
+export function SpotOrderHistoryModal({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <SpotProviderShell orderModule={Module.LIMIT}>
+      <OrderHistoryModal open={open} onOpenChange={onOpenChange} />
+    </SpotProviderShell>
+  );
+}
+
+export function AdvancedOrderForm({
+  orderHistoryOpen,
+  onOrderHistoryOpenChange,
+  tab,
+}: {
+  orderHistoryOpen: boolean;
+  onOrderHistoryOpenChange: (open: boolean) => void;
+  tab: FormTab;
+}) {
+  const orderModule = useMemo(() => getModule(tab), [tab]);
+
+  return (
+    <SpotProviderShell orderModule={orderModule}>
+      <AdvancedOrderContent
+        orderHistoryOpen={orderHistoryOpen}
+        onOrderHistoryOpenChange={onOrderHistoryOpenChange}
+        orderModule={orderModule}
+      />
+    </SpotProviderShell>
   );
 }

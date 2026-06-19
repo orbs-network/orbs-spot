@@ -31,9 +31,9 @@ const SettingsHeader = ({
   tooltip?: string;
 }) => {
   return (
-    <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border/70 px-5 py-5 text-left sm:px-7">
+    <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border/70 px-5 py-4 text-left sm:px-6">
       <div className="flex min-w-0 items-center gap-2">
-        <DialogTitle className="text-[26px] font-semibold leading-none tracking-normal">
+        <DialogTitle className="text-[16px] font-semibold leading-none tracking-normal sm:text-[18px]">
           {title}
         </DialogTitle>
         {tooltip && (
@@ -44,7 +44,7 @@ const SettingsHeader = ({
                 className="text-muted-foreground transition-colors hover:text-foreground"
                 aria-label={`${title} info`}
               >
-                <InfoIcon className="size-5" />
+                <InfoIcon className="size-4" />
               </button>
             </TooltipTrigger>
             <TooltipContent>{tooltip}</TooltipContent>
@@ -54,7 +54,7 @@ const SettingsHeader = ({
       <DialogClose asChild>
         <button
           type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
           aria-label="Close settings"
         >
           <XIcon className="size-5" />
@@ -96,13 +96,13 @@ const PercentSettings = ({
       : -1;
 
   return (
-    <div className="px-5 py-6 sm:px-7">
-      <div className="flex min-h-[76px] w-full flex-col gap-3 rounded-[24px] border border-border/70 bg-secondary/45 p-2 sm:flex-row sm:items-center">
-        <div className="relative grid flex-1 grid-cols-4 overflow-hidden rounded-[20px] border border-border/60 bg-background/45 p-1">
+    <div className="px-5 py-5 sm:px-6">
+      <div className="flex min-h-[46px] w-full flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative grid flex-1 grid-cols-4 overflow-hidden rounded-[12px] border border-border/45 bg-secondary/25 p-1">
           <div
             aria-hidden="true"
             className={cn(
-              "absolute inset-y-1 left-1 z-0 rounded-[16px] bg-primary shadow-[var(--button-primary-shadow)] transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+              "absolute inset-y-1 left-1 z-0 rounded-[10px] bg-primary shadow-[var(--button-primary-shadow)] transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
               activeIndex < 0 && "opacity-0",
             )}
             style={{
@@ -114,7 +114,7 @@ const PercentSettings = ({
             type="button"
             onClick={() => onChange(defaultValue, "auto")}
             className={cn(
-              "relative z-10 h-12 rounded-[16px] px-3 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground",
+              "relative z-10 h-10 rounded-[10px] px-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-white/3 hover:text-foreground sm:text-[12px]",
               isAuto && "text-primary-foreground hover:text-primary-foreground",
             )}
           >
@@ -128,7 +128,7 @@ const PercentSettings = ({
                 type="button"
                 onClick={() => onChange(preset, "custom")}
                 className={cn(
-                  "relative z-10 h-12 rounded-[16px] px-3 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground",
+                  "relative z-10 h-10 rounded-[10px] px-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-white/3 hover:text-foreground sm:text-[12px]",
                   selected &&
                     "text-primary-foreground hover:text-primary-foreground",
                 )}
@@ -138,16 +138,16 @@ const PercentSettings = ({
             );
           })}
         </div>
-        <div className="flex h-12 w-full items-center rounded-[18px] border border-border/80 px-3 transition-colors focus-within:border-primary sm:w-[150px]">
+        <div className="flex h-10 w-full items-center rounded-[12px] border border-border/80 px-3 transition-colors focus-within:border-primary sm:w-[114px]">
           <NumericInput
             value={value ? value.toString() : ""}
             onChange={(nextValue) => onChange(Number(nextValue), "custom")}
-            className="text-center text-[18px] font-semibold"
+            className="text-center text-lg font-semibold"
             placeholder={formatPlaceholder(defaultValue)}
             decimalScale={2}
           />
-          <span className="mx-2 h-6 w-px bg-border" />
-          <span className="text-[18px] font-semibold text-muted-foreground">
+          <span className="mx-2 h-5 w-px bg-border" />
+          <span className="text-sm font-semibold text-muted-foreground">
             %
           </span>
         </div>
@@ -185,7 +185,13 @@ const SpotSettings = () => {
   );
 };
 
-const SettingsInlineTrigger = () => {
+type SettingsTriggerVariant = "card" | "action";
+
+const SettingsInlineTrigger = ({
+  variant = "card",
+}: {
+  variant?: SettingsTriggerVariant;
+}) => {
   const isSpotTab = useIsSpotTab();
   const { slippage, slippageMode, priceProtection, priceProtectionMode } =
     useSettings();
@@ -196,11 +202,23 @@ const SettingsInlineTrigger = () => {
   const formattedValue = formatInlinePercent(value);
   const displayValue =
     mode === "auto" ? `Auto: ${formattedValue}%` : `${formattedValue}%`;
+  const isActionVariant = variant === "action";
 
   return (
-    <div className="flex min-h-[58px] w-full items-center justify-between gap-3 rounded-[22px] border border-border/70 bg-secondary/35 px-4 text-left transition-colors hover:border-primary/45 hover:bg-secondary/55">
+    <div
+      className={cn(
+        "flex w-full items-center justify-between gap-3 text-left",
+        isActionVariant
+          ? "min-h-0"
+          : "min-h-[46px] rounded-[18px] border border-border/70 bg-secondary/35 px-4 transition-colors hover:border-primary/25 hover:bg-secondary/40",
+      )}
+    >
       <div className="flex min-w-0 items-center gap-2">
-        <span className="text-[15px] font-semibold leading-none text-muted-foreground">
+        <span
+          className={cn(
+            "font-semibold leading-none text-muted-foreground text-[14px]",
+          )}
+        >
           {label}
         </span>
         <Tooltip>
@@ -220,7 +238,11 @@ const SettingsInlineTrigger = () => {
         <button
           type="button"
           aria-label={`Open ${label} settings`}
-          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-[18px] bg-primary/14 px-4 text-[15px] font-semibold leading-none text-primary transition-colors hover:bg-primary/20 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none"
+          className={cn(
+            "inline-flex shrink-0 items-center gap-2 rounded-[14px] bg-primary/14 font-semibold leading-none text-primary transition-colors hover:bg-primary/16 focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none",
+            isActionVariant ? "h-10 px-3.5" : "h-10 px-4",
+            isActionVariant ? "text-[12px]" : "text-[12px]",
+          )}
         >
           {displayValue}
           <PencilIcon className="size-4" />
@@ -230,19 +252,25 @@ const SettingsInlineTrigger = () => {
   );
 };
 
-export const SettingsModal = ({ className }: { className?: string }) => {
+export const SettingsModal = ({
+  className,
+  triggerVariant = "card",
+}: {
+  className?: string;
+  triggerVariant?: SettingsTriggerVariant;
+}) => {
   const isSpotTab = useIsSpotTab();
   const [open, setOpen] = useState(false);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <div className={className}>
-        <SettingsInlineTrigger />
+        <SettingsInlineTrigger variant={triggerVariant} />
       </div>
       <DialogContent
         presentation="center"
         showCloseButton={false}
-        className="w-[calc(100vw-1.5rem)] max-w-[640px] gap-0 overflow-hidden rounded-[28px] border-border/80 bg-card/98 p-0"
+        className="w-[calc(100vw-1.5rem)] max-w-[512px] gap-0 overflow-hidden rounded-[22px] border-border/80 p-0"
       >
         <SettingsHeader
           title={isSpotTab ? "Price Protection" : "Slippage Setting"}

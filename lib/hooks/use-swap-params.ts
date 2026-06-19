@@ -1,7 +1,7 @@
 import { StringParam, useQueryParams } from "use-query-params";
-import { useConnection } from "wagmi";
 import { useCallback, useMemo } from "react";
 import { getDefaultTokensForChain } from "../utils";
+import { useDataChainId } from "./use-data-chain-id";
 
 export const useSwapParams = () => {
   const [currencies, setCurrencies] = useQueryParams({
@@ -9,8 +9,9 @@ export const useSwapParams = () => {
     outputCurrency: StringParam,
   });
 
-  const { chainId } = useConnection();
+  const chainId = useDataChainId();
   const defaultTokens = useMemo(() => {
+    if (!chainId) return undefined;
     return getDefaultTokensForChain(chainId);
   }, [chainId]);
 

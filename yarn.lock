@@ -788,22 +788,22 @@
   resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.0.97.tgz#9a008615ca8977c1647c68b005e6f8cbb4033c55"
   integrity sha512-iQ0hDJqhXFBtZwTsMH2zuVu2y8c+pIiKOBtqgz7qzKTzwmGl+3hixuR3Riw2JJmKf2s7+zwZvku8boXTvGDuNA==
 
-"@orbs-network/spot-react@1.1.30":
-  version "1.1.30"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.30.tgz#3b0019770d11a61150f482df35aeee8adde11b0a"
-  integrity sha512-bzxZyQm+gJLOwjaELcQaH6taHydW5t8rypDFSRSRwCvzY1dImwTgGzNMFdEiiPtFVFpN6af7uHBieUtX5QbMrQ==
+"@orbs-network/spot-react@^1.1.32":
+  version "1.1.32"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.32.tgz#42e6d77378d6bac8c43287fb2c9b16f64884f521"
+  integrity sha512-KHZAQCpn/4/Bot8C5enkD1640rtRVh17HebP86naAjD7yfwvoyz/RKtYmoH0Or1iTf0Aefa3DUQRJEWm1rtYAw==
   dependencies:
-    "@orbs-network/spot-ui" "1.0.15"
+    "@orbs-network/spot-ui" "1.0.16"
 
-"@orbs-network/spot-ui@1.0.15":
-  version "1.0.15"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.15.tgz#6773dd5446d3eb0ba88d05c7ad5762bed4ecc93c"
-  integrity sha512-iHXvDKA/V9Y2Ah1VhnfZzFl0pqgvYMsByHpSpgCtGl1NQ6hsMPacucrjQV+ZYrT2DpZUqeRWP0piVF4G4YQYJQ==
+"@orbs-network/spot-ui@1.0.16":
+  version "1.0.16"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.16.tgz#8d03856d1b8b0cac9be2c05b959ccd642b310837"
+  integrity sha512-UkkoS6el/ZN9cq+bm6di4yoGMoymbOvEW5BjlJbWLvV/O6IN3J/3TMovfCqmB7dddmuvm9HpDGsStLluyiMYHQ==
   dependencies:
-    "@orbs-network/spot" "^2.6.1"
+    "@orbs-network/spot" "^2.6.2"
     "@orbs-network/twap" "^2.7.28"
 
-"@orbs-network/spot@^2.6.1":
+"@orbs-network/spot@^2.6.2":
   version "2.6.2"
   resolved "https://registry.yarnpkg.com/@orbs-network/spot/-/spot-2.6.2.tgz#d747e7db467bffbacab086bd421894cd512c3dfd"
   integrity sha512-ZsI3u9PyJy4lShuyoOC2ZmN2q6AqrsXGyIsZEybrWoWWQTD6+dR7DdQpGwcGMnHNJ//VvLbRJa4TxEUP/Hdjrg==
@@ -866,7 +866,7 @@
   resolved "https://registry.yarnpkg.com/@radix-ui/react-context/-/react-context-1.1.4.tgz#5e39f26ebbefed27836e46e763e8f71e09999ccd"
   integrity sha512-QwH4PO5urrbO+FaGd5Aglg+YJgWTyyuZ3g/6mKvsqraLkglDdckw9JafgL5McL5VEJ6EPNduPaT3ZE9BttDAqg==
 
-"@radix-ui/react-dialog@^1.1.15":
+"@radix-ui/react-dialog@^1.1.1", "@radix-ui/react-dialog@^1.1.15":
   version "1.1.17"
   resolved "https://registry.yarnpkg.com/@radix-ui/react-dialog/-/react-dialog-1.1.17.tgz#43d0f7b3a8b7f0d12f79fd67176528dcdd61ff7f"
   integrity sha512-TDTYmpdq8dI2+Xgvgj9AJ8Ghqq+Eph/TRVEdaFQPDItIY+6QSkU7MJMeevw1568Yw/2Ijz8BTphPSP2XejKphw==
@@ -922,6 +922,27 @@
   integrity sha512-orBC88futVpqCmhX1p4cvquNHsELQ+w+vBJnuj3ftETI5bJb0bZn3Tqu3SWN2IOcPycTnMGnhwoermvISt72sA==
   dependencies:
     "@radix-ui/react-use-layout-effect" "1.1.2"
+
+"@radix-ui/react-popover@^1.1.17":
+  version "1.1.17"
+  resolved "https://registry.yarnpkg.com/@radix-ui/react-popover/-/react-popover-1.1.17.tgz#f65ef3ab3ad229fb5efc772633681d4ad11ad571"
+  integrity sha512-/YSAOdJ7YJvdn7bn5sdSx2egW+SKY+u7O5RyAVs94Ymrg2fg5QTSFPMRkzvhGyFuE4/qsmPBdrwYoZMZh/4f+g==
+  dependencies:
+    "@radix-ui/primitive" "1.1.4"
+    "@radix-ui/react-compose-refs" "1.1.3"
+    "@radix-ui/react-context" "1.1.4"
+    "@radix-ui/react-dismissable-layer" "1.1.13"
+    "@radix-ui/react-focus-guards" "1.1.4"
+    "@radix-ui/react-focus-scope" "1.1.10"
+    "@radix-ui/react-id" "1.1.2"
+    "@radix-ui/react-popper" "1.3.1"
+    "@radix-ui/react-portal" "1.1.12"
+    "@radix-ui/react-presence" "1.1.6"
+    "@radix-ui/react-primitive" "2.1.6"
+    "@radix-ui/react-slot" "1.3.0"
+    "@radix-ui/react-use-controllable-state" "1.2.3"
+    aria-hidden "^1.2.4"
+    react-remove-scroll "^2.7.2"
 
 "@radix-ui/react-popper@1.3.1":
   version "1.3.1"
@@ -995,6 +1016,19 @@
   integrity sha512-MojKku4U/miO8Av4Dkb+ctMAQx7JmY96LmtDQlAarCRtd7rN52QCSzBF+XAvr5S6coSVj9HEPBgHAHKEJVk/WA==
   dependencies:
     "@radix-ui/react-compose-refs" "1.1.3"
+
+"@radix-ui/react-switch@^1.3.1":
+  version "1.3.1"
+  resolved "https://registry.yarnpkg.com/@radix-ui/react-switch/-/react-switch-1.3.1.tgz#5b9c6218d14531d66d4133263fddf26b58ff1264"
+  integrity sha512-55bQtCnOB0BohomSHi6qvQXpJEEqUGDm6hRrM0Bph5OXwhSegqkd8IqgBAQkM1IlgUlWZIxpxRcpOEfRIgimyw==
+  dependencies:
+    "@radix-ui/primitive" "1.1.4"
+    "@radix-ui/react-compose-refs" "1.1.3"
+    "@radix-ui/react-context" "1.1.4"
+    "@radix-ui/react-primitive" "2.1.6"
+    "@radix-ui/react-use-controllable-state" "1.2.3"
+    "@radix-ui/react-use-previous" "1.1.2"
+    "@radix-ui/react-use-size" "1.1.2"
 
 "@radix-ui/react-tooltip@^1.2.8":
   version "1.2.10"
@@ -4199,6 +4233,13 @@ use-sync-external-store@1.4.0:
   version "1.4.0"
   resolved "https://registry.yarnpkg.com/use-sync-external-store/-/use-sync-external-store-1.4.0.tgz#adbc795d8eeb47029963016cefdf89dc799fcebc"
   integrity sha512-9WXSPC5fMv61vaupRkCKCxsPxBocVnwakBEkMIHHpkTTg6icbJtg6jzgtLDm4bl3cSHAca52rYWih0k4K3PfHw==
+
+vaul@^1.1.2:
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/vaul/-/vaul-1.1.2.tgz#c959f8b9dc2ed4f7d99366caee433fbef91f5ba9"
+  integrity sha512-ZFkClGpWyI2WUQjdLJ/BaGuV6AVQiJ3uELGk3OYtP+B6yCO7Cmn9vPFXVJkRaGkOJu3m8bQMgtyzNHixULceQA==
+  dependencies:
+    "@radix-ui/react-dialog" "^1.1.1"
 
 viem@2.x:
   version "2.52.2"

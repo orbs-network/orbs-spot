@@ -18,9 +18,9 @@ export const Balance = ({
         onClick={() => onAmountChange?.(formatDecimals(BN(ui).toString(), 8))}
       >
         {isLoading ? (
-          <Skeleton className="h-4 w-[50px]" />
+          <Skeleton className="h-4 w-[40px]" />
         ) : (
-          <p className="max-w-full truncate text-right text-[13px] font-medium text-muted-foreground">
+          <p className="max-w-full truncate text-right text-[12px] font-medium text-muted-foreground">
             {formatted} {currency?.symbol}
           </p>
         )}

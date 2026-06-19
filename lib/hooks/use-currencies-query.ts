@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { useConnection } from "wagmi";
 import { DEFAULT_CHAIN_ID } from "../consts";
 import { getCurrencies } from "../get-currencies";
 import { dedupeCurrenciesByAddress, getTokenKey } from "../utils";
 import { useUserStore } from "./store";
+import { useDataChainId } from "./use-data-chain-id";
 
 const CURRENCIES_STALE_TIME = 1000 * 60 * 60 * 24;
 
@@ -20,10 +20,9 @@ const getCurrenciesQueryKey = (chainId: number, customCurrenciesKey: string) =>
 const fetchCurrencies = async (
   chainId: number,
   customCurrenciesList: Parameters<typeof dedupeCurrenciesByAddress>[0],
-  signal?: AbortSignal
 ) => {
   try {
-    const currencies = await getCurrencies(chainId, signal);
+    const currencies = await getCurrencies(chainId);
     return dedupeCurrenciesByAddress([...currencies, ...customCurrenciesList]);
   } catch (error) {
     console.error("Error fetching currencies:", error);
@@ -32,10 +31,10 @@ const fetchCurrencies = async (
 };
 
 const useCurrenciesQueryMeta = () => {
-  const { chainId = DEFAULT_CHAIN_ID } = useConnection();
+  const chainId = useDataChainId();
   const customCurrencies = useUserStore((state) => state.customCurrencies);
   const customCurrenciesList = useMemo(
-    () => customCurrencies[chainId] ?? [],
+    () => customCurrencies[chainId ?? DEFAULT_CHAIN_ID] ?? [],
     [chainId, customCurrencies]
   );
   const customCurrenciesKey = useMemo(
@@ -43,7 +42,7 @@ const useCurrenciesQueryMeta = () => {
     [customCurrenciesList]
   );
   const queryKey = useMemo(
-    () => getCurrenciesQueryKey(chainId, customCurrenciesKey),
+    () => getCurrenciesQueryKey(chainId ?? DEFAULT_CHAIN_ID, customCurrenciesKey),
     [chainId, customCurrenciesKey]
   );
 
@@ -58,7 +57,8 @@ export function useCurrenciesQuery() {
   
     return useQuery({
       queryKey,
-      queryFn: ({ signal }) => fetchCurrencies(chainId, customCurrenciesList, signal),
+      queryFn: () => fetchCurrencies(chainId!, customCurrenciesList),
+      enabled: Boolean(chainId),
       staleTime: CURRENCIES_STALE_TIME,
     });
   }

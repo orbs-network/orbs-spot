@@ -1,9 +1,9 @@
 import { createPublicClient, http } from "viem";
-import * as chains from "viem/chains";
+import { SUPPORTED_CHAINS } from "./consts";
 import { getRpcUrl } from "./rpc-url";
 
 export function getPublicClient(chainId: number) {
-  const chain = Object.values(chains).find((chain) => chain.id === chainId);
+  const chain = SUPPORTED_CHAINS.find((supportedChain) => supportedChain.id === chainId);
 
   return createPublicClient({
     chain,

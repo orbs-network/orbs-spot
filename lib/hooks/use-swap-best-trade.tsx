@@ -20,6 +20,10 @@ import { useBalances } from "./use-balances";
 import { useCallback, useMemo, useRef } from "react";
 import TokensPair from "@/components/tokens-pair";
 import { useConnection } from "wagmi";
+import {
+  isUserRejectedError,
+  showTransactionRejectedToast,
+} from "../tx-rejection";
 
 const usePrepareQuote = () => {
   const { trade, refetchTrade } = useDerivedSwap();
@@ -58,18 +62,6 @@ const getTotalSteps = (shouldWrap: boolean, shouldApprove: boolean) => {
 };
 
 type ToastId = string | number;
-
-const isUserRejectedError = (error: unknown) => {
-  if (!(error instanceof Error)) return false;
-  const message = error.message.toLowerCase();
-  return (
-    message.includes("rejected") ||
-    message.includes("denied") ||
-    message.includes("declined") ||
-    message.includes("user denied") ||
-    message.includes("user rejected")
-  );
-};
 
 const getReadableSwapError = (error: unknown) => {
   if (!(error instanceof Error)) {
@@ -228,11 +220,8 @@ const useToasts = () => {
   const onTransactionRejected = useCallback(() => {
     const id = activeToastId.current ?? swapToastId.current;
     dismissPendingToasts();
-    toast.info("Transaction rejected", {
+    showTransactionRejectedToast({
       id,
-      description: "No transaction was submitted and no funds moved.",
-      duration: 5_000,
-      closeButton: true,
     });
     activeToastId.current = undefined;
   }, [dismissPendingToasts]);

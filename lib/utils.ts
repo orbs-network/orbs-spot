@@ -8,22 +8,25 @@ import {
   BASE_TOKENS,
   DEFAULT_CHAIN_ID,
   DEFAULT_TOKENS,
+  hyperEvmChain,
+  megaethChain,
   NATIVE_TOKENS_LOGO_URLS,
   POPULAR_TOKENS,
+  SUPPORTED_CHAINS,
 } from "./consts";
 import * as chains from "viem/chains";
 
 export const getBaseCurrencies = (chainId?: number) => {
+  const targetChainId = chainId ?? DEFAULT_CHAIN_ID;
   const defaultTokens =
-    DEFAULT_TOKENS[(chainId ?? DEFAULT_CHAIN_ID) as keyof typeof DEFAULT_TOKENS] ??
-    DEFAULT_TOKENS[DEFAULT_CHAIN_ID];
+    DEFAULT_TOKENS[targetChainId as keyof typeof DEFAULT_TOKENS];
   const baseTokens =
-    BASE_TOKENS[(chainId ?? DEFAULT_CHAIN_ID) as keyof typeof BASE_TOKENS] ??
-    BASE_TOKENS[DEFAULT_CHAIN_ID];
+    BASE_TOKENS[targetChainId as keyof typeof BASE_TOKENS] ??
+    (chainId ? [] : BASE_TOKENS[DEFAULT_CHAIN_ID]);
 
   return uniqueTokenAddresses([
-    defaultTokens.input,
-    defaultTokens.output,
+    defaultTokens?.input,
+    defaultTokens?.output,
     ...baseTokens,
   ]);
 };
@@ -123,6 +126,17 @@ const CHAIN_NATIVE_SYMBOLS: Record<number, string[]> = {
   [chains.arbitrum.id]: ["ETH", "WETH"],
   [chains.base.id]: ["ETH", "WETH"],
   [chains.linea.id]: ["ETH", "WETH"],
+  [chains.sei.id]: ["SEI", "WSEI"],
+  [chains.berachain.id]: ["BERA", "WBERA"],
+  [chains.flare.id]: ["FLR", "WFLR"],
+  [chains.avalanche.id]: ["AVAX", "WAVAX"],
+  [chains.katana.id]: ["ETH", "WETH"],
+  [chains.optimism.id]: ["ETH", "WETH"],
+  [chains.mantle.id]: ["MNT", "WMNT"],
+  [hyperEvmChain.id]: ["HYPE", "WHYPE"],
+  [chains.unichain.id]: ["ETH", "WETH"],
+  [chains.xLayer.id]: ["OKB", "WOKB"],
+  [megaethChain.id]: ["ETH", "WETH"],
 };
 
 const getSymbolRank = (symbol?: string, chainId?: number) => {
@@ -287,6 +301,38 @@ export function formatDecimals(
   return significant ? sign + "0." + leadingZeros + significant : "0";
 }
 
+function normalizeDecimalString(value?: string) {
+  if (!value || !/[eE]/.test(value)) return value;
+
+  const [mantissa, exponentValue] = value.toLowerCase().split("e");
+  const exponent = Number(exponentValue);
+  if (!Number.isFinite(exponent)) return value;
+
+  const sign = mantissa.startsWith("-") ? "-" : "";
+  const unsignedMantissa = sign ? mantissa.slice(1) : mantissa;
+  const [integerPart, decimalPart = ""] = unsignedMantissa.split(".");
+  const digits = `${integerPart}${decimalPart}`.replace(/^0+(?=\d)/, "");
+  const decimalIndex = integerPart.length + exponent;
+
+  if (decimalIndex <= 0) {
+    return `${sign}0.${"0".repeat(Math.abs(decimalIndex))}${digits}`;
+  }
+
+  if (decimalIndex >= digits.length) {
+    return `${sign}${digits}${"0".repeat(decimalIndex - digits.length)}`;
+  }
+
+  return `${sign}${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
+}
+
+export function dynamicDecimals(
+  value?: string | number,
+  scale = 4,
+  maxDecimals = 12
+): string {
+  return formatDecimals(normalizeDecimalString(value?.toString()), scale, maxDecimals);
+}
+
 export const parseNativeCurrencyAddress = (
   address: string,
   chainId: number
@@ -305,15 +351,18 @@ export const getNativeTokenLogoUrl = (chainId: number) => {
 };
 
 export const getDefaultTokensForChain = (chainId: number = DEFAULT_CHAIN_ID) => {
-  return (
-    DEFAULT_TOKENS[chainId as keyof typeof DEFAULT_TOKENS] ??
-    DEFAULT_TOKENS[DEFAULT_CHAIN_ID]
-  );
+  const defaultTokens = DEFAULT_TOKENS[chainId as keyof typeof DEFAULT_TOKENS];
+
+  if (defaultTokens) {
+    return defaultTokens;
+  }
+
+  return DEFAULT_TOKENS[DEFAULT_CHAIN_ID];
 };
 
 export const getChainName = (chainId: number) => {
   return (
-    Object.values(chains).find((chain) => chain.id === chainId)?.name ?? ""
+    SUPPORTED_CHAINS.find((chain) => chain.id === chainId)?.name ?? ""
   );
 };
 
@@ -340,7 +389,7 @@ export const getExplorerUrl = (chainId?: number, txHash?: string) => {
   if (!chainId || !txHash) {
     return "";
   }
-  const explorer = Object.values(chains).find((chain) => chain.id === chainId)
+  const explorer = SUPPORTED_CHAINS.find((chain) => chain.id === chainId)
     ?.blockExplorers?.default;
   if (!explorer) {
     return "";

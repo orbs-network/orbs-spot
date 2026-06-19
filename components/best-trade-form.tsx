@@ -13,12 +13,13 @@ import { Field, SwapStep } from "@/lib/types";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import BN from "bignumber.js";
-import { getExplorerUrl } from "@/lib/utils";
+import { dynamicDecimals, getExplorerUrl } from "@/lib/utils";
 import { useConnection } from "wagmi";
-import { Spinner } from "./ui/spinner";
 import { CurrencyLogo } from "./ui/currency-logo";
 import { useTranslations } from "@/lib/use-translations";
 import { SettingsModal } from "./settings-modal";
+import { FormActionPanel } from "./form-action-panel";
+import { SwapFlowLoader } from "./swap-flow-loader";
 
 const useStep = () => {
   const currentStep = useBestTradeSwapStore((state) => state.currentStep);
@@ -65,6 +66,11 @@ const Detail = ({ title, value }: { title: string; value: ReactNode }) => {
 const formatSafeFixed = (value: BN, decimals = 2) => {
   if (!value.isFinite() || value.isNaN()) return "0.00";
   return value.toFixed(decimals);
+};
+
+const formatDynamicDecimals = (value: BN) => {
+  if (!value.isFinite() || value.isNaN()) return "0.00";
+  return dynamicDecimals(value.toString()) || "0.00";
 };
 
 const NetworkCost = () => {
@@ -116,7 +122,7 @@ const Rate = () => {
       return "0.00";
     }
 
-    return formatSafeFixed(output.div(input));
+    return formatDynamicDecimals(output.div(input));
   }, [outputAmount, inputAmount]);
 
   return (
@@ -201,7 +207,7 @@ const SwapReviewContent = ({
           Failed: <SwapFlow.Failed />,
           Success: <Success />,
           Main: <Main />,
-          Loader: <Spinner className="size-18" />,
+          Loader: <SwapFlowLoader />,
         }}
       />
     </DialogContent>
@@ -330,8 +336,8 @@ export function SwapBestTradeForm() {
   const { setInputAmount, handleCurrencyChange } = useActionHandlers();
 
   return (
-    <>
-      <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
         <CurrencyCard
           currency={inputCurrency}
           onCurrencyChange={(currency: string) =>
@@ -354,10 +360,10 @@ export function SwapBestTradeForm() {
           statusText={noLiquidity ? t("noLiquidity") : undefined}
         />
       </div>
-      <div className="flex flex-col gap-3">
-        <SettingsModal />
+      <FormActionPanel>
+        <SettingsModal triggerVariant="action" />
         <SubmitSwap />
-      </div>
-    </>
+      </FormActionPanel>
+    </div>
   );
 }

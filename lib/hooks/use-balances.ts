@@ -13,6 +13,7 @@ import { useSwapParams } from "./use-swap-params";
 import { useUserStore } from "./store";
 import { DEFAULT_CHAIN_ID } from "../consts";
 import { zeroAddress } from "viem";
+import { useDataChainId } from "./use-data-chain-id";
 
 type BalanceResponse = Record<string, string>;
 
@@ -42,15 +43,17 @@ const postBalances = async ({
 
 const useWatchedBalanceAddresses = () => {
   const { chainId } = useConnection();
+  const dataChainId = useDataChainId();
+  const tokenChainId = chainId ?? dataChainId ?? DEFAULT_CHAIN_ID;
   const { inputCurrency, outputCurrency } = useSwapParams();
   const customCurrencies = useUserStore((state) => state.customCurrencies);
 
   return useMemo(() => {
     const custom =
-      customCurrencies[chainId ?? DEFAULT_CHAIN_ID]?.map(
+      customCurrencies[tokenChainId]?.map(
         (currency) => currency.address
       ) ?? [];
-    const defaultTokens = getDefaultTokensForChain(chainId);
+    const defaultTokens = getDefaultTokensForChain(tokenChainId);
 
     return uniqueTokenAddresses([
       zeroAddress,
@@ -58,10 +61,10 @@ const useWatchedBalanceAddresses = () => {
       defaultTokens.output,
       inputCurrency,
       outputCurrency,
-      ...getPopularTokenForChain(chainId),
+      ...getPopularTokenForChain(tokenChainId),
       ...custom,
     ]).slice(0, MAX_WATCHED_BALANCE_TOKENS);
-  }, [chainId, customCurrencies, inputCurrency, outputCurrency]);
+  }, [customCurrencies, inputCurrency, outputCurrency, tokenChainId]);
 };
 
 const useBalanceQueryMeta = () => {

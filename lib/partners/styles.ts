@@ -47,7 +47,7 @@ export function getPartnerStyleVariables(
     "--sidebar-ring": colors.sidebarRing,
     "--app-shell-background": colors.background,
     "--nav-pill-background": transparentMix(colors.secondary, 86),
-    "--nav-pill-hover-background": colors.accent,
+    "--nav-pill-hover-background": transparentMix(colors.accent, 48),
     "--nav-pill-shadow":
       "inset 0 1px 0 rgba(255,255,255,0.04), 0 10px 26px rgba(0,0,0,0.24)",
     "--wallet-avatar-shadow": `0 0 18px ${transparentMix(colors.primary, 42)}`,

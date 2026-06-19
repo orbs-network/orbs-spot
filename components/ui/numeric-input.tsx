@@ -47,7 +47,7 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     <NumericFormat
       getInputRef={ref}
       className={cn(
-        "bg-transparent w-full h-full outline-none text-[26px]",
+        "bg-transparent w-full h-full outline-none text-[18px]",
         className,
         isLoading && "animate-pulse text-muted-foreground/35"
       )}

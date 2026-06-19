@@ -6,30 +6,29 @@ import { useBalances } from "./use-balances";
 import { useUSDPrices } from "./use-usd-price";
 import { Currency } from "../types";
 import { useCurrenciesQuery } from "./use-currencies-query";
-import { DEFAULT_CHAIN_ID } from "../consts";
+import { useDataChainId } from "./use-data-chain-id";
 
 const useExternalCurrency = (address?: `0x${string}`) => {
-  const { chainId } = useConnection();
-  const targetChainId = chainId ?? DEFAULT_CHAIN_ID;
-  const enabled = Boolean(address);
+  const chainId = useDataChainId();
+  const enabled = Boolean(address && chainId);
   const { data: externalCurrency } = useReadContracts({
     allowFailure: false,
     contracts: [
       {
         address,
-        chainId: targetChainId,
+        chainId,
         abi: erc20Abi,
         functionName: "decimals",
       },
       {
         address,
-        chainId: targetChainId,
+        chainId,
         abi: erc20Abi,
         functionName: "name",
       },
       {
         address,
-        chainId: targetChainId,
+        chainId,
         abi: erc20Abi,
         functionName: "symbol",
       },
@@ -100,7 +99,7 @@ export const useCurrencies = (query?: string) => {
   }, [currencies, query]);
 
   const allowExternal =
-    query && !internalCurrencies?.length && isAddress(query);
+    query && !isLoading && !internalCurrencies?.length && isAddress(query);
 
   const externalCurrency = useExternalCurrency(
     allowExternal ? query : undefined
@@ -126,7 +125,7 @@ export const useCurrencies = (query?: string) => {
 
 export const useCurrency = (address?: string) => {
   const tokenKey = getTokenKey(address);
-  const { data: currencies } = useCurrenciesQuery();
+  const { data: currencies, isLoading } = useCurrenciesQuery();
 
   const internalCurrency = useMemo(() => {
     return currencies?.find((currency) => getTokenKey(currency.address) === tokenKey);
@@ -135,6 +134,7 @@ export const useCurrency = (address?: string) => {
   const allowExternal =
     address &&
     !internalCurrency &&
+    !isLoading &&
     !isNativeAddress(address) &&
     isAddress(address);
 

@@ -1,15 +1,52 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { ChevronDownIcon, WalletIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon } from "lucide-react";
+import { useDisconnect, useSwitchChain } from "wagmi";
+import { toast } from "sonner";
+import { cn, makeEllipsisAddress } from "@/lib/utils";
+import { CHAIN_LOGO_URLS, MAIN_CHAINS, SPOT_CHAINS } from "@/lib/consts";
+import { useIsSpotTab } from "@/lib/hooks/use-form-tab";
 import type { PartnerBrand } from "@/lib/partners/types";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 const navPillClass =
-  "inline-flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3 text-sm font-semibold text-foreground shadow-[var(--nav-pill-shadow)] transition-colors hover:border-primary/45 hover:bg-[var(--nav-pill-hover-background)] focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:outline-none";
+  "inline-flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3 text-sm font-semibold text-foreground shadow-[var(--nav-pill-shadow)] transition-colors hover:border-primary/30 hover:bg-[var(--nav-pill-hover-background)] focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:outline-none";
+
+const CHAIN_LABELS: Record<number, string> = {
+  1: "Ethereum",
+  56: "BNB Chain",
+  137: "Polygon",
+  8453: "Base",
+  42161: "Arbitrum One",
+  59144: "Linea",
+  146: "Sonic",
+  1329: "Sei",
+  80094: "Berachain",
+  14: "Flare",
+  43114: "Avalanche",
+  747474: "Katana",
+  10: "Optimism",
+  5000: "Mantle",
+  999: "HyperEVM",
+  130: "Unichain",
+  196: "X Layer",
+  4326: "MegaETH",
+  10143: "Monad",
+};
+
+const getChainLabel = (chainId?: number, fallback?: string) => {
+  if (!chainId) return fallback ?? "Network";
+  return CHAIN_LABELS[chainId] ?? fallback ?? "Network";
+};
+
+const getChainIconUrl = (chainId?: number) => {
+  if (!chainId) return undefined;
+  return CHAIN_LOGO_URLS[chainId as keyof typeof CHAIN_LOGO_URLS];
+};
 
 const ChainIcon = ({
   iconUrl,
@@ -22,7 +59,7 @@ const ChainIcon = ({
 }) => {
   return (
     <span
-      className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 text-[10px] font-bold"
+      className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 text-[8px] font-bold"
       style={{ background: iconBackground ?? "var(--secondary)" }}
     >
       {iconUrl ? (
@@ -35,12 +72,177 @@ const ChainIcon = ({
   );
 };
 
+const ChainSelectorPopover = ({
+  currentChainId,
+  currentChainName,
+  currentChainIconUrl,
+  currentChainIconBackground,
+  isUnsupported,
+}: {
+  currentChainId?: number;
+  currentChainName?: string;
+  currentChainIconUrl?: string;
+  currentChainIconBackground?: string;
+  isUnsupported?: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const switchChain = useSwitchChain();
+  const isSpotTab = useIsSpotTab();
+  const availableChains = isSpotTab ? SPOT_CHAINS : MAIN_CHAINS;
+  const chainOptions = useMemo(
+    () =>
+      availableChains.map((supportedChain) => ({
+        id: supportedChain.id,
+        label: getChainLabel(supportedChain.id, supportedChain.name),
+        iconUrl: getChainIconUrl(supportedChain.id),
+      })),
+    [availableChains],
+  );
+  const isUnavailableForTab = !availableChains.some(
+    (chain) => chain.id === currentChainId,
+  );
+  const isWrongNetwork = isUnsupported || isUnavailableForTab;
+  const currentLabel = isWrongNetwork
+    ? "Wrong network"
+    : getChainLabel(currentChainId, currentChainName);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            navPillClass,
+            "pr-2.5",
+            isWrongNetwork && "border-destructive/60 text-destructive",
+          )}
+        >
+          <ChainIcon
+            iconUrl={getChainIconUrl(currentChainId) ?? currentChainIconUrl}
+            iconBackground={currentChainIconBackground}
+            name={currentLabel}
+          />
+          <span className="hidden max-w-[132px] truncate sm:inline">
+            {currentLabel}
+          </span>
+          <ChevronDownIcon
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        drawerTitle="Select chain"
+        className="max-h-[min(520px,calc(100vh-96px))] w-[174px] overflow-y-auto rounded-[14px] border-primary/35 bg-popover/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.04)]"
+      >
+        <div className="flex flex-col gap-1">
+          {chainOptions.map((option) => {
+            const selected = currentChainId === option.id && !isWrongNetwork;
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  if (!selected) {
+                    switchChain.mutate({ chainId: option.id });
+                  }
+                }}
+                className={cn(
+                  "flex h-12 w-full items-center gap-3 rounded-[11px] px-3 text-left text-[12px] font-semibold text-foreground transition-colors hover:bg-secondary/55 focus-visible:bg-secondary/55 focus-visible:outline-none",
+                  selected && "text-primary",
+                )}
+              >
+                <ChainIcon iconUrl={option.iconUrl} name={option.label} />
+                <span className="min-w-0 truncate">{option.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 const WalletAvatar = ({ label }: { label?: string }) => {
   return (
     <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--wallet-avatar-shadow)]">
       <WalletIcon className="size-3.5" />
       <span className="sr-only">{label ?? "Wallet"}</span>
     </span>
+  );
+};
+
+const WalletAccountPopover = ({
+  address,
+  displayName,
+}: {
+  address: string;
+  displayName: string;
+}) => {
+  const [open, setOpen] = useState(false);
+  const disconnect = useDisconnect();
+
+  const copyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(address);
+      toast.success("Address copied");
+      setOpen(false);
+    } catch {
+      toast.error("Failed to copy address");
+    }
+  };
+
+  const disconnectWallet = () => {
+    setOpen(false);
+    disconnect.mutate({});
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={cn(navPillClass, "max-w-[138px] pr-2.5")}
+        >
+          <WalletAvatar label={displayName} />
+          <span className="min-w-0 truncate">{displayName}</span>
+          <ChevronDownIcon
+            className={cn(
+              "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        drawerTitle="Wallet menu"
+        className="w-[176px] rounded-[14px] border-primary/60 bg-popover/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.5),0_0_0_1px_rgba(255,255,255,0.04)]"
+      >
+        <div className="flex flex-col gap-1">
+          <button
+            type="button"
+            onClick={() => void copyAddress()}
+            className="flex h-11 w-full items-center gap-3 rounded-[11px] px-3 text-left text-[11px] font-semibold text-foreground transition-colors hover:bg-secondary/55 focus-visible:bg-secondary/55 focus-visible:outline-none"
+          >
+            <CopyIcon className="size-4 text-muted-foreground" />
+            <span>Copy address</span>
+          </button>
+          <button
+            type="button"
+            onClick={disconnectWallet}
+            className="flex h-11 w-full items-center gap-3 rounded-[11px] px-3 text-left text-[11px] font-semibold text-destructive transition-colors hover:bg-destructive/8 focus-visible:bg-destructive/8 focus-visible:outline-none"
+          >
+            <LogOutIcon className="size-4" />
+            <span>Disconnect</span>
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 };
 
@@ -52,8 +254,6 @@ const NavWalletControls = () => {
         chain,
         mounted,
         authenticationStatus,
-        openAccountModal,
-        openChainModal,
         openConnectModal,
       }) => {
         const ready = mounted && authenticationStatus !== "loading";
@@ -68,7 +268,7 @@ const NavWalletControls = () => {
           return (
             <div
               aria-hidden="true"
-              className="h-10 w-[140px] rounded-full bg-secondary/80 opacity-0"
+              className="h-10 w-[112px] rounded-full bg-secondary/80 opacity-0"
             />
           );
         }
@@ -80,7 +280,7 @@ const NavWalletControls = () => {
               onClick={openConnectModal}
               className={cn(
                 navPillClass,
-                "bg-primary px-4 text-primary-foreground hover:bg-[var(--ring)]"
+                "bg-primary px-4 text-primary-foreground hover:bg-primary/74"
               )}
             >
               Connect Wallet
@@ -90,33 +290,20 @@ const NavWalletControls = () => {
 
         return (
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openChainModal}
-              className={cn(
-                navPillClass,
-                chain.unsupported && "border-destructive/60 text-destructive"
-              )}
-            >
-              <ChainIcon
-                iconUrl={chain.iconUrl}
-                iconBackground={chain.iconBackground}
-                name={chain.name}
-              />
-              <span className="max-w-[118px] truncate">
-                {chain.unsupported ? "Wrong network" : chain.name}
-              </span>
-              <ChevronDownIcon className="size-4 text-muted-foreground" />
-            </button>
-            <button
-              type="button"
-              onClick={openAccountModal}
-              className={cn(navPillClass, "max-w-[172px] pr-2.5")}
-            >
-              <WalletAvatar label={account.displayName} />
-              <span className="min-w-0 truncate">{account.displayName}</span>
-              <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
-            </button>
+            <ChainSelectorPopover
+              currentChainId={chain.id}
+              currentChainName={chain.name}
+              currentChainIconUrl={chain.iconUrl}
+              currentChainIconBackground={chain.iconBackground}
+              isUnsupported={chain.unsupported}
+            />
+            <WalletAccountPopover
+              address={account.address}
+              displayName={makeEllipsisAddress(account.address, {
+                start: 5,
+                end: 4,
+              })}
+            />
           </div>
         );
       }}
@@ -125,22 +312,9 @@ const NavWalletControls = () => {
 };
 
 export function Navigation({ brand }: { brand: PartnerBrand }) {
-  const pathname = usePathname();
-  const navItems: Array<{ label: string; path: string; external: boolean }> = [
-    { label: "Swap", path: "/", external: false },
-  ];
-
-  if (brand.externalUrl) {
-    navItems.push({
-      label: "Company",
-      path: brand.externalUrl,
-      external: true,
-    });
-  }
-
   return (
-    <nav className="sticky top-0 z-50 border-b border-border/80 bg-background/88 px-4 py-3 backdrop-blur-xl">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3">
+    <nav className="fixed left-0 right-0 top-0 z-50 w-full border-b border-border/80 bg-background/88 px-4 py-3 backdrop-blur-xl">
+      <div className="flex w-full flex-wrap items-center gap-3">
         <Link
           href="/"
           className="flex min-h-8 shrink-0 items-center no-underline"
@@ -161,33 +335,6 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
             </span>
           )}
         </Link>
-        <div className="order-2 flex w-full min-w-0 items-center gap-1 overflow-x-auto sm:order-none sm:w-auto sm:flex-1">
-          {navItems.map(({ label, path, external }) => {
-            const isActive =
-              !external &&
-              (path === "/" ? pathname === "/" : pathname.startsWith(path));
-            const className = `rounded-lg px-3 py-2 text-sm font-medium no-underline transition-colors ${
-              isActive
-                ? "bg-secondary text-foreground"
-                : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"
-            }`;
-            return external ? (
-              <a
-                key={path}
-                href={path}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={className}
-              >
-                {label}
-              </a>
-            ) : (
-              <Link key={path} href={path} className={className}>
-                {label}
-              </Link>
-            );
-          })}
-        </div>
         <div className="order-1 flex w-full shrink-0 items-center justify-start gap-2 sm:order-none sm:ml-auto sm:w-auto">
           <NavWalletControls />
         </div>

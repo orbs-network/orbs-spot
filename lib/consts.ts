@@ -1,16 +1,83 @@
 import {
   arbitrum,
+  avalanche,
   base,
+  berachain,
   bsc,
+  flare,
+  katana,
   linea,
   mainnet,
+  mantle,
   monad,
+  optimism,
   polygon,
+  sei,
   sonic,
+  unichain,
+  xLayer,
 } from "viem/chains";
+import { defineChain, type Chain } from "viem";
 import { FormTab } from "./types";
 
-export const SUPPORTED_CHAINS = [
+export const hyperEvmChain: Chain = defineChain({
+  id: 999,
+  name: "HyperEVM",
+  network: "hyperevm",
+  nativeCurrency: {
+    decimals: 18,
+    name: "HYPE",
+    symbol: "HYPE",
+  },
+  rpcUrls: {
+    default: {
+      http: ["https://rpc.hyperliquid.xyz/evm"],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: "HyperEVMScan",
+      url: "https://hyperevmscan.io",
+    },
+  },
+  contracts: {
+    multicall3: {
+      address: "0xca11bde05977b3631167028862be2a173976ca11",
+      blockCreated: 0,
+    },
+  },
+});
+
+export const megaethChain: Chain = defineChain({
+  id: 4326,
+  name: "MegaETH",
+  network: "megaeth",
+  nativeCurrency: {
+    decimals: 18,
+    name: "Ether",
+    symbol: "ETH",
+  },
+  rpcUrls: {
+    default: {
+      http: ["https://mainnet.megaeth.com/rpc"],
+      webSocket: ["wss://mainnet.megaeth.com/ws"],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: "MegaETH Etherscan",
+      url: "https://mega.etherscan.io",
+    },
+  },
+  contracts: {
+    multicall3: {
+      address: "0xca11bde05977b3631167028862be2a173976ca11",
+      blockCreated: 0,
+    },
+  },
+});
+
+export const MAIN_CHAINS = [
   mainnet,
   arbitrum,
   bsc,
@@ -20,6 +87,30 @@ export const SUPPORTED_CHAINS = [
   polygon,
   monad,
 ] as const;
+
+export const SPOT_CHAINS = [
+  bsc,
+  linea,
+  sei,
+  base,
+  sonic,
+  polygon,
+  berachain,
+  flare,
+  avalanche,
+  monad,
+  arbitrum,
+  mainnet,
+  katana,
+  optimism,
+  mantle,
+  hyperEvmChain,
+  unichain,
+  xLayer,
+  megaethChain,
+] as const;
+
+export const SUPPORTED_CHAINS = SPOT_CHAINS;
 
 export type SupportedChainId = (typeof SUPPORTED_CHAINS)[number]["id"];
 
@@ -55,6 +146,10 @@ export const DEFAULT_TOKENS = {
     input: "0x176211869ca2b568f2a7d4ee941e073a821ee1ff",
     output: "0xe5d7c2a44ffddf6b295a15c148167daaaf5cf34f",
   },
+  [sei.id]: {
+    input: "0xe30fedd158a2e3b13e9badaeabafc5516e95e8c7",
+    output: "0x5cf6826140c1c56ff49c808a1a75407cd1df9423",
+  },
   [sonic.id]: {
     input: "0x039e2fb66102314ce7b64ce5ce3e5183bc94ad38",
     output: "0x29219dd400f2bf60e5a23d13be72b486d4038894",
@@ -63,7 +158,47 @@ export const DEFAULT_TOKENS = {
     input: "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
     output: "0x754704bc059f8c67012fed69bc8a327a5aafb603",
   },
-} satisfies Record<SupportedChainId, DefaultTokenPair>;
+  [berachain.id]: {
+    input: "0x6969696969696969696969696969696969696969",
+    output: "0x549943e04f40284185054145c6e4e9568c1d3241",
+  },
+  [flare.id]: {
+    input: "0x1d80c49bbbcd1c0911346656b529df9e5c2f783d",
+    output: "0x0b38e83b86d491735feaa0a791f65c2b99535396",
+  },
+  [avalanche.id]: {
+    input: "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7",
+    output: "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e",
+  },
+  [katana.id]: {
+    input: "0xee7d8bcfb72bc1880d0cf19822eb0a2e6577ab62",
+    output: "0x203a662b0bd271a6ed5a60edfbd04bfce608fd36",
+  },
+  [optimism.id]: {
+    input: "0x4200000000000000000000000000000000000006",
+    output: "0x7f5c764cbc14f9669b88837ca1490cca17c31607",
+  },
+  [mantle.id]: {
+    input: "0x78c1b0c915c4faa5fffa6cabf0219da63d7f4cb8",
+    output: "0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9",
+  },
+  [hyperEvmChain.id]: {
+    input: "0x5555555555555555555555555555555555555555",
+    output: "0xb88339cb7199b77e23db6e890353e22632ba630f",
+  },
+  [unichain.id]: {
+    input: "0x4200000000000000000000000000000000000006",
+    output: "0x078d782b760474a361dda0af3839290b0ef57ad6",
+  },
+  [xLayer.id]: {
+    input: "0xe538905cf8410324e03a5a23c1c177a474d59b2b",
+    output: "0x74b7f16337b8972027f6196a17a631ac6de26d22",
+  },
+  [megaethChain.id]: {
+    input: "0x4200000000000000000000000000000000000006",
+    output: "0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb",
+  },
+} satisfies Record<number, DefaultTokenPair>;
 
 export const BASE_TOKENS = {
   [bsc.id]: [
@@ -120,7 +255,79 @@ export const BASE_TOKENS = {
     "0x3bd359c1119da7da1d913d1c4d2b7c461115433a",
     "0x754704bc059f8c67012fed69bc8a327a5aafb603",
   ],
-} satisfies Record<SupportedChainId, string[]>;
+  [sei.id]: [
+    "0xe30fedd158a2e3b13e9badaeabafc5516e95e8c7",
+    "0x5cf6826140c1c56ff49c808a1a75407cd1df9423",
+    "0xe15fc38f6d8c56af07bbcbe3baf5708a2bf42392",
+    "0x9151434b16b9763660705744891fa906f660ecc5",
+    "0x0555e30da8f98308edb960aa94c0db47230d2b9c",
+    "0x160345fc359604fc6e70e3c5facbde5f7a9342d8",
+  ],
+  [berachain.id]: [
+    "0x6969696969696969696969696969696969696969",
+    "0x549943e04f40284185054145c6e4e9568c1d3241",
+    "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+    "0x0555e30da8f98308edb960aa94c0db47230d2b9c",
+    "0x2f6f07cdcf3588944bf4c42ac74ff24bf56e7590",
+  ],
+  [flare.id]: [
+    "0x1d80c49bbbcd1c0911346656b529df9e5c2f783d",
+    "0x0b38e83b86d491735feaa0a791f65c2b99535396",
+  ],
+  [avalanche.id]: [
+    "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7",
+    "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e",
+    "0x9702230a8ea53601f5cd2dc00fdbc13d4df4a8c7",
+    "0xa7d7079b0fead91f3e65f86e8915cb59c1a4c664",
+    "0xd586e7f844cea2f87f50152665bcbc2c279d8d70",
+    "0x49d5c2bdffac6ce2bfdb6640f4f80f226bc10bab",
+  ],
+  [katana.id]: [
+    "0xee7d8bcfb72bc1880d0cf19822eb0a2e6577ab62",
+    "0x203a662b0bd271a6ed5a60edfbd04bfce608fd36",
+    "0x2dca96907fde857dd3d816880a0df407eeb2d2f2",
+    "0x0913da6da4b42f538b445599b46bb4622342cf52",
+    "0x7fb4d0f51544f24f385a421db6e7d4fc71ad8e5c",
+  ],
+  [optimism.id]: [
+    "0x4200000000000000000000000000000000000006",
+    "0x7f5c764cbc14f9669b88837ca1490cca17c31607",
+    "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+    "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+    "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1",
+    "0x68f180fcce6836688e9084f035309e29bf0a2095",
+  ],
+  [mantle.id]: [
+    "0x78c1b0c915c4faa5fffa6cabf0219da63d7f4cb8",
+    "0x09bc4e0d864854c6afb6eb9a9cdf58ac190d0df9",
+    "0x201eba5cc46d216ce6dc03f6a759e8e766e956ae",
+    "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+    "0xdeaddeaddeaddeaddeaddeaddeaddeaddead1111",
+  ],
+  [hyperEvmChain.id]: [
+    "0x5555555555555555555555555555555555555555",
+    "0xb88339cb7199b77e23db6e890353e22632ba630f",
+    "0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb",
+  ],
+  [unichain.id]: [
+    "0x4200000000000000000000000000000000000006",
+    "0x078d782b760474a361dda0af3839290b0ef57ad6",
+    "0x588ce4f028d8e7b53b687865d6a67b3a54c75518",
+    "0x9151434b16b9763660705744891fa906f660ecc5",
+    "0x927b51f251480a681271180da4de28d44ec4afb8",
+  ],
+  [xLayer.id]: [
+    "0xe538905cf8410324e03a5a23c1c177a474d59b2b",
+    "0x74b7f16337b8972027f6196a17a631ac6de26d22",
+    "0x1e4a5963abfd975d8c9021ce480b42188849d41d",
+    "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+    "0x5a77f1443d16ee5761d310e38b62f77f726bc71c",
+  ],
+  [megaethChain.id]: [
+    "0x4200000000000000000000000000000000000006",
+    "0xb8ce59fc3717ada4c02eadf9682a9e934f625ebb",
+  ],
+} satisfies Record<number, string[]>;
 
 export const POPULAR_TOKENS = {
   [bsc.id]: [
@@ -134,7 +341,18 @@ export const POPULAR_TOKENS = {
   [linea.id]: BASE_TOKENS[linea.id],
   [sonic.id]: BASE_TOKENS[sonic.id],
   [monad.id]: BASE_TOKENS[monad.id],
-} satisfies Record<SupportedChainId, string[]>;
+  [sei.id]: BASE_TOKENS[sei.id],
+  [berachain.id]: BASE_TOKENS[berachain.id],
+  [flare.id]: BASE_TOKENS[flare.id],
+  [avalanche.id]: BASE_TOKENS[avalanche.id],
+  [katana.id]: BASE_TOKENS[katana.id],
+  [optimism.id]: BASE_TOKENS[optimism.id],
+  [mantle.id]: BASE_TOKENS[mantle.id],
+  [hyperEvmChain.id]: BASE_TOKENS[hyperEvmChain.id],
+  [unichain.id]: BASE_TOKENS[unichain.id],
+  [xLayer.id]: BASE_TOKENS[xLayer.id],
+  [megaethChain.id]: BASE_TOKENS[megaethChain.id],
+} satisfies Record<number, string[]>;
 
 export const NATIVE_TOKENS_LOGO_URLS = {
   [bsc.id]: "https://s2.coinmarketcap.com/static/img/coins/128x128/1839.png",
@@ -148,7 +366,43 @@ export const NATIVE_TOKENS_LOGO_URLS = {
   [linea.id]: "https://s2.coinmarketcap.com/static/img/coins/128x128/1027.png",
   [sonic.id]: "https://s2.coinmarketcap.com/static/img/coins/128x128/32684.png",
   [monad.id]: "https://s2.coinmarketcap.com/static/img/coins/128x128/30495.png",
-} satisfies Record<SupportedChainId, string>;
+  [sei.id]: "https://icons.llamao.fi/icons/chains/rsz_sei",
+  [berachain.id]: "https://icons.llamao.fi/icons/chains/rsz_berachain",
+  [flare.id]: "https://icons.llamao.fi/icons/chains/rsz_flare",
+  [avalanche.id]:
+    "https://s2.coinmarketcap.com/static/img/coins/128x128/5805.png",
+  [katana.id]: "https://icons.llamao.fi/icons/chains/rsz_katana",
+  [optimism.id]:
+    "https://s2.coinmarketcap.com/static/img/coins/128x128/1027.png",
+  [mantle.id]: "https://icons.llamao.fi/icons/chains/rsz_mantle",
+  [hyperEvmChain.id]: "https://icons.llamao.fi/icons/chains/rsz_hyperliquid",
+  [unichain.id]: "https://icons.llamao.fi/icons/chains/rsz_unichain",
+  [xLayer.id]: "https://icons.llamao.fi/icons/chains/rsz_x-layer",
+  [megaethChain.id]:
+    "https://s2.coinmarketcap.com/static/img/coins/128x128/1027.png",
+} satisfies Record<number, string>;
+
+export const CHAIN_LOGO_URLS = {
+  [bsc.id]: "https://icons.llamao.fi/icons/chains/rsz_bsc",
+  [polygon.id]: "https://icons.llamao.fi/icons/chains/rsz_polygon",
+  [base.id]: "https://icons.llamao.fi/icons/chains/rsz_base",
+  [mainnet.id]: "https://icons.llamao.fi/icons/chains/rsz_ethereum",
+  [arbitrum.id]: "https://icons.llamao.fi/icons/chains/rsz_arbitrum",
+  [linea.id]: "https://icons.llamao.fi/icons/chains/rsz_linea",
+  [sonic.id]: "https://icons.llamao.fi/icons/chains/rsz_sonic",
+  [monad.id]: "https://icons.llamao.fi/icons/chains/rsz_monad",
+  [sei.id]: "https://icons.llamao.fi/icons/chains/rsz_sei",
+  [berachain.id]: "https://icons.llamao.fi/icons/chains/rsz_berachain",
+  [flare.id]: "https://icons.llamao.fi/icons/chains/rsz_flare",
+  [avalanche.id]: "https://icons.llamao.fi/icons/chains/rsz_avalanche",
+  [katana.id]: "https://icons.llamao.fi/icons/chains/rsz_katana",
+  [optimism.id]: "https://icons.llamao.fi/icons/chains/rsz_optimism",
+  [mantle.id]: "https://icons.llamao.fi/icons/chains/rsz_mantle",
+  [hyperEvmChain.id]: "https://icons.llamao.fi/icons/chains/rsz_hyperliquid",
+  [unichain.id]: "https://icons.llamao.fi/icons/chains/rsz_unichain",
+  [xLayer.id]: "https://icons.llamao.fi/icons/chains/rsz_x-layer",
+  [megaethChain.id]: "https://icons.llamao.fi/icons/chains/rsz_megaeth",
+} satisfies Record<number, string>;
 
 export const DEFAULT_SLIPPAGE = 0.5;
 

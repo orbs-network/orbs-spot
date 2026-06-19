@@ -44,7 +44,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           cancelButton:
             "rounded-xl border border-border bg-secondary px-3 py-1.5 text-foreground",
           closeButton:
-            "border-border bg-popover text-muted-foreground hover:bg-secondary hover:text-foreground",
+            "border-border bg-popover text-muted-foreground hover:bg-secondary/40 hover:text-foreground",
         },
       }}
       {...props}

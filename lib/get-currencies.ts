@@ -2,7 +2,7 @@ import * as chains from "viem/chains";
 import { Currency } from "./types";
 import { getAddress, isAddress, zeroAddress } from "viem";
 import axios from "axios";
-import type { SupportedChainId } from "./consts";
+import { SUPPORTED_CHAINS, type SupportedChainId } from "./consts";
 import {
   dedupeCurrenciesByAddress,
   eqCompare,
@@ -17,9 +17,20 @@ const coingekoChainToName = {
   [chains.mainnet.id]: "ethereum",
   [chains.bsc.id]: "binance-smart-chain",
   [chains.linea.id]: "linea",
+  [chains.sei.id]: "sei-v2",
+  [chains.berachain.id]: "berachain",
+  [chains.flare.id]: "flare-network",
   [chains.sonic.id]: "sonic",
   [chains.monad.id]: "monad",
-} satisfies Record<SupportedChainId, string>;
+  [chains.avalanche.id]: "avalanche",
+  [chains.katana.id]: "katana",
+  [chains.optimism.id]: "optimistic-ethereum",
+  [chains.mantle.id]: "mantle",
+  [chains.hyperEvm.id]: "hyperevm",
+  [chains.unichain.id]: "unichain",
+  [chains.xLayer.id]: "x-layer",
+  [chains.megaeth.id]: "megaeth",
+} satisfies Partial<Record<SupportedChainId, string>>;
 
 type CoinGeckoToken = {
   address?: string;
@@ -38,9 +49,21 @@ export const getCurrencies = async (
   try {
     const name =
       coingekoChainToName[chainId as keyof typeof coingekoChainToName];
+    const nativeCurrency = SUPPORTED_CHAINS.find(
+      (chain) => chain.id === chainId,
+    )?.nativeCurrency;
+    const nativeToken = nativeCurrency
+      ? {
+          address: zeroAddress,
+          symbol: nativeCurrency.symbol,
+          decimals: nativeCurrency.decimals,
+          logoUrl: getNativeTokenLogoUrl(chainId),
+          name: nativeCurrency.name,
+        }
+      : undefined;
 
     if (!name) {
-      return [];
+      return nativeToken ? [nativeToken] : [];
     }
 
     const response = await axios.get(
@@ -71,26 +94,13 @@ export const getCurrencies = async (
         }))
     );
 
-    const _native = Object.values(chains).find(
-      (chain) => chain.id === chainId
-    )?.nativeCurrency;
-
     const tokensWithoutNativeSymbol = tokens.filter(
-      (token: Currency) => !eqCompare(token.symbol, _native?.symbol ?? "")
+      (token: Currency) => !eqCompare(token.symbol, nativeCurrency?.symbol ?? "")
     );
 
     let res = sortByBaseAssets(tokensWithoutNativeSymbol, chainId);
-    if (_native) {
-      res = [
-        {
-          address: zeroAddress,
-          symbol: _native.symbol,
-          decimals: _native.decimals,
-          logoUrl: getNativeTokenLogoUrl(chainId),
-          name: _native.name,
-        },
-        ...res,
-      ];
+    if (nativeToken) {
+      res = [nativeToken, ...res];
     }
     return dedupeCurrenciesByAddress(res).slice(0, CURRENCY_LIST_LIMIT);
   } catch (error) {

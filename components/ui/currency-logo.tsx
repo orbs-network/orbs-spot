@@ -5,6 +5,7 @@ import { Currency } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import { Avatar, AvatarFallback } from "./avatar";
 import { cn, getFirstAndLastLetter } from "@/lib/utils";
+import { Skeleton } from "./skeleton";
 
 type Props = {
   currency?: Currency;
@@ -57,10 +58,14 @@ function getFallbackLogoUrls(symbol?: string) {
 
 function CurrencyLogoImage({
   alt,
+  isLoaded,
+  onLoad,
   src,
   onError,
 }: {
   alt: string;
+  isLoaded: boolean;
+  onLoad: () => void;
   src?: string;
   onError: () => void;
 }) {
@@ -71,8 +76,12 @@ function CurrencyLogoImage({
       key={src}
       src={src}
       alt={alt}
+      onLoad={onLoad}
       onError={onError}
-      className="absolute inset-0 z-10 aspect-square size-full rounded-full object-contain"
+      className={cn(
+        "absolute inset-0 z-10 aspect-square size-full rounded-full object-contain transition-opacity duration-150",
+        isLoaded ? "opacity-100" : "opacity-0"
+      )}
     />
   );
 }
@@ -96,6 +105,10 @@ export function CurrencyLogo({
     key: string;
     sources: Set<string>;
   }>(() => ({ key: "", sources: new Set() }));
+  const [loadedState, setLoadedState] = useState<{
+    src?: string;
+    loaded: boolean;
+  }>(() => ({ loaded: false }));
   const failedSources =
     failedState.key === logoSourcesKey
       ? failedState.sources
@@ -104,8 +117,17 @@ export function CurrencyLogo({
     () => logoSources.find((source) => !failedSources.has(source)),
     [failedSources, logoSources]
   );
+  const isLogoLoaded =
+    Boolean(activeLogoSource) &&
+    loadedState.src === activeLogoSource &&
+    loadedState.loaded;
+  const onLogoLoad = useCallback(() => {
+    if (!activeLogoSource) return;
+    setLoadedState({ src: activeLogoSource, loaded: true });
+  }, [activeLogoSource]);
   const onLogoError = useCallback(() => {
     if (!activeLogoSource) return;
+    setLoadedState({ src: activeLogoSource, loaded: false });
     setFailedState((current) => {
       const sources =
         current.key === logoSourcesKey
@@ -117,11 +139,16 @@ export function CurrencyLogo({
   }, [activeLogoSource, logoSourcesKey]);
 
   return (
-    <Avatar className={cn("size-10", className)}>
+    <Avatar className={cn("size-8", className)}>
+      {activeLogoSource && !isLogoLoaded && (
+        <Skeleton className="absolute inset-0 z-0 size-full rounded-full bg-muted/25" />
+      )}
       <CurrencyLogoImage
         key={logoSourcesKey}
         alt={displayName}
+        isLoaded={isLogoLoaded}
         src={activeLogoSource}
+        onLoad={onLogoLoad}
         onError={onLogoError}
       />
       {!activeLogoSource && (
