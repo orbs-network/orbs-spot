@@ -35,7 +35,7 @@ export function DetailRow({
   return (
     <div
       className={cn(
-        "flex justify-between gap-4 text-sm",
+        "flex justify-between gap-4 text-sm flex-wrap",
         align === "center" ? "items-center" : "items-start",
         className,
       )}

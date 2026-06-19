@@ -56,7 +56,6 @@ export type PartnerBrand = {
 
 export type PartnerConfig = {
   id: string;
-  appId: string;
   brand: PartnerBrand;
   styles: PartnerStyles;
 };

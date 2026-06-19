@@ -2,7 +2,6 @@ import type { PartnerConfig } from "./types";
 
 export const defaultPartner: PartnerConfig = {
   id: "default",
-  appId: "agent-swap",
   brand: {
     name: "Agent Swap",
     iconSrc: "/favicon.ico",

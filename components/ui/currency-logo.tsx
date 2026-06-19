@@ -5,7 +5,6 @@ import { Currency } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import { Avatar, AvatarFallback } from "./avatar";
 import { cn, getFirstAndLastLetter } from "@/lib/utils";
-import { Skeleton } from "./skeleton";
 
 type Props = {
   currency?: Currency;
@@ -17,6 +16,8 @@ type Props = {
 };
 
 const EMPTY_FAILED_SOURCES = new Set<string>();
+const FAILED_LOGO_SOURCES = new Set<string>();
+const LOADED_LOGO_SOURCES = new Set<string>();
 
 const TOKEN_LOGO_SYMBOL_ALIASES: Record<string, string> = {
   WBTC: "BTC",
@@ -135,10 +136,11 @@ function CurrencyLogoImage({
       key={src}
       src={src}
       alt={alt}
+      decoding="async"
       onLoad={onLoad}
       onError={onError}
       className={cn(
-        "absolute inset-0 z-10 aspect-square size-full rounded-full object-contain transition-opacity duration-150",
+        "absolute inset-0 z-10 aspect-square size-full rounded-full object-contain",
         isLoaded ? "opacity-100" : "opacity-0"
       )}
     />
@@ -177,19 +179,25 @@ export function CurrencyLogo({
       ? failedState.sources
       : EMPTY_FAILED_SOURCES;
   const activeLogoSource = useMemo(
-    () => logoSources.find((source) => !failedSources.has(source)),
+    () =>
+      logoSources.find(
+        (source) =>
+          !failedSources.has(source) && !FAILED_LOGO_SOURCES.has(source)
+      ),
     [failedSources, logoSources]
   );
-  const isLogoLoaded =
-    Boolean(activeLogoSource) &&
-    loadedState.src === activeLogoSource &&
-    loadedState.loaded;
+  const isLogoLoaded = activeLogoSource
+    ? LOADED_LOGO_SOURCES.has(activeLogoSource) ||
+      (loadedState.src === activeLogoSource && loadedState.loaded)
+    : false;
   const onLogoLoad = useCallback(() => {
     if (!activeLogoSource) return;
+    LOADED_LOGO_SOURCES.add(activeLogoSource);
     setLoadedState({ src: activeLogoSource, loaded: true });
   }, [activeLogoSource]);
   const onLogoError = useCallback(() => {
     if (!activeLogoSource) return;
+    FAILED_LOGO_SOURCES.add(activeLogoSource);
     setLoadedState({ src: activeLogoSource, loaded: false });
     setFailedState((current) => {
       const sources =
@@ -203,18 +211,7 @@ export function CurrencyLogo({
 
   return (
     <Avatar className={cn("size-8", className)}>
-      {activeLogoSource && !isLogoLoaded && (
-        <Skeleton className="absolute inset-0 z-0 size-full rounded-full bg-muted/25" />
-      )}
-      <CurrencyLogoImage
-        key={logoSourcesKey}
-        alt={displayName}
-        isLoaded={isLogoLoaded}
-        src={activeLogoSource}
-        onLoad={onLogoLoad}
-        onError={onLogoError}
-      />
-      {!activeLogoSource && (
+      {(!activeLogoSource || !isLogoLoaded) && (
         <AvatarFallback
           className={cn(
             "absolute inset-0 z-0 flex h-full w-full items-center justify-center rounded-full bg-accent text-xs",
@@ -224,6 +221,14 @@ export function CurrencyLogo({
           {getFirstAndLastLetter(displaySymbol)}
         </AvatarFallback>
       )}
+      <CurrencyLogoImage
+        key={logoSourcesKey}
+        alt={displayName}
+        isLoaded={isLogoLoaded}
+        src={activeLogoSource}
+        onLoad={onLogoLoad}
+        onError={onLogoError}
+      />
     </Avatar>
   );
 }

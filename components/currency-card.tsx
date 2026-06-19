@@ -28,8 +28,8 @@ const CurrencySelectorTrigger = ({ currency }: { currency?: Currency }) => {
       currency={currency}
       showChevron
       className="gap-1 border border-border/80 bg-card px-2 py-1.5 hover:border-primary/25 hover:bg-secondary/45"
-      logoClassName="size-5"
-      symbolClassName="flex-1 text-[14px] font-medium"
+      logoClassName="size-5.5 mr-0.5"
+      symbolClassName="flex-1 text-[14px] font-medium relative top-[-1px]"
     />
   );
 };

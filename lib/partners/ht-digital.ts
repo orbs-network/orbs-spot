@@ -2,7 +2,6 @@ import type { PartnerConfig } from "./types";
 
 export const htDigitalPartner: PartnerConfig = {
   id: "ht-digital",
-  appId: "ht-digital-swap",
   brand: {
     name: "HT Digital",
     logoSrc: "/ht-digital-logo-mark.svg",

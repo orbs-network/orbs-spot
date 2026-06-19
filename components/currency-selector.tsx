@@ -24,6 +24,7 @@ import { useConnection } from "wagmi";
 import {
   getTokenKey,
   getPopularTokenForChain,
+  dynamicDecimals,
   isNativeAddress,
   makeEllipsisAddress,
   toAmountUI,
@@ -56,6 +57,16 @@ const formatTokenName = (name?: string) => {
     .replace(/\s*\([^)]*\)/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
+};
+
+const TOKEN_AMOUNT_VISIBLE_CHARACTERS = 7;
+
+const limitTokenAmountText = (amount?: string) => {
+  if (!amount || amount.length <= TOKEN_AMOUNT_VISIBLE_CHARACTERS) {
+    return amount;
+  }
+
+  return `${amount.slice(0, TOKEN_AMOUNT_VISIBLE_CHARACTERS)}...`;
 };
 
 const PopularTokens = ({
@@ -326,16 +337,25 @@ const CurrencyItem = memo(function CurrencyItem({
 }) {
   const displayName = formatTokenName(currency.name);
   const displaySymbol = formatTokenSymbol(currency.symbol);
+  const isTokenAddress = !isNativeAddress(currency.address);
   const balance = useMemo(
     () => toAmountUI(balanceWei, currency.decimals),
     [balanceWei, currency.decimals],
   );
   const formattedBalance = useFormatNumber({ value: balance });
+  const displayBalance = useMemo(() => {
+    const balanceText =
+      BN(balance || 0).gt(0) && formattedBalance === "0"
+        ? dynamicDecimals(balance, 4, 18)
+        : formattedBalance;
+
+    return limitTokenAmountText(balanceText);
+  }, [balance, formattedBalance]);
   const usdValue = useMemo(
     () =>
-      BN(balance || 0)
+     BN(balance || 0)
         .times(usdPrice || 0)
-        .toString(),
+        .toFixed(),
     [balance, usdPrice],
   );
   const formattedUsdValue = useFormatNumber({
@@ -345,9 +365,9 @@ const CurrencyItem = memo(function CurrencyItem({
   const hasBalance = BN(balanceWei ?? "0").gt(0);
 
   return (
-    <DialogClose className="w-full px-2">
+    <DialogClose asChild className="w-full px-2">
       <div
-        className="mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 transition-colors hover:border-primary/14 hover:bg-primary/6 data-[highlighted]:bg-primary/6"
+        className="group mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 transition-colors hover:border-primary/14 hover:bg-primary/6 data-[highlighted]:bg-primary/6"
         onClick={() => onCurrencyChange(currency)}
       >
         <div className="flex items-center gap-3 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -356,13 +376,13 @@ const CurrencyItem = memo(function CurrencyItem({
             name={displayName}
             symbol={displaySymbol}
           />
-          <div className="flex flex-col items-start flex-1">
-            <p className="text-base font-medium overflow-hidden text-ellipsis whitespace-nowrap max-w-[calc(100%-16px)]">
+          <div className="flex min-w-0 flex-1 flex-col items-start">
+            <p className="max-w-[calc(100%-16px)] overflow-hidden text-ellipsis whitespace-nowrap text-base font-medium">
               {displayName || displaySymbol}
             </p>
-            <p className="text-sm text-muted-foreground font-medium">
+            <p className="text-sm font-medium text-muted-foreground">
               {displaySymbol}
-              {!isNativeAddress(currency.address) && (
+              {isTokenAddress && (
                 <span className="text-xs text-muted-foreground/80 ml-1">
                   {makeEllipsisAddress(currency.address, { start: 6, end: 4 })}
                 </span>
@@ -377,7 +397,7 @@ const CurrencyItem = memo(function CurrencyItem({
             </p>
 
             <p className="text-sm text-muted-foreground">
-              {formattedBalance}
+              {displayBalance}
             </p>
           </div>
         )}

@@ -21,7 +21,7 @@
   "dependencies": {
     "@ethersproject/hash": "^5.8.0",
     "@orbs-network/liquidity-hub-sdk": "^1.0.97",
-    "@orbs-network/spot-react": "^1.1.32",
+    "@orbs-network/spot-react": "^1.1.33",
     "@orbs-network/swap-ui": "^0.0.61",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",

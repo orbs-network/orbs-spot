@@ -9,7 +9,7 @@ export function getRpcUrl(chainId: number | string) {
 
   const url = new URL(rpcUrl);
   url.searchParams.set("chainId", String(chainId));
-  url.searchParams.set("appId", getActivePartnerConfig().appId);
+  url.searchParams.set("appId", getActivePartnerConfig().id);
 
   return url.toString();
 }

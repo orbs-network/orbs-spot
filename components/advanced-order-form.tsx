@@ -35,6 +35,7 @@ import {
 import { useFormatNumber } from "@/lib/hooks/common";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
+import { useCurrency } from "@/lib/hooks/use-currencies";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useFormTabStore } from "@/lib/hooks/store";
 import {
@@ -88,6 +89,7 @@ import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { type Abi, erc20Abi, maxUint256 } from "viem";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
+import { getActiveClientPartnerConfig } from "@/lib/partners/client";
 
 const DURATION_OPTIONS = [
   { text: "Minutes", value: TimeUnit.Minutes },
@@ -709,6 +711,7 @@ function PriceTokenSelector({
   logoClassName: string;
   token?: Token;
 }) {
+  const currency = useCurrency(token?.address);
   const { handleCurrencyChange } = useActionHandlers();
   const onCurrencyChange = useCallback(
     (currency: Currency) => handleCurrencyChange(currency.address, field),
@@ -720,8 +723,9 @@ function PriceTokenSelector({
       onCurrencyChange={onCurrencyChange}
       trigger={
         <TokenSelectorTrigger
+          currency={currency}
           symbol={token?.symbol}
-          logoUrl={token?.logoUrl}
+          logoUrl={token?.logoUrl || currency?.logoUrl}
           className={cn(
             "-mx-1 gap-1.5 px-1 py-0.5 hover:bg-primary/8 hover:text-foreground",
             className,
@@ -741,7 +745,6 @@ function SpotPriceInput({
   onChange,
   percentage,
   onPercentageChange,
-  isLoading,
   usd,
 }: {
   token?: Token;
@@ -750,7 +753,6 @@ function SpotPriceInput({
   onChange: (value: string) => void;
   percentage: string;
   onPercentageChange: (value: string) => void;
-  isLoading?: boolean;
   usd?: string;
 }) {
   const usdFormatted = useFormatNumber({ value: usd, decimalScale: 2 });
@@ -781,7 +783,6 @@ function SpotPriceInput({
         <div className="min-w-0 flex-1 text-right">
           <NumericInput
             ref={valueInputRef}
-            isLoading={isLoading}
             value={value}
             onChange={onChange}
             className="text-right text-[20px] font-semibold text-foreground"
@@ -833,7 +834,6 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
     invertedDstToken,
     isTypedValue,
     usd,
-    isLoading,
   } = useSpot().triggerPricePanel;
 
   if (orderModule !== Module.STOP_LOSS && orderModule !== Module.TAKE_PROFIT) {
@@ -862,7 +862,6 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
         percentage={percentage}
         onPercentageChange={(value) => onPercentageChange(value)}
         usd={usd}
-        isLoading={isLoading}
       />
     </div>
   );
@@ -879,7 +878,6 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
     isLimitPrice,
     toggleLimitPrice,
     onReset,
-    isLoading,
     invertedDstToken,
     isTypedValue,
     usd,
@@ -910,7 +908,6 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
           onChange={(value) => onInputChange(value)}
           percentage={percentage}
           onPercentageChange={(value) => onPercentageChange(value)}
-          isLoading={isLoading}
           usd={usd}
         />
       )}
@@ -1063,15 +1060,12 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
   });
   const sizePerTrade = useFormatNumber({
     value: order.sizePerTradeUI,
-    decimalScale: 4,
   });
   const triggerPrice = useFormatNumber({
     value: order.triggerPriceUI,
-    decimalScale: 5,
   });
   const limitPrice = useFormatNumber({
     value: order.limitPriceUI,
-    decimalScale: 5,
   });
   const feesUsd = useFormatNumber({ value: order.feesUsd, decimalScale: 2 });
 
@@ -1313,6 +1307,9 @@ function SubmitOrderPanel({
     () => ({ symbol: dstToken?.symbol, logoUrl: dstToken?.logoUrl }),
     [dstToken],
   );
+  const srcCurrency = useCurrency(srcToken?.address);
+  const dstCurrency = useCurrency(dstToken?.address);
+  const tokenLogoClassName = status ? "size-[26px]" : "size-10";
 
   return (
     <SwapFlow
@@ -1325,8 +1322,20 @@ function SubmitOrderPanel({
       inToken={inToken}
       outToken={outToken}
       components={{
-        SrcTokenLogo: <SwapFlowTokenLogo token={srcToken} />,
-        DstTokenLogo: <SwapFlowTokenLogo token={dstToken} />,
+        SrcTokenLogo: (
+          <SwapFlowTokenLogo
+            token={srcToken}
+            currency={srcCurrency}
+            className={tokenLogoClassName}
+          />
+        ),
+        DstTokenLogo: (
+          <SwapFlowTokenLogo
+            token={dstToken}
+            currency={dstCurrency}
+            className={tokenLogoClassName}
+          />
+        ),
         Failed: <SwapFlow.Failed error={<TxError error={parsedError} />} />,
         Success: <OrderFlowSuccess orderTitle={orderTitle} />,
         Main: (
@@ -1394,7 +1403,7 @@ function SubmitOrder({ orderModule }: { orderModule: Module }) {
       >
         <DialogHeader>
           <DialogTitle>
-            {parsedError ? "Error Creating Order" : t("orderReview")}
+            {parsedError ? "Error Creating Order" : !status ? t("orderReview") : ''}
           </DialogTitle>
         </DialogHeader>
         <SubmitOrderPanel
@@ -1486,10 +1495,11 @@ function SpotProviderShell({
       priceProtection={priceProtection}
       module={orderModule}
       marketReferencePrice={marketReferencePrice}
-      minChunkSizeUsd={5}
+      minChunkSizeUsd={10}
       callbacks={callbacks}
       fees={0.25}
       isDev={false}
+      appId={getActiveClientPartnerConfig().id}
       enableQueryParams={false}
     >
       {children}

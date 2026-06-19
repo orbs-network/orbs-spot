@@ -788,10 +788,10 @@
   resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.0.97.tgz#9a008615ca8977c1647c68b005e6f8cbb4033c55"
   integrity sha512-iQ0hDJqhXFBtZwTsMH2zuVu2y8c+pIiKOBtqgz7qzKTzwmGl+3hixuR3Riw2JJmKf2s7+zwZvku8boXTvGDuNA==
 
-"@orbs-network/spot-react@^1.1.32":
-  version "1.1.32"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.32.tgz#42e6d77378d6bac8c43287fb2c9b16f64884f521"
-  integrity sha512-KHZAQCpn/4/Bot8C5enkD1640rtRVh17HebP86naAjD7yfwvoyz/RKtYmoH0Or1iTf0Aefa3DUQRJEWm1rtYAw==
+"@orbs-network/spot-react@^1.1.33":
+  version "1.1.33"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.33.tgz#1e7bf2f40f564309459e3bae5e109bf801d071c9"
+  integrity sha512-luq386gqh8A/v065HLZxzmu/Hur4NJ3G9Ud+kIKqg6ERjiUxtLkGa3MrUz0tPl0NsfwrEd/g2p98Fto7hagq6g==
   dependencies:
     "@orbs-network/spot-ui" "1.0.16"
 

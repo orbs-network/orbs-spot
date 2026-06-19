@@ -47,9 +47,9 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
     <NumericFormat
       getInputRef={ref}
       className={cn(
-        "bg-transparent w-full h-full outline-none text-[18px]",
-        className,
-        isLoading && "animate-pulse text-muted-foreground/35"
+        "bg-transparent w-full h-full outline-none text-[18px] placeholder:text-current placeholder:opacity-50",
+        isLoading && "animate-pulse text-muted-foreground/35",
+        className
       )}
       allowNegative={allowNegative}
       disabled={disabled}
