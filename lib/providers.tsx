@@ -5,7 +5,7 @@ import { darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { Spinner } from "@/components/ui/spinner";
 import dynamic from "next/dynamic";
 import { WagmiProvider } from "wagmi";
-import type { PartnerStyles } from "./partners/config";
+import type { PartnerBrand, PartnerStyles } from "./partners/types";
 import { QueryProvider } from "./query-provider";
 import { useWagmiConfig } from "./wagmi-config";
 
@@ -36,12 +36,12 @@ const Fallback = () => {
 
 const WagmiWrapper = ({
   children,
-  appName,
+  partnerBrand,
 }: {
   children: React.ReactNode;
-  appName: string;
+  partnerBrand: PartnerBrand;
 }) => {
-  const config = useWagmiConfig(appName);
+  const config = useWagmiConfig({ partnerBrand });
   return (
     <WagmiProvider config={config}>
       {children}
@@ -51,17 +51,17 @@ const WagmiWrapper = ({
 
 export function Providers({
   children,
-  partnerName,
+  partnerBrand,
   partnerStyles,
 }: {
   children: React.ReactNode;
-  partnerName: string;
+  partnerBrand: PartnerBrand;
   partnerStyles: PartnerStyles;
 }) {
   return (
     <Suspense fallback={<Fallback />}>
       <QueryProvider>
-        <WagmiWrapper appName={partnerName}>
+        <WagmiWrapper partnerBrand={partnerBrand}>
           <QueryClientProvider client={queryClient}>
             <RainbowKitProvider
               theme={darkTheme({

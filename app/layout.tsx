@@ -74,7 +74,7 @@ export default function RootLayout({
         style={getPartnerStyleVariables(partner.styles)}
       >
         <Providers
-          partnerName={partner.brand.name}
+          partnerBrand={partner.brand}
           partnerStyles={partner.styles}
         >
           <Toaster />
