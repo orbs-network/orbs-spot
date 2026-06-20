@@ -1,4 +1,12 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import {
+  coinbaseWallet,
+  metaMaskWallet,
+  rainbowWallet,
+  safeWallet,
+  uniswapWallet,
+  walletConnectWallet,
+} from "@rainbow-me/rainbowkit/wallets";
 import { useMemo } from "react";
 import { http, type Chain } from "viem";
 import { SUPPORTED_CHAINS } from "./consts";
@@ -65,6 +73,24 @@ export const useWagmiConfig = ({ partnerBrand }: WagmiConfigOptions) => {
           (typeof SUPPORTED_CHAINS)[number]["id"],
           ReturnType<typeof http>
         >,
+        wallets: [
+          {
+            groupName: "Recommended",
+            wallets: [
+              metaMaskWallet,
+              coinbaseWallet,
+              rainbowWallet,
+              walletConnectWallet,
+            ],
+          },
+          {
+            groupName: "More",
+            wallets: [
+              uniswapWallet,
+              safeWallet,
+            ],
+          },
+        ],
       });
     },
     [iconSrc, metadata.description, name],

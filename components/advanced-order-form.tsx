@@ -1,6 +1,6 @@
 "use client";
 
-import { useFormTabStore } from "@/lib/hooks/store";
+import { useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { FormTab } from "@/lib/types";
 import { useMemo } from "react";
 import { AdvancedOrderContent } from "./advanced-order/content";
@@ -12,8 +12,9 @@ export function AdvancedOrderForm({
 }: {
   hidden?: boolean;
 }) {
-  const selectedTab = useFormTabStore((state) => state.selectedTab);
-  const tab = selectedTab === FormTab.SWAP ? FormTab.TWAP : selectedTab;
+  const { selectedTab } = useSelectedFormTab();
+  const tab =
+    selectedTab.value === FormTab.SWAP ? FormTab.TWAP : selectedTab.value;
   const orderModule = useMemo(() => getModule(tab), [tab]);
 
   return (

@@ -1,8 +1,7 @@
 import { StringParam, useQueryParam } from "use-query-params";
 import { FORM_TABS, SPOT_TABS } from "../consts";
 import { FormTab } from "../types";
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useFormTabStore } from "./store";
+import { useCallback, useMemo } from "react";
 
 const tabParamToFormTab: Record<string, FormTab> = {
   swap: FormTab.SWAP,
@@ -22,34 +21,7 @@ const formTabToTabParam: Record<FormTab, string | undefined> = {
 
 export const useSelectedFormTab = () => {
   const [tab, setTab] = useQueryParam("tab", StringParam);
-  const urlValue = tabParamToFormTab[tab ?? ""] ?? FormTab.SWAP;
-  const queryUpdateTimerRef = useRef<number | null>(null);
-  const pendingTab = useFormTabStore((state) => state.pendingTab);
-  const selectedValue = useFormTabStore((state) => state.selectedTab);
-  const clearPendingTab = useFormTabStore((state) => state.clearPendingTab);
-  const setPendingTab = useFormTabStore((state) => state.setPendingTab);
-  const setSelectedTabValue = useFormTabStore((state) => state.setSelectedTab);
-
-  useEffect(() => {
-    if (pendingTab) {
-      if (urlValue === pendingTab) {
-        clearPendingTab();
-      }
-      return;
-    }
-
-    if (selectedValue !== urlValue) {
-      setSelectedTabValue(urlValue);
-    }
-  }, [clearPendingTab, pendingTab, selectedValue, setSelectedTabValue, urlValue]);
-
-  useEffect(() => {
-    return () => {
-      if (queryUpdateTimerRef.current) {
-        window.clearTimeout(queryUpdateTimerRef.current);
-      }
-    };
-  }, []);
+  const selectedValue = tabParamToFormTab[tab ?? ""] ?? FormTab.SWAP;
 
   const selectedTab =
     FORM_TABS.find((formTab) => formTab.value === selectedValue) ??
@@ -57,19 +29,9 @@ export const useSelectedFormTab = () => {
 
   const setSelectedTab = useCallback(
     (nextTab: FormTab) => {
-      setSelectedTabValue(nextTab);
-      setPendingTab(nextTab);
-
-      if (queryUpdateTimerRef.current) {
-        window.clearTimeout(queryUpdateTimerRef.current);
-      }
-
-      queryUpdateTimerRef.current = window.setTimeout(() => {
-        setTab(formTabToTabParam[nextTab] ?? undefined);
-        queryUpdateTimerRef.current = null;
-      }, 320);
+      setTab(formTabToTabParam[nextTab] ?? undefined);
     },
-    [setPendingTab, setSelectedTabValue, setTab]
+    [setTab]
   );
 
   return useMemo(

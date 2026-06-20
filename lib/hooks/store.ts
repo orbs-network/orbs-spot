@@ -1,7 +1,7 @@
 import { SwapStatus } from "@orbs-network/swap-ui";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { Currency, FormTab, SwapStep } from "../types";
+import { Currency, SwapStep } from "../types";
 import { DEFAULT_PRICE_PROTECTION, DEFAULT_SLIPPAGE } from "../consts";
 import { getTokenKey } from "../utils";
 
@@ -93,21 +93,12 @@ export const useSwapStore = create<SwapStore>((set) => ({
 
 type FormTabStore = {
   orderHistoryOpen: boolean;
-  pendingTab?: FormTab;
-  selectedTab: FormTab;
-  clearPendingTab: () => void;
   setOrderHistoryOpen: (open: boolean) => void;
-  setPendingTab: (tab: FormTab) => void;
-  setSelectedTab: (tab: FormTab) => void;
 };
 
 export const useFormTabStore = create<FormTabStore>((set) => ({
   orderHistoryOpen: false,
-  selectedTab: FormTab.SWAP,
-  clearPendingTab: () => set({ pendingTab: undefined }),
   setOrderHistoryOpen: (open: boolean) => set({ orderHistoryOpen: open }),
-  setPendingTab: (tab: FormTab) => set({ pendingTab: tab }),
-  setSelectedTab: (tab: FormTab) => set({ selectedTab: tab }),
 }));
 
 type BestTradeSwapStore = {
