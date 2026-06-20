@@ -1,4 +1,8 @@
-import { getDefaultConfig } from "@rainbow-me/rainbowkit";
+import {
+  getDefaultConfig,
+  getWalletConnectConnector,
+  type WalletList,
+} from "@rainbow-me/rainbowkit";
 import {
   coinbaseWallet,
   metaMaskWallet,
@@ -18,6 +22,63 @@ const rpcProxyTransport = (chain: Chain) =>
 type WagmiConfigOptions = {
   partnerBrand: PartnerBrand;
 };
+
+type CreateWallet = WalletList[number]["wallets"][number];
+
+function isMobileBrowser() {
+  if (typeof navigator === "undefined") {
+    return false;
+  }
+
+  return /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+}
+
+function hasInjectedMetaMask() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const ethereum = (window as typeof window & {
+    ethereum?: { isMetaMask?: boolean };
+  }).ethereum;
+
+  return Boolean(ethereum?.isMetaMask);
+}
+
+const desktopOnlyWallet =
+  (createWallet: CreateWallet): CreateWallet =>
+  (params) => {
+    const wallet = createWallet(params);
+    const hidden = wallet.hidden;
+
+    return {
+      ...wallet,
+      hidden: () => isMobileBrowser() || hidden?.() === true,
+    };
+  };
+
+const metaMaskWalletWithMobileWalletConnect: CreateWallet = (params) => {
+  const wallet = metaMaskWallet(params);
+
+  if (!isMobileBrowser() || hasInjectedMetaMask()) {
+    return wallet;
+  }
+
+  const getUri = (uri: string) =>
+    `https://metamask.app.link/wc?uri=${encodeURIComponent(uri)}`;
+
+  return {
+    ...wallet,
+    mobile: { getUri },
+    qrCode: wallet.qrCode ? { ...wallet.qrCode, getUri } : { getUri },
+    createConnector: getWalletConnectConnector({
+      projectId: params.projectId,
+      walletConnectParameters: params.walletConnectParameters,
+    }),
+  };
+};
+
+const desktopWalletConnectWallet = desktopOnlyWallet(walletConnectWallet);
 
 function getAbsoluteUrl(value?: string) {
   if (!value) {
@@ -77,16 +138,15 @@ export const useWagmiConfig = ({ partnerBrand }: WagmiConfigOptions) => {
           {
             groupName: "Recommended",
             wallets: [
-              metaMaskWallet,
+              metaMaskWalletWithMobileWalletConnect,
               coinbaseWallet,
               rainbowWallet,
-              walletConnectWallet,
+              desktopWalletConnectWallet,
             ],
           },
           {
             groupName: "More",
             wallets: [
-              uniswapWallet,
               safeWallet,
             ],
           },
