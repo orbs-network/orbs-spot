@@ -7,10 +7,12 @@ import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { cn } from "@/lib/utils";
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
+import { XIcon } from "lucide-react";
 
 const ResponsivePopoverContext = React.createContext({ isDrawer: false });
 
@@ -48,25 +50,48 @@ function PopoverContent({
   align = "center",
   sideOffset = 8,
   drawerTitle = "Menu",
+  mobilePresentation = "drawer",
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content> & {
   drawerTitle?: string;
+  mobilePresentation?: "drawer" | "fullscreen";
 }) {
   const { isDrawer } = React.useContext(ResponsivePopoverContext);
 
   if (isDrawer) {
+    const isFullscreen = mobilePresentation === "fullscreen";
+
     return (
       <DrawerContent
         data-slot="popover-content"
         className={cn(
-          "max-h-[85dvh] p-4",
+          "p-4",
           className,
           "bg-card/98 text-card-foreground",
-          "!w-screen !max-w-none rounded-b-none"
+          isFullscreen
+            ? "!mt-0 !flex !h-[100dvh] !max-h-[100dvh] !w-screen !max-w-none !rounded-none !border-0 bg-card !p-0 [&>div:first-child]:hidden"
+            : "max-h-[85dvh] !w-screen !max-w-none rounded-b-none",
         )}
         {...props}
       >
-        <DrawerTitle className="sr-only">{drawerTitle}</DrawerTitle>
+        {isFullscreen ? (
+          <div className="flex h-[72px] shrink-0 items-center justify-between border-b border-border/70 px-5 pt-[env(safe-area-inset-top)]">
+            <DrawerTitle className="text-[20px] font-bold leading-none">
+              {drawerTitle}
+            </DrawerTitle>
+            <DrawerClose asChild>
+              <button
+                type="button"
+                className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary/45 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:outline-none"
+                aria-label="Close"
+              >
+                <XIcon className="size-5" />
+              </button>
+            </DrawerClose>
+          </div>
+        ) : (
+          <DrawerTitle className="sr-only">{drawerTitle}</DrawerTitle>
+        )}
         {children}
       </DrawerContent>
     );

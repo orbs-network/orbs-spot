@@ -1,14 +1,20 @@
 "use client";
 
-import { type ComponentProps, forwardRef, useMemo, useState } from "react";
+import {
+  type ComponentProps,
+  forwardRef,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon } from "lucide-react";
 import { useDisconnect, useSwitchChain } from "wagmi";
 import { toast } from "sonner";
 import { cn, makeEllipsisAddress } from "@/lib/utils";
-import { CHAIN_LOGO_URLS, MAIN_CHAINS, SPOT_CHAINS } from "@/lib/consts";
-import { useIsSpotTab } from "@/lib/hooks/use-form-tab";
+import { CHAIN_LOGO_URLS, MAIN_CHAINS, SPOT_CHAINS, SPOT_TABS } from "@/lib/consts";
+import { useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import type { PartnerBrand } from "@/lib/partners/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
@@ -75,18 +81,25 @@ const getChainIconUrl = (chainId?: number) => {
   return CHAIN_LOGO_URLS[chainId as keyof typeof CHAIN_LOGO_URLS];
 };
 
+const UNSUPPORTED_CHAIN_TOAST_ID = "unsupported-chain";
+
 const ChainIcon = ({
+  className,
   iconUrl,
   iconBackground,
   name,
 }: {
+  className?: string;
   iconUrl?: string;
   iconBackground?: string;
   name?: string;
 }) => {
   return (
     <span
-      className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 text-[8px] font-bold"
+      className={cn(
+        "flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 text-[8px] font-bold",
+        className,
+      )}
       style={{ background: iconBackground ?? "var(--secondary)" }}
     >
       {iconUrl ? (
@@ -114,7 +127,10 @@ const ChainSelectorPopover = ({
 }) => {
   const [open, setOpen] = useState(false);
   const switchChain = useSwitchChain();
-  const isSpotTab = useIsSpotTab();
+  const { selectedTab } = useSelectedFormTab();
+  const isSpotTab = SPOT_TABS.includes(
+    selectedTab.value as (typeof SPOT_TABS)[number],
+  );
   const availableChains = isSpotTab ? SPOT_CHAINS : MAIN_CHAINS;
   const chainOptions = useMemo(
     () =>
@@ -132,6 +148,21 @@ const ChainSelectorPopover = ({
   const currentLabel = isWrongNetwork
     ? "Wrong network"
     : getChainLabel(currentChainId, currentChainName);
+
+  useEffect(() => {
+    if (!isWrongNetwork || !currentChainId) {
+      toast.dismiss(UNSUPPORTED_CHAIN_TOAST_ID);
+      return;
+    }
+
+    toast.warning(
+      `This chain is not supported by ${selectedTab.fullLabel}`,
+      {
+        id: UNSUPPORTED_CHAIN_TOAST_ID,
+        description: "Switch to a supported network to continue.",
+      },
+    );
+  }, [currentChainId, isWrongNetwork, selectedTab.fullLabel]);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -161,9 +192,10 @@ const ChainSelectorPopover = ({
       <PopoverContent
         align="end"
         drawerTitle="Select chain"
-        className="max-h-[min(520px,calc(100vh-96px))] w-[224px] overflow-y-auto rounded-[14px] border-primary/35 bg-popover/98 p-2"
+        mobilePresentation="fullscreen"
+        className="w-[224px] overflow-hidden rounded-[14px] border-primary/35 bg-popover/98 p-2"
       >
-        <div className="flex flex-col gap-1">
+        <div className="flex max-h-[min(520px,calc(85dvh-48px))] flex-col gap-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] max-sm:min-h-0 max-sm:flex-1 max-sm:max-h-none">
           {chainOptions.map((option) => {
             const selected = currentChainId === option.id && !isWrongNetwork;
             return (
@@ -176,9 +208,16 @@ const ChainSelectorPopover = ({
                     switchChain.mutate({ chainId: option.id });
                   }
                 }}
-                className={cn(selected && "text-primary")}
+                className={cn(
+                  "gap-3 rounded-[16px] text-[14px] py-3",
+                  selected && "text-primary",
+                )}
               >
-                <ChainIcon iconUrl={option.iconUrl} name={option.label} />
+                <ChainIcon
+                  iconUrl={option.iconUrl}
+                  name={option.label}
+                  className="size-7 text-[9px]"
+                />
                 <span className="whitespace-nowrap">{option.label}</span>
               </PopoverMenuButton>
             );

@@ -80,7 +80,7 @@ export default function RootLayout({
           <Toaster />
           <div className="ef-app-shell flex min-h-screen flex-col font-sans text-foreground">
             <Navigation brand={partner.brand} />
-            <div className="flex flex-1 justify-center px-4 pt-[112px] sm:pt-[72px]">
+            <div className="flex flex-1 justify-center px-4 pt-[60px] sm:pt-[72px]">
               {children}
             </div>
           </div>

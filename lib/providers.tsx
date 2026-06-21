@@ -1,10 +1,10 @@
 "use client";
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { Spinner } from "@/components/ui/spinner";
 import dynamic from "next/dynamic";
-import { WagmiProvider } from "wagmi";
+import { useConnection, useReconnect, WagmiProvider } from "wagmi";
 import type { PartnerBrand, PartnerStyles } from "./partners/types";
 import { QueryProvider } from "./query-provider";
 import { useWagmiConfig } from "./wagmi-config";
@@ -34,6 +34,45 @@ const Fallback = () => {
   );
 };
 
+const WalletReturnReconnect = () => {
+  const { isConnected, isConnecting, isReconnecting } = useConnection();
+  const { mutate: reconnect } = useReconnect();
+
+  useEffect(() => {
+    let lastReconnectAt = 0;
+
+    const reconnectIfNeeded = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      if (isConnected || isConnecting || isReconnecting) {
+        return;
+      }
+
+      const now = Date.now();
+      if (now - lastReconnectAt < 1_500) {
+        return;
+      }
+
+      lastReconnectAt = now;
+      reconnect();
+    };
+
+    window.addEventListener("focus", reconnectIfNeeded);
+    window.addEventListener("pageshow", reconnectIfNeeded);
+    document.addEventListener("visibilitychange", reconnectIfNeeded);
+
+    return () => {
+      window.removeEventListener("focus", reconnectIfNeeded);
+      window.removeEventListener("pageshow", reconnectIfNeeded);
+      document.removeEventListener("visibilitychange", reconnectIfNeeded);
+    };
+  }, [isConnected, isConnecting, isReconnecting, reconnect]);
+
+  return null;
+};
+
 const WagmiWrapper = ({
   children,
   partnerBrand,
@@ -42,6 +81,7 @@ const WagmiWrapper = ({
   partnerBrand: PartnerBrand;
 }) => {
   const config = useWagmiConfig({ partnerBrand });
+
   return (
     <WagmiProvider config={config}>
       {children}
@@ -63,6 +103,7 @@ export function Providers({
       <QueryProvider>
         <WagmiWrapper partnerBrand={partnerBrand}>
           <QueryClientProvider client={queryClient}>
+            <WalletReturnReconnect />
             <RainbowKitProvider
               theme={darkTheme({
                 accentColor: partnerStyles.colors.primary,

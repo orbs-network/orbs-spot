@@ -531,7 +531,7 @@ function OrderFillsView({
   const t = useTranslations();
 
   return (
-    <div className="flex flex-col px-5 pb-5 pt-5">
+    <div className="flex flex-col px-5 pb-5 pt-5 max-sm:min-h-0 max-sm:flex-1">
       <div className="mb-6 flex items-center gap-4 pr-8">
         <HistoryBackButton label="Back to order details" onClick={onBack} />
         <DialogTitle className="truncate text-[16px] font-semibold leading-none">
@@ -543,7 +543,7 @@ function OrderFillsView({
 
       {order.fills.length ? (
         <div
-          className="overflow-hidden pr-1"
+          className="overflow-hidden pr-1 max-sm:min-h-0 max-sm:flex-1 max-sm:!h-auto"
           style={{ height: FILL_LIST_HEIGHT }}
         >
           <Virtuoso
@@ -595,7 +595,7 @@ function SelectedOrderDetails({
   }
 
   return (
-    <div className="px-5 pb-5 pt-5">
+    <div className="px-5 pb-5 pt-5 max-sm:flex-1 max-sm:overflow-y-auto">
       <div className="mb-6 flex items-center gap-4 pr-8">
         <HistoryBackButton label="Back to orders" onClick={onBack} />
         <DialogTitle className="truncate text-[16px] font-semibold leading-none">
@@ -844,7 +844,8 @@ export function OrderHistoryModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         presentation="center"
-        className="w-[calc(100vw-1.5rem)] max-w-[560px] gap-0 overflow-y-auto rounded-[22px] border-border/80 p-0"
+        mobilePresentation="fullscreen"
+        className="!flex w-[calc(100vw-1.5rem)] max-w-[560px] flex-col gap-0 overflow-hidden rounded-[22px] border-border/80 p-0"
       >
         {selectedOrder ? (
           <SelectedOrderDetails
@@ -854,13 +855,13 @@ export function OrderHistoryModal({
           />
         ) : (
           <>
-            <DialogHeader className="px-5 pb-6 pt-5 text-left">
+            <DialogHeader className="shrink-0 px-5 pb-6 pt-5 text-left">
               <DialogTitle className="text-[16px] font-semibold leading-none">
                 Order history
               </DialogTitle>
             </DialogHeader>
 
-            <div className="flex flex-col gap-4 px-5 pb-5">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pb-5">
               <div className="sm:w-[144px]">
                 <StyledSelect
                   value={selectedFilter}
@@ -878,7 +879,7 @@ export function OrderHistoryModal({
                 </div>
               ) : filteredOrders.length ? (
                 <div
-                  className="overflow-hidden"
+                  className="overflow-hidden max-sm:min-h-0 max-sm:flex-1 max-sm:!h-auto max-sm:!max-h-none"
                   style={{ height: orderListHeight, maxHeight: "76dvh" }}
                 >
                   <Virtuoso

@@ -93,8 +93,8 @@ const PercentSettings = ({
   ];
 
   return (
-    <div className="px-5 py-5 sm:px-6">
-      <div className="flex h-[42px] w-full flex-col gap-3 sm:flex-row sm:items-center">
+    <div className="px-4 py-4 sm:px-6 sm:py-5">
+      <div className="flex h-11 w-full items-center gap-2 sm:h-[42px] sm:gap-3">
         <SegmentedTabs
           aria-label="Preset percentage"
           value={selectedTabValue}
@@ -107,13 +107,13 @@ const PercentSettings = ({
 
             onChange(nextValue, "custom");
           }}
-          className="h-full flex-1 rounded-[12px] border border-border/45 bg-secondary/25 p-1"
+          className="h-full min-w-0 flex-1 rounded-[12px] border border-border/45 bg-secondary/25 p-1"
           indicatorClassName="rounded-[10px] bg-primary"
           tabClassName="rounded-[10px] px-2 text-sm font-semibold transition-colors"
           selectedTabClassName="text-primary-foreground hover:text-primary-foreground"
           unselectedTabClassName="text-muted-foreground hover:bg-accent/45 hover:text-foreground"
         />
-        <FormNumberField className="h-full w-full rounded-[12px] px-3 sm:w-[114px]">
+        <FormNumberField className="h-full w-[92px] shrink-0 rounded-[12px] px-2 sm:w-[114px] sm:px-3">
           <NumericInput
             value={value ? value.toString() : ""}
             onChange={(nextValue) => onChange(Number(nextValue), "custom")}
@@ -185,7 +185,7 @@ const SettingsInlineTrigger = ({
         "flex w-full items-center justify-between gap-3 text-left",
         isActionVariant
           ? "min-h-0"
-          : "min-h-[46px] rounded-[18px] border border-border/70 bg-secondary/35 px-4 transition-colors hover:border-primary/25 hover:bg-secondary/40",
+          : "min-h-[46px] rounded-[18px] border border-border/70 bg-secondary/35 px-4 transition-colors hover:border-primary/25 hover:bg-secondary/40 max-sm:flex-wrap max-sm:items-start",
       )}
     >
       <FormLabel
@@ -202,7 +202,9 @@ const SettingsInlineTrigger = ({
           aria-label={`Open ${label} settings`}
           className={cn(
             "inline-flex shrink-0 items-center gap-2 rounded-[14px] font-semibold leading-none text-[var(--settings-trigger-foreground)] [background:var(--settings-trigger-background)] transition-colors hover:[background:var(--settings-trigger-hover-background)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none",
-            isActionVariant ? "h-10 px-3.5" : "h-10 px-4",
+            isActionVariant
+              ? "h-10 px-3.5"
+              : "h-10 px-4 max-sm:ml-auto",
             "text-sm",
           )}
         >
@@ -232,7 +234,7 @@ export const SettingsModal = ({
       <DialogContent
         presentation="center"
         showCloseButton={false}
-        className="w-[calc(100vw-1.5rem)] max-w-[512px] gap-0 overflow-hidden rounded-[22px] border-border/80 p-0"
+        className="w-[calc(100vw-1.5rem)] max-w-[512px] gap-0 overflow-hidden rounded-[22px] border-border/80 bg-card p-0"
       >
         <SettingsHeader
           title={isSpotTab ? "Price Protection" : "Slippage Setting"}

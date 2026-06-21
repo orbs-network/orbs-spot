@@ -127,7 +127,7 @@ function DialogContent({
           "grid gap-4 bg-card/98 p-6 text-card-foreground",
           className,
           mobilePresentation === "fullscreen"
-            ? "!mt-0 !h-[100dvh] !max-h-[100dvh] !w-screen !max-w-none !rounded-none !border-0 !p-0"
+            ? "!mt-0 !h-[100dvh] !max-h-[100dvh] !w-screen !max-w-none !rounded-none !border-0 bg-card !p-0 [&>div:first-child]:hidden"
             : "!w-screen !max-w-none rounded-b-none"
         )}
         {...props}
