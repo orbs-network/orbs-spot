@@ -46,8 +46,6 @@ const walletConnectModalWallet = ({
       createWalletConnectConnector({
         rkDetails: {
           ...walletDetails.rkDetails,
-          id: "walletConnect",
-          isWalletConnectModalConnector: true,
           showQrModal: true,
         },
       }),
