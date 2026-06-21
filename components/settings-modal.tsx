@@ -185,11 +185,12 @@ const SettingsInlineTrigger = ({
         "flex w-full items-center justify-between gap-3 text-left",
         isActionVariant
           ? "min-h-0"
-          : "min-h-[46px] rounded-[18px] border border-border/70 bg-secondary/35 px-4 transition-colors hover:border-primary/25 hover:bg-secondary/40 max-sm:flex-wrap max-sm:items-start",
+          : "min-h-[46px] rounded-[18px] border border-border/70 bg-secondary/35 px-4 transition-colors hover:border-primary/25 hover:bg-secondary/40 max-sm:gap-2 max-sm:px-3",
       )}
     >
       <FormLabel
-        className="min-w-0"
+        className="min-w-0 flex-1 whitespace-nowrap max-sm:gap-1.5"
+        textClassName="whitespace-nowrap max-sm:text-[13px]"
         tooltip={tooltip}
         tooltipAriaLabel={`${label} info`}
       >
@@ -201,15 +202,15 @@ const SettingsInlineTrigger = ({
           data-settings-trigger
           aria-label={`Open ${label} settings`}
           className={cn(
-            "inline-flex shrink-0 items-center gap-2 rounded-[14px] font-semibold leading-none text-[var(--settings-trigger-foreground)] [background:var(--settings-trigger-background)] transition-colors hover:[background:var(--settings-trigger-hover-background)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none",
+            "inline-flex shrink-0 items-center gap-2 rounded-[14px] font-semibold leading-none text-[var(--settings-trigger-foreground)] [background:var(--settings-trigger-background)] transition-colors hover:[background:var(--settings-trigger-hover-background)] focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:outline-none max-sm:gap-1.5",
             isActionVariant
               ? "h-10 px-3.5"
-              : "h-10 px-4 max-sm:ml-auto",
+              : "h-10 px-4 max-sm:ml-auto max-sm:px-3",
             "text-sm",
           )}
         >
           {displayValue}
-          <PencilIcon className="size-4" />
+          <PencilIcon className="size-4 max-sm:size-3.5" />
         </button>
       </DialogTrigger>
     </div>
