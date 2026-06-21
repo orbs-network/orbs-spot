@@ -38,6 +38,11 @@ type WalletConnectProviderWithSession = {
   session?: unknown;
 };
 
+type ConnectorWithType = {
+  id: string;
+  type?: string;
+};
+
 const hasWalletConnectSession = (
   provider: unknown,
 ): provider is WalletConnectProviderWithSession => {
@@ -48,6 +53,9 @@ const hasWalletConnectSession = (
       (provider as WalletConnectProviderWithSession).session,
   );
 };
+
+const isWalletConnectConnector = (connector: ConnectorWithType) =>
+  connector.id === "walletConnect" || connector.type === "walletConnect";
 
 const WalletReturnReconnect = () => {
   const { address, isConnected, isConnecting, isReconnecting } =
@@ -84,21 +92,28 @@ const WalletReturnReconnect = () => {
           return;
         }
 
-        const walletConnectConnector = connectors.find(
-          (connector) => connector.id === "walletConnect",
+        const walletConnectConnectors = connectors.filter(
+          isWalletConnectConnector,
         );
-        if (!walletConnectConnector) {
+        if (!walletConnectConnectors.length) {
           return;
         }
 
-        const provider = await walletConnectConnector
-          .getProvider()
-          .catch(() => undefined);
-        if (cancelled || !hasWalletConnectSession(provider)) {
+        for (const walletConnectConnector of walletConnectConnectors) {
+          const provider = await walletConnectConnector
+            .getProvider()
+            .catch(() => undefined);
+          if (cancelled) {
+            return;
+          }
+
+          if (!hasWalletConnectSession(provider)) {
+            continue;
+          }
+
+          await connect({ connector: walletConnectConnector });
           return;
         }
-
-        await connect({ connector: walletConnectConnector });
       } catch {
         // WalletConnect can leave an approved mobile session in storage before
         // Wagmi has accounts. The next focus/pageshow will try again.

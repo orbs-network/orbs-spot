@@ -59,6 +59,7 @@ export const useWagmiConfig = ({ partnerBrand }: WagmiConfigOptions) => {
       projectId,
       ssr: true,
       walletConnectParameters: {
+        customStoragePrefix: "efficient-frontier-swap",
         isNewChainsStale: false,
         qrModalOptions: {
           explorerRecommendedWalletIds: [METAMASK_WALLETCONNECT_ID],
