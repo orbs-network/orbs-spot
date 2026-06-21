@@ -57,7 +57,9 @@ export const useWagmiConfig = ({ partnerBrand }: WagmiConfigOptions) => {
       appUrl,
       appIcon,
       projectId,
+      ssr: true,
       walletConnectParameters: {
+        isNewChainsStale: false,
         qrModalOptions: {
           explorerRecommendedWalletIds: [METAMASK_WALLETCONNECT_ID],
         },

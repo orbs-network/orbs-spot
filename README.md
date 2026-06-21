@@ -26,6 +26,18 @@ Supported values:
 yarn build
 ```
 
+## WalletConnect
+
+WalletConnect uses `NEXT_PUBLIC_PROJECT_ID` as the Reown project id. The
+current browser domain must be added to that project in Reown Dashboard under
+Project Domains, otherwise the WalletConnect modal can show
+`Invalid App Configuration`.
+
+For mobile testing, allow the exact origin you open on the phone, for example
+the production domain, tunnel domain, or local network host. `NEXT_PUBLIC_APP_URL`
+only controls the app metadata sent to wallets; it does not replace Reown's
+domain allowlist check.
+
 ## Deploy
 
 The manual GitHub Actions workflow `.github/workflows/frontend-deploy.yml`

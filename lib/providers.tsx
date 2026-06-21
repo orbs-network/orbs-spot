@@ -1,10 +1,10 @@
 "use client";
-import React, { Suspense, useEffect } from "react";
+import React, { Suspense, useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { Spinner } from "@/components/ui/spinner";
 import dynamic from "next/dynamic";
-import { useConnection, useReconnect, WagmiProvider } from "wagmi";
+import { useConnect, useConnection, useReconnect, WagmiProvider } from "wagmi";
 import type { PartnerBrand, PartnerStyles } from "./partners/types";
 import { QueryProvider } from "./query-provider";
 import { useWagmiConfig } from "./wagmi-config";
@@ -34,41 +34,112 @@ const Fallback = () => {
   );
 };
 
+type WalletConnectProviderWithSession = {
+  session?: unknown;
+};
+
+const hasWalletConnectSession = (
+  provider: unknown,
+): provider is WalletConnectProviderWithSession => {
+  return Boolean(
+    provider &&
+      typeof provider === "object" &&
+      "session" in provider &&
+      (provider as WalletConnectProviderWithSession).session,
+  );
+};
+
 const WalletReturnReconnect = () => {
-  const { isConnected, isConnecting, isReconnecting } = useConnection();
-  const { mutate: reconnect } = useReconnect();
+  const { address, isConnected, isConnecting, isReconnecting } =
+    useConnection();
+  const { connectors, mutateAsync: connect } = useConnect();
+  const { mutateAsync: reconnect } = useReconnect();
+  const lastReconnectAt = useRef(0);
+  const reconnectInFlight = useRef(false);
 
   useEffect(() => {
-    let lastReconnectAt = 0;
+    let reconnectTimer: number | undefined;
+    let cancelled = false;
 
-    const reconnectIfNeeded = () => {
+    const reconnectIfNeeded = async () => {
       if (document.visibilityState !== "visible") {
         return;
       }
 
-      if (isConnected || isConnecting || isReconnecting) {
+      if (address || isConnected || isReconnecting || reconnectInFlight.current) {
         return;
       }
 
       const now = Date.now();
-      if (now - lastReconnectAt < 1_500) {
+      if (now - lastReconnectAt.current < 1_500) {
         return;
       }
 
-      lastReconnectAt = now;
-      reconnect();
+      lastReconnectAt.current = now;
+      reconnectInFlight.current = true;
+
+      try {
+        const connections = isConnecting ? [] : await reconnect();
+        if (cancelled || connections.length > 0) {
+          return;
+        }
+
+        const walletConnectConnector = connectors.find(
+          (connector) => connector.id === "walletConnect",
+        );
+        if (!walletConnectConnector) {
+          return;
+        }
+
+        const provider = await walletConnectConnector
+          .getProvider()
+          .catch(() => undefined);
+        if (cancelled || !hasWalletConnectSession(provider)) {
+          return;
+        }
+
+        await connect({ connector: walletConnectConnector });
+      } catch {
+        // WalletConnect can leave an approved mobile session in storage before
+        // Wagmi has accounts. The next focus/pageshow will try again.
+      } finally {
+        reconnectInFlight.current = false;
+      }
     };
 
-    window.addEventListener("focus", reconnectIfNeeded);
-    window.addEventListener("pageshow", reconnectIfNeeded);
-    document.addEventListener("visibilitychange", reconnectIfNeeded);
+    const queueReconnect = () => {
+      if (reconnectTimer) {
+        window.clearTimeout(reconnectTimer);
+      }
+
+      reconnectTimer = window.setTimeout(() => {
+        void reconnectIfNeeded();
+      }, 400);
+    };
+
+    window.addEventListener("focus", queueReconnect);
+    window.addEventListener("pageshow", queueReconnect);
+    document.addEventListener("visibilitychange", queueReconnect);
+    queueReconnect();
 
     return () => {
-      window.removeEventListener("focus", reconnectIfNeeded);
-      window.removeEventListener("pageshow", reconnectIfNeeded);
-      document.removeEventListener("visibilitychange", reconnectIfNeeded);
+      cancelled = true;
+      if (reconnectTimer) {
+        window.clearTimeout(reconnectTimer);
+      }
+      window.removeEventListener("focus", queueReconnect);
+      window.removeEventListener("pageshow", queueReconnect);
+      document.removeEventListener("visibilitychange", queueReconnect);
     };
-  }, [isConnected, isConnecting, isReconnecting, reconnect]);
+  }, [
+    address,
+    connect,
+    connectors,
+    isConnected,
+    isConnecting,
+    isReconnecting,
+    reconnect,
+  ]);
 
   return null;
 };
