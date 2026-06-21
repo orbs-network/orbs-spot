@@ -1,0 +1,7 @@
+interface:
+  display_name: "Add Partner"
+  short_description: "Create partners from website branding"
+  default_prompt: "Use $add-partner to add a new white-label partner from its website branding, assets, styles, scripts, and CI."
+
+policy:
+  allow_implicit_invocation: true

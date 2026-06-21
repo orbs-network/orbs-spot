@@ -1,7 +1,0 @@
-interface:
-  display_name: "Add Partner"
-  short_description: "Onboard white-label partners safely"
-  default_prompt: "Use $add-partner to add a new white-label partner with styles, assets, scripts, and CI."
-
-policy:
-  allow_implicit_invocation: true
