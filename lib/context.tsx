@@ -1,21 +1,23 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
-import { useConnection } from "wagmi";
+import { useDataChainId } from "./hooks/use-data-chain-id";
 import { useSwapParams } from "./hooks/use-swap-params";
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const { chainId } = useConnection();
+  const dataChainId = useDataChainId();
   const { setCurrencies } = useSwapParams();
   const chainRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    if (chainRef.current && chainRef.current !== chainId) {
+    if (chainRef.current && chainRef.current !== dataChainId) {
       setCurrencies({ inputCurrency: undefined, outputCurrency: undefined });
     }
 
-    chainRef.current = chainId;
-  }, [chainId, setCurrencies]);
+    if (dataChainId) {
+      chainRef.current = dataChainId;
+    }
+  }, [dataChainId, setCurrencies]);
 
   return children;
 };
