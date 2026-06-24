@@ -131,11 +131,13 @@
   background: var(--app-shell-background);
 }
 
+html[data-partner="ht"] [data-submit-button],
 html[data-partner="ht-digital"] [data-submit-button] {
   background-color: #161440 !important;
   color: #ffffff !important;
 }
 
+html[data-partner="ht"] [data-submit-button]:hover,
 html[data-partner="ht-digital"] [data-submit-button]:hover {
   background-color: #161440 !important;
 }
@@ -160,7 +162,7 @@ html[data-partner="ht-digital"] [data-submit-button]:hover {
   background-color: var(--primary) !important;
 }
 .orbs_StepIndicator {
-  background-color: var(--accent) !important;
+  background-color: var(--muted) !important;
 }
 
 .orbs_MainTokenLeft {
@@ -201,6 +203,16 @@ html[data-partner="ht-digital"] [data-submit-button]:hover {
 }
 [data-sonner-toast][data-styled=true] [data-close-button]:hover {
  background: var(--accent) !important;
+}
+
+html[data-partner="ef"] [data-rich-colors="true"][data-sonner-toast][data-styled="true"],
+html[data-partner="efficient-frontier"] [data-rich-colors="true"][data-sonner-toast][data-styled="true"] {
+  background: var(--popover) !important;
+}
+
+html[data-partner="ef"] [data-rich-colors="true"][data-sonner-toast][data-styled="true"] [data-close-button],
+html[data-partner="efficient-frontier"] [data-rich-colors="true"][data-sonner-toast][data-styled="true"] [data-close-button] {
+  background: var(--popover) !important;
 }
 
 .orbs_Success .orbs_TradePreviewToken img {

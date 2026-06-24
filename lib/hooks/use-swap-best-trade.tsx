@@ -161,6 +161,12 @@ const useToasts = () => {
 
   const onSwapConfirming = useCallback(
     (txHash: `0x${string}`) => {
+      const explorerUrl = getExplorerUrl(chainId, txHash);
+      const transactionText = `Transaction ${makeEllipsisAddress(txHash, {
+        start: 8,
+        end: 6,
+      })}`;
+
       toast.loading(
         <TokensPair
           prefix="Confirming"
@@ -169,14 +175,22 @@ const useToasts = () => {
         />,
         {
           id: swapToastId.current,
-          description: `Transaction ${makeEllipsisAddress(txHash, {
-            start: 8,
-            end: 6,
-          })}`,
+          description: explorerUrl ? (
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-500 hover:text-blue-600"
+            >
+              {transactionText}
+            </a>
+          ) : (
+            transactionText
+          ),
         }
       );
     },
-    [inputCurrency?.address, outputCurrency?.address]
+    [chainId, inputCurrency?.address, outputCurrency?.address]
   );
 
   const onSwapSuccess = useCallback((txHash: `0x${string}`) => {
