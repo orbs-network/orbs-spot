@@ -40,12 +40,17 @@ export enum FormTab {
 }
 
   export type BestTradeQuote = {
+    provider: "liquidityHub" | "paraswap";
     outAmount: string;
     minAmountOut: string;
     inToken: string;
     outToken: string;
     inAmount: string;
     gas: string;
+    gasUsd?: string;
+    dexMinAmountOut?: string;
+    paraswapQuoteUpdatedAt?: number;
+    timestamp?: number;
     originalQuote: any;
   }
   

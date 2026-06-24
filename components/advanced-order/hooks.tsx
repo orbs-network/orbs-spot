@@ -60,15 +60,15 @@ export function useSpotToken(currency?: Currency) {
 }
 
 export function useSpotMarketReferencePrice() {
-  const { trade, isLoadingTrade, noLiquidity } = useDerivedSwap();
+  const { isLoadingTrade, noLiquidity, outputRawAmount } = useDerivedSwap();
 
   return useMemo(
     () => ({
-      value: trade?.outAmount,
+      value: outputRawAmount,
       isLoading: isLoadingTrade,
       noLiquidity,
     }),
-    [isLoadingTrade, noLiquidity, trade?.outAmount],
+    [isLoadingTrade, noLiquidity, outputRawAmount],
   );
 }
 

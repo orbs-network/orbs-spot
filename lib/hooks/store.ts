@@ -106,6 +106,8 @@ type BestTradeSwapStore = {
   totalSteps?: number;
   currentStep?: SwapStep;
   currentStepIndex?: number;
+  executionMode?: "transaction" | "gasless";
+  orderId?: string;
   txHash?: string;
   updateStore: (data: Partial<BestTradeSwapStore>) => void;
   resetStore: () => void;
@@ -120,6 +122,8 @@ export const useBestTradeSwapStore = create<BestTradeSwapStore>((set) => ({
       totalSteps: undefined,
       currentStep: undefined,
       currentStepIndex: undefined,
+      executionMode: undefined,
+      orderId: undefined,
       txHash: undefined,
     }),
 }));

@@ -3,6 +3,7 @@ import React from "react";
 import { FORM_TABS } from "@/lib/consts";
 import { useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { useFormTabStore } from "@/lib/hooks/store";
+import { FormTab } from "@/lib/types";
 import { OrderHistoryTrigger } from "./order-history-trigger";
 import { StyledSelect } from "./ui/styled-select";
 import { SegmentedTabs } from "./ui/tabs";
@@ -38,9 +39,11 @@ const FormHeader = () => {
 
 const FormSectionHeader = ({
   onOpenOrderHistory,
+  showOrderHistory,
   title,
 }: {
   onOpenOrderHistory: () => void;
+  showOrderHistory: boolean;
   title: string;
 }) => {
   return (
@@ -48,7 +51,7 @@ const FormSectionHeader = ({
       <h2 className="min-w-0 truncate text-[18px] font-bold leading-none text-foreground">
         {title}
       </h2>
-      <OrderHistoryTrigger onOpen={onOpenOrderHistory} />
+      {showOrderHistory && <OrderHistoryTrigger onOpen={onOpenOrderHistory} />}
     </div>
   );
 };
@@ -78,6 +81,7 @@ export function FormContainer({
   children: React.ReactNode;
 }) {
   const { selectedTab } = useSelectedFormTab();
+  const showOrderHistory = selectedTab.value !== FormTab.SWAP;
   const setOrderHistoryOpen = useFormTabStore(
     (state) => state.setOrderHistoryOpen,
   );
@@ -91,6 +95,7 @@ export function FormContainer({
         <FormHeader />
         <FormSectionHeader
           title={selectedTab.fullLabel}
+          showOrderHistory={showOrderHistory}
           onOpenOrderHistory={openOrderHistory}
         />
         {children}

@@ -5,15 +5,15 @@ import { ToggleCurrencies } from "./toggle-currencies";
 import { SubmitSwapButton } from "./submit-swap-button";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
-import { Step, SwapFlow, SwapStatus, Token } from "@orbs-network/swap-ui";
+import { SwapFlow, SwapStatus, type Step } from "@orbs-network/swap-ui";
 import { useCallback, useMemo, useState } from "react";
 import { useFormatNumber, useToAmountUI } from "@/lib/hooks/common";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
-import { Field, SwapStep, type Currency } from "@/lib/types";
+import { Field, SwapStep } from "@/lib/types";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import BN from "bignumber.js";
-import { cn, dynamicDecimals, getExplorerUrl } from "@/lib/utils";
+import { cn, dynamicDecimals, formatDecimals, getExplorerUrl } from "@/lib/utils";
 import { useConnection } from "wagmi";
 import { useTranslations } from "@/lib/use-translations";
 import { SettingsModal } from "./settings-modal";
@@ -26,6 +26,7 @@ import { ArrowRightIcon, CheckIcon } from "lucide-react";
 const useStep = () => {
   const t = useTranslations();
   const currentStep = useBestTradeSwapStore((state) => state.currentStep);
+  const executionMode = useBestTradeSwapStore((state) => state.executionMode);
   const txHash = useBestTradeSwapStore((state) => state.txHash);
   const { inputCurrency } = useDerivedSwap();
   const { chainId } = useConnection();
@@ -46,11 +47,15 @@ const useStep = () => {
       return {
         title: "Swap",
         footerLink: explorerUrl,
-        footerText: explorerUrl ? t("viewOnExplorer") : t("proceedInWallet"),
+        footerText: explorerUrl
+          ? t("viewOnExplorer")
+          : executionMode === "gasless"
+            ? t("waitingForGaslessOrder")
+            : t("proceedInWallet"),
       };
     }
     return undefined;
-  }, [currentStep, explorerUrl, inputCurrency?.symbol, t]);
+  }, [currentStep, executionMode, explorerUrl, inputCurrency?.symbol, t]);
 };
 
 const formatSafeFixed = (value: BN, decimals = 2) => {
@@ -63,21 +68,34 @@ const formatDynamicDecimals = (value: BN) => {
   return dynamicDecimals(value.toString()) || "0.00";
 };
 
-const NetworkCost = () => {
-  const { trade, outputCurrency } = useDerivedSwap();
-  const amount = useToAmountUI(outputCurrency?.decimals, trade?.gas);
-  const usd = useUSDPrice({
-    token: outputCurrency?.address,
-    amount: amount,
-  });
-  return (
-    <DetailRow
-      label="Network Cost"
-      value={`$${usd.formatted ?? "0"}`}
-      labelClassName="font-medium text-foreground"
-      valueClassName="font-normal text-foreground"
-    />
+const useSwapFlowPreview = () => {
+  const { inputAmount, outputAmount, inputCurrency, outputCurrency } =
+    useDerivedSwap();
+  const inputAmountF = useFormatNumber({ value: inputAmount });
+  const outputAmountF = useFormatNumber({ value: outputAmount });
+  const inToken = useMemo(
+    () => ({
+      symbol: inputCurrency?.symbol,
+      logoUrl: inputCurrency?.logoUrl,
+    }),
+    [inputCurrency?.logoUrl, inputCurrency?.symbol],
   );
+  const outToken = useMemo(
+    () => ({
+      symbol: outputCurrency?.symbol,
+      logoUrl: outputCurrency?.logoUrl,
+    }),
+    [outputCurrency?.logoUrl, outputCurrency?.symbol],
+  );
+
+  return {
+    inputAmountF,
+    outputAmountF,
+    inputCurrency,
+    outputCurrency,
+    inToken,
+    outToken,
+  };
 };
 
 const PriceImpact = () => {
@@ -155,7 +173,7 @@ const MinimumAmountOut = () => {
 const Details = () => {
   return (
     <div className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
-      <NetworkCost />
+      {/* <NetworkCost /> */}
       <PriceImpact />
       <MinimumAmountOut />
       <Rate />
@@ -172,14 +190,20 @@ function SwapSuccessIcon() {
 }
 
 function SwapSuccessToken({
-  amount,
+  field,
   className,
-  currency,
 }: {
-  amount?: string;
+  field: Field;
   className?: string;
-  currency?: Currency;
 }) {
+  const { inputAmount, outputAmount, inputCurrency, outputCurrency } =
+    useDerivedSwap();
+  const isInput = field === Field.INPUT;
+  const amount = useFormatNumber({
+    value: isInput ? inputAmount : outputAmount,
+  });
+  const currency = isInput ? inputCurrency : outputCurrency;
+
   return (
     <div className={cn("flex min-w-0 items-center gap-2", className)}>
       <SwapFlowTokenLogo currency={currency} className="size-[26px]" />
@@ -190,17 +214,7 @@ function SwapSuccessToken({
   );
 }
 
-const Success = ({
-  inputAmountF,
-  outputAmountF,
-  inputCurrency,
-  outputCurrency,
-}: {
-  inputAmountF?: string;
-  outputAmountF?: string;
-  inputCurrency?: Currency;
-  outputCurrency?: Currency;
-}) => {
+const Success = () => {
   const t = useTranslations();
   const txHash = useBestTradeSwapStore((state) => state.txHash);
   const { chainId } = useConnection();
@@ -213,12 +227,11 @@ const Success = ({
       body={
         <div className="flex w-full flex-col items-center gap-3">
           <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
-            <SwapSuccessToken amount={inputAmountF} currency={inputCurrency} />
+            <SwapSuccessToken field={Field.INPUT} />
             <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
             <SwapSuccessToken
-              amount={outputAmountF}
+              field={Field.OUTPUT}
               className="justify-end"
-              currency={outputCurrency}
             />
           </div>
         </div>
@@ -229,27 +242,21 @@ const Success = ({
   );
 };
 
-const SwapReviewContent = ({
-  status,
-  totalSteps,
-  currentStepIndex,
-  inputAmountF,
-  outputAmountF,
-  inputCurrency,
-  outputCurrency,
-  inToken,
-  outToken,
-}: {
-  status?: SwapStatus;
-  totalSteps?: number;
-  currentStepIndex?: number;
-  inputAmountF?: string;
-  outputAmountF?: string;
-  inputCurrency?: Currency;
-  outputCurrency?: Currency;
-  inToken: Token;
-  outToken: Token;
-}) => {
+const SwapReviewContent = () => {
+  const status = useBestTradeSwapStore((state) => state.status);
+  const totalSteps = useBestTradeSwapStore((state) => state.totalSteps);
+  const currentStepIndex = useBestTradeSwapStore(
+    (state) => state.currentStepIndex,
+  );
+  const currentStep = useStep();
+  const {
+    inputAmountF,
+    outputAmountF,
+    inputCurrency,
+    outputCurrency,
+    inToken,
+    outToken,
+  } = useSwapFlowPreview();
   const tokenLogoClassName = status ? "size-[26px]" : "size-10";
 
   return (
@@ -262,7 +269,7 @@ const SwapReviewContent = ({
         outAmount={outputAmountF}
         swapStatus={status}
         totalSteps={totalSteps}
-        currentStep={useStep()}
+        currentStep={currentStep}
         currentStepIndex={currentStepIndex}
         inToken={inToken}
         outToken={outToken}
@@ -282,14 +289,7 @@ const SwapReviewContent = ({
             />
           ),
           Failed: <SwapFlow.Failed />,
-          Success: (
-            <Success
-              inputAmountF={inputAmountF}
-              outputAmountF={outputAmountF}
-              inputCurrency={inputCurrency}
-              outputCurrency={outputCurrency}
-            />
-          ),
+          Success: <Success />,
           SuccessIcon: <SwapSuccessIcon />,
           Main: <Main />,
           Loader: <SwapFlowLoader />,
@@ -302,36 +302,15 @@ const SwapReviewContent = ({
 const SubmitSwap = () => {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
-  const {
-    inputCurrency,
-    outputCurrency,
-    inputAmount,
-    outputAmount,
-    isLoadingTrade,
-  } = useDerivedSwap();
-  const { setInputAmount, } = useActionHandlers();
-  const { status, totalSteps, currentStepIndex, reset } = useSwapBestTrade();
-  const inputAmountF = useFormatNumber({ value: inputAmount });
-  const outputAmountF = useFormatNumber({ value: outputAmount });
-
-  const inToken = useMemo(() => {
-    return {
-      symbol: inputCurrency?.symbol,
-      logoUrl: inputCurrency?.logoUrl,
-    };
-  }, [inputCurrency]);
-
-  const outToken = useMemo(() => {
-    return {
-      symbol: outputCurrency?.symbol,
-      logoUrl: outputCurrency?.logoUrl,
-    };
-  }, [outputCurrency]);
+  const { isLoadingTrade } = useDerivedSwap();
+  const { setInputAmount } = useActionHandlers();
+  const status = useBestTradeSwapStore((state) => state.status);
+  const reset = useBestTradeSwapStore((state) => state.resetStore);
 
   const closeReview = useCallback(() => {
     setOpen(false);
-    if(status === SwapStatus.SUCCESS) {
-      setInputAmount('');
+    if (status === SwapStatus.SUCCESS) {
+      setInputAmount("");
     }
   }, [setInputAmount, setOpen, status]);
 
@@ -348,9 +327,9 @@ const SubmitSwap = () => {
 
   const onOpen = useCallback(() => {
     setOpen(true);
-   if(status !== SwapStatus.LOADING) {
-    reset();
-   }
+    if (status !== SwapStatus.LOADING) {
+      reset();
+    }
   }, [reset, setOpen, status]);
 
   return (
@@ -360,17 +339,7 @@ const SubmitSwap = () => {
         isLoading={isLoadingTrade}
         text={isLoadingTrade ? t("fetchingQuote") : "Submit Swap"}
       />
-      <SwapReviewContent
-        status={status}
-        totalSteps={totalSteps}
-        currentStepIndex={currentStepIndex}
-        inputAmountF={inputAmountF}
-        outputAmountF={outputAmountF}
-        inputCurrency={inputCurrency}
-        outputCurrency={outputCurrency}
-        inToken={inToken}
-        outToken={outToken}
-      />
+      <SwapReviewContent />
     </Dialog>
   );
 };
@@ -379,7 +348,7 @@ const Main = () => {
   const t = useTranslations();
   const { inputAmount, outputAmount, inputCurrency, outputCurrency } =
     useDerivedSwap();
-  const { status, onSwapBestTrade } = useSwapBestTrade();
+  const { status, onSwapBestTrade, isPreparing } = useSwapBestTrade();
   const inputUsd = useUSDPrice({
     token: inputCurrency?.address,
     amount: inputAmount,
@@ -407,7 +376,7 @@ const Main = () => {
           <Details />
           <SubmitSwapButton
             onClick={onSwapBestTrade}
-            isLoading={status === SwapStatus.LOADING}
+            isLoading={isPreparing}
             text="Confirm Swap"
           />
         </div>
@@ -441,7 +410,7 @@ export function SwapBestTradeForm() {
             handleCurrencyChange(currency, Field.OUTPUT)
           }
           disabled={true}
-          amount={outputAmount}
+          amount={formatDecimals(outputAmount, 6)}
           title={t("to")}
           isLoading={isLoadingTrade}
           statusText={noLiquidity ? t("noLiquidity") : undefined}

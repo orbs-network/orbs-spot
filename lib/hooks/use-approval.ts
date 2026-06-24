@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useParseNativeCurrencyAddress } from "./common";
 import { useApproveToken } from "./use-token-approval";
 import { useHasTokenAllowance } from "./use-token-allowance";
+import { maxUint256 } from "viem";
 
 export const useApproval = (
   spender: string,
@@ -40,7 +41,7 @@ export const useApproval = (
         const { receipt } = await approveToken({
           tokenAddress: currencyAddress,
           spenderAddress: spender,
-          amount,
+          amount: maxUint256.toString(),
         });
 
         const hasAllowance = await hasTokenAllowance({

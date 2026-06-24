@@ -49,7 +49,7 @@ export function SpotProviderShell({
       typedInputAmount={inputAmount}
       walletInteractions={walletInteractions}
       account={spotAccount}
-      partner={Partners.Agent}
+      partner={Partners.EfficientFrontier}
       srcBalance={inputBalance}
       dstBalance={outputBalance}
       srcToken={spotSrcToken}

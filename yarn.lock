@@ -1061,25 +1061,25 @@
   resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.0.97.tgz#9a008615ca8977c1647c68b005e6f8cbb4033c55"
   integrity sha512-iQ0hDJqhXFBtZwTsMH2zuVu2y8c+pIiKOBtqgz7qzKTzwmGl+3hixuR3Riw2JJmKf2s7+zwZvku8boXTvGDuNA==
 
-"@orbs-network/spot-react@^1.1.33":
-  version "1.1.33"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.33.tgz#1e7bf2f40f564309459e3bae5e109bf801d071c9"
-  integrity sha512-luq386gqh8A/v065HLZxzmu/Hur4NJ3G9Ud+kIKqg6ERjiUxtLkGa3MrUz0tPl0NsfwrEd/g2p98Fto7hagq6g==
+"@orbs-network/spot-react@^1.1.35":
+  version "1.1.35"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.35.tgz#b4126f232caf20d39f6ea884c3973906d23bd13b"
+  integrity sha512-7+GybIJiXXe97MW2kdm4uLwOD4JzM8vfCapygioRIv72Q2QrUCBId1B+xbsaXwOUJK1BfRH95IEpw/VPEqYssQ==
   dependencies:
-    "@orbs-network/spot-ui" "1.0.16"
+    "@orbs-network/spot-ui" "1.0.18"
 
-"@orbs-network/spot-ui@1.0.16":
-  version "1.0.16"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.16.tgz#8d03856d1b8b0cac9be2c05b959ccd642b310837"
-  integrity sha512-UkkoS6el/ZN9cq+bm6di4yoGMoymbOvEW5BjlJbWLvV/O6IN3J/3TMovfCqmB7dddmuvm9HpDGsStLluyiMYHQ==
+"@orbs-network/spot-ui@1.0.18":
+  version "1.0.18"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.18.tgz#7fca91ce0c306a73944ee027ef17b965f2e70bf2"
+  integrity sha512-bu3am9l35brDOxNaUP7j6vXOOcBtsbXb7L5CP0eOX3QtxyhDmoz9GjIe8Q0fCmr/Qo0yQ9QU5p3rHo5sAI1Z5w==
   dependencies:
-    "@orbs-network/spot" "^2.6.2"
+    "@orbs-network/spot" "^2.6.3"
     "@orbs-network/twap" "^2.7.28"
 
-"@orbs-network/spot@^2.6.2":
-  version "2.6.2"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot/-/spot-2.6.2.tgz#d747e7db467bffbacab086bd421894cd512c3dfd"
-  integrity sha512-ZsI3u9PyJy4lShuyoOC2ZmN2q6AqrsXGyIsZEybrWoWWQTD6+dR7DdQpGwcGMnHNJ//VvLbRJa4TxEUP/Hdjrg==
+"@orbs-network/spot@^2.6.3":
+  version "2.6.3"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot/-/spot-2.6.3.tgz#02f9fe84c6ae5cf003936bac357b5aaaa4fba328"
+  integrity sha512-hCMXkWhjhgeTmYgHYbaylBnB4L0QvZVpYYaARzddwjEeI/agSllQozjPVsaftFW9sE6cySVGl6nC1J2UD0wcFw==
 
 "@orbs-network/swap-ui@^0.0.61":
   version "0.0.61"
@@ -1090,6 +1090,11 @@
   version "2.7.29"
   resolved "https://registry.yarnpkg.com/@orbs-network/twap/-/twap-2.7.29.tgz#224724d35d834f4b90d2daf629cee9551c200e67"
   integrity sha512-6Va1LQZc3o5F5a0FyHozRoBJNacX4K4BfjMevlAmmnx5Sgb6YEhTYMYiIpMwzBpcRB4vMlCIEbKtzPLTcxwUsw==
+
+"@paraswap/core@2.4.3":
+  version "2.4.3"
+  resolved "https://registry.yarnpkg.com/@paraswap/core/-/core-2.4.3.tgz#22b84da7cf0447cd6bfc4620f1d14d43907eb287"
+  integrity sha512-2AxAsSzGfaaUWdsbr5qAAwP0eiEfIFd9LDzGMK+aMXYAbS7LgC33LqGnhMDXKJsAQuPgdXhCMpMcasuFrYXz0w==
 
 "@paulmillr/qr@^0.2.1":
   version "0.2.1"
@@ -2505,6 +2510,15 @@
   version "1.6.5"
   resolved "https://registry.yarnpkg.com/@vanilla-extract/sprinkles/-/sprinkles-1.6.5.tgz#71f8cf21ca47cf75b2fc74e63c1854a8ef4e4a82"
   integrity sha512-HOYidLONR/SeGk8NBAeI64I4gYdsMX9vJmniL13ZcLVwawyK0s2GUENEAcGA+GYLIoeyQB61UqmhqPodJry7zA==
+
+"@velora-dex/sdk@10.0.0":
+  version "10.0.0"
+  resolved "https://registry.yarnpkg.com/@velora-dex/sdk/-/sdk-10.0.0.tgz#77527c98e71e9fc43f8abb3716b33059301f6d1d"
+  integrity sha512-SKP5xCL9tJxmU0f6aR/grxOBosqUUVrPp5Pku/XhYF49uZuo9AgJE9rqEUaUb2EgwVrM6DDbBHdBe7IW5dgk6g==
+  dependencies:
+    "@paraswap/core" "2.4.3"
+    ts-essentials "^10.0.3"
+    viem "^2.21.0"
 
 "@wagmi/connectors@8.0.15":
   version "8.0.15"
@@ -6124,6 +6138,11 @@ ts-api-utils@^2.5.0:
   resolved "https://registry.yarnpkg.com/ts-api-utils/-/ts-api-utils-2.5.0.tgz#4acd4a155e22734990a5ed1fe9e97f113bcb37c1"
   integrity sha512-OJ/ibxhPlqrMM0UiNHJ/0CKQkoKF243/AEmplt3qpRgkW8VG7IfOS41h7V8TjITqdByHzrjcS/2si+y4lIh8NA==
 
+ts-essentials@^10.0.3:
+  version "10.2.1"
+  resolved "https://registry.yarnpkg.com/ts-essentials/-/ts-essentials-10.2.1.tgz#f16288c2a43d0b09a080f29b4dc7fdfa7b5e6091"
+  integrity sha512-+Id1fRkuir+CsgK2x04/icS2b4V1hQmq7ObzIrDjhN0ozfRYivnP7aaKMVJfLApQm0trjR39A6NIMVchiB9Erw==
+
 tsconfig-paths@^3.15.0:
   version "3.15.0"
   resolved "https://registry.yarnpkg.com/tsconfig-paths/-/tsconfig-paths-3.15.0.tgz#5299ec605e55b1abb23ec939ef15edaf483070d4"
@@ -6405,6 +6424,20 @@ viem@2.x, viem@>=2.33.3, viem@^2.1.1, viem@^2.27.2, viem@^2.31.7, viem@^2.47.0:
   version "2.52.2"
   resolved "https://registry.yarnpkg.com/viem/-/viem-2.52.2.tgz#b5f2899463ddc1cc2039bd804311a67c2c4806e6"
   integrity sha512-HSU12p5aD/kAPZfrlbCUqdiP4P/c6hQ9AhfTS51VbLUQIjkWd1d5EjrCx/SCxZ0zhZVRn4Iv5X5WDqXPG8Ubew==
+  dependencies:
+    "@noble/curves" "1.9.1"
+    "@noble/hashes" "1.8.0"
+    "@scure/bip32" "1.7.0"
+    "@scure/bip39" "1.6.0"
+    abitype "1.2.3"
+    isows "1.0.7"
+    ox "0.14.29"
+    ws "8.20.1"
+
+viem@^2.21.0:
+  version "2.53.1"
+  resolved "https://registry.yarnpkg.com/viem/-/viem-2.53.1.tgz#8f8dff96b0c85317ce7ce54d282bd7b27798a695"
+  integrity sha512-FhfJ/SW73CVosiyVLmIMVgKDRKYV1AGCLzZoHYvmNayyVff63Qi1ocPCk59LqC/cNw244RbBJjHnmxqXkE7NpA==
   dependencies:
     "@noble/curves" "1.9.1"
     "@noble/hashes" "1.8.0"

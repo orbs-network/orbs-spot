@@ -98,6 +98,7 @@
   "maxOrderSizeError": "Max. trade size is {maxOrderSize} USD",
   "viewOnExplorer": "View on explorer",
   "proceedInWallet": "Proceed in wallet",
+  "waitingForGaslessOrder": "Waiting for gasless order",
   "wrapMsg": "Note: {symbol} was wrapped to {wSymbol}",
   "createOrderActionSuccess": "{name} order placed"
 }
