@@ -20,6 +20,18 @@ import {
   useWalletInteractions,
 } from "./hooks";
 
+const getPartner = () => {
+  switch (getActiveClientPartnerConfig().id) {
+    case 'ef':
+      return Partners.EfficientFrontier;
+    case 'ht':
+      return Partners.HtDigital;
+    default:
+      return Partners.Agent;
+  }
+}
+
+
 export function SpotProviderShell({
   children,
   orderModule,
@@ -49,7 +61,7 @@ export function SpotProviderShell({
       typedInputAmount={inputAmount}
       walletInteractions={walletInteractions}
       account={spotAccount}
-      partner={Partners.Agent}
+      partner={getPartner()}
       srcBalance={inputBalance}
       dstBalance={outputBalance}
       srcToken={spotSrcToken}

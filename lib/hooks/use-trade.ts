@@ -10,6 +10,7 @@ import {
 import { useConnection } from "wagmi";
 import { useSwapStore } from "./store";
 import { useMemo } from "react";
+import { useIsSwapTab } from "./use-form-tab";
 
 const stopQuoteLiquidityHub = (_error?: string) => {
   if (!_error) return false;
@@ -26,7 +27,8 @@ const stopQuoteLiquidityHub = (_error?: string) => {
 const useQuoteLiquidityHub = (
   inputCurrency?: Currency,
   outputCurrency?: Currency,
-  parsedInputAmount = ""
+  parsedInputAmount = "",
+  enabled = true
 ) => {
   const liquidityHub = useLiquidityHub();
   const { slippage } = useSettings();
@@ -57,7 +59,7 @@ const useQuoteLiquidityHub = (
         account: account,
       });
       return {
-        outAmount: quote.outAmount,
+        outAmount: BN(quote.outAmount).plus(BN(quote.gasAmountOut || '0')).toString(),
         minAmountOut: quote.minAmountOut,
         inToken: inputCurrency!.address,
         outToken: outputCurrency!.address,
@@ -79,6 +81,7 @@ const useQuoteLiquidityHub = (
       return failureCount < 2;
     },
     enabled:
+      enabled &&
       !!inputCurrencyAddress &&
       !!outputCurrencyAddress &&
       BN(parsedInputAmount).gt(0) &&
@@ -91,18 +94,26 @@ export const useTrade = (
   outputCurrency?: Currency,
   parsedInputAmount = ""
 ) => {
+  const isSwapTab = useIsSwapTab();
   const liquidityHubQuote = useQuoteLiquidityHub(
     inputCurrency,
     outputCurrency,
-    parsedInputAmount
+    parsedInputAmount,
+    isSwapTab
   );
 
   return useMemo(
     () => ({
-      isLoading: liquidityHubQuote.isLoading,
+      isLoading: isSwapTab ? liquidityHubQuote.isLoading : false,
       refetch: liquidityHubQuote.refetch,
-      data: liquidityHubQuote.data,
+      data: isSwapTab ? liquidityHubQuote.data : undefined,
+      usesLiquidityHubQuote: isSwapTab,
     }),
-    [liquidityHubQuote.data, liquidityHubQuote.isLoading, liquidityHubQuote.refetch]
+    [
+      isSwapTab,
+      liquidityHubQuote.data,
+      liquidityHubQuote.isLoading,
+      liquidityHubQuote.refetch,
+    ]
   );
 };

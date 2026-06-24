@@ -64,3 +64,8 @@ export const useIsSpotTab = () => {
   const { selectedTab } = useSelectedFormTab();
   return SPOT_TABS.includes(selectedTab.value as (typeof SPOT_TABS)[number]);
 };
+
+export const useIsSwapTab = () => {
+  const { selectedTab } = useSelectedFormTab();
+  return selectedTab.value === FormTab.SWAP;
+};

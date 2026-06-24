@@ -24,6 +24,7 @@ export const useDerivedSwap = () => {
     data: trade,
     isLoading: isLoadingTrade,
     refetch: refetchTrade,
+    usesLiquidityHubQuote,
   } = useTrade(inputCurrency, outputCurrency, parsedInputAmount);
 
   const outputAmount = useFormatDecimals(useToAmountUI(
@@ -33,6 +34,7 @@ export const useDerivedSwap = () => {
 
   const noLiquidity = useMemo(
     () =>
+      usesLiquidityHubQuote &&
       Boolean(inputCurrency && outputCurrency) &&
       !isLoadingTrade &&
       BN(parsedInputAmount ?? "0").gt(0) &&
@@ -43,6 +45,7 @@ export const useDerivedSwap = () => {
       outputCurrency,
       parsedInputAmount,
       trade?.outAmount,
+      usesLiquidityHubQuote,
     ]
   );
 
@@ -57,6 +60,7 @@ export const useDerivedSwap = () => {
       noLiquidity,
       refetchTrade,
       outputAmount,
+      usesLiquidityHubQuote,
     }),
     [
       inputAmount,
@@ -68,6 +72,7 @@ export const useDerivedSwap = () => {
       parsedInputAmount,
       refetchTrade,
       trade,
+      usesLiquidityHubQuote,
     ]
   );
 };

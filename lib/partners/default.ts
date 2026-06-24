@@ -1,16 +1,16 @@
 import type { PartnerConfig } from "./types";
 
 export const defaultPartner: PartnerConfig = {
-  id: "default",
+  id: "playground",
   brand: {
-    name: "Agent Swap",
+    name: "Orbs Swap",
     iconSrc: "/favicon.ico",
     appleIconSrc: "/icon.png",
-    logoAlt: "Agent Swap",
+    logoAlt: "Orbs Swap",
     logoSrc:'https://www.orbs.com/assets/img/common/logo.svg',
     externalUrl: "https://www.orbs.com/",
     metadata: {
-      title: "Agent Swap",
+      title: "Orbs Swap",
       description: "A white-label intent-powered swap and advanced order app.",
       url: "https://www.orbs.com/",
     },

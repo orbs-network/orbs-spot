@@ -1,7 +1,7 @@
 import type { PartnerConfig } from "./types";
 
 export const efficientFrontierPartner: PartnerConfig = {
-  id: "efficient-frontier",
+  id: "ef",
   brand: {
     name: "Efficient Frontier",
     logoSrc: "/efficient-frontier-logo.avif",

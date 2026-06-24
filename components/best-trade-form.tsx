@@ -80,39 +80,6 @@ const NetworkCost = () => {
   );
 };
 
-const PriceImpact = () => {
-  const { outputCurrency, inputAmount, inputCurrency, outputAmount } =
-    useDerivedSwap();
-  const inputUsd = useUSDPrice({
-    token: inputCurrency?.address,
-    amount: inputAmount,
-  });
-  const outputUsd = useUSDPrice({
-    token: outputCurrency?.address,
-    amount: outputAmount,
-  });
-  const priceImpactText = useMemo(() => {
-    const inputValue = BN(inputUsd.data ?? 0);
-    const outputValue = BN(outputUsd.data ?? 0);
-
-    if (inputValue.lte(0) || outputValue.lte(0)) {
-      return "0.00";
-    }
-
-    return formatSafeFixed(
-      BN(100).minus(outputValue.div(inputValue).multipliedBy(100))
-    );
-  }, [outputUsd.data, inputUsd.data]);
-
-  return (
-    <DetailRow
-      label="Price Impact"
-      value={`${priceImpactText}%`}
-      labelClassName="font-medium text-foreground"
-      valueClassName="font-normal text-foreground"
-    />
-  );
-};
 
 const Rate = () => {
   const { inputAmount, outputAmount, inputCurrency, outputCurrency } =
@@ -142,11 +109,22 @@ const Rate = () => {
 const MinimumAmountOut = () => {
   const { trade, outputCurrency } = useDerivedSwap();
   const amount = useToAmountUI(outputCurrency?.decimals, trade?.minAmountOut);
-  const formatted = useFormatNumber({ value: amount });
+  const usd = useUSDPrice({
+    token: outputCurrency?.address,
+    amount,
+  });
+  const formatted = useFormatNumber({ value: amount, decimalScale: 2 });
   return (
     <DetailRow
-      label="Minimum Amount Out"
-      value={`${formatted ?? "0"} ${outputCurrency?.symbol}`}
+      label="Min. Amount Out"
+      value={
+        <span className="inline-flex flex-wrap justify-end gap-x-1">
+          <span>
+            {formatted ?? "0"} {outputCurrency?.symbol}
+          </span>
+          <span className="text-muted-foreground">(${usd.formatted ?? "0"})</span>
+        </span>
+      }
       labelClassName="font-medium text-foreground"
       valueClassName="font-normal text-foreground"
     />
@@ -156,7 +134,6 @@ const Details = () => {
   return (
     <div className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
       <NetworkCost />
-      <PriceImpact />
       <MinimumAmountOut />
       <Rate />
     </div>
@@ -388,8 +365,8 @@ const Main = () => {
     token: outputCurrency?.address,
     amount: outputAmount,
   });
-  const inputUsdFormatted = useFormatNumber({ value: inputUsd.data });
-  const outputUsdFormatted = useFormatNumber({ value: outputUsd.data });
+  const inputUsdFormatted = useFormatNumber({ value: inputUsd.data, decimalScale: 2 });
+  const outputUsdFormatted = useFormatNumber({ value: outputUsd.data, decimalScale: 2 });
   return (
     <>
       <SwapFlow.Main

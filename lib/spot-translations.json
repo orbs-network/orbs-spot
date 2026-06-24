@@ -21,6 +21,7 @@
   "Open": "Open",
   "Completed": "Completed",
   "orderFilled": "Order filled",
+  "orderPlaced": "Order placed",
   "Expired": "Expired",
   "Cancelled": "Cancelled",
   "cancelOrder": "Cancel Order",

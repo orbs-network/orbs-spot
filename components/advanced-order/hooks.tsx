@@ -4,6 +4,7 @@
 import TokensPair from "@/components/tokens-pair";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { useRefetchSelectedCurrenciesBalances } from "@/lib/hooks/use-balances";
+import { useToAmountWei } from "@/lib/hooks/common";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import {
   isUserRejectedError,
@@ -19,6 +20,7 @@ import { useGetTransactionReceiptCallback } from "@/lib/hooks/use-get-transactio
 import { useSignTypedDataPayload } from "@/lib/hooks/use-sign-typed-data";
 import { useApproveToken } from "@/lib/hooks/use-token-approval";
 import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
+import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
 import {
   isNativeAddress,
@@ -35,6 +37,7 @@ import {
   type Token,
   type WalletInteractions,
 } from "@orbs-network/spot-react";
+import BN from "bignumber.js";
 import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { type Abi, maxUint256 } from "viem";
@@ -60,15 +63,52 @@ export function useSpotToken(currency?: Currency) {
 }
 
 export function useSpotMarketReferencePrice() {
-  const { trade, isLoadingTrade, noLiquidity } = useDerivedSwap();
+  const { trade, isLoadingTrade, noLiquidity, inputCurrency, outputCurrency, inputAmount } =
+    useDerivedSwap();
+  const inputUsd = useUSDPrice({
+    token: inputCurrency?.address,
+    amount: inputAmount || "0",
+  });
+  const outputUsd = useUSDPrice({ token: outputCurrency?.address });
+
+  const defaultOutputAmount = useMemo(() => {
+    const inputUsdValue = BN(inputUsd.data ?? 0);
+    const outputTokenUsd = BN(outputUsd.data ?? 0);
+
+    if (
+      !outputCurrency ||
+      !inputUsdValue.isFinite() ||
+      !outputTokenUsd.isFinite() ||
+      inputUsdValue.lte(0) ||
+      outputTokenUsd.lte(0)
+    ) {
+      return "";
+    }
+
+    return inputUsdValue
+      .div(outputTokenUsd)
+      .decimalPlaces(outputCurrency.decimals, BN.ROUND_DOWN)
+      .toFixed();
+  }, [inputUsd.data, outputCurrency, outputUsd.data]);
+  const defaultOutputAmountWei = useToAmountWei(
+    outputCurrency?.decimals,
+    defaultOutputAmount,
+  );
+  const defaultPriceLoading = inputUsd.isLoading || outputUsd.isLoading;
 
   return useMemo(
     () => ({
-      value: trade?.outAmount,
-      isLoading: isLoadingTrade,
+      value: trade?.outAmount ?? defaultOutputAmountWei,
+      isLoading: trade?.outAmount ? isLoadingTrade : defaultPriceLoading,
       noLiquidity,
     }),
-    [isLoadingTrade, noLiquidity, trade?.outAmount],
+    [
+      defaultOutputAmountWei,
+      defaultPriceLoading,
+      isLoadingTrade,
+      noLiquidity,
+      trade?.outAmount,
+    ],
   );
 }
 
@@ -256,6 +296,16 @@ export function useSpotCallbacks() {
             dstTokenAddress={outputCurrency?.address}
           />,
           { id: CREATE_ORDER_TOAST_ID, description: t("proceedInWallet") },
+        );
+      },
+      onOrderCreated: (order: Order) => {
+        toast.success(
+          <TokensPair
+            prefix={t("orderPlaced")}
+            srcTokenAddress={order.srcTokenAddress}
+            dstTokenAddress={order.dstTokenAddress}
+          />,
+          { id: CREATE_ORDER_TOAST_ID },
         );
       },
       onOrderFilled: (order: Order) => {
