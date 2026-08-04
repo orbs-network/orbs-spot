@@ -11,7 +11,9 @@ import { getTokenKey } from "../utils";
 const DEFAULT_CHAIN_FALLBACK_DELAY = 150;
 const LAST_DATA_CHAIN_ID_STORAGE_KEY = "swap-last-data-chain-id";
 
-const supportedChainIds = new Set(SUPPORTED_CHAINS.map((chain) => chain.id));
+const supportedChainIds: ReadonlySet<number> = new Set(
+  SUPPORTED_CHAINS.map((chain) => chain.id),
+);
 
 const tokenChainIds = new Map<string, Set<number>>();
 

@@ -104,10 +104,6 @@ export const SPOT_CHAINS = [
   katana,
   optimism,
   mantle,
-  hyperEvmChain,
-  unichain,
-  xLayer,
-  megaethChain,
 ] as const;
 
 export const SUPPORTED_CHAINS = SPOT_CHAINS;

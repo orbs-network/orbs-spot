@@ -2,6 +2,21 @@ export type PartnerStyles = {
   radius: string;
   fontFamily: string;
   selectedTabBackground?: string;
+  selectedTabForeground?: string;
+  selectedTabRadius?: string;
+  selectedTabShadow?: string;
+  navBackground?: string;
+  controlRadius?: string;
+  formContainerBackground?: string;
+  formContainerBorder?: string;
+  formContainerRadius?: string;
+  formPanelBackground?: string;
+  formPanelBorder?: string;
+  formPanelRadius?: string;
+  submitButtonRadius?: string;
+  tabListBackground?: string;
+  tabListBorder?: string;
+  tabListRadius?: string;
   settingsTriggerBackground?: string;
   settingsTriggerHoverBackground?: string;
   settingsTriggerForeground?: string;
@@ -43,6 +58,7 @@ export type PartnerStyles = {
 export type PartnerBrand = {
   name: string;
   logoSrc?: string;
+  navLogoClassName?: string;
   iconSrc?: string;
   appleIconSrc?: string;
   logoAlt: string;

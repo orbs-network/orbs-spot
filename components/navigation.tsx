@@ -9,7 +9,12 @@ import {
 } from "react";
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  CopyIcon,
+  LogOutIcon,
+  WalletIcon,
+} from "lucide-react";
 import { useDisconnect, useSwitchChain } from "wagmi";
 import { toast } from "sonner";
 import { cn, makeEllipsisAddress } from "@/lib/utils";
@@ -25,6 +30,7 @@ const NavPillButton = forwardRef<HTMLButtonElement, ComponentProps<"button">>(
   function NavPillButton({ children, className, ...props }, ref) {
     return (
       <button
+        data-nav-pill
         ref={ref}
         type="button"
         className={cn(navPillClass, className)}
@@ -64,7 +70,7 @@ function PopoverMenuButton({
   );
 }
 
-const CHAIN_LABELS = new Map(
+const CHAIN_LABELS: ReadonlyMap<number, string> = new Map(
   [...MAIN_CHAINS, ...SPOT_CHAINS].map((chain) => [chain.id, chain.name]),
 );
 
@@ -326,6 +332,7 @@ const NavWalletControls = () => {
         if (!connected) {
           return (
             <NavPillButton
+              data-primary-nav-pill
               onClick={openConnectModal}
               className="bg-primary px-4 text-primary-foreground hover:bg-primary/74"
             >
@@ -359,7 +366,7 @@ const NavWalletControls = () => {
 
 export function Navigation({ brand }: { brand: PartnerBrand }) {
   return (
-    <nav className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 bg-background/88 px-4 py-3 shadow-none backdrop-blur-xl">
+    <nav className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
       <div className="flex w-full flex-nowrap items-center gap-2 sm:gap-3">
         <Link
           href="/"
@@ -371,7 +378,10 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
             <img
               src={brand.logoSrc}
               alt={brand.logoAlt}
-              className="h-7 max-w-[112px] object-contain sm:h-10 sm:max-w-none"
+              className={cn(
+                "h-7 max-w-[112px] object-contain sm:h-10 sm:max-w-none",
+                brand.navLogoClassName,
+              )}
             />
           )}
           {!brand.logoSrc && (

@@ -131,6 +131,116 @@
   background: var(--app-shell-background);
 }
 
+[data-form-container] {
+  background: var(--form-container-background);
+  border-color: var(--form-container-border);
+  border-radius: var(--form-container-radius);
+}
+
+[data-form-panel] {
+  background: var(--form-panel-background);
+  border-color: var(--form-panel-border);
+  border-radius: var(--form-panel-radius);
+}
+
+[data-segmented-tabs] {
+  background: var(--tab-list-background);
+  border-color: var(--tab-list-border);
+  border-radius: var(--tab-list-radius);
+}
+
+[data-segmented-tabs-indicator] {
+  border-radius: var(--selected-tab-radius);
+  box-shadow: var(--selected-tab-shadow);
+}
+
+[data-segmented-tab],
+[data-percentage-button],
+[data-slot="select-trigger"],
+[data-token-selector-trigger],
+[data-toggle-currencies-button] {
+  border-radius: var(--control-radius);
+}
+
+[data-submit-button] {
+  border-radius: var(--submit-button-radius) !important;
+}
+
+html[data-partner="ginco"],
+html[data-partner="ginco"] body {
+  color-scheme: light;
+}
+
+html[data-partner="ginco"] body,
+html[data-partner="ginco"] .ef-app-shell {
+  background: #f4f4f4;
+}
+
+html[data-partner="ginco"] [data-nav-pill] {
+  border-color: rgba(22, 27, 47, 0.16);
+  border-radius: 2px !important;
+  background: #ffffff;
+  box-shadow: none;
+  color: #161b2f;
+  font-size: 12px;
+  padding-inline: 10px;
+}
+
+html[data-partner="ginco"] [data-nav-pill]:hover {
+  border-color: rgba(40, 120, 227, 0.48);
+  background: #f2f3f5;
+}
+
+html[data-partner="ginco"] [data-primary-nav-pill] {
+  border-color: #2878e3;
+  background: #2878e3;
+  color: #ffffff;
+  padding-inline: 16px;
+}
+
+html[data-partner="ginco"] [data-primary-nav-pill]:hover {
+  border-color: #2878e3;
+  background: #1f6ed6;
+  color: #ffffff;
+}
+
+html[data-partner="ginco"] [data-percentage-button],
+html[data-partner="ginco"] [data-slot="select-trigger"],
+html[data-partner="ginco"] [data-toggle-currencies-button] {
+  border: 1px solid rgba(22, 27, 47, 0.14);
+  border-radius: 2px !important;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+html[data-partner="ginco"] [data-form-section-header] h2 {
+  color: #161b2f;
+}
+
+html[data-partner="ginco"] [data-form-panel] {
+  border: 1px solid rgba(22, 27, 47, 0.1);
+  background: #fafafa;
+  box-shadow: none;
+}
+
+html[data-partner="ginco"] [data-form-panel]:hover {
+  border-color: rgba(40, 120, 227, 0.42);
+}
+
+html[data-partner="ginco"] [data-submit-button] {
+  border-radius: 2px !important;
+  background: #2878e3;
+  box-shadow: none;
+}
+
+html[data-partner="ginco"] [data-settings-trigger] {
+  border-radius: 2px;
+}
+
+html[data-partner="ginco"] [data-powered-by] {
+  display: none;
+}
+
 html[data-partner="ht"] [data-submit-button],
 html[data-partner="ht-digital"] [data-submit-button] {
   background-color: #161440 !important;

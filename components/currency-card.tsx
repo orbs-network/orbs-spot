@@ -78,6 +78,7 @@ const PercentageButtons = ({
     <div className="absolute right-4 top-4 flex cursor-pointer flex-wrap items-center justify-end gap-1">
       {PERCENTAGE_BUTTONS.map((button) => (
         <div
+          data-percentage-button
           key={button.value}
           className="flex cursor-pointer items-center gap-1 rounded-xl border border-border/80 bg-card/80 px-2.5 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:border-primary/35 hover:bg-primary/10 hover:text-foreground sm:text-sm"
           onClick={() => onPercentageClick(button.value)}

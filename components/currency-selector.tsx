@@ -126,7 +126,7 @@ const SearchInput = ({
 
 const Loader = () => {
   return (
-    <div className="flex flex-col gap-5 p-2">
+    <div className="flex flex-col gap-5 p-3">
       {Array.from({ length: 4 }).map((_, index) => (
         <div key={index} className="flex items-center gap-2 justify-start">
           <Skeleton className="size-10 rounded-full" />
@@ -365,9 +365,9 @@ const CurrencyItem = memo(function CurrencyItem({
   const hasBalance = BN(balanceWei ?? "0").gt(0);
 
   return (
-    <DialogClose asChild className="w-full px-2">
+    <DialogClose asChild>
       <div
-        className="group mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 transition-colors hover:border-primary/14 hover:bg-primary/6 data-[highlighted]:bg-primary/6"
+        className="group mx-3 mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 transition-colors hover:border-primary/14 hover:bg-primary/6 data-[highlighted]:bg-primary/6"
         onClick={() => onCurrencyChange(currency)}
       >
         <div className="flex items-center gap-3 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">

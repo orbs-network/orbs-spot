@@ -1,5 +1,8 @@
+"use client";
+
 /* eslint-disable @next/next/no-img-element */
 import React from "react";
+
 import { FORM_TABS } from "@/lib/consts";
 import { useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { useFormTabStore } from "@/lib/hooks/store";
@@ -12,7 +15,7 @@ const FormHeader = () => {
   const { selectedTab, setSelectedTab } = useSelectedFormTab();
 
   return (
-    <div className="flex items-center">
+    <div data-form-header className="flex items-center">
       <div className="min-w-0 flex-1 sm:hidden">
         <StyledSelect
           value={selectedTab.value}
@@ -47,7 +50,10 @@ const FormSectionHeader = ({
   title: string;
 }) => {
   return (
-    <div className="flex min-h-11 items-center justify-between gap-3 px-1">
+    <div
+      data-form-section-header
+      className="flex min-h-11 items-center justify-between gap-3 px-1"
+    >
       <h2 className="min-w-0 truncate text-[18px] font-bold leading-none text-foreground">
         {title}
       </h2>
@@ -59,6 +65,7 @@ const FormSectionHeader = ({
 const PoweredBy = () => {
   return (
     <a
+      data-powered-by
       href="https://www.orbs.com/"
       target="_blank"
       rel="noopener noreferrer"
@@ -89,8 +96,14 @@ export function FormContainer({
   }, [setOrderHistoryOpen]);
 
   return (
-    <div className="mx-auto mb-[80px] mt-4 flex w-full min-w-0 max-w-[calc(100vw-2rem)] flex-col gap-4 sm:max-w-[480px]">
-      <div className="flex w-full flex-col gap-3 rounded-[21px] border border-border/80 bg-card/95 p-3 backdrop-blur">
+    <div
+      data-form-root
+      className="mx-auto mb-[80px] mt-4 flex w-full min-w-0 max-w-[calc(100vw-2rem)] flex-col gap-4 sm:max-w-[480px]"
+    >
+      <div
+        data-form-container
+        className="flex w-full flex-col gap-3 rounded-[21px] border border-border/80 bg-card/95 p-3 backdrop-blur"
+      >
         <FormHeader />
         <FormSectionHeader
           title={selectedTab.fullLabel}

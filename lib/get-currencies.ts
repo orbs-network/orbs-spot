@@ -2,7 +2,7 @@ import * as chains from "viem/chains";
 import { Currency } from "./types";
 import { getAddress, isAddress, zeroAddress } from "viem";
 import axios from "axios";
-import { SUPPORTED_CHAINS, type SupportedChainId } from "./consts";
+import { SUPPORTED_CHAINS } from "./consts";
 import {
   dedupeCurrenciesByAddress,
   eqCompare,
@@ -30,7 +30,7 @@ const coingekoChainToName = {
   [chains.unichain.id]: "unichain",
   [chains.xLayer.id]: "x-layer",
   [chains.megaeth.id]: "megaeth",
-} satisfies Partial<Record<SupportedChainId, string>>;
+} satisfies Partial<Record<number, string>>;
 
 type CoinGeckoToken = {
   address?: string;

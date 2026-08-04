@@ -26,6 +26,8 @@ const getPartner = () => {
       return Partners.EfficientFrontier;
     case 'ht':
       return Partners.HtDigital;
+      case 'ginco':
+        return Partners.Ginco;
     default:
       return Partners.Agent;
   }

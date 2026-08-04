@@ -16,7 +16,11 @@ export function FormPanel({
   variant?: keyof typeof panelVariants;
 }) {
   return (
-    <div className={cn(panelVariants[variant], className)} {...props}>
+    <div
+      data-form-panel
+      className={cn(panelVariants[variant], className)}
+      {...props}
+    >
       {children}
     </div>
   );

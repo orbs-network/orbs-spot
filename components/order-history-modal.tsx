@@ -115,6 +115,14 @@ function getOrderFilterLabel(filter: OrderFilter) {
   }
 }
 
+function getNoOrdersTitle(filter: OrderFilter) {
+  if (filter === OrderFilter.All) {
+    return "No orders";
+  }
+
+  return `No ${getOrderFilterLabel(filter).toLowerCase()} orders`;
+}
+
 function getOrderTypeLabel(orderType?: OrderType) {
   if (!orderType) return "Order";
   return ORDER_TYPE_LABELS[orderType] ?? "Order";
@@ -771,7 +779,7 @@ function OrderHistoryEmpty({
     <EmptyState
       title={
         hasWallet
-          ? `No ${getOrderFilterLabel(selectedFilter).toLowerCase()} orders`
+          ? getNoOrdersTitle(selectedFilter)
           : "Connect wallet to view orders"
       }
       description={
@@ -791,11 +799,7 @@ export function OrderHistoryModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const { address } = useConnection();
-  const {
-    orders,
-    isLoading,
-    isRefetching,
-  } = useSpot().orderHistoryPanel;
+  const { orders, isLoading } = useSpot().orderHistoryPanel;
   const [selectedFilter, setSelectedFilter] = useState<OrderFilter>(
     OrderFilter.All,
   );
@@ -822,7 +826,7 @@ export function OrderHistoryModal({
     ORDER_LIST_MIN_HEIGHT,
   );
 
-  const loading = isLoading || isRefetching;
+  const loading = isLoading;
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       onOpenChange(nextOpen);

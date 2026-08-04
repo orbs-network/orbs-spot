@@ -29,6 +29,7 @@ export function TokenSelectorTrigger({
 
   return (
     <span
+      data-token-selector-trigger
       data-no-card-focus
       className={cn(
         "inline-flex min-w-0 cursor-pointer items-center rounded-full transition-colors",
