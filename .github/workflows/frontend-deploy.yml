@@ -55,6 +55,7 @@ jobs:
           VERCEL_PROJECT_ID_CRYMBO: ${{ secrets.VERCEL_PROJECT_ID_CRYMBO }}
           VERCEL_PROJECT_ID_EFFICIENT_FRONTIER: ${{ secrets.VERCEL_PROJECT_ID_EFFICIENT_FRONTIER }}
           VERCEL_PROJECT_ID_GINCO: ${{ secrets.VERCEL_PROJECT_ID_GINCO }}
+          VERCEL_PROJECT_ID_CRINGO: ${{ secrets.VERCEL_PROJECT_ID_CRINGO }}
           VERCEL_PROJECT_ID_HT_DIGITAL: ${{ secrets.VERCEL_PROJECT_ID_HT_DIGITAL }}
         run: |
           set -euo pipefail
@@ -74,7 +75,7 @@ jobs:
               ;;
             ginco)
               next_partner="ginco"
-              project_id="$VERCEL_PROJECT_ID_GINCO"
+              project_id="${VERCEL_PROJECT_ID_GINCO:-$VERCEL_PROJECT_ID_CRINGO}"
               ;;
             ht-digital)
               next_partner="ht-digital"
