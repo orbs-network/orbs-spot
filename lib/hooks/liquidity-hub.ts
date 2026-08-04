@@ -5,12 +5,11 @@ import { getActiveClientPartnerConfig } from "../partners/client";
 
 export const useLiquidityHub = () => {
   const { chainId } = useConnection();
-  return useMemo(
-    () =>
-      constructSDK({
-        chainId: chainId || 1,
-        partner: getActiveClientPartnerConfig().id,
-      }),
-    [chainId],
-  );
+  return useMemo(() => {
+    const id = getActiveClientPartnerConfig().id;
+    return constructSDK({
+      chainId: chainId || 1,
+      partner: id === 'ginco' ? 'playground' : id,
+    });
+  }, [chainId]);
 };
