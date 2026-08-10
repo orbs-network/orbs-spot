@@ -50,10 +50,6 @@ import BN from "bignumber.js";
 import { toast } from "sonner";
 
 const ORDER_HISTORY_CLOSE_RESET_DELAY = 180;
-const ORDER_LIST_ITEM_ESTIMATED_HEIGHT = 92;
-const ORDER_LIST_MAX_HEIGHT = 560;
-const ORDER_LIST_MIN_HEIGHT = 118;
-const FILL_LIST_HEIGHT = "min(520px, 66dvh)";
 
 const ORDER_FILTER_OPTIONS = [
   OrderFilter.All,
@@ -68,18 +64,6 @@ type DerivedHistoryOrder = NonNullable<
 >;
 type DerivedHistoryFill = DerivedHistoryOrder["fills"][number];
 type OpenDetailSection = "summary" | "info" | undefined;
-
-function getVirtualListHeight(
-  itemCount: number,
-  estimatedItemHeight: number,
-  maxHeight: number,
-  minHeight: number,
-) {
-  return Math.min(
-    maxHeight,
-    Math.max(minHeight, itemCount * estimatedItemHeight),
-  );
-}
 
 const STATUS_CLASS_NAMES: Record<OrderStatus, string> = {
   [OrderStatus.Open]: "text-primary",
@@ -539,7 +523,7 @@ function OrderFillsView({
   const t = useTranslations();
 
   return (
-    <div className="flex flex-col px-5 pb-5 pt-5 max-sm:min-h-0 max-sm:flex-1">
+    <div className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-5">
       <div className="mb-6 flex items-center gap-4 pr-8">
         <HistoryBackButton label="Back to order details" onClick={onBack} />
         <DialogTitle className="truncate text-[16px] font-semibold leading-none">
@@ -551,8 +535,7 @@ function OrderFillsView({
 
       {order.fills.length ? (
         <div
-          className="overflow-hidden pr-1 max-sm:min-h-0 max-sm:flex-1 max-sm:!h-auto"
-          style={{ height: FILL_LIST_HEIGHT }}
+          className="min-h-0 flex-1 overflow-hidden pr-1"
         >
           <Virtuoso
             style={{ height: "100%" }}
@@ -603,7 +586,7 @@ function SelectedOrderDetails({
   }
 
   return (
-    <div className="px-5 pb-5 pt-5 max-sm:flex-1 max-sm:overflow-y-auto">
+    <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-5">
       <div className="mb-6 flex items-center gap-4 pr-8">
         <HistoryBackButton label="Back to orders" onClick={onBack} />
         <DialogTitle className="truncate text-[16px] font-semibold leading-none">
@@ -819,13 +802,6 @@ export function OrderHistoryModal({
     () => filterAndSortOrders(orders.all, selectedFilter),
     [orders.all, selectedFilter],
   );
-  const orderListHeight = getVirtualListHeight(
-    filteredOrders.length,
-    ORDER_LIST_ITEM_ESTIMATED_HEIGHT,
-    ORDER_LIST_MAX_HEIGHT,
-    ORDER_LIST_MIN_HEIGHT,
-  );
-
   const loading = isLoading;
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -845,11 +821,10 @@ export function OrderHistoryModal({
   );
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange} responsive={false}>
       <DialogContent
         presentation="center"
-        mobilePresentation="fullscreen"
-        className="!flex w-[calc(100vw-1.5rem)] max-w-[560px] flex-col gap-0 overflow-hidden rounded-[22px] border-border/80 p-0"
+        className="!flex h-[70dvh] max-h-[70dvh] w-[calc(100vw-1.5rem)] max-w-[500px] flex-col gap-0 overflow-hidden rounded-[22px] border-border/80 p-0"
       >
         {selectedOrder ? (
           <SelectedOrderDetails
@@ -878,14 +853,11 @@ export function OrderHistoryModal({
               </div>
 
               {loading && !filteredOrders.length ? (
-                <div className="flex min-h-[320px] items-center justify-center">
+                <div className="flex min-h-0 flex-1 items-center justify-center">
                   <Spinner className="size-10" />
                 </div>
               ) : filteredOrders.length ? (
-                <div
-                  className="overflow-hidden max-sm:min-h-0 max-sm:flex-1 max-sm:!h-auto max-sm:!max-h-none"
-                  style={{ height: orderListHeight, maxHeight: "76dvh" }}
-                >
+                <div className="min-h-0 flex-1 overflow-hidden">
                   <Virtuoso
                     style={{ height: "100%" }}
                     data={filteredOrders}

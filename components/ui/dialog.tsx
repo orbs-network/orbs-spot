@@ -20,9 +20,13 @@ const ResponsiveDialogContext = React.createContext({ isDrawer: false })
 
 function Dialog({
   children,
+  responsive = true,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  const isDrawer = useIsMobile()
+}: React.ComponentProps<typeof DialogPrimitive.Root> & {
+  responsive?: boolean
+}) {
+  const isMobile = useIsMobile()
+  const isDrawer = responsive && isMobile
 
   return (
     <ResponsiveDialogContext.Provider value={{ isDrawer }}>
