@@ -1,5 +1,6 @@
 "use client";
 
+import { LiveOrderFlowTrigger } from "@/components/developer-tools/live-order-flow-trigger";
 import { SubmitSwapButton } from "@/components/submit-swap-button";
 import { SwapFlowLoader } from "@/components/swap-flow-loader";
 import { Button } from "@/components/ui/button";
@@ -58,13 +59,20 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
 
   return (
     <div className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
-      <DetailRow label={t("orderType")} align="start">
+      <DetailRow
+        label={t("orderType")}
+        align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
+      >
         {orderTitle}
       </DetailRow>
       <DetailRow
         label={t("expirationLabel")}
         tooltip={t("expirationTooltip")}
         align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
       >
         {formatDeadline(order.deadline)}
       </DetailRow>
@@ -73,6 +81,8 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         tooltip={t("triggerPriceTooltip")}
         hidden={BN(order.triggerPriceUI || 0).isZero()}
         align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
       >
         1 {srcToken?.symbol} = {triggerPrice || "-"} {dstToken?.symbol}
       </DetailRow>
@@ -81,6 +91,8 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         tooltip={t("limitPriceTooltip")}
         hidden={BN(order.limitPriceUI || 0).isZero()}
         align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
       >
         1 {srcToken?.symbol} = {limitPrice || "-"} {dstToken?.symbol}
       </DetailRow>
@@ -91,6 +103,8 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         tooltip={t("minDstAmountTooltip")}
         hidden={BN(order.minDestAmountPerTradeUI || 0).isZero()}
         align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
       >
         {minReceived || "-"} {dstToken?.symbol}
       </DetailRow>
@@ -99,6 +113,8 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         tooltip={t("tradeSizeTooltip")}
         hidden={order.totalTrades <= 1}
         align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
       >
         {sizePerTrade || "-"} {srcToken?.symbol}
       </DetailRow>
@@ -107,6 +123,8 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         tooltip={t("totalTradesTooltip")}
         hidden={order.totalTrades <= 1}
         align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
       >
         {order.totalTrades}
       </DetailRow>
@@ -115,6 +133,8 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         tooltip={t("tradeIntervalTooltip")}
         hidden={order.totalTrades <= 1}
         align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
       >
         {formatDuration(order.tradeInterval)}
       </DetailRow>
@@ -122,6 +142,8 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         label={t("fees", { value: `(${order.feesPercentage}%)` })}
         hidden={order.feesUsd === undefined || order.feesUsd === null}
         align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
       >
         ${feesUsd || "0"}
       </DetailRow>
@@ -235,6 +257,7 @@ function OrderFlowMain({
             />
           </div>
           <Button
+            type="button"
             data-submit-button
             className="h-12 w-full rounded-[14px] text-base"
             disabled={!accepted || isSubmitting}
@@ -420,6 +443,7 @@ function SubmitOrderPanel({
 
 export function SubmitOrder({ orderModule }: { orderModule: Module }) {
   const t = useTranslations();
+  const spot = useSpot();
   const {
     onSubmit,
     status,
@@ -427,13 +451,12 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
     resetCurrentSwap,
     parsedError,
     confirmButtonLoading,
-  } = useSpot().orderExecutionPanel;
-  const { disabled, loading } = useSpot().submitOrderButton;
+  } = spot.orderExecutionPanel;
+  const { disabled, loading } = spot.submitOrderButton;
   const { setInputAmount } = useActionHandlers();
   const { chainId } = useConnection();
   const [open, setOpen] = useState(false);
   const orderTitle = getOrderTitle(orderModule, t);
-
   const onOpen = useCallback(() => {
     setOpen(true);
     if (status !== SwapStatus.LOADING) {
@@ -452,33 +475,42 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
   }, [resetCurrentSwap, resetState, setInputAmount, setOpen, status]);
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => (nextOpen ? onOpen() : closeReview())}
-    >
-      <SubmitSwapButton
-        onClick={onOpen}
-        disabled={disabled}
-        isLoading={loading}
-        text={loading ? t("fetchingQuote") : t("placeOrder")}
-        validateSwap={false}
-        chainId={chainId}
-      />
-      <DialogContent
-        presentation="center"
-        className="w-[calc(100vw-1rem)] sm:max-w-[460px]"
-      >
-        <DialogHeader>
-          <DialogTitle>
-            {parsedError ? "Error Creating Order" : !status ? t("orderReview") : ''}
-          </DialogTitle>
-        </DialogHeader>
-        <SubmitOrderPanel
-          orderTitle={orderTitle}
-          onSubmit={onSubmit}
-          isSubmitting={confirmButtonLoading}
-        />
-      </DialogContent>
-    </Dialog>
+    <div className="flex w-full items-center gap-2">
+      <div className="min-w-0 flex-1">
+        <Dialog
+          open={open}
+          onOpenChange={(nextOpen) => (nextOpen ? onOpen() : closeReview())}
+        >
+          <SubmitSwapButton
+            onClick={onOpen}
+            disabled={disabled}
+            isLoading={loading}
+            text={loading ? t("fetchingQuote") : t("placeOrder")}
+            validateSwap={false}
+            chainId={chainId}
+          />
+          <DialogContent
+            presentation="center"
+            className="w-[calc(100vw-1rem)] sm:max-w-[460px]"
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {parsedError
+                  ? "Error Creating Order"
+                  : !status
+                    ? t("orderReview")
+                    : ""}
+              </DialogTitle>
+            </DialogHeader>
+            <SubmitOrderPanel
+              orderTitle={orderTitle}
+              onSubmit={onSubmit}
+              isSubmitting={confirmButtonLoading}
+            />
+          </DialogContent>
+        </Dialog>
+      </div>
+      <LiveOrderFlowTrigger submitDisabled={disabled || loading} />
+    </div>
   );
 }
