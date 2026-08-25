@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "react-json-view-lite/dist/index.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -164,6 +165,48 @@
 
 [data-submit-button] {
   border-radius: var(--submit-button-radius) !important;
+}
+
+@keyframes developer-trigger-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--primary) 24%, transparent),
+      0 0 12px color-mix(in srgb, var(--primary) 24%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--primary) 42%, transparent),
+      0 0 22px color-mix(in srgb, var(--primary) 48%, transparent);
+  }
+}
+
+[data-developer-trigger] {
+  border-color: color-mix(in srgb, var(--primary) 52%, transparent) !important;
+  background: color-mix(in srgb, var(--primary) 10%, transparent) !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 24%, transparent),
+    0 0 12px color-mix(in srgb, var(--primary) 24%, transparent);
+  color: var(--primary) !important;
+  animation: developer-trigger-glow 2.6s ease-in-out infinite;
+}
+
+[data-developer-trigger]:hover {
+  border-color: color-mix(in srgb, var(--primary) 78%, transparent) !important;
+  background: color-mix(in srgb, var(--primary) 17%, transparent) !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--primary) 48%, transparent),
+    0 0 24px color-mix(in srgb, var(--primary) 54%, transparent) !important;
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-developer-trigger] {
+    animation: none;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--primary) 24%, transparent),
+      0 0 12px color-mix(in srgb, var(--primary) 24%, transparent) !important;
+  }
 }
 
 html[data-partner="ginco"],

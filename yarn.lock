@@ -1061,25 +1061,25 @@
   resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.0.97.tgz#9a008615ca8977c1647c68b005e6f8cbb4033c55"
   integrity sha512-iQ0hDJqhXFBtZwTsMH2zuVu2y8c+pIiKOBtqgz7qzKTzwmGl+3hixuR3Riw2JJmKf2s7+zwZvku8boXTvGDuNA==
 
-"@orbs-network/spot-react@^1.1.40":
-  version "1.1.40"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.40.tgz#ad2e378e203f0e6c97c2a208e800d98089d11800"
-  integrity sha512-KOR2hiLHNpB9UKlNk+VMGrUu/av0JZP9yKAxdTICXd3mLfAkxvZf70ExThtCzYj04BniJalsTBQB3nm8ZvVMoA==
+"@orbs-network/spot-react@^1.1.42":
+  version "1.1.42"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.42.tgz#90f6e66a0138d36b5ac12f3e8bc59e35705f201f"
+  integrity sha512-PdLFUJ1cqT2hKW33ZBBdnfUdGau3Nqz32f/muwOrttQd1O9atBRr9AQePoI5H3GZtOzYO7J8+o3wMHX3czlhTQ==
   dependencies:
-    "@orbs-network/spot-ui" "1.0.22"
+    "@orbs-network/spot-ui" "1.0.24"
 
-"@orbs-network/spot-ui@1.0.22":
-  version "1.0.22"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.22.tgz#8a7b68ebf575d9bef4a9b3417e5593e14da00d27"
-  integrity sha512-Lz5g2WRR7u8GgGHlRSYncgkYtX2G2QfrW7vppzXBF1mu1mLZX9Gxoj99fNHhsS0baiYrDfjOGLsg1wJ7tGCtHQ==
+"@orbs-network/spot-ui@1.0.24":
+  version "1.0.24"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.24.tgz#3072b0b5f03ecb20dfa6a5010a1b19c62aa304d2"
+  integrity sha512-AL6+8XCum61M1chYpL7lRL4LOoxpVx9VEcnhkzpKwzq1tfh6zGPg55blnPxH0EB+aghKTBvQWWPJOljExSjYUw==
   dependencies:
-    "@orbs-network/spot" "^2.7.1"
+    "@orbs-network/spot" "^2.7.2"
     "@orbs-network/twap" "^2.7.28"
 
-"@orbs-network/spot@^2.7.1":
-  version "2.7.1"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot/-/spot-2.7.1.tgz#15d7e146ea541e692b6479f14b96317e31512aa4"
-  integrity sha512-//LEcOOaF8VBluK/KM4f1o3At7ePgaTsgnXC20Jiyt6VAfdLbcxQRMCusRWBEP9mfvHn0ZfXfwoUzjKY5c+F9Q==
+"@orbs-network/spot@^2.7.2":
+  version "2.7.2"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot/-/spot-2.7.2.tgz#3a3a2ee2a33b2afd8b55a38a2ab549a6f204f90d"
+  integrity sha512-GkCgCXAtr7o2OB8hQtR2sG161GoFbu4RGYXyDDqSwkYq/tQnOCzNPFAszBLB941DWdF9dKBHZMZh33LanVWIuQ==
 
 "@orbs-network/swap-ui@^0.0.61":
   version "0.0.61"
@@ -2250,6 +2250,11 @@
   dependencies:
     undici-types "~6.21.0"
 
+"@types/prismjs@^1.26.0":
+  version "1.26.6"
+  resolved "https://registry.yarnpkg.com/@types/prismjs/-/prismjs-1.26.6.tgz#6ea27c126d645319ae4f7055eda63a9e835c0187"
+  integrity sha512-vqlvI7qlMvcCBbVe0AKAb4f97//Hy0EBTaiW8AalRnG/xAN5zOiWWyrNqNXeq8+KAuvRewjCVY1+IPxk4RdNYw==
+
 "@types/react-dom@^19":
   version "19.2.3"
   resolved "https://registry.yarnpkg.com/@types/react-dom/-/react-dom-19.2.3.tgz#c1e305d15a52a3e508d54dca770d202cb63abf2c"
@@ -3342,7 +3347,7 @@ clsx@1.2.1, clsx@^1.2.1:
   resolved "https://registry.yarnpkg.com/clsx/-/clsx-1.2.1.tgz#0ddc4a20a549b59c93a4116bb26f5294ca17dc12"
   integrity sha512-EcR6r5a8bj6pu3ycsa/E/cKVGuTgZJZdsyUYHOksG/UHIiKfjxzRxYJpyVBwYaQeOvghal9fcc4PidlgzugAQg==
 
-clsx@2.1.1, clsx@^2.1.1:
+clsx@2.1.1, clsx@^2.0.0, clsx@^2.1.1:
   version "2.1.1"
   resolved "https://registry.yarnpkg.com/clsx/-/clsx-2.1.1.tgz#eed397c9fd8bd882bfb18deab7102049a2f32999"
   integrity sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==
@@ -5489,6 +5494,14 @@ prelude-ls@^1.2.1:
   resolved "https://registry.yarnpkg.com/prelude-ls/-/prelude-ls-1.2.1.tgz#debc6489d7a6e6b0e7611888cec880337d316396"
   integrity sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==
 
+prism-react-renderer@^2.4.1:
+  version "2.4.1"
+  resolved "https://registry.yarnpkg.com/prism-react-renderer/-/prism-react-renderer-2.4.1.tgz#ac63b7f78e56c8f2b5e76e823a976d5ede77e35f"
+  integrity sha512-ey8Ls/+Di31eqzUxC46h8MksNuGx/n0AAC8uKpwFau4RPDYLuE3EXTp8N8G2vX2N7UC/+IXeNUnlWBGGcAG+Ig==
+  dependencies:
+    "@types/prismjs" "^1.26.0"
+    clsx "^2.0.0"
+
 process-warning@^1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/process-warning/-/process-warning-1.0.0.tgz#980a0b25dc38cd6034181be4b7726d89066b4616"
@@ -5603,6 +5616,11 @@ react-is@^16.13.1:
   version "16.13.1"
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-16.13.1.tgz#789729a4dc36de2999dc156dd6c1d9c18cea56a4"
   integrity sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==
+
+react-json-view-lite@^2.5.0:
+  version "2.5.0"
+  resolved "https://registry.yarnpkg.com/react-json-view-lite/-/react-json-view-lite-2.5.0.tgz#c7ff011c7cc80e9900abc7aa4916c6a5c6d6c1c6"
+  integrity sha512-tk7o7QG9oYyELWHL8xiMQ8x4WzjCzbWNyig3uexmkLb54r8jO0yH3WCWx8UZS0c49eSA4QUmG5caiRJ8fAn58g==
 
 react-number-format@^5.4.4:
   version "5.4.5"

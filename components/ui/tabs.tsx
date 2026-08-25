@@ -1,6 +1,7 @@
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export type SegmentedTabOption<TValue extends string | number> = {
   value: TValue;
@@ -80,27 +81,30 @@ export function SegmentedTabs<TValue extends string | number>({
         const selected = option.value === value;
 
         return (
-          <button
-            data-segmented-tab
-            key={option.value}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            aria-label={option.ariaLabel}
-            title={option.title}
-            onClick={() => onValueChange(option.value)}
-            className={cn(
-              "relative z-10",
-              tabClassName ?? DEFAULT_SEGMENTED_TABS_TAB_CLASS_NAME,
-              selected
-                ? selectedTabClassName ??
-                    DEFAULT_SEGMENTED_TABS_SELECTED_CLASS_NAME
-                : unselectedTabClassName ??
-                    DEFAULT_SEGMENTED_TABS_UNSELECTED_CLASS_NAME,
-            )}
-          >
-            {option.label}
-          </button>
+          <Tooltip key={option.value}>
+            <TooltipTrigger asChild>
+              <button
+                data-segmented-tab
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-label={option.ariaLabel}
+                onClick={() => onValueChange(option.value)}
+                className={cn(
+                  "relative z-10",
+                  tabClassName ?? DEFAULT_SEGMENTED_TABS_TAB_CLASS_NAME,
+                  selected
+                    ? selectedTabClassName ??
+                        DEFAULT_SEGMENTED_TABS_SELECTED_CLASS_NAME
+                    : unselectedTabClassName ??
+                        DEFAULT_SEGMENTED_TABS_UNSELECTED_CLASS_NAME,
+                )}
+              >
+                {option.label}
+              </button>
+            </TooltipTrigger>
+            {option.title && <TooltipContent>{option.title}</TooltipContent>}
+          </Tooltip>
         );
       })}
     </div>

@@ -1,5 +1,9 @@
 "use client";
 
+import {
+  CancelOrderDeveloperButton,
+  FetchOrdersDeveloperButton,
+} from "@/components/developer-tools/order-history-actions";
 import { CurrencyLogo } from "@/components/ui/currency-logo";
 import { Button } from "@/components/ui/button";
 import {
@@ -735,16 +739,23 @@ function SelectedOrderDetails({
         />
 
         {isOpenOrder && !isSuccess && (
-          <Button
-            data-submit-button
-            type="button"
-            onClick={() => void cancelOrder()}
-            isLoading={isCancelling}
-            disabled={isCancelling}
-            className="mt-1 h-12 w-full rounded-[14px] text-base"
-          >
-            {t("cancelOrder")}
-          </Button>
+          <div className="mt-1 flex w-full items-center gap-2">
+            <Button
+              data-submit-button
+              type="button"
+              onClick={() => void cancelOrder()}
+              isLoading={isCancelling}
+              disabled={isCancelling}
+              className="h-12 min-w-0 flex-1 rounded-[14px] text-base"
+            >
+              {t("cancelOrder")}
+            </Button>
+            <CancelOrderDeveloperButton
+              isCancelling={isCancelling}
+              onCancel={cancelOrder}
+              rawOrder={rawOrder}
+            />
+          </div>
         )}
       </div>
     </div>
@@ -802,6 +813,7 @@ export function OrderHistoryModal({
     () => filterAndSortOrders(orders.all, selectedFilter),
     [orders.all, selectedFilter],
   );
+
   const loading = isLoading;
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -835,9 +847,12 @@ export function OrderHistoryModal({
         ) : (
           <>
             <DialogHeader className="shrink-0 px-5 pb-6 pt-5 text-left">
-              <DialogTitle className="text-[16px] font-semibold leading-none">
-                Order history
-              </DialogTitle>
+              <div className="flex items-center gap-2 pr-8">
+                <DialogTitle className="text-[16px] font-semibold leading-none">
+                  Order history
+                </DialogTitle>
+                <FetchOrdersDeveloperButton orders={orders.all} />
+              </div>
             </DialogHeader>
 
             <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pb-5">

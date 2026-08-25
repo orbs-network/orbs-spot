@@ -6,11 +6,8 @@ import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { getActiveClientPartnerConfig } from "@/lib/partners/client";
-import {
-  Module,
-  Partners,
-  SpotProvider,
-} from "@orbs-network/spot-react";
+import { getActiveSpotPartner } from "@/lib/partners/spot";
+import { Module, SpotProvider } from "@orbs-network/spot-react";
 import { type ReactNode } from "react";
 import { useConnection } from "wagmi";
 import {
@@ -19,20 +16,6 @@ import {
   useSpotToken,
   useWalletInteractions,
 } from "./hooks";
-
-const getPartner = () => {
-  switch (getActiveClientPartnerConfig().id) {
-    case 'ef':
-      return Partners.EfficientFrontier;
-    case 'ht':
-      return Partners.HtDigital;
-      case 'ginco':
-        return Partners.Ginco;
-    default:
-      return Partners.Agent;
-  }
-}
-
 
 export function SpotProviderShell({
   children,
@@ -63,7 +46,7 @@ export function SpotProviderShell({
       typedInputAmount={inputAmount}
       walletInteractions={walletInteractions}
       account={spotAccount}
-      partner={getPartner()}
+      partner={getActiveSpotPartner()}
       srcBalance={inputBalance}
       dstBalance={outputBalance}
       srcToken={spotSrcToken}
@@ -84,4 +67,3 @@ export function SpotProviderShell({
     </SpotProvider>
   );
 }
-

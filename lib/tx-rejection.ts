@@ -64,9 +64,10 @@ export function showTransactionRejectedToast(options: ExternalToast = {}) {
     toast.dismiss(id);
   }
 
-  toast.info("Transaction rejected", {
+  toast.info("Request cancelled", {
     id: getRejectionToastId(id),
-    description: "No transaction was submitted and no funds moved.",
+    description:
+      "Nothing was submitted and no funds moved. Try again whenever you're ready.",
     duration: duration ?? REJECTION_TOAST_DURATION,
     closeButton: true,
     ...toastOptions,
