@@ -18,9 +18,6 @@ import {
 } from "lucide-react";
 import { useDisconnect, useSwitchChain } from "wagmi";
 import { toast } from "sonner";
-import {
-  DeveloperToolsLauncher,
-} from "@/components/developer-tools/developer-tools-launcher";
 import { useDeveloperMode } from "@/components/developer-tools/use-developer-mode";
 import { cn, makeEllipsisAddress } from "@/lib/utils";
 import { CHAIN_LOGO_URLS, MAIN_CHAINS, SPOT_CHAINS, SPOT_TABS } from "@/lib/consts";
@@ -373,6 +370,10 @@ const NavWalletControls = () => {
 
 export function Navigation({ brand }: { brand: PartnerBrand }) {
   const { isDeveloperMode, setIsDeveloperMode } = useDeveloperMode();
+  const { selectedTab } = useSelectedFormTab();
+  const isSpotTab = SPOT_TABS.includes(
+    selectedTab.value as (typeof SPOT_TABS)[number],
+  );
 
   return (
     <nav className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
@@ -400,40 +401,51 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
           )}
         </Link>
         <div className="ml-auto flex w-auto shrink-0 items-center justify-end gap-2">
-          <DeveloperToolsLauncher
-            trigger={
-              <NavPillButton
-                data-developer-trigger
-                aria-label="Open developer tools"
-                className="size-10 justify-center p-0"
-              >
-                <Code2Icon className="size-4" />
-              </NavPillButton>
-            }
-          />
-          <div className="flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3">
-            <label
-              htmlFor="navbar-developer-mode"
-              className="hidden cursor-pointer whitespace-nowrap text-xs font-semibold text-foreground sm:block"
-            >
-              Dev mode
-            </label>
+          {isSpotTab && isDeveloperMode && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="inline-flex">
-                  <Switch
-                    id="navbar-developer-mode"
-                    checked={isDeveloperMode}
-                    onCheckedChange={setIsDeveloperMode}
-                    aria-label="Developer mode"
-                  />
-                </span>
+                <Link
+                  data-nav-pill
+                  data-developer-trigger
+                  href="/developers/orders-sink"
+                  aria-label="Open Orders Sink integration guide"
+                  className={cn(
+                    navPillClass,
+                    "w-10 justify-center p-0 sm:w-auto sm:px-3",
+                  )}
+                >
+                  <Code2Icon className="size-4" />
+                  <span className="hidden sm:inline">Dev guide</span>
+                </Link>
               </TooltipTrigger>
-              <TooltipContent>
-                Show developer code and request controls
-              </TooltipContent>
+              <TooltipContent>Open Orders Sink integration guide</TooltipContent>
             </Tooltip>
-          </div>
+          )}
+          {isSpotTab && (
+            <div className="flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3">
+              <label
+                htmlFor="navbar-developer-mode"
+                className="hidden cursor-pointer whitespace-nowrap text-xs font-semibold text-foreground sm:block"
+              >
+                Dev mode
+              </label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <Switch
+                      id="navbar-developer-mode"
+                      checked={isDeveloperMode}
+                      onCheckedChange={setIsDeveloperMode}
+                      aria-label="Developer mode"
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Show developer code and request controls
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          )}
           <NavWalletControls />
         </div>
       </div>

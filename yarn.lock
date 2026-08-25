@@ -1061,17 +1061,17 @@
   resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.0.97.tgz#9a008615ca8977c1647c68b005e6f8cbb4033c55"
   integrity sha512-iQ0hDJqhXFBtZwTsMH2zuVu2y8c+pIiKOBtqgz7qzKTzwmGl+3hixuR3Riw2JJmKf2s7+zwZvku8boXTvGDuNA==
 
-"@orbs-network/spot-react@^1.1.41":
-  version "1.1.41"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.41.tgz#9d17d61ae0f1223e0aa582b26986d555fe09573e"
-  integrity sha512-YX1fIFOnhELbQ1TubECitvMblFuRldcf634K2tDxX1Z+r1J8ci5lq2lLi4FzB3/K3C+QCnARizofRS1oar18tg==
+"@orbs-network/spot-react@^1.1.42":
+  version "1.1.42"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.42.tgz#90f6e66a0138d36b5ac12f3e8bc59e35705f201f"
+  integrity sha512-PdLFUJ1cqT2hKW33ZBBdnfUdGau3Nqz32f/muwOrttQd1O9atBRr9AQePoI5H3GZtOzYO7J8+o3wMHX3czlhTQ==
   dependencies:
-    "@orbs-network/spot-ui" "1.0.23"
+    "@orbs-network/spot-ui" "1.0.24"
 
-"@orbs-network/spot-ui@1.0.23":
-  version "1.0.23"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.23.tgz#e278f45f23785977152b3fd4fb87a9a11c91f8d2"
-  integrity sha512-54L+mnBkxb0Oow0TYYoPNI9PFMWP6c3qPYlh3PitY3Qn7tgOLXKWVBQAXVESaIQSth2Y8N2mrBebhxdF2q+4Nw==
+"@orbs-network/spot-ui@1.0.24":
+  version "1.0.24"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.24.tgz#3072b0b5f03ecb20dfa6a5010a1b19c62aa304d2"
+  integrity sha512-AL6+8XCum61M1chYpL7lRL4LOoxpVx9VEcnhkzpKwzq1tfh6zGPg55blnPxH0EB+aghKTBvQWWPJOljExSjYUw==
   dependencies:
     "@orbs-network/spot" "^2.7.2"
     "@orbs-network/twap" "^2.7.28"

@@ -751,8 +751,9 @@ function SelectedOrderDetails({
               {t("cancelOrder")}
             </Button>
             <CancelOrderDeveloperButton
+              isCancelling={isCancelling}
+              onCancel={cancelOrder}
               rawOrder={rawOrder}
-              title={getOrderTypeLabel(order.orderType)}
             />
           </div>
         )}
@@ -846,7 +847,7 @@ export function OrderHistoryModal({
         ) : (
           <>
             <DialogHeader className="shrink-0 px-5 pb-6 pt-5 text-left">
-              <div className="flex items-center justify-between gap-3 pr-8">
+              <div className="flex items-center gap-2 pr-8">
                 <DialogTitle className="text-[16px] font-semibold leading-none">
                   Order history
                 </DialogTitle>

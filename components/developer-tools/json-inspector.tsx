@@ -96,9 +96,11 @@ export type JsonInspectorModalProps = {
   curl?: CurlOptions;
   data: JsonContainer;
   defaultOpen?: boolean;
+  density?: "default" | "documentation";
   description?: string;
   editable?: boolean;
   explanation?: string;
+  explanationDisplay?: "subtitle" | "tooltip";
   getFieldExplanation?: (path: JsonValuePath, value: JsonValue) => string | undefined;
   getResponseFieldExplanation?: (
     path: JsonValuePath,
@@ -108,6 +110,7 @@ export type JsonInspectorModalProps = {
     ariaLabel?: string;
     onClick: () => void;
   };
+  headerNotice?: ReactNode;
   isValueEditable?: (path: JsonValuePath, value: JsonPrimitive) => boolean;
   onOpenChange?: (open: boolean) => void;
   onSave?: (data: JsonContainer) => Promise<void> | void;
@@ -644,13 +647,16 @@ function JsonInspectorModalContent({
   curl,
   data,
   defaultOpen,
+  density = "default",
   description,
   editable = false,
   embedded = false,
   explanation,
+  explanationDisplay = "tooltip",
   getFieldExplanation,
   getResponseFieldExplanation,
   headerBackAction,
+  headerNotice,
   isValueEditable,
   onOpenChange,
   onSave,
@@ -696,6 +702,11 @@ function JsonInspectorModalContent({
     (codeSnippet
       ? "This view shows runnable code generated from the complete input data. Edit a field to regenerate the snippet."
       : "This view shows the complete JSON payload. Select an object or array label to collapse or expand its fields.");
+  const headerSubtitle =
+    explanationDisplay === "subtitle"
+      ? resolvedExplanation
+      : resolvedDescription;
+  const isDocumentationDensity = density === "documentation";
   const codeFiles = useMemo(
     () =>
       codeSnippet
@@ -1227,9 +1238,15 @@ function JsonInspectorModalContent({
       <InspectorContent
         descriptionId={descriptionId}
         embedded={embedded}
-        hasDescription={Boolean(resolvedDescription)}
+        hasDescription={Boolean(headerSubtitle)}
       >
-        <DialogHeader className="border-b border-border/70 px-5 py-5 pr-14 text-left sm:px-6">
+        <DialogHeader
+          className={`border-b border-border/70 pr-14 text-left ${
+            isDocumentationDensity
+              ? "px-4 py-4 sm:px-5"
+              : "px-5 py-5 sm:px-6"
+          }`}
+        >
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -1245,27 +1262,55 @@ function JsonInspectorModalContent({
                     <ArrowLeftIcon className="size-4" />
                   </Button>
                 )}
-                <DialogTitle className="flex items-center gap-2 text-[18px]">
-                  <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
-                    <BracesIcon className="size-4" />
-                  </span>
-                  {title}
-                </DialogTitle>
-                <InfoTooltip
-                  tooltip={resolvedExplanation}
-                  ariaLabel={`${title} explanation`}
-                  buttonClassName="flex size-7 shrink-0 items-center justify-center rounded-full hover:bg-secondary/60"
-                  iconClassName="size-4"
-                />
+                {embedded ? (
+                  <h2
+                    className={`flex items-center gap-2 font-semibold ${
+                      isDocumentationDensity ? "text-[16px]" : "text-[18px]"
+                    }`}
+                  >
+                    <span
+                      className={`flex items-center justify-center rounded-lg bg-primary/12 text-primary ${
+                        isDocumentationDensity ? "size-7" : "size-8"
+                      }`}
+                    >
+                      <BracesIcon
+                        className={
+                          isDocumentationDensity ? "size-3.5" : "size-4"
+                        }
+                      />
+                    </span>
+                    {title}
+                  </h2>
+                ) : (
+                  <DialogTitle className="flex items-center gap-2 text-[18px]">
+                    <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
+                      <BracesIcon className="size-4" />
+                    </span>
+                    {title}
+                  </DialogTitle>
+                )}
+                {explanationDisplay === "tooltip" && (
+                  <InfoTooltip
+                    tooltip={resolvedExplanation}
+                    ariaLabel={`${title} explanation`}
+                    buttonClassName="flex size-7 shrink-0 items-center justify-center rounded-full hover:bg-secondary/60"
+                    iconClassName="size-4"
+                  />
+                )}
               </div>
-              {resolvedDescription && (
+              {headerSubtitle && (
                 <p
                   id={descriptionId}
-                  className="mt-2 max-w-[560px] text-sm leading-relaxed text-muted-foreground"
+                  className={`mt-2 max-w-[560px] leading-relaxed text-muted-foreground ${
+                    explanationDisplay === "subtitle"
+                      ? "text-xs"
+                      : "text-sm"
+                  }`}
                 >
-                  {resolvedDescription}
+                  {headerSubtitle}
                 </p>
               )}
+              {headerNotice && <div className="mt-3">{headerNotice}</div>}
             </div>
             {editable && (
               <div className="mr-5 flex h-8 items-center gap-2 rounded-[10px] border border-border/70 bg-secondary/30 px-2.5 sm:mr-6">
@@ -1288,7 +1333,11 @@ function JsonInspectorModalContent({
           </div>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-hidden p-4 sm:p-6">
+        <div
+          className={`min-h-0 overflow-hidden ${
+            isDocumentationDensity ? "p-4 sm:p-5" : "p-4 sm:p-6"
+          }`}
+        >
           {mode === "view" || keepsCodeVisibleWhileEditing ? (
             <div
               className={`flex h-full min-h-0 flex-col ${
@@ -1458,7 +1507,11 @@ function JsonInspectorModalContent({
                     tokens,
                   }) => (
                     <pre
-                      className={`${className} min-h-0 flex-1 overflow-auto p-4 font-mono text-[13px] leading-6 sm:p-5`}
+                      className={`${className} min-h-0 flex-1 overflow-auto p-4 font-mono ${
+                        isDocumentationDensity
+                          ? "text-[12px] leading-5"
+                          : "text-[13px] leading-6"
+                      } sm:p-5`}
                       style={{ ...style, background: "transparent" }}
                       aria-label={`${title} code snippet`}
                       tabIndex={0}
@@ -1513,6 +1566,8 @@ function JsonInspectorModalContent({
                           ) => {
                             const tokenProps = getTokenProps({ token });
                             const isExplainedKey =
+                              colonIndex >= 0 &&
+                              tokenIndex < colonIndex &&
                               lineExplanation?.key === token.content.trim();
 
                             if (!isExplainedKey) {

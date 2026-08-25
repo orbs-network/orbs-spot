@@ -2,6 +2,7 @@ import type {
   CodeSnippetOptions,
   JsonContainer,
   JsonPrimitive,
+  JsonValue,
   JsonValuePath,
 } from "./json-inspector";
 
@@ -9,11 +10,47 @@ const CANCEL_ABI_PLACEHOLDER = "__CANCEL_ABI__";
 const CANCEL_CHAIN_PLACEHOLDER = "__CANCEL_CHAIN__";
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 
-function serializeTypeScriptObject(data: JsonContainer) {
-  return JSON.stringify(data, null, 2).replace(
-    /^(\s*)"([A-Za-z_$][\w$]*)":/gm,
-    "$1$2:",
-  );
+function serializeTypeScriptValue(
+  value: JsonValue,
+  getExpression: (path: JsonValuePath) => string | undefined,
+  path: JsonValuePath = [],
+  indent = 0,
+): string {
+  const expression = getExpression(path);
+  if (expression) return expression;
+
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+
+  const entries = Array.isArray(value)
+    ? value.map((entry, index) => [index, entry] as const)
+    : Object.entries(value);
+  const opening = Array.isArray(value) ? "[" : "{";
+  const closing = Array.isArray(value) ? "]" : "}";
+  if (!entries.length) return `${opening}${closing}`;
+
+  const childIndent = indent + 2;
+  const lines = entries.map(([key, entry]) => {
+    const entryPath = [...path, key];
+    const propertyName = String(key);
+    const prefix = Array.isArray(value)
+      ? ""
+      : `${
+          /^[A-Za-z_$][\w$]*$/.test(propertyName)
+            ? propertyName
+            : JSON.stringify(propertyName)
+        }: `;
+
+    return `${" ".repeat(childIndent)}${prefix}${serializeTypeScriptValue(
+      entry,
+      getExpression,
+      entryPath,
+      childIndent,
+    )}`;
+  });
+
+  return `${opening}\n${lines.join(",\n")}\n${" ".repeat(indent)}${closing}`;
 }
 
 const SIGNATURE_FIELD_EXPLANATIONS: Record<string, string> = {
@@ -108,7 +145,7 @@ const FETCH_ORDERS_RESPONSE_FIELD_EXPLANATIONS: Record<string, string> = {
   "orders.metadata.nextEligibleTime":
     "The earliest time the next order fill may be attempted.",
   "orders.metadata.status":
-    "The order's current execution status reported by the order service.",
+    "The order's current execution status reported by Orders Sink.",
   "orders.metadata.description":
     "A human-readable description of the order strategy.",
   "orders.metadata.displayOnlyInputTokenPriceUSD":
@@ -117,7 +154,7 @@ const FETCH_ORDERS_RESPONSE_FIELD_EXPLANATIONS: Record<string, string> = {
     "The RePermit order digest used to identify and cancel this order.",
   "orders.signature":
     "The wallet signature authorizing the submitted RePermit order.",
-  "orders.timestamp": "The time the order was accepted by the order service.",
+  "orders.timestamp": "The time the order was accepted by Orders Sink.",
 };
 
 export function isSignatureValueEditable(
@@ -162,13 +199,6 @@ export function getFetchOrdersResponseFieldExplanation(path: JsonValuePath) {
     .join(".");
 
   return FETCH_ORDERS_RESPONSE_FIELD_EXPLANATIONS[normalizedPath];
-}
-
-export function isCancelValueEditable(
-  _path: JsonValuePath,
-  value: JsonPrimitive,
-) {
-  return typeof value !== "string" || !ADDRESS_PATTERN.test(value);
 }
 
 export function isApprovalValueEditable(
@@ -271,7 +301,7 @@ export type OrderMetadata = {
   repermitDigest: Hex;
 };
 
-// Raw order shape returned by the order service.
+// Raw order shape returned by Orders Sink.
 export type OrderResponse = {
   hash: Hex;
   metadata: OrderMetadata;
@@ -306,118 +336,264 @@ export type FetchOrdersResponse = {
 }
 
 function formatSignTypedDataArgs(data: JsonContainer) {
-  const serializedData = serializeTypeScriptObject(data)
-    .replace(
-      "  message: {\n",
-      "  message: {\n    ...permitData.order,\n",
-    )
-    .replace(
-      "    permitted: {\n",
-      "    permitted: {\n      ...permitData.order.permitted,\n",
-    )
-    .replace(
-      "    witness: {\n",
-      "    witness: {\n      ...permitData.order.witness,\n",
-    )
-    .replace(
-      "      input: {\n",
-      "      input: {\n        ...permitData.order.witness.input,\n",
-    )
-    .replace(
-      "      output: {\n",
-      "      output: {\n        ...permitData.order.witness.output,\n",
-    );
-  const permitFields =
-    "  domain: permitData.domain,\n  primaryType: permitData.primaryType,\n  types: permitData.types,";
-  return serializedData.includes("\n  account:")
-    ? serializedData.replace(
-        "\n  account:",
-        `\n${permitFields}\n  account:`,
-      )
-    : serializedData.replace("\n}", `\n${permitFields}\n}`);
-}
-
-export function formatUsePermitDataCode(data: JsonContainer) {
   const root = Array.isArray(data) ? {} : data;
-  const populatedPermitData = serializeTypeScriptObject({
-    order:
+  const signTypedDataArgs = {
+    message:
       root.message && typeof root.message === "object"
         ? root.message
         : {},
     domain:
-      root.domain && typeof root.domain === "object" ? root.domain : {},
-    primaryType:
-      typeof root.primaryType === "string" ? root.primaryType : "",
+      root.domain && typeof root.domain === "object"
+        ? root.domain
+        : {},
+    primaryType: root.primaryType ?? "",
     types:
       root.types && typeof root.types === "object" ? root.types : {},
-  });
-  const indentedPermitData = populatedPermitData.replaceAll(
-    "\n",
-    "\n  ",
+    ...(root.account !== undefined ? { account: root.account } : {}),
+  } satisfies JsonContainer;
+  const baseDataExpressions: Record<string, string> = {
+    account: "account",
+    domain: "basePermitData.domain",
+    primaryType: "basePermitData.primaryType",
+    types: "basePermitData.types",
+    "message.spender": "basePermitData.order.spender",
+    "message.witness.reactor":
+      "basePermitData.order.witness.reactor",
+    "message.witness.executor":
+      "basePermitData.order.witness.executor",
+    "message.witness.exchange.adapter":
+      "basePermitData.order.witness.exchange.adapter",
+    "message.witness.exchange.ref":
+      "basePermitData.order.witness.exchange.ref",
+    "message.witness.exchange.share":
+      "basePermitData.order.witness.exchange.share",
+    "message.witness.exchange.data":
+      "basePermitData.order.witness.exchange.data",
+    "message.witness.chainid":
+      "basePermitData.order.witness.chainid",
+    "message.witness.exclusivity":
+      "basePermitData.order.witness.exclusivity",
+    "message.witness.swapper": "account",
+    "message.witness.output.recipient": "account",
+    "message.witness.output.stop":
+      "basePermitData.order.witness.output.stop",
+  };
+
+  return serializeTypeScriptValue(
+    signTypedDataArgs,
+    (path) => baseDataExpressions[path.join(".")],
+  );
+}
+
+export function formatGetBasePermitDataCode(data: JsonContainer) {
+  const root = Array.isArray(data) ? {} : data;
+  const domain =
+    root.domain && typeof root.domain === "object" && !Array.isArray(root.domain)
+      ? root.domain
+      : {};
+  const partner =
+    typeof root.partner === "string" ? root.partner : "unknown";
+  const query =
+    root.query && typeof root.query === "object" && !Array.isArray(root.query)
+      ? root.query
+      : {};
+  const chain =
+    typeof domain.chainId === "number" || typeof domain.chainId === "string"
+      ? domain.chainId
+      : typeof root.chainId === "number" || typeof root.chainId === "string"
+        ? root.chainId
+        : typeof root.chain === "number" || typeof root.chain === "string"
+          ? root.chain
+          : typeof query.chainId === "number" ||
+              typeof query.chainId === "string"
+            ? query.chainId
+            : 137;
+  return `import type { PermitData } from "./order-types";
+
+const partner = ${JSON.stringify(partner)};
+const chain = ${JSON.stringify(chain)};
+
+// Security boundary: keep this trusted endpoint fixed in your application.
+// Use the partner ID assigned by Orbs, or "unknown" if none was assigned.
+// Fetch and return the initial, unchanged base permit data.
+export const getBasePermitData = async (): Promise<PermitData> => {
+  const response = await fetch(
+    \`https://order-sink-v2.orbs.network/config?partner=\${partner}&chain=\${chain}\`,
+    { headers: { Accept: "application/json" } },
   );
 
-  return `import type { PermitData } from "./order-types";
+  if (!response.ok) {
+    throw new Error(\`Failed to fetch permit config (\${response.status})\`);
+  }
 
-// Keep the permit values derived from the current form, quote, and wallet together.
-export const usePermitData = (): PermitData => {
-  return ${indentedPermitData};
+  const basePermitData = (await response.json()) as PermitData;
+  return basePermitData;
 };`;
 }
 
-export function formatSignOrderExampleCode() {
-  return `import type { PermitData } from "./order-types";
-import { usePermitData } from "./use-permit-data";
+export function formatSignOrderExampleCode(data: JsonContainer) {
+  const serializedArgs = formatSignTypedDataArgs(data);
+
+  return `import { useCallback } from "react";
+import { parseSignature, toHex } from "viem";
 import { useConnection, useSignTypedData } from "wagmi";
 
-// Read the connected signer and initialize Wagmi's EIP-712 signing hook.
-const { address: account } = useConnection();
-const { signTypedDataAsync } = useSignTypedData();
-const permitData: PermitData = usePermitData();
+import { getBasePermitData } from "./get-base-permit-data";
+import type { Signature } from "./order-types";
 
-// Sign the populated order returned for the current form and quote.
-export const signOrder = async () => {
-  return await signTypedDataAsync({
-    message: permitData.order,
-    domain: permitData.domain,
-    primaryType: permitData.primaryType,
-    types: permitData.types,
-    account: account ?? permitData.order.witness.swapper,
-  });
-};`;
+// Hooks stay inside a custom hook so this file follows React's Rules of Hooks.
+export function useSignOrder() {
+  const { address: account } = useConnection();
+  const { signTypedDataAsync } = useSignTypedData();
+
+  return useCallback(async () => {
+    if (!account) throw new Error("Connect a wallet before signing");
+
+    // Fetch trusted contract fields and layer in fresh form/quote values.
+    // Replace the sample amounts, nonces, and timestamps shown below.
+    const basePermitData = await getBasePermitData();
+    const signTypedDataArgs = ${serializedArgs} as const;
+    const order = signTypedDataArgs.message;
+    const signatureHex = await signTypedDataAsync(signTypedDataArgs);
+    const parsedSignature = parseSignature(signatureHex);
+    const signature: Signature = {
+      v: toHex(
+        parsedSignature.v ??
+          BigInt((parsedSignature.yParity ?? 0) + 27),
+      ),
+      r: parsedSignature.r,
+      s: parsedSignature.s,
+    };
+
+    // Preserve the exact object that was signed for POST /orders/new.
+    return { signature, order };
+  }, [account, signTypedDataAsync]);
+}`;
 }
 
-export function formatFullOrderFlowCode() {
-  return `import type { Address } from "./order-types";
-import { approveToken, checkApproval } from "./approve-token";
-import { signAndCreateOrder } from "./sign-and-create-order";
-import { wrapNativeToken } from "./wrap-native-token";
-import { zeroAddress } from "viem";
+export function formatFullOrderFlowCode(data: JsonContainer) {
+  const root = Array.isArray(data) ? {} : data;
+  const sourceTokenAddress =
+    typeof root.sourceTokenAddress === "string"
+      ? root.sourceTokenAddress
+      : !Array.isArray(root.message) &&
+          root.message &&
+          typeof root.message === "object" &&
+          root.message.permitted &&
+          typeof root.message.permitted === "object" &&
+          !Array.isArray(root.message.permitted) &&
+          typeof root.message.permitted.token === "string"
+        ? root.message.permitted.token
+        : "0x0000000000000000000000000000000000000000";
+  const serializedArgs = formatSignTypedDataArgs(data);
 
-const isNativeAddress = (address: Address) =>
-  address.toLowerCase() === zeroAddress;
+  return `import { useCallback } from "react";
+import {
+  erc20Abi,
+  maxUint256,
+  parseAbi,
+  parseSignature,
+  toHex,
+  zeroAddress,
+} from "viem";
+import {
+  useConnection,
+  usePublicClient,
+  useSignTypedData,
+  useWalletClient,
+} from "wagmi";
 
-const submitOrderFlow = async (
-  sourceTokenAddress: Address,
-  tokenAddress: Address,
-  inputAmount: string,
-) => {
-  // Check the current allowance before requesting an approval transaction.
-  const approvalRequired = await checkApproval(inputAmount, tokenAddress);
+import { createOrder } from "./create-order";
+import { getBasePermitData } from "./get-base-permit-data";
+import type { Address, Signature } from "./order-types";
 
-  // Native tokens must be wrapped before the RePermit contract can spend them.
-  // Pass the chain's wrapped-token address as tokenAddress for a native source.
-  if (isNativeAddress(sourceTokenAddress)) await wrapNativeToken(inputAmount, tokenAddress);
+const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
 
-  // Approve the RePermit contract only when the allowance is insufficient.
-  if (approvalRequired) await approveToken(tokenAddress);
+// One hook owns the complete Orders Sink creation flow.
+export function useSubmitOrdersSinkOrder() {
+  const { address: account } = useConnection();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const { signTypedDataAsync } = useSignTypedData();
 
-  // Build the populated order once, sign it, and submit that same order.
-  return await signAndCreateOrder();
-};`;
+  return useCallback(async () => {
+    if (!account || !publicClient || !walletClient) {
+      throw new Error("Connect a wallet before creating an order");
+    }
+
+    // 1. GET /config from the trusted Orders Sink endpoint.
+    const basePermitData = await getBasePermitData();
+
+    // 2. Build the order once. Replace sample literals with fresh form/quote
+    // values, then never rebuild this object between signing and submit.
+    const signTypedDataArgs = ${serializedArgs} as const;
+    const order = signTypedDataArgs.message;
+    const tokenAddress = order.permitted.token as Address;
+    const spender = basePermitData.domain.verifyingContract;
+    const requiredAmount = BigInt(order.permitted.amount);
+
+    if (
+      walletClient.chain.id !== basePermitData.domain.chainId ||
+      order.witness.chainid !== basePermitData.domain.chainId
+    ) {
+      throw new Error("Wallet, domain, and order chain IDs must match");
+    }
+
+    // 3. Read allowance without prompting the wallet.
+    const allowance = await publicClient.readContract({
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: "allowance",
+      args: [account, spender],
+    });
+
+    // 4. Native input is represented by its wrapped-token address in the order.
+    const sourceTokenAddress = ${JSON.stringify(sourceTokenAddress)} as Address;
+    if (sourceTokenAddress.toLowerCase() === zeroAddress) {
+      const wrapHash = await walletClient.writeContract({
+        address: tokenAddress,
+        abi: wrappedNativeAbi,
+        functionName: "deposit",
+        value: requiredAmount,
+        account,
+        chain: walletClient.chain,
+      });
+      await publicClient.waitForTransactionReceipt({ hash: wrapHash });
+    }
+
+    // 5. Approve only when the current allowance is insufficient.
+    if (allowance < requiredAmount) {
+      const approveHash = await walletClient.writeContract({
+        address: tokenAddress,
+        abi: erc20Abi,
+        functionName: "approve",
+        args: [spender, maxUint256],
+        account,
+        chain: walletClient.chain,
+      });
+      await publicClient.waitForTransactionReceipt({ hash: approveHash });
+    }
+
+    // 6. Sign the exact order object created above.
+    const signatureHex = await signTypedDataAsync(signTypedDataArgs);
+    const parsedSignature = parseSignature(signatureHex);
+    const signature: Signature = {
+      v: toHex(
+        parsedSignature.v ??
+          BigInt((parsedSignature.yParity ?? 0) + 27),
+      ),
+      r: parsedSignature.r,
+      s: parsedSignature.s,
+    };
+
+    // 7. POST that same order object to Orders Sink.
+    return await createOrder(signature, order);
+  }, [account, publicClient, signTypedDataAsync, walletClient]);
+}`;
 }
 
 export function formatWrapNativeTokenCode() {
-  return `import type { Address } from "./order-types";
+  return `import { useCallback } from "react";
 import { parseAbi } from "viem";
 import {
   useConnection,
@@ -425,30 +601,35 @@ import {
   useWalletClient,
 } from "wagmi";
 
+import type { Address } from "./order-types";
+
 // The wrapped-native contract exposes a payable deposit() function.
 const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
-const publicClient = usePublicClient()!;
-const walletClient = useWalletClient().data!;
-const account = useConnection().address!;
 
-// Deposit the native amount into the wrapped-token contract.
-export const wrapNativeToken = async (
-  amount: string,
-  tokenAddress: Address,
-) => {
-  const hash = await walletClient.writeContract({
-    address: tokenAddress,
-    abi: wrappedNativeAbi,
-    functionName: "deposit",
-    value: BigInt(amount),
-    account,
-    chain: walletClient.chain,
-  });
+export function useWrapNativeTokenExample() {
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const { address: account } = useConnection();
 
-  // Wait until the wrapped balance is available for the next step.
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
-};`;
+  return useCallback(async (amount: string, tokenAddress: Address) => {
+    if (!account || !publicClient || !walletClient) {
+      throw new Error("Connect a wallet before wrapping");
+    }
+
+    const hash = await walletClient.writeContract({
+      address: tokenAddress,
+      abi: wrappedNativeAbi,
+      functionName: "deposit",
+      value: BigInt(amount),
+      account,
+      chain: walletClient.chain,
+    });
+
+    // Wait until the wrapped balance is available for the next step.
+    await publicClient.waitForTransactionReceipt({ hash });
+    return hash;
+  }, [account, publicClient, walletClient]);
+}`;
 }
 
 export function formatLiveWrapNativeTokenCode(data: JsonContainer) {
@@ -460,14 +641,20 @@ export function formatLiveWrapNativeTokenCode(data: JsonContainer) {
     !Array.isArray(data) && typeof data.tokenAddress === "string"
       ? data.tokenAddress
       : "0x0000000000000000000000000000000000000000";
-
   return `${formatWrapNativeTokenCode()}
 
-// Execute this helper with the current order values.
-await wrapNativeToken(
-  ${JSON.stringify(amount)},
-  ${JSON.stringify(tokenAddress)},
-);`;
+// This hook exposes the current live order as an event-safe callback.
+export function useWrapCurrentOrderToken() {
+  const wrapNativeToken = useWrapNativeTokenExample();
+
+  return useCallback(
+    () => wrapNativeToken(
+      ${JSON.stringify(amount)},
+      ${JSON.stringify(tokenAddress)},
+    ),
+    [wrapNativeToken],
+  );
+}`;
 }
 
 export function formatCreateOrderFetchCode() {
@@ -482,14 +669,14 @@ export async function createOrder(
   signature: Signature,
   order: PermitOrder,
 ) {
-  // The order service expects the signature, populated order, and pending state.
+  // Orders Sink expects the signature, populated order, and pending state.
   const body: SignedOrder = {
     signature,
     order,
     status: "pending",
   };
 
-  // Submit the signed order to the order service.
+  // Submit the signed order to Orders Sink.
   const response = await fetch(${JSON.stringify(CREATE_ORDER_EXAMPLE_URL)}, {
     method: "POST",
     headers: {
@@ -499,8 +686,7 @@ export async function createOrder(
     body: JSON.stringify(body),
   });
 
-  // Parse the response before checking its API-level success flag.
-  const result = (await response.json()) as CreateOrderResponse;
+  const result = (await response.json().catch(() => ({}))) as CreateOrderResponse;
 
   // Surface transport and API errors separately.
   if (!response.ok) {
@@ -517,44 +703,42 @@ export async function createOrder(
 }
 
 export function formatLiveCreateOrderCode(data: JsonContainer) {
-  const root = Array.isArray(data) ? {} : data;
-  const signData = {
-    message:
-      root.message && typeof root.message === "object"
-        ? root.message
-        : {},
-    ...(root.account !== undefined ? { account: root.account } : {}),
-  } satisfies JsonContainer;
-  const serializedArgs = formatSignTypedDataArgs(signData);
+  const serializedArgs = formatSignTypedDataArgs(data);
 
-  return `import { createOrder } from "./create-order";
-import { usePermitData } from "./use-permit-data";
-import type { Signature } from "./order-types";
+  return `import { useCallback } from "react";
 import { parseSignature, toHex } from "viem";
-import { useSignTypedData } from "wagmi";
+import { useConnection, useSignTypedData } from "wagmi";
 
-// Build the exact order values once for signing and submission.
-const permitData = usePermitData();
-const { signTypedDataAsync } = useSignTypedData();
+import { createOrder } from "./create-order";
+import { getBasePermitData } from "./get-base-permit-data";
+import type { Signature } from "./order-types";
 
-export const signAndCreateOrder = async () => {
-  const signTypedDataArgs = ${serializedArgs};
+export function useSignAndCreateOrder() {
+  const { address: account } = useConnection();
+  const { signTypedDataAsync } = useSignTypedData();
 
-  // Sign the populated order with the connected wallet.
-  const signatureHex = await signTypedDataAsync(signTypedDataArgs);
-  const parsedSignature = parseSignature(signatureHex);
-  const signature: Signature = {
-    v: toHex(
-      parsedSignature.v ??
-        BigInt((parsedSignature.yParity ?? 0) + 27),
-    ),
-    r: parsedSignature.r,
-    s: parsedSignature.s,
-  };
+  return useCallback(async () => {
+    if (!account) throw new Error("Connect a wallet before signing");
 
-  // Pass the signature returned above with the exact same order message.
-  return await createOrder(signature, signTypedDataArgs.message);
-};`;
+    // Build one order object and reuse it for both operations.
+    const basePermitData = await getBasePermitData();
+    const signTypedDataArgs = ${serializedArgs} as const;
+    const order = signTypedDataArgs.message;
+
+    const signatureHex = await signTypedDataAsync(signTypedDataArgs);
+    const parsedSignature = parseSignature(signatureHex);
+    const signature: Signature = {
+      v: toHex(
+        parsedSignature.v ??
+          BigInt((parsedSignature.yParity ?? 0) + 27),
+      ),
+      r: parsedSignature.r,
+      s: parsedSignature.s,
+    };
+
+    return await createOrder(signature, order);
+  }, [account, signTypedDataAsync]);
+}`;
 }
 
 export function formatFetchOrdersCode(data: JsonContainer) {
@@ -580,28 +764,31 @@ export function formatFetchOrdersCode(data: JsonContainer) {
       ? query.chainId
       : 1;
 
-  return `import type { FetchOrdersResponse, PermitData } from "./order-types";
+  return `import { getBasePermitData } from "./get-base-permit-data";
+import type { FetchOrdersResponse, PermitData } from "./order-types";
 
-// Use the current permit data to target the same exchange adapter as the order.
-const permitData: PermitData = usePermitData();
+export const fetchOrders = async () => {
+  // Use the base permit data to target the configured exchange adapter.
+  const basePermitData: PermitData = await getBasePermitData();
 
-// Request orders for this wallet, chain, and exchange.
-const response = await fetch(
-  \`${endpoint}?swapper=${swapper}&chainId=${chainId}&exchange=\${permitData.order.witness.exchange.adapter}\`,
-  {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  },
-);
+  // Request orders for this wallet, chain, and exchange.
+  const response = await fetch(
+    \`${endpoint}?swapper=${swapper}&chainId=${chainId}&exchange=\${basePermitData.order.witness.exchange.adapter}\`,
+    {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    },
+  );
 
-// Stop before parsing order data when the HTTP request failed.
-if (!response.ok) {
-  throw new Error(\`Failed to fetch orders (\${response.status})\`);
-}
+  // Stop before parsing order data when the HTTP request failed.
+  if (!response.ok) {
+    throw new Error(\`Failed to fetch orders (\${response.status})\`);
+  }
 
-// Return only the order list consumed by order history.
-const result = (await response.json()) as FetchOrdersResponse;
-return result.orders;`;
+  // Return only the order list consumed by order history.
+  const result = (await response.json()) as FetchOrdersResponse;
+  return result.orders;
+};`;
 }
 
 export function formatPermitConfigFetchCode(data: JsonContainer) {
@@ -624,28 +811,33 @@ export function formatPermitConfigFetchCode(data: JsonContainer) {
 const partner = ${JSON.stringify(partner)};
 const chain = ${JSON.stringify(chain)};
 
-// Fetch the unchanged permit skeleton for this partner and chain.
-const response = await fetch(
-  \`${endpoint}?partner=\${partner}&chain=\${chain}\`,
-  {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  },
-);
+export const getBasePermitData = async (): Promise<PermitData> => {
+  // Security boundary: keep this trusted endpoint fixed in your application.
+  // Fetch the unchanged base permit data for this partner and chain.
+  const response = await fetch(
+    \`${endpoint}?partner=\${partner}&chain=\${chain}\`,
+    {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    },
+  );
 
-// Do not use a skeleton returned by a failed request.
-if (!response.ok) {
-  throw new Error(\`Failed to fetch permit config (\${response.status})\`);
-}
+  // Do not use base permit data returned by a failed request.
+  if (!response.ok) {
+    throw new Error(\`Failed to fetch permit config (\${response.status})\`);
+  }
 
-// Fill the returned skeleton with calculated values before signing it.
-return (await response.json()) as PermitData;`;
+  // Return the base data; populate its calculated values before signing.
+  const basePermitData = (await response.json()) as PermitData;
+  return basePermitData;
+};`;
 }
 
 export function formatCancelOrderCode(data: JsonContainer) {
   if (Array.isArray(data)) return JSON.stringify(data, null, 2);
 
   const abi = typeof data.abi === "string" ? data.abi : "";
+  const isLegacyOrder = abi.includes("uint64");
   const chainId = typeof data.chain === "number" ? data.chain : 0;
   const writeContractArgs = {
     abi: CANCEL_ABI_PLACEHOLDER,
@@ -655,45 +847,87 @@ export function formatCancelOrderCode(data: JsonContainer) {
     chain: CANCEL_CHAIN_PLACEHOLDER,
     account: data.account,
   };
+  const fieldSourceComments: Record<string, string> = {
+    abi: "Cancellation ABI selected from order.version.",
+    functionName: 'Fixed contract method: "cancel".',
+    address: isLegacyOrder
+      ? "Legacy contract address from order.twapAddress."
+      : "RePermit contract address from basePermitData.domain.verifyingContract.",
+    args: isLegacyOrder
+      ? "Legacy order ID from order.id."
+      : "RePermit digest from order.metadata.repermitDigest.",
+    chain: "Active wallet chain, which must match order.chainId.",
+    account:
+      "Connected account from useConnection().address, falling back to order.maker.",
+  };
   const serializedArgs = JSON.stringify(writeContractArgs, null, 2)
     .replace(JSON.stringify(CANCEL_ABI_PLACEHOLDER), "cancelAbi")
     .replace(JSON.stringify(CANCEL_CHAIN_PLACEHOLDER), "walletClient.chain")
-    .replace(/^(\s*)"([A-Za-z_$][\w$]*)":/gm, "$1$2:");
+    .replace(/^(\s*)"([A-Za-z_$][\w$]*)":/gm, "$1$2:")
+    .replace(
+      /^  (abi|functionName|address|args|chain|account):/gm,
+      (_match, field: string) =>
+        `  // ${fieldSourceComments[field]}\n  ${field}:`,
+    );
 
-  return `import { parseAbi } from "viem";
-import { useWalletClient } from "wagmi";
+  return `import { useCallback } from "react";
+import { parseAbi } from "viem";
+import { usePublicClient, useWalletClient } from "wagmi";
 
 // Use the connected wallet and the cancellation ABI shown by the current order.
 // The connected wallet should be on chain ${chainId} before submitting.
-const walletClient = useWalletClient().data!;
 const cancelAbi = parseAbi([${JSON.stringify(abi)}]);
 
-// Submit the populated cancellation call to the selected RePermit contract.
-return await walletClient.writeContract(${serializedArgs});`;
+export function useCancelSelectedOrder() {
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+
+  return useCallback(async () => {
+    if (!publicClient || !walletClient) {
+      throw new Error("Connect a wallet before cancelling");
+    }
+
+    const hash = await walletClient.writeContract(${serializedArgs});
+    await publicClient.waitForTransactionReceipt({ hash });
+    return hash;
+  }, [publicClient, walletClient]);
+}`;
 }
 
 export function formatCancelOrderExampleCode() {
-  return `import type { Hex, PermitData } from "./order-types";
+  return `import { useCallback } from "react";
+import type { Hex, PermitData } from "./order-types";
 import { parseAbi } from "viem";
-import { useConnection, useWalletClient } from "wagmi";
+import { useConnection, usePublicClient, useWalletClient } from "wagmi";
+
+import { getBasePermitData } from "./get-base-permit-data";
 
 const cancelAbi = parseAbi(["function cancel(bytes32[] digests)"]);
-const walletClient = useWalletClient().data!;
-const account = useConnection().address!;
-const permitData: PermitData = usePermitData();
 
-// Pass order.metadata.repermitDigest and target the current RePermit contract.
-const cancelOrder = async (repermitDigest: Hex) => {
-  // Cancellation expects the digest inside a bytes32 array.
-  return await walletClient.writeContract({
-    address: permitData.domain.verifyingContract,
-    abi: cancelAbi,
-    functionName: "cancel",
-    args: [[repermitDigest]],
-    account,
-    chain: walletClient.chain,
-  });
-};`;
+export function useCancelOrderExample() {
+  const { address: account } = useConnection();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+
+  return useCallback(async (repermitDigest: Hex) => {
+    if (!account || !publicClient || !walletClient) {
+      throw new Error("Connect a wallet before cancelling");
+    }
+
+    const basePermitData: PermitData = await getBasePermitData();
+    const hash = await walletClient.writeContract({
+      address: basePermitData.domain.verifyingContract,
+      abi: cancelAbi,
+      functionName: "cancel",
+      args: [[repermitDigest]],
+      account,
+      chain: walletClient.chain,
+    });
+
+    await publicClient.waitForTransactionReceipt({ hash });
+    return hash;
+  }, [account, publicClient, walletClient]);
+}`;
 }
 
 export function formatApproveTokenCode(
@@ -708,19 +942,35 @@ export function formatApproveTokenCode(
     !Array.isArray(data) && typeof data.tokenAddress === "string"
       ? data.tokenAddress
       : "0x0000000000000000000000000000000000000000";
+  const spender =
+    !Array.isArray(data) && typeof data.spender === "string"
+      ? data.spender
+      : "0x0000000000000000000000000000000000000000";
   const usage = includeUsage
     ? `
 
-const approvalRequired = await checkApproval(
-  ${JSON.stringify(amount)},
-  ${JSON.stringify(tokenAddress)},
-);
+export function useApproveExample() {
+  const { checkApproval, approveToken } = useTokenApproval();
 
-// Only request a wallet transaction when the allowance check requires it.
-if (approvalRequired) await approveToken(${JSON.stringify(tokenAddress)});`
+  return useCallback(async () => {
+    const approvalRequired = await checkApproval(
+      ${JSON.stringify(amount)},
+      ${JSON.stringify(tokenAddress)},
+      ${JSON.stringify(spender)},
+    );
+
+    // Only request a wallet transaction when allowance is insufficient.
+    if (approvalRequired) {
+      return await approveToken(
+        ${JSON.stringify(tokenAddress)},
+        ${JSON.stringify(spender)},
+      );
+    }
+  }, [approveToken, checkApproval]);
+}`
     : "";
 
-  return `import type { Address, PermitData } from "./order-types";
+  return `import { useCallback } from "react";
 import { erc20Abi, maxUint256 } from "viem";
 import {
   useConnection,
@@ -728,42 +978,55 @@ import {
   useWalletClient,
 } from "wagmi";
 
-const publicClient = usePublicClient()!;
-const walletClient = useWalletClient().data!;
-const account = useConnection().address!;
-const permitData: PermitData = usePermitData();
+import type { Address } from "./order-types";
 
-// Compare the current ERC-20 allowance with the amount required by the order.
-export const checkApproval = async (
-  amount: string,
-  tokenAddress: Address,
-) => {
-  const spender = permitData.domain.verifyingContract;
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: erc20Abi,
-    functionName: "allowance",
-    args: [account, spender],
-  });
+export function useTokenApproval() {
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+  const { address: account } = useConnection();
 
-  return allowance < BigInt(amount);
-};
+  const checkApproval = useCallback(async (
+    amount: string,
+    tokenAddress: Address,
+    spender: Address,
+  ) => {
+    if (!account || !publicClient) {
+      throw new Error("Connect a wallet before checking allowance");
+    }
 
-// Approve the RePermit verifying contract for the maximum ERC-20 allowance.
-export const approveToken = async (tokenAddress: Address) => {
-  const hash = await walletClient.writeContract({
-    address: tokenAddress,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [permitData.domain.verifyingContract, maxUint256],
-    account,
-    chain: walletClient.chain,
-  });
+    const allowance = await publicClient.readContract({
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: "allowance",
+      args: [account, spender],
+    });
 
-  // Wait for confirmation before signing or creating the order.
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
-};${usage}`;
+    return allowance < BigInt(amount);
+  }, [account, publicClient]);
+
+  const approveToken = useCallback(async (
+    tokenAddress: Address,
+    spender: Address,
+  ) => {
+    if (!account || !publicClient || !walletClient) {
+      throw new Error("Connect a wallet before approving");
+    }
+
+    const hash = await walletClient.writeContract({
+      address: tokenAddress,
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [spender, maxUint256],
+      account,
+      chain: walletClient.chain,
+    });
+
+    await publicClient.waitForTransactionReceipt({ hash });
+    return hash;
+  }, [account, publicClient, walletClient]);
+
+  return { approveToken, checkApproval };
+}${usage}`;
 }
 
 export function formatLiveApproveTokenCode(data: JsonContainer) {
@@ -771,38 +1034,25 @@ export function formatLiveApproveTokenCode(data: JsonContainer) {
     !Array.isArray(data) && typeof data.tokenAddress === "string"
       ? data.tokenAddress
       : "0x0000000000000000000000000000000000000000";
+  const spender =
+    !Array.isArray(data) && typeof data.spender === "string"
+      ? data.spender
+      : "0x0000000000000000000000000000000000000000";
 
-  return `import type { Address, PermitData } from "./order-types";
-import { erc20Abi, maxUint256 } from "viem";
-import {
-  useConnection,
-  usePublicClient,
-  useWalletClient,
-} from "wagmi";
+  return `${formatApproveTokenCode(data, false)}
 
-const publicClient = usePublicClient()!;
-const walletClient = useWalletClient().data!;
-const account = useConnection().address!;
-const permitData: PermitData = usePermitData();
+// This callback is safe to call from a button or mutation handler.
+export function useApproveCurrentOrder() {
+  const { approveToken } = useTokenApproval();
 
-// This step runs only after the allowance check requested approval.
-export const approveToken = async (tokenAddress: Address) => {
-  const hash = await walletClient.writeContract({
-    address: tokenAddress,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [permitData.domain.verifyingContract, maxUint256],
-    account,
-    chain: walletClient.chain,
-  });
-
-  // Wait for the approval receipt before advancing to the sign step.
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
-};
-
-// Execute approval with the current source-token address.
-await approveToken(${JSON.stringify(tokenAddress)});`;
+  return useCallback(
+    () => approveToken(
+      ${JSON.stringify(tokenAddress)},
+      ${JSON.stringify(spender)},
+    ),
+    [approveToken],
+  );
+}`;
 }
 
 export function formatLiveCheckApprovalCode(data: JsonContainer) {
@@ -814,50 +1064,31 @@ export function formatLiveCheckApprovalCode(data: JsonContainer) {
     !Array.isArray(data) && typeof data.tokenAddress === "string"
       ? data.tokenAddress
       : "0x0000000000000000000000000000000000000000";
+  const spender =
+    !Array.isArray(data) && typeof data.spender === "string"
+      ? data.spender
+      : "0x0000000000000000000000000000000000000000";
 
-  return `import type { Address, PermitData } from "./order-types";
-import { erc20Abi } from "viem";
-import { useConnection, usePublicClient } from "wagmi";
-
-const publicClient = usePublicClient()!;
-const account = useConnection().address!;
-const permitData: PermitData = usePermitData();
+  return `${formatApproveTokenCode(data, false)}
 
 // Read allowance without opening the wallet or sending a transaction.
-export const checkApproval = async (
-  amount: string,
-  tokenAddress: Address,
-) => {
-  const allowance = await publicClient.readContract({
-    address: tokenAddress,
-    abi: erc20Abi,
-    functionName: "allowance",
-    args: [account, permitData.domain.verifyingContract],
-  });
+export function useCheckCurrentOrderApproval() {
+  const { checkApproval } = useTokenApproval();
 
-  return allowance < BigInt(amount);
-};
-
-// Check the exact amount and token used by the current order.
-const approvalRequired = await checkApproval(
-  ${JSON.stringify(amount)},
-  ${JSON.stringify(tokenAddress)},
-);`;
-}
-
-function formatApproveTokenHelperCode() {
-  return formatApproveTokenCode({}, false);
+  return useCallback(
+    () => checkApproval(
+      ${JSON.stringify(amount)},
+      ${JSON.stringify(tokenAddress)},
+      ${JSON.stringify(spender)},
+    ),
+    [checkApproval],
+  );
+}`;
 }
 
 const ORDER_TYPES_FILE = {
   format: formatOrderTypesCode,
   name: "order-types.ts",
-  syntaxLanguage: "typescript",
-} as const;
-
-const APPROVE_TOKEN_FILE = {
-  format: formatApproveTokenHelperCode,
-  name: "approve-token.ts",
   syntaxLanguage: "typescript",
 } as const;
 
@@ -867,28 +1098,16 @@ const CREATE_ORDER_FILE = {
   syntaxLanguage: "typescript",
 } as const;
 
-const USE_PERMIT_DATA_FILE = {
-  format: formatUsePermitDataCode,
-  name: "use-permit-data.ts",
-  syntaxLanguage: "typescript",
-} as const;
-
-const SIGN_AND_CREATE_ORDER_FILE = {
-  format: formatLiveCreateOrderCode,
-  name: "sign-and-create-order.ts",
-  syntaxLanguage: "typescript",
-} as const;
-
-const WRAP_NATIVE_TOKEN_FILE = {
-  format: formatWrapNativeTokenCode,
-  name: "wrap-native-token.ts",
+const GET_BASE_PERMIT_DATA_FILE = {
+  format: formatGetBasePermitDataCode,
+  name: "get-base-permit-data.ts",
   syntaxLanguage: "typescript",
 } as const;
 
 export const SIGNATURE_EXAMPLE_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "sign-order.ts",
-  files: [USE_PERMIT_DATA_FILE, ORDER_TYPES_FILE],
+  files: [GET_BASE_PERMIT_DATA_FILE, ORDER_TYPES_FILE],
   format: formatSignOrderExampleCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -905,7 +1124,7 @@ export const CANCEL_CODE_SNIPPET: CodeSnippetOptions = {
 export const CANCEL_EXAMPLE_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "cancel-order.ts",
-  files: [ORDER_TYPES_FILE],
+  files: [GET_BASE_PERMIT_DATA_FILE, ORDER_TYPES_FILE],
   format: formatCancelOrderExampleCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -950,42 +1169,26 @@ export const LIVE_WRAP_NATIVE_TOKEN_CODE_SNIPPET: CodeSnippetOptions = {
 export const LIVE_CREATE_ORDER_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "sign-and-create-order.ts",
-  files: [USE_PERMIT_DATA_FILE, CREATE_ORDER_FILE, ORDER_TYPES_FILE],
+  files: [
+    GET_BASE_PERMIT_DATA_FILE,
+    CREATE_ORDER_FILE,
+    ORDER_TYPES_FILE,
+  ],
   format: formatLiveCreateOrderCode,
   inlineEditable: true,
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
 
-export const ORDER_TYPES_CODE_SNIPPET: CodeSnippetOptions = {
-  copyLabel: "Copy code",
-  fileName: "order-types.ts",
-  format: formatOrderTypesCode,
-  language: "TypeScript",
-  syntaxLanguage: "typescript",
-};
-
 export const FULL_ORDER_FLOW_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "submit-order-flow.ts",
+  fileName: "create-orders-sink-order.ts",
   files: [
-    APPROVE_TOKEN_FILE,
-    SIGN_AND_CREATE_ORDER_FILE,
-    USE_PERMIT_DATA_FILE,
+    GET_BASE_PERMIT_DATA_FILE,
     CREATE_ORDER_FILE,
-    WRAP_NATIVE_TOKEN_FILE,
     ORDER_TYPES_FILE,
   ],
   format: formatFullOrderFlowCode,
-  language: "TypeScript",
-  syntaxLanguage: "typescript",
-};
-
-export const WRAP_NATIVE_TOKEN_CODE_SNIPPET: CodeSnippetOptions = {
-  copyLabel: "Copy code",
-  fileName: "wrap-native-token.ts",
-  files: [ORDER_TYPES_FILE],
-  format: formatWrapNativeTokenCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
@@ -1002,7 +1205,7 @@ export const CREATE_ORDER_CODE_SNIPPET: CodeSnippetOptions = {
 export const FETCH_ORDERS_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "fetch-orders.ts",
-  files: [ORDER_TYPES_FILE],
+  files: [GET_BASE_PERMIT_DATA_FILE, ORDER_TYPES_FILE],
   format: formatFetchOrdersCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -1010,7 +1213,7 @@ export const FETCH_ORDERS_CODE_SNIPPET: CodeSnippetOptions = {
 
 export const PERMIT_CONFIG_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "get-permit-data.ts",
+  fileName: "get-base-permit-data.ts",
   files: [ORDER_TYPES_FILE],
   format: formatPermitConfigFetchCode,
   hideStatusLabel: true,
@@ -1019,6 +1222,7 @@ export const PERMIT_CONFIG_CODE_SNIPPET: CodeSnippetOptions = {
 };
 
 export const SIGNATURE_EXAMPLE_DATA = {
+  partner: "unknown",
   message: {
     permitted: {
       token: "0x1111111111111111111111111111111111111111",
@@ -1116,11 +1320,6 @@ export const SIGNATURE_EXAMPLE_DATA = {
   account: "0x5555555555555555555555555555555555555555",
 } satisfies JsonContainer;
 
-export const ORDER_TYPES_EXAMPLE_DATA = {} satisfies JsonContainer;
-export const FULL_ORDER_FLOW_EXAMPLE_DATA =
-  SIGNATURE_EXAMPLE_DATA satisfies JsonContainer;
-export const WRAP_NATIVE_TOKEN_EXAMPLE_DATA = {} satisfies JsonContainer;
-
 export const CREATE_ORDER_EXAMPLE_DATA = {
   signature: {
     v: "0x1b",
@@ -1143,7 +1342,7 @@ export const PERMIT_CONFIG_REQUEST_DATA = {
 export const PERMIT_CONFIG_REQUEST_URL =
   "https://order-sink-v2.orbs.network/config?partner=quickswap&chain=137";
 
-export const PERMIT_CONFIG_SKELETON_DATA = {
+export const BASE_PERMIT_DATA_RESPONSE = {
   domain: {
     chainId: 137,
     name: "RePermit",
@@ -1256,7 +1455,7 @@ export const CANCEL_EXAMPLE_DATA = {
 
 export const APPROVE_TOKEN_EXAMPLE_DATA = {
   tokenAddress: "0x1111111111111111111111111111111111111111",
-  spenderAddress: "0x2222222222222222222222222222222222222222",
+  spender: "0x2222222222222222222222222222222222222222",
   amount: "1000000000000000000",
   account: "0x5555555555555555555555555555555555555555",
   chainId: 1,

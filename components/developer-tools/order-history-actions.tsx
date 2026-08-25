@@ -26,17 +26,23 @@ export function FetchOrdersDeveloperButton({ orders }: { orders: Order[] }) {
 }
 
 export function CancelOrderDeveloperButton({
+  isCancelling,
+  onCancel,
   rawOrder,
-  title,
 }: {
+  isCancelling: boolean;
+  onCancel: () => Promise<unknown>;
   rawOrder: Order;
-  title: string;
 }) {
   const { isDeveloperMode } = useDeveloperMode();
 
   return isDeveloperMode ? (
     <Suspense fallback={null}>
-      <CancelOrderDeveloperButtonContent rawOrder={rawOrder} title={title} />
+      <CancelOrderDeveloperButtonContent
+        isCancelling={isCancelling}
+        onCancel={onCancel}
+        rawOrder={rawOrder}
+      />
     </Suspense>
   ) : null;
 }
