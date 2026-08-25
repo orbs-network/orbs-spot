@@ -3,6 +3,10 @@ import { ExternalLinkIcon } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  preserveDeveloperModeInHref,
+  useDeveloperMode,
+} from "./use-developer-mode";
 
 export function OrdersSinkGuideLink({
   className,
@@ -11,7 +15,11 @@ export function OrdersSinkGuideLink({
   className?: string;
   section?: string;
 }) {
-  const href = `/developers/orders-sink${section ? `#${section}` : ""}`;
+  const { isDeveloperMode } = useDeveloperMode();
+  const href = preserveDeveloperModeInHref(
+    `/developers/orders-sink${section ? `#${section}` : ""}`,
+    isDeveloperMode,
+  );
 
   return (
     <Link

@@ -54,6 +54,14 @@ function serializeTypeScriptValue(
 }
 
 const SIGNATURE_FIELD_EXPLANATIONS: Record<string, string> = {
+  chainId:
+    "The active chain selected by the DEX. It is used to fetch and validate protocol configuration.",
+  tokenAddress:
+    "The DEX-derived ERC-20 input address authorized by RePermit. Use WToken when the user selected native input.",
+  inputTokenAddress:
+    "The DEX-derived ERC-20 address consumed by each fill. Native input is unsupported, so this must be WToken.",
+  requiredAmount:
+    "The total input amount calculated by the DEX, expressed in the token's smallest unit.",
   message:
     "The complete EIP-712 RePermit order message that the wallet signs.",
   "message.permitted":
@@ -213,100 +221,162 @@ export function getCancelFieldExplanation(path: JsonValuePath) {
 }
 
 export function formatOrderTypesCode() {
-  return `export type Address = \`0x\${string}\`;
+  return `// Ethereum-compatible addresses and hex values used by viem and Wagmi.
+export type Address = \`0x\${string}\`;
 export type Hex = \`0x\${string}\`;
 
+// ECDSA signature parts expected by POST /orders/new.
 export type Signature = {
+  // Recovery identifier encoded as hex (normally 0x1b or 0x1c).
   v: \`0x\${string}\`;
+  // First 32-byte signature scalar.
   r: \`0x\${string}\`;
+  // Second 32-byte signature scalar.
   s: \`0x\${string}\`;
 };
 
+// The exact EIP-712 message signed by the wallet and submitted to Orders Sink.
+// Numeric uint values are strings when they can exceed JavaScript's safe range.
 export type PermitOrder = {
+  // Permit scope: the ERC-20 token and total amount authorized by this signature.
   permitted: {
+    // Use an ERC-20 address. Native input is unsupported, so use WToken instead.
     token: Address;
+    // Maximum total amount the permit may transfer, in token base units.
     amount: string;
   };
+  // Approval/execution spender returned by GET /config.
   spender: Address;
+  // Fresh application-generated permit nonce used to prevent replay.
   nonce: string;
+  // Permit expiry as Unix seconds. Expired orders cannot execute.
   deadline: string;
+  // Strategy-specific data covered by the same wallet signature.
   witness: {
+    // Protocol reactor returned by GET /config.
     reactor: Address;
+    // Protocol executor returned by GET /config.
     executor: Address;
+    // Exchange integration selected by the trusted partner configuration.
     exchange: {
+      // Adapter used to execute the swap.
       adapter: Address;
+      // Optional referral address.
       ref: Address;
+      // Referral share in basis points.
       share: number;
+      // Optional adapter-specific calldata; use 0x when empty.
       data: Hex;
     };
+    // Wallet that owns the input tokens and signs the typed data.
     swapper: Address;
+    // Fresh order nonce; keep it synchronized with your nonce strategy.
     nonce: string;
+    // Earliest Unix-second timestamp at which execution may begin.
     start?: string;
+    // Latest Unix-second timestamp at which the order may execute.
     deadline: string;
+    // Must match the connected wallet and EIP-712 domain chain IDs.
     chainid: number;
+    // Protocol exclusivity setting returned by GET /config unless customized.
     exclusivity: number;
+    // Minimum interval between eligible fills, in seconds.
     epoch: number;
+    // Allowed execution slippage in basis points (100 = 1%).
     slippage: number;
+    // Maximum quote/price age accepted by the strategy, in seconds.
     freshness: number;
+    // Per-fill input constraints.
     input: {
+      // Must match permitted.token; use WToken when the UI selected native input.
       token: Address;
+      // Desired input per fill, in token base units.
       amount: string;
+      // Maximum input available across fills, in token base units.
       maxAmount: string;
     };
+    // Per-fill output constraints.
     output: {
+      // ERC-20 token the strategy should receive.
       token: Address;
+      // Minimum output accepted per fill, in output-token base units.
       limit: string;
+      // Optional stop value used by strategies that support it.
       stop?: string;
+      // Optional lower trigger boundary.
       triggerLower?: string;
+      // Optional upper trigger boundary.
       triggerUpper?: string;
+      // Address that receives output tokens; commonly the connected wallet.
       recipient: Address;
     };
   };
 };
 
+// One field declaration in the EIP-712 type map returned by GET /config.
 export type TypedDataField = {
   name: string;
   type: string;
 };
 
+// Trusted protocol configuration used as the base for the local order.
 export type PermitData = {
+  // EIP-712 domain; never silently replace these values with user input.
   domain: {
     name: string;
     version: string;
     chainId: number;
+    // RePermit contract and ERC-20 approval spender.
     verifyingContract: Address;
   };
+  // Base order containing protocol contract and exchange fields.
   order: PermitOrder;
+  // Root EIP-712 type used when requesting the wallet signature.
   primaryType: "RePermitWitnessTransferFrom";
+  // Full EIP-712 type definitions supplied by the service.
   types: Record<string, TypedDataField[]>;
+  // Partner identifier applied by Orders Sink, when present.
   partner?: string;
 };
 
-// Request body sent when creating an order.
+// Exact request body sent to POST /orders/new after signing.
 export type SignedOrder = {
   signature: Signature;
+  // This must be the same object used as signTypedData's message.
   order: PermitOrder;
+  // New orders always enter the service as pending.
   status: "pending";
 };
 
 // Service-managed execution details returned with an order.
 export type OrderMetadata = {
+  // Execution chunks already processed by the strategy.
   chunks?: unknown[];
+  // Total number of fills expected by the strategy.
   expectedChunks: number;
+  // ISO timestamp of the last price evaluation.
   lastPriceCheck: string;
+  // ISO timestamp at which another fill may become eligible.
   nextEligibleTime: string;
+  // Service status such as pending, completed, or cancelled.
   status: string;
+  // Human-readable strategy summary for display.
   description: string;
+  // Display-only USD price; never use it for execution math.
   displayOnlyInputTokenPriceUSD: string;
+  // On-chain digest passed to cancel(bytes32[] digests).
   repermitDigest: Hex;
 };
 
 // Raw order shape returned by Orders Sink.
 export type OrderResponse = {
+  // Orders Sink identifier for this signed order.
   hash: Hex;
   metadata: OrderMetadata;
+  // The message originally signed and submitted.
   order: PermitOrder;
   signature: Signature;
+  // ISO creation timestamp assigned by the service.
   timestamp: string;
 };
 
@@ -324,8 +394,11 @@ export type CreateOrderResponse =
 
 // Filters required by the order-history endpoint.
 export type FetchOrdersQuery = {
+  // Wallet whose orders should be returned.
   swapper: Address;
+  // Network on which those orders execute.
   chainId: number;
+  // Exchange adapter from the partner's GET /config response.
   exchange: Address;
 };
 
@@ -335,7 +408,97 @@ export type FetchOrdersResponse = {
 };`;
 }
 
-function formatSignTypedDataArgs(data: JsonContainer) {
+function getDexOrderValues(data: JsonContainer) {
+  const root = Array.isArray(data) ? {} : data;
+  const message =
+    root.message &&
+    typeof root.message === "object" &&
+    !Array.isArray(root.message)
+      ? root.message
+      : {};
+  const permitted =
+    message.permitted &&
+    typeof message.permitted === "object" &&
+    !Array.isArray(message.permitted)
+      ? message.permitted
+      : {};
+  const witness =
+    message.witness &&
+    typeof message.witness === "object" &&
+    !Array.isArray(message.witness)
+      ? message.witness
+      : {};
+  const input =
+    witness.input &&
+    typeof witness.input === "object" &&
+    !Array.isArray(witness.input)
+      ? witness.input
+      : {};
+  const domain =
+    root.domain &&
+    typeof root.domain === "object" &&
+    !Array.isArray(root.domain)
+      ? root.domain
+      : {};
+  const fallbackTokenAddress =
+    typeof permitted.token === "string"
+      ? permitted.token
+      : "0x0000000000000000000000000000000000000000";
+  const chainIdValue =
+    typeof root.chainId === "number" || typeof root.chainId === "string"
+      ? root.chainId
+      : typeof witness.chainid === "number" ||
+          typeof witness.chainid === "string"
+        ? witness.chainid
+        : typeof domain.chainId === "number" ||
+            typeof domain.chainId === "string"
+          ? domain.chainId
+          : 137;
+  const parsedChainId = Number(chainIdValue);
+
+  return {
+    chainId: Number.isFinite(parsedChainId) ? parsedChainId : 137,
+    tokenAddress:
+      typeof root.tokenAddress === "string"
+        ? root.tokenAddress
+        : fallbackTokenAddress,
+    inputTokenAddress:
+      typeof root.inputTokenAddress === "string"
+        ? root.inputTokenAddress
+        : typeof input.token === "string"
+          ? input.token
+          : fallbackTokenAddress,
+    requiredAmount:
+      typeof root.requiredAmount === "string" ||
+      typeof root.requiredAmount === "number"
+        ? String(root.requiredAmount)
+        : typeof permitted.amount === "string" ||
+            typeof permitted.amount === "number"
+          ? String(permitted.amount)
+          : "0",
+  } satisfies JsonContainer;
+}
+
+function formatDexOrderValueDeclarations(data: JsonContainer) {
+  const values = getDexOrderValues(data);
+
+  return `const chainId = ${JSON.stringify(values.chainId)};
+const tokenAddress = ${JSON.stringify(values.tokenAddress)};
+const inputTokenAddress = ${JSON.stringify(values.inputTokenAddress)};
+const requiredAmount = ${JSON.stringify(values.requiredAmount)};`;
+}
+
+const DEX_VALUE_EXPRESSIONS: Record<string, string> = {
+  "message.permitted.token": "tokenAddress",
+  "message.permitted.amount": "requiredAmount",
+  "message.witness.input.token": "inputTokenAddress",
+  "message.witness.chainid": "chainId",
+};
+
+function formatSignTypedDataArgs(
+  data: JsonContainer,
+  applicationExpressions: Record<string, string> = {},
+) {
   const root = Array.isArray(data) ? {} : data;
   const signTypedDataArgs = {
     message:
@@ -369,14 +532,13 @@ function formatSignTypedDataArgs(data: JsonContainer) {
       "basePermitData.order.witness.exchange.share",
     "message.witness.exchange.data":
       "basePermitData.order.witness.exchange.data",
-    "message.witness.chainid":
-      "basePermitData.order.witness.chainid",
     "message.witness.exclusivity":
       "basePermitData.order.witness.exclusivity",
     "message.witness.swapper": "account",
     "message.witness.output.recipient": "account",
     "message.witness.output.stop":
       "basePermitData.order.witness.output.stop",
+    ...applicationExpressions,
   };
 
   return serializeTypeScriptValue(
@@ -385,7 +547,7 @@ function formatSignTypedDataArgs(data: JsonContainer) {
   );
 }
 
-export function formatGetBasePermitDataCode(data: JsonContainer) {
+function getPermitConfigExampleParams(data: JsonContainer) {
   const root = Array.isArray(data) ? {} : data;
   const domain =
     root.domain && typeof root.domain === "object" && !Array.isArray(root.domain)
@@ -408,38 +570,29 @@ export function formatGetBasePermitDataCode(data: JsonContainer) {
               typeof query.chainId === "string"
             ? query.chainId
             : 137;
-  return `import type { PermitData } from "./order-types";
-
-const partner = ${JSON.stringify(partner)};
-const chain = ${JSON.stringify(chain)};
-
-// Security boundary: keep this trusted endpoint fixed in your application.
-// Use the partner ID assigned by Orbs, or "unknown" if none was assigned.
-// Fetch and return the initial, unchanged base permit data.
-export const getBasePermitData = async (): Promise<PermitData> => {
-  const response = await fetch(
-    \`https://order-sink-v2.orbs.network/config?partner=\${partner}&chain=\${chain}\`,
-    { headers: { Accept: "application/json" } },
-  );
-
-  if (!response.ok) {
-    throw new Error(\`Failed to fetch permit config (\${response.status})\`);
-  }
-
-  const basePermitData = (await response.json()) as PermitData;
-  return basePermitData;
-};`;
+  return { chain, partner };
 }
 
 export function formatSignOrderExampleCode(data: JsonContainer) {
-  const serializedArgs = formatSignTypedDataArgs(data);
+  const { partner } = getPermitConfigExampleParams(data);
+  const dexOrderValueDeclarations =
+    formatDexOrderValueDeclarations(data);
+  const serializedArgs = formatSignTypedDataArgs(
+    data,
+    DEX_VALUE_EXPRESSIONS,
+  );
 
   return `import { useCallback } from "react";
 import { parseSignature, toHex } from "viem";
 import { useConnection, useSignTypedData } from "wagmi";
+import type { PermitData, Signature } from "./order-types";
 
-import { getBasePermitData } from "./get-base-permit-data";
-import type { Signature } from "./order-types";
+const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
+const partner = ${JSON.stringify(partner)};
+
+// Read these values from the DEX-derived form/quote state. GET /config does not
+// own the input assets, required amount, or active chain.
+${dexOrderValueDeclarations}
 
 // Hooks stay inside a custom hook so this file follows React's Rules of Hooks.
 export function useSignOrder() {
@@ -447,11 +600,19 @@ export function useSignOrder() {
   const { signTypedDataAsync } = useSignTypedData();
 
   return useCallback(async () => {
-    if (!account) throw new Error("Connect a wallet before signing");
-
     // Fetch trusted contract fields and layer in fresh form/quote values.
     // Replace the sample amounts, nonces, and timestamps shown below.
-    const basePermitData = await getBasePermitData();
+    const configResponse = await fetch(
+      \`\${ORDERS_SINK_URL}/config?partner=\${partner}&chain=\${chainId}\`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!configResponse.ok) {
+      throw new Error(\`Failed to fetch permit config (\${configResponse.status})\`);
+    }
+    const basePermitData = (await configResponse.json()) as PermitData;
+    if (basePermitData.domain.chainId !== chainId) {
+      throw new Error("DEX and config chain IDs must match");
+    }
     const signTypedDataArgs = ${serializedArgs} as const;
     const order = signTypedDataArgs.message;
     const signatureHex = await signTypedDataAsync(signTypedDataArgs);
@@ -473,6 +634,10 @@ export function useSignOrder() {
 
 export function formatFullOrderFlowCode(data: JsonContainer) {
   const root = Array.isArray(data) ? {} : data;
+  const partner =
+    typeof root.partner === "string" ? root.partner : "unknown";
+  const dexOrderValueDeclarations =
+    formatDexOrderValueDeclarations(data);
   const sourceTokenAddress =
     typeof root.sourceTokenAddress === "string"
       ? root.sourceTokenAddress
@@ -485,61 +650,133 @@ export function formatFullOrderFlowCode(data: JsonContainer) {
           typeof root.message.permitted.token === "string"
         ? root.message.permitted.token
         : "0x0000000000000000000000000000000000000000";
-  const serializedArgs = formatSignTypedDataArgs(data);
+  const serializedArgs = formatSignTypedDataArgs(
+    data,
+    DEX_VALUE_EXPRESSIONS,
+  );
 
-  return `import { useCallback } from "react";
-import {
-  erc20Abi,
-  maxUint256,
-  parseAbi,
-  parseSignature,
-  toHex,
-  zeroAddress,
-} from "viem";
-import {
-  useConnection,
-  usePublicClient,
-  useSignTypedData,
-  useWalletClient,
-} from "wagmi";
+  return `// Complete client-side Orders Sink integration.
+//
+// Flow: trusted config -> one local order -> token preparation -> EIP-712
+// signature -> submit the exact signed object. Replace sample literals with
+// current form, quote, wallet, nonce, and timestamp values from your app.
+import { useCallback } from "react";
+import { erc20Abi, maxUint256, parseAbi, parseSignature, toHex, zeroAddress } from "viem";
+import { useConnection, usePublicClient, useSignTypedData, useWalletClient } from "wagmi";
+import type { Address, CreateOrderResponse, OrderResponse, PermitData, PermitOrder, Signature, SignedOrder } from "./order-types";
 
-import { createOrder } from "./create-order";
-import { getBasePermitData } from "./get-base-permit-data";
-import type { Address, Signature } from "./order-types";
-
+// Keep this service origin fixed. Do not let users override the config source.
+const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
+// Use the partner ID assigned by Orbs, or "unknown" when none was assigned.
+const partner = ${JSON.stringify(partner)};
+// Populate these values from the DEX-derived form/quote state. These are order
+// inputs, not protocol defaults, so GET /config must never choose them.
+${dexOrderValueDeclarations}
+// WToken contracts expose deposit() for converting native currency to ERC-20.
 const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
 
-// One hook owns the complete Orders Sink creation flow.
+// Submit only after the wallet has signed the exact order argument.
+async function createOrder(
+  signature: Signature,
+  order: PermitOrder,
+): Promise<OrderResponse> {
+  // Orders Sink expects the decomposed signature, original message, and the
+  // initial pending status in one JSON request body.
+  const body: SignedOrder = { signature, order, status: "pending" };
+  const response = await fetch(\`${"${ORDERS_SINK_URL}"}/orders/new\`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  // The API may return a useful JSON error even for a non-2xx response.
+  const result = (await response.json().catch(() => ({}))) as CreateOrderResponse;
+
+  // HTTP failures indicate transport/auth/routing problems.
+  if (!response.ok) {
+    throw new Error(\`Request failed (${"${response.status}"})\`);
+  }
+  // A successful HTTP response can still contain a domain-level API failure.
+  if (!result.success) {
+    throw new Error(result.message ?? "Order creation failed");
+  }
+
+  // Return the server record so the UI can display or track the new order.
+  return result.signedOrder;
+}
+
+// One hook owns the complete flow so every step uses the same wallet, chain,
+// config response, and order object.
 export function useSubmitOrdersSinkOrder() {
+  // The connected address becomes swapper, recipient, and signing account in
+  // this sample. Change recipient only when your product explicitly supports it.
   const { address: account } = useConnection();
+  // Public client performs reads and waits for transaction confirmations.
   const publicClient = usePublicClient();
+  // Wallet client sends wrap/approval transactions on the active chain.
   const { data: walletClient } = useWalletClient();
+  // signTypedDataAsync requests an off-chain EIP-712 wallet signature.
   const { signTypedDataAsync } = useSignTypedData();
 
   return useCallback(async () => {
+    // Stop before reading config or constructing an order without wallet state.
     if (!account || !publicClient || !walletClient) {
       throw new Error("Connect a wallet before creating an order");
     }
 
-    // 1. GET /config from the trusted Orders Sink endpoint.
-    const basePermitData = await getBasePermitData();
+    // Read DEX-owned values before fetching protocol configuration. The DEX
+    // must already resolve native input to its WToken address because Orders
+    // Sink does not accept the native zero address in either order token field.
+    const requiredAmountValue = BigInt(requiredAmount);
+
+    // 1. GET /config from the trusted Orders Sink endpoint for the DEX chain.
+    // The response is a security boundary: it supplies the EIP-712 domain,
+    // spender, protocol contracts, exchange adapter, primary type, and type map.
+    const configResponse = await fetch(
+      \`${"${ORDERS_SINK_URL}"}/config?partner=${"${partner}"}&chain=${"${chainId}"}\`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!configResponse.ok) {
+      throw new Error(
+        \`Failed to fetch permit config (${"${configResponse.status}"})\`,
+      );
+    }
+    // Keep this response unchanged and layer only application-owned values into
+    // signTypedDataArgs below.
+    const basePermitData = (await configResponse.json()) as PermitData;
 
     // 2. Build the order once. Replace sample literals with fresh form/quote
     // values, then never rebuild this object between signing and submit.
+    // Amounts use token base units, timestamps use Unix seconds, and slippage /
+    // fee shares use basis points.
+    //
+    // Field ownership summary:
+    // - GET /config: domain, primaryType, types, spender, reactor, executor,
+    //   exchange adapter/ref/share/data, exclusivity, and default stop behavior.
+    // - Connected wallet: account, swapper, and normally output.recipient.
+    // - DEX state: chainId, tokenAddress, inputTokenAddress, requiredAmount,
+    //   quote amounts, output limits, and strategy trigger values.
+    // - Application state: nonces, start/deadline, epoch, slippage, freshness,
+    //   recipient overrides, and any product-specific constraints.
     const signTypedDataArgs = ${serializedArgs} as const;
+    // This message object is the single source of truth for all later steps.
     const order = signTypedDataArgs.message;
-    const tokenAddress = order.permitted.token as Address;
+    // Always approve the verifying contract returned by trusted config.
     const spender = basePermitData.domain.verifyingContract;
-    const requiredAmount = BigInt(order.permitted.amount);
 
+    // Never let wallet state or fetched config silently replace the DEX chain.
     if (
-      walletClient.chain.id !== basePermitData.domain.chainId ||
-      order.witness.chainid !== basePermitData.domain.chainId
+      walletClient.chain.id !== chainId ||
+      basePermitData.domain.chainId !== chainId ||
+      order.witness.chainid !== chainId
     ) {
-      throw new Error("Wallet, domain, and order chain IDs must match");
+      throw new Error("DEX, wallet, domain, and order chain IDs must match");
     }
 
     // 3. Read allowance without prompting the wallet.
+    // This read determines whether an approval transaction is necessary.
     const allowance = await publicClient.readContract({
       address: tokenAddress,
       abi: erc20Abi,
@@ -547,22 +784,39 @@ export function useSubmitOrdersSinkOrder() {
       args: [account, spender],
     });
 
-    // 4. Native input is represented by its wrapped-token address in the order.
+    // 4. Orders Sink does not support native input. If native was selected,
+    // wrap it first; both order token fields must already contain WToken.
+    // sourceTokenAddress represents the raw UI selection, while tokenAddress is
+    // the ERC-20 address written into the order.
     const sourceTokenAddress = ${JSON.stringify(sourceTokenAddress)} as Address;
     if (sourceTokenAddress.toLowerCase() === zeroAddress) {
+      // Reject a malformed native-input order before sending any transaction.
+      if (
+        tokenAddress.toLowerCase() === zeroAddress ||
+        inputTokenAddress.toLowerCase() !== tokenAddress.toLowerCase()
+      ) {
+        throw new Error(
+          "Native input must use WToken for permitted.token and witness.input.token",
+        );
+      }
+
+      // deposit() converts native currency to WToken owned by account.
       const wrapHash = await walletClient.writeContract({
         address: tokenAddress,
         abi: wrappedNativeAbi,
         functionName: "deposit",
-        value: requiredAmount,
+        value: requiredAmountValue,
         account,
         chain: walletClient.chain,
       });
+      // Do not continue until the wrapped balance is available on-chain.
       await publicClient.waitForTransactionReceipt({ hash: wrapHash });
     }
 
     // 5. Approve only when the current allowance is insufficient.
-    if (allowance < requiredAmount) {
+    // maxUint256 avoids repeated approvals; use requiredAmountValue instead if your
+    // product's approval policy requires exact allowances.
+    if (allowance < requiredAmountValue) {
       const approveHash = await walletClient.writeContract({
         address: tokenAddress,
         abi: erc20Abi,
@@ -571,11 +825,14 @@ export function useSubmitOrdersSinkOrder() {
         account,
         chain: walletClient.chain,
       });
+      // Signing before confirmation could produce an order that cannot execute.
       await publicClient.waitForTransactionReceipt({ hash: approveHash });
     }
 
     // 6. Sign the exact order object created above.
+    // EIP-712 signing is not an on-chain transaction and spends no gas.
     const signatureHex = await signTypedDataAsync(signTypedDataArgs);
+    // Orders Sink expects v/r/s fields instead of one concatenated hex value.
     const parsedSignature = parseSignature(signatureHex);
     const signature: Signature = {
       v: toHex(
@@ -587,6 +844,8 @@ export function useSubmitOrdersSinkOrder() {
     };
 
     // 7. POST that same order object to Orders Sink.
+    // Never reconstruct or normalize order here: any byte-level change can make
+    // the signature invalid.
     return await createOrder(signature, order);
   }, [account, publicClient, signTypedDataAsync, walletClient]);
 }`;
@@ -703,25 +962,42 @@ export async function createOrder(
 }
 
 export function formatLiveCreateOrderCode(data: JsonContainer) {
-  const serializedArgs = formatSignTypedDataArgs(data);
+  const { partner } = getPermitConfigExampleParams(data);
+  const dexOrderValueDeclarations =
+    formatDexOrderValueDeclarations(data);
+  const serializedArgs = formatSignTypedDataArgs(
+    data,
+    DEX_VALUE_EXPRESSIONS,
+  );
 
   return `import { useCallback } from "react";
 import { parseSignature, toHex } from "viem";
 import { useConnection, useSignTypedData } from "wagmi";
-
 import { createOrder } from "./create-order";
-import { getBasePermitData } from "./get-base-permit-data";
-import type { Signature } from "./order-types";
+import type { PermitData, Signature } from "./order-types";
+
+const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
+const partner = ${JSON.stringify(partner)};
+// Replace this snapshot with the equivalent values from your DEX hook/store.
+${dexOrderValueDeclarations}
 
 export function useSignAndCreateOrder() {
   const { address: account } = useConnection();
   const { signTypedDataAsync } = useSignTypedData();
 
   return useCallback(async () => {
-    if (!account) throw new Error("Connect a wallet before signing");
-
     // Build one order object and reuse it for both operations.
-    const basePermitData = await getBasePermitData();
+    const configResponse = await fetch(
+      \`\${ORDERS_SINK_URL}/config?partner=\${partner}&chain=\${chainId}\`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!configResponse.ok) {
+      throw new Error(\`Failed to fetch permit config (\${configResponse.status})\`);
+    }
+    const basePermitData = (await configResponse.json()) as PermitData;
+    if (basePermitData.domain.chainId !== chainId) {
+      throw new Error("DEX and config chain IDs must match");
+    }
     const signTypedDataArgs = ${serializedArgs} as const;
     const order = signTypedDataArgs.message;
 
@@ -763,15 +1039,33 @@ export function formatFetchOrdersCode(data: JsonContainer) {
     typeof query.chainId === "number"
       ? query.chainId
       : 1;
+  const { partner } = getPermitConfigExampleParams(data);
 
-  return `import { getBasePermitData } from "./get-base-permit-data";
+  return `// Fetch the connected wallet's Orders Sink history.
+// The exchange filter comes from trusted partner configuration so history is
+// scoped to the same integration used when the orders were created.
 import type { FetchOrdersResponse, PermitData } from "./order-types";
 
-export const fetchOrders = async () => {
-  // Use the base permit data to target the configured exchange adapter.
-  const basePermitData: PermitData = await getBasePermitData();
+// Keep the Orders Sink origin fixed instead of accepting a user-provided host.
+const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
+// Use the partner ID assigned by Orbs, or "unknown" when none was assigned.
+const partner = ${JSON.stringify(partner)};
 
-  // Request orders for this wallet, chain, and exchange.
+export const fetchOrders = async () => {
+  // 1. Fetch trusted config for the same partner and chain as the history query.
+  // The exchange adapter identifies which integration's orders to return.
+  const configResponse = await fetch(
+    \`\${ORDERS_SINK_URL}/config?partner=\${partner}&chain=${chainId}\`,
+    { headers: { Accept: "application/json" } },
+  );
+  if (!configResponse.ok) {
+    throw new Error(\`Failed to fetch permit config (\${configResponse.status})\`);
+  }
+  const basePermitData = (await configResponse.json()) as PermitData;
+
+  // 2. Request orders for one wallet, chain, and configured exchange adapter.
+  // swapper is the wallet that signed/owns the orders, not necessarily a token
+  // recipient used by a custom integration.
   const response = await fetch(
     \`${endpoint}?swapper=${swapper}&chainId=${chainId}&exchange=\${basePermitData.order.witness.exchange.adapter}\`,
     {
@@ -780,12 +1074,15 @@ export const fetchOrders = async () => {
     },
   );
 
-  // Stop before parsing order data when the HTTP request failed.
+  // 3. Stop before parsing order data when the HTTP request failed.
+  // Surface this error to the order-history UI or your monitoring layer.
   if (!response.ok) {
     throw new Error(\`Failed to fetch orders (\${response.status})\`);
   }
 
-  // Return only the order list consumed by order history.
+  // 4. Return only the array consumed by the order-history UI.
+  // Each item includes the original message, signature, service metadata, and
+  // repermitDigest required by the cancellation flow.
   const result = (await response.json()) as FetchOrdersResponse;
   return result.orders;
 };`;
@@ -811,7 +1108,7 @@ export function formatPermitConfigFetchCode(data: JsonContainer) {
 const partner = ${JSON.stringify(partner)};
 const chain = ${JSON.stringify(chain)};
 
-export const getBasePermitData = async (): Promise<PermitData> => {
+export const fetchPermitConfig = async (): Promise<PermitData> => {
   // Security boundary: keep this trusted endpoint fixed in your application.
   // Fetch the unchanged base permit data for this partner and chain.
   const response = await fetch(
@@ -894,28 +1191,56 @@ export function useCancelSelectedOrder() {
 }`;
 }
 
-export function formatCancelOrderExampleCode() {
-  return `import { useCallback } from "react";
+export function formatCancelOrderExampleCode(data: JsonContainer) {
+  const { partner } = getPermitConfigExampleParams(data);
+
+  return `// Cancel a RePermit order on-chain using the digest returned by Orders Sink.
+// Cancellation prevents future fills but cannot reverse fills already executed.
+import { useCallback } from "react";
 import type { Hex, PermitData } from "./order-types";
 import { parseAbi } from "viem";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 
-import { getBasePermitData } from "./get-base-permit-data";
-
+// Keep the config origin fixed because it supplies the cancellation contract.
+const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
+// Use the same partner identity used to create and query the order.
+const partner = ${JSON.stringify(partner)};
+// RePermit accepts one or more order digests, hence the bytes32[] argument.
 const cancelAbi = parseAbi(["function cancel(bytes32[] digests)"]);
 
 export function useCancelOrderExample() {
+  // account submits and pays gas for the cancellation transaction.
   const { address: account } = useConnection();
+  // publicClient waits until cancellation is confirmed.
   const publicClient = usePublicClient();
+  // walletClient sends the on-chain cancel transaction.
   const { data: walletClient } = useWalletClient();
 
+  // Pass order.metadata.repermitDigest from the selected history item.
   return useCallback(async (repermitDigest: Hex) => {
     if (!account || !publicClient || !walletClient) {
       throw new Error("Connect a wallet before cancelling");
     }
 
-    const basePermitData: PermitData = await getBasePermitData();
+    // 1. Resolve the trusted RePermit contract for the wallet's active chain.
+    // Never accept this contract address from editable UI input.
+    const configResponse = await fetch(
+      \`\${ORDERS_SINK_URL}/config?partner=\${partner}&chain=\${walletClient.chain.id}\`,
+      { headers: { Accept: "application/json" } },
+    );
+    if (!configResponse.ok) {
+      throw new Error(\`Failed to fetch permit config (\${configResponse.status})\`);
+    }
+    const basePermitData = (await configResponse.json()) as PermitData;
+
+    // Protect against submitting a digest to a contract on the wrong network.
+    if (basePermitData.domain.chainId !== walletClient.chain.id) {
+      throw new Error("Wallet and cancellation contract chain IDs must match");
+    }
+
+    // 2. Call cancel with an array containing the selected order's digest.
     const hash = await walletClient.writeContract({
+      // verifyingContract is both the permit spender and cancellation contract.
       address: basePermitData.domain.verifyingContract,
       abi: cancelAbi,
       functionName: "cancel",
@@ -924,6 +1249,8 @@ export function useCancelOrderExample() {
       chain: walletClient.chain,
     });
 
+    // 3. Wait for confirmation before marking the order cancelled in the UI.
+    // Refresh order history afterward to display the service's latest status.
     await publicClient.waitForTransactionReceipt({ hash });
     return hash;
   }, [account, publicClient, walletClient]);
@@ -1098,17 +1425,18 @@ const CREATE_ORDER_FILE = {
   syntaxLanguage: "typescript",
 } as const;
 
-const GET_BASE_PERMIT_DATA_FILE = {
-  format: formatGetBasePermitDataCode,
-  name: "get-base-permit-data.ts",
-  syntaxLanguage: "typescript",
-} as const;
-
 export const SIGNATURE_EXAMPLE_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "sign-order.ts",
-  files: [GET_BASE_PERMIT_DATA_FILE, ORDER_TYPES_FILE],
+  files: [ORDER_TYPES_FILE],
   format: formatSignOrderExampleCode,
+  inlineEditable: true,
+  inlineEditableVariables: [
+    "chainId",
+    "tokenAddress",
+    "inputTokenAddress",
+    "requiredAmount",
+  ],
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
@@ -1124,7 +1452,7 @@ export const CANCEL_CODE_SNIPPET: CodeSnippetOptions = {
 export const CANCEL_EXAMPLE_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "cancel-order.ts",
-  files: [GET_BASE_PERMIT_DATA_FILE, ORDER_TYPES_FILE],
+  files: [ORDER_TYPES_FILE],
   format: formatCancelOrderExampleCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -1169,11 +1497,7 @@ export const LIVE_WRAP_NATIVE_TOKEN_CODE_SNIPPET: CodeSnippetOptions = {
 export const LIVE_CREATE_ORDER_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "sign-and-create-order.ts",
-  files: [
-    GET_BASE_PERMIT_DATA_FILE,
-    CREATE_ORDER_FILE,
-    ORDER_TYPES_FILE,
-  ],
+  files: [CREATE_ORDER_FILE, ORDER_TYPES_FILE],
   format: formatLiveCreateOrderCode,
   inlineEditable: true,
   language: "TypeScript",
@@ -1182,12 +1506,8 @@ export const LIVE_CREATE_ORDER_CODE_SNIPPET: CodeSnippetOptions = {
 
 export const FULL_ORDER_FLOW_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "create-orders-sink-order.ts",
-  files: [
-    GET_BASE_PERMIT_DATA_FILE,
-    CREATE_ORDER_FILE,
-    ORDER_TYPES_FILE,
-  ],
+  fileName: "create-order-flow.ts",
+  files: [ORDER_TYPES_FILE],
   format: formatFullOrderFlowCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -1205,7 +1525,7 @@ export const CREATE_ORDER_CODE_SNIPPET: CodeSnippetOptions = {
 export const FETCH_ORDERS_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "fetch-orders.ts",
-  files: [GET_BASE_PERMIT_DATA_FILE, ORDER_TYPES_FILE],
+  files: [ORDER_TYPES_FILE],
   format: formatFetchOrdersCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -1213,7 +1533,7 @@ export const FETCH_ORDERS_CODE_SNIPPET: CodeSnippetOptions = {
 
 export const PERMIT_CONFIG_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "get-base-permit-data.ts",
+  fileName: "permit-config.ts",
   files: [ORDER_TYPES_FILE],
   format: formatPermitConfigFetchCode,
   hideStatusLabel: true,

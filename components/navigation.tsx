@@ -18,7 +18,10 @@ import {
 } from "lucide-react";
 import { useDisconnect, useSwitchChain } from "wagmi";
 import { toast } from "sonner";
-import { useDeveloperMode } from "@/components/developer-tools/use-developer-mode";
+import {
+  preserveDeveloperModeInHref,
+  useDeveloperMode,
+} from "@/components/developer-tools/use-developer-mode";
 import { cn, makeEllipsisAddress } from "@/lib/utils";
 import { CHAIN_LOGO_URLS, MAIN_CHAINS, SPOT_CHAINS, SPOT_TABS } from "@/lib/consts";
 import { useSelectedFormTab } from "@/lib/hooks/use-form-tab";
@@ -379,7 +382,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
     <nav className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
       <div className="flex w-full flex-nowrap items-center gap-2 sm:gap-3">
         <Link
-          href="/"
+          href={preserveDeveloperModeInHref("/", isDeveloperMode)}
           className="flex min-h-8 min-w-0 shrink items-center gap-2.5 no-underline"
           aria-label={`${brand.name} trading`}
         >
@@ -407,7 +410,10 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
                 <Link
                   data-nav-pill
                   data-developer-trigger
-                  href="/developers/orders-sink"
+                  href={preserveDeveloperModeInHref(
+                    "/developers/orders-sink",
+                    isDeveloperMode,
+                  )}
                   aria-label="Open Orders Sink integration guide"
                   className={cn(
                     navPillClass,

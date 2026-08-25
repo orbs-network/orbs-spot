@@ -4,13 +4,13 @@ import {
   type ReactElement,
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from "react";
 import {
   CheckIcon,
-  CircleAlertIcon,
   CircleCheckIcon,
   InfoIcon,
   RefreshCwIcon,
@@ -154,7 +154,7 @@ function refreshSignatureTiming(
 }
 
 const STEP_ACTION_LABELS: Record<DeveloperOrderStep, string> = {
-  flow: "Start with allowance",
+  flow: "Start",
   check: "Check allowance",
   wrap: "Wrap token",
   approve: "Approve token",
@@ -186,6 +186,12 @@ function createSignatureData(
     JSON.stringify({
       partner,
       sourceTokenAddress,
+      // These values come from Spot's DEX-derived RePermit data. Keeping them
+      // explicit makes their ownership clear in the generated integration code.
+      chainId: order.witness.chainid,
+      tokenAddress: order.permitted.token,
+      inputTokenAddress: order.witness.input.token,
+      requiredAmount: order.permitted.amount,
       message: order,
       domain: permitData.domain,
       primaryType: permitData.primaryType,
@@ -205,6 +211,33 @@ function applySignatureData(
   const witness = asRecord(message.witness);
   const input = asRecord(witness.input);
   const output = asRecord(witness.output);
+  const chainId =
+    typeof root.chainId === "number" || typeof root.chainId === "string"
+      ? root.chainId
+      : typeof witness.chainid === "number" ||
+          typeof witness.chainid === "string"
+        ? witness.chainid
+        : permitData.order.witness.chainid;
+  const tokenAddress =
+    typeof root.tokenAddress === "string"
+      ? root.tokenAddress
+      : typeof permitted.token === "string"
+        ? permitted.token
+        : permitData.order.permitted.token;
+  const inputTokenAddress =
+    typeof root.inputTokenAddress === "string"
+      ? root.inputTokenAddress
+      : typeof input.token === "string"
+        ? input.token
+        : permitData.order.witness.input.token;
+  const requiredAmount =
+    typeof root.requiredAmount === "string" ||
+    typeof root.requiredAmount === "number"
+      ? root.requiredAmount
+      : typeof permitted.amount === "string" ||
+          typeof permitted.amount === "number"
+        ? permitted.amount
+        : permitData.order.permitted.amount;
 
   return JSON.parse(
     JSON.stringify({
@@ -215,13 +248,17 @@ function applySignatureData(
         permitted: {
           ...permitData.order.permitted,
           ...permitted,
+          token: tokenAddress,
+          amount: requiredAmount,
         },
         witness: {
           ...permitData.order.witness,
           ...witness,
+          chainid: chainId,
           input: {
             ...permitData.order.witness.input,
             ...input,
+            token: inputTokenAddress,
           },
           output: {
             ...permitData.order.witness.output,
@@ -257,7 +294,6 @@ function LiveFlowNotice({
   actualStep,
   createdOrder,
   disabledReason,
-  error,
   isReviewing,
   outcome,
   viewedStep,
@@ -265,7 +301,6 @@ function LiveFlowNotice({
   actualStep: DeveloperOrderStep;
   createdOrder?: CreatedOrderSummary;
   disabledReason?: string;
-  error?: string;
   isReviewing: boolean;
   outcome?: string;
   viewedStep: DeveloperOrderStep;
@@ -281,34 +316,28 @@ function LiveFlowNotice({
       : undefined;
   const message = createdOrder
     ? undefined
-    : error
+    : disabledReason
       ? {
-          icon: <CircleAlertIcon className="mt-0.5 size-3.5 shrink-0" />,
-          text: `${error} Try this step again.`,
-          tone: "error",
+          icon: <InfoIcon className="mt-0.5 size-3.5 shrink-0" />,
+          text: disabledReason,
+          tone: "info",
         }
-      : disabledReason
+      : isReviewing
         ? {
             icon: <InfoIcon className="mt-0.5 size-3.5 shrink-0" />,
-            text: disabledReason,
+            text: "Reviewing a completed step. Returning will not rerun it.",
             tone: "info",
           }
-        : isReviewing
+        : outcome
           ? {
-              icon: <InfoIcon className="mt-0.5 size-3.5 shrink-0" />,
-              text: "Reviewing a completed step. Returning will not rerun it.",
-              tone: "info",
+              icon: <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0" />,
+              text: outcome,
+              tone: "success",
             }
-          : outcome
-            ? {
-                icon: <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0" />,
-                text: outcome,
-                tone: "success",
-              }
-            : undefined;
+          : undefined;
 
   return (
-    <div className="max-w-[660px] rounded-[12px] border border-border/75 bg-background/35 px-3 py-2.5">
+    <div className="w-[420px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-border/80 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl">
       <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
         <span className="text-foreground">
           {viewedStep === "flow"
@@ -327,7 +356,15 @@ function LiveFlowNotice({
       </div>
       <div className="mt-2 grid grid-cols-4 gap-1.5" aria-label="Order creation progress">
         {LIVE_FLOW_PHASES.map((phase, index) => (
-          <div key={phase.label}>
+          <div
+            key={phase.label}
+            aria-current={index === viewedPhaseIndex ? "step" : undefined}
+            className={`rounded-md border px-1.5 py-1 transition-colors ${
+              index === viewedPhaseIndex
+                ? "border-primary/40 bg-primary/10"
+                : "border-transparent"
+            }`}
+          >
             <span
               className={`block h-1 rounded-full ${
                 index <= actualPhaseIndex
@@ -337,7 +374,13 @@ function LiveFlowNotice({
                     : "bg-secondary"
               }`}
             />
-            <span className="mt-1 block truncate text-[9px] text-muted-foreground">
+            <span
+              className={`mt-1 block truncate text-[9px] ${
+                index === viewedPhaseIndex
+                  ? "font-semibold text-primary"
+                  : "text-muted-foreground"
+              }`}
+            >
               {phase.label}
             </span>
           </div>
@@ -355,11 +398,9 @@ function LiveFlowNotice({
       ) : message ? (
         <div
           className={`mt-2 flex items-start gap-2 text-[11px] leading-4 ${
-            message.tone === "error"
-              ? "text-destructive"
-              : message.tone === "success"
-                ? "text-emerald-300"
-                : "text-muted-foreground"
+            message.tone === "success"
+              ? "text-emerald-300"
+              : "text-muted-foreground"
           }`}
         >
           {message.icon}
@@ -382,6 +423,7 @@ function LiveOrderFlowModalContent({
   triggerTooltip?: string;
 }) {
   const spot = useSpot();
+  const flowToastId = useId();
   const { address: connectedAccount } = useConnection();
   const partner = getActiveSpotPartner() || "unknown";
   const currentSourceToken = spot.derivedFormData.srcToken;
@@ -394,6 +436,15 @@ function LiveOrderFlowModalContent({
     useRefetchSelectedCurrenciesBalances();
   const setOrderHistoryOpen = useFormTabStore(
     (state) => state.setOrderHistoryOpen,
+  );
+  const dexDerivedSignatureData = useMemo(
+    () =>
+      createSignatureData(
+        currentPermitData,
+        partner,
+        currentSourceToken?.address,
+      ),
+    [currentPermitData, currentSourceToken?.address, partner],
   );
 
   const [open, setOpen] = useState(false);
@@ -418,7 +469,6 @@ function LiveOrderFlowModalContent({
   const [orderSignature, setOrderSignature] = useState<Signature>();
   const [createdOrder, setCreatedOrder] = useState<CreatedOrderSummary>();
   const [stepOutcome, setStepOutcome] = useState<string>();
-  const [stepError, setStepError] = useState<string>();
   const completedStepsRef = useRef({ wrappedAmount: BigInt(0) });
   const step = navigation.history.at(-1) ?? "flow";
   const viewedStep = navigation.history[navigation.viewedIndex] ?? step;
@@ -463,7 +513,6 @@ function LiveOrderFlowModalContent({
         setOrderSignature(undefined);
         setCreatedOrder(undefined);
         setStepOutcome(undefined);
-        setStepError(undefined);
         completedStepsRef.current = { wrappedAmount: BigInt(0) };
       } else if (step === "success") {
         setInputAmount("");
@@ -492,7 +541,6 @@ function LiveOrderFlowModalContent({
     if (isRunning || step === "success") return;
 
     setIsRunning(true);
-    setStepError(undefined);
 
     try {
       if (step === "flow") {
@@ -640,11 +688,9 @@ function LiveOrderFlowModalContent({
       }
     } catch (executionError) {
       if (isUserRejectedError(executionError)) {
-        setStepError("The wallet request was rejected.");
         showTransactionRejectedToast();
       } else {
         const errorMessage = getErrorMessage(executionError);
-        setStepError(errorMessage);
         toast.error("Order step failed", {
           description: errorMessage,
         });
@@ -671,6 +717,26 @@ function LiveOrderFlowModalContent({
     wrapNativeToken,
   ]);
 
+  const handleSaveSignSnippet = useCallback(
+    (nextSignatureData: JsonContainer) => {
+      const refreshedSignatureData = refreshSignatureTiming(
+        nextSignatureData,
+        currentPermitData,
+      );
+      const nextPermitData = applySignatureData(
+        permitData,
+        refreshedSignatureData,
+      );
+
+      setSignatureData(refreshedSignatureData);
+      setPermitData(nextPermitData);
+      setWrapAmount(nextPermitData.order.permitted.amount);
+      setOrderSignature(undefined);
+      setStepOutcome(undefined);
+    },
+    [currentPermitData, permitData],
+  );
+
   const presentation = useMemo<StepPresentation>(() => {
     const tokenAddress = permitData.order.permitted.token;
 
@@ -679,7 +745,7 @@ function LiveOrderFlowModalContent({
         codeSnippet: FULL_ORDER_FLOW_CODE_SNIPPET,
         data: signatureData,
         explanation:
-          "Inspect and run the current order in four phases. Allowance is read-only; Prepare appears only when wrapping or approval is needed; Sign opens the wallet; Submit sends the signed order to Orders Sink.",
+          "Run the current order in four phases. Allowance is read-only; Prepare appears only when wrapping or approval is needed; Sign opens the wallet; Submit sends the signed order to Orders Sink.",
         title: "Orders Sink live creation flow",
       };
     }
@@ -787,6 +853,54 @@ function LiveOrderFlowModalContent({
           ? "submit"
           : "end-to-end";
 
+  useEffect(() => {
+    if (!open) {
+      toast.dismiss(flowToastId);
+      return;
+    }
+
+    toast.custom(
+      () => (
+        <LiveFlowNotice
+          actualStep={step}
+          createdOrder={
+            viewedStep === "success" ? createdOrder : undefined
+          }
+          disabledReason={
+            !isReviewingPreviousStep ? disabledReason : undefined
+          }
+          isReviewing={isReviewingPreviousStep}
+          outcome={!isReviewingPreviousStep ? stepOutcome : undefined}
+          viewedStep={viewedStep}
+        />
+      ),
+      {
+        id: flowToastId,
+        closeButton: false,
+        dismissible: false,
+        duration: Infinity,
+        position: "top-right",
+        unstyled: true,
+      },
+    );
+  }, [
+    createdOrder,
+    disabledReason,
+    flowToastId,
+    isReviewingPreviousStep,
+    open,
+    step,
+    stepOutcome,
+    viewedStep,
+  ]);
+
+  useEffect(
+    () => () => {
+      toast.dismiss(flowToastId);
+    },
+    [flowToastId],
+  );
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <Tooltip>
@@ -806,24 +920,12 @@ function LiveOrderFlowModalContent({
           data={presentation.data}
           editable={presentation.editable}
           codeSnippet={presentation.codeSnippet}
+          codeSnippetState={
+            isReviewingPreviousStep ? "review" : "active"
+          }
           description=""
           explanation={presentation.explanation}
           explanationDisplay="subtitle"
-          headerNotice={
-            <LiveFlowNotice
-              actualStep={step}
-              createdOrder={
-                viewedStep === "success" ? createdOrder : undefined
-              }
-              disabledReason={
-                !isReviewingPreviousStep ? disabledReason : undefined
-              }
-              error={!isReviewingPreviousStep ? stepError : undefined}
-              isReviewing={isReviewingPreviousStep}
-              outcome={!isReviewingPreviousStep ? stepOutcome : undefined}
-              viewedStep={viewedStep}
-            />
-          }
           headerBackAction={
             navigation.viewedIndex > 0 && !isRunning
               ? {
@@ -837,7 +939,9 @@ function LiveOrderFlowModalContent({
               : undefined
           }
           getFieldExplanation={
-            viewedStep === "sign" ? getSignatureFieldExplanation : undefined
+            viewedStep === "sign"
+              ? getSignatureFieldExplanation
+              : undefined
           }
           isValueEditable={
             viewedStep === "sign"
@@ -848,13 +952,12 @@ function LiveOrderFlowModalContent({
           }
           onSave={
             !isReviewingPreviousStep && step === "sign"
-              ? (nextSignatureData) =>
-                  setSignatureData(
-                    refreshSignatureTiming(
-                      nextSignatureData,
-                      currentPermitData,
-                    ),
-                  )
+              ? handleSaveSignSnippet
+              : undefined
+          }
+          resetData={
+            viewedStep === "sign"
+              ? dexDerivedSignatureData
               : undefined
           }
           title={presentation.title}

@@ -22,6 +22,10 @@ import {
   ClipboardIcon,
   Code2Icon,
   LockIcon,
+  Maximize2Icon,
+  Minimize2Icon,
+  PencilIcon,
+  RotateCcwIcon,
   SaveIcon,
 } from "lucide-react";
 import {
@@ -85,12 +89,14 @@ export type CodeSnippetOptions = {
   format: (data: JsonContainer) => string;
   hideStatusLabel?: boolean;
   inlineEditable?: boolean;
+  inlineEditableVariables?: string[];
   language?: string;
   syntaxLanguage?: Language;
 };
 
 export type JsonInspectorModalProps = {
   codeSnippet?: CodeSnippetOptions;
+  codeSnippetState?: "active" | "review";
   copyActionsInHeaders?: boolean;
   copyAs?: "curl" | "json";
   curl?: CurlOptions;
@@ -117,6 +123,7 @@ export type JsonInspectorModalProps = {
   open?: boolean;
   requiresDeveloperMode?: boolean;
   requestResponseTabs?: boolean;
+  resetData?: JsonContainer;
   tabsInSectionHeader?: boolean;
   responseData?: JsonContainer;
   responseInitiallyCollapsed?: boolean;
@@ -432,8 +439,10 @@ type JsonLineAnnotation = {
 const buildCodeLineAnnotations = (
   code: string,
   data: JsonContainer,
+  editableVariables: readonly string[] = [],
 ) => {
   const annotations = new Map<number, JsonLineAnnotation>();
+  const editableVariableNames = new Set(editableVariables);
   const contexts: Array<{
     indent: number;
     path: JsonValuePath;
@@ -444,7 +453,24 @@ const buildCodeLineAnnotations = (
     const propertyMatch = line.match(
       /^(\s*)([A-Za-z_$][\w$]*):\s*(.*)$/,
     );
-    if (!propertyMatch) return;
+    if (!propertyMatch) {
+      const variableMatch = line.match(
+        /^\s*const\s+([A-Za-z_$][\w$]*)\s*=.*;\s*$/,
+      );
+      const variableName = variableMatch?.[1];
+      if (!variableName || !editableVariableNames.has(variableName)) {
+        return;
+      }
+
+      const value = getValueAtPath(data, [variableName]);
+      if (value !== undefined && !isJsonContainer(value)) {
+        annotations.set(lineIndex, {
+          path: [variableName],
+          value,
+        });
+      }
+      return;
+    }
 
     const indent = propertyMatch[1].length;
     const key = propertyMatch[2];
@@ -642,6 +668,7 @@ function InspectorContent({
 
 function JsonInspectorModalContent({
   codeSnippet,
+  codeSnippetState,
   copyActionsInHeaders = true,
   copyAs = "curl",
   curl,
@@ -662,6 +689,7 @@ function JsonInspectorModalContent({
   onSave,
   open,
   requestResponseTabs = false,
+  resetData,
   tabsInSectionHeader = false,
   responseData,
   responseInitiallyCollapsed = false,
@@ -674,8 +702,8 @@ function JsonInspectorModalContent({
   viewModeAction,
 }: JsonInspectorContentProps) {
   const descriptionId = useId();
-  const editModeSwitchId = useId();
   const fieldIdPrefix = useId();
+  const codeContainerRef = useRef<HTMLDivElement>(null);
   const copyResetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [mode, setMode] = useState<EditorMode>("view");
   const [draft, setDraft] = useState<JsonContainer>(data);
@@ -684,6 +712,7 @@ function JsonInspectorModalContent({
   );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isCodeFullscreen, setIsCodeFullscreen] = useState(false);
   const [previewTab, setPreviewTab] = useState<PreviewTab>("request");
   const [codeFileSelection, setCodeFileSelection] = useState<{
     codeSnippet?: CodeSnippetOptions;
@@ -747,8 +776,12 @@ function JsonInspectorModalContent({
       return new Map<number, JsonLineAnnotation>();
     }
 
-    return buildCodeLineAnnotations(formattedCode, data);
-  }, [codeSnippet?.inlineEditable, data, formattedCode, isMainCodeFile]);
+    return buildCodeLineAnnotations(
+      formattedCode,
+      data,
+      codeSnippet.inlineEditableVariables,
+    );
+  }, [codeSnippet, data, formattedCode, isMainCodeFile]);
   const codeLineExplanations = useMemo(() => {
     const explanations = new Map<
       number,
@@ -769,7 +802,30 @@ function JsonInspectorModalContent({
 
     formattedCode.split("\n").forEach((line, lineIndex) => {
       const match = line.match(/^(\s*)([A-Za-z_$][\w$]*):/);
-      if (!match) return;
+      if (!match) {
+        const variableMatch = line.match(
+          /^\s*const\s+([A-Za-z_$][\w$]*)\s*=/,
+        );
+        const variableName = variableMatch?.[1];
+        if (
+          !variableName ||
+          !codeSnippet?.inlineEditableVariables?.includes(variableName)
+        ) {
+          return;
+        }
+
+        const value = getValueAtPath(draft, [variableName]);
+        if (value === undefined) return;
+        const tooltip = getFieldExplanation([variableName], value);
+        if (tooltip) {
+          explanations.set(lineIndex, {
+            key: variableName,
+            path: variableName,
+            tooltip,
+          });
+        }
+        return;
+      }
 
       const indent = match[1].length;
       const key = match[2];
@@ -801,13 +857,31 @@ function JsonInspectorModalContent({
     });
 
     return explanations;
-  }, [draft, formattedCode, getFieldExplanation, isMainCodeFile]);
+  }, [
+    codeSnippet?.inlineEditableVariables,
+    draft,
+    formattedCode,
+    getFieldExplanation,
+    isMainCodeFile,
+  ]);
 
   const resetDraft = useCallback(() => {
     setDraft(data);
     setFieldInputs(createFieldInputs(data));
     setFieldErrors({});
   }, [data]);
+
+  const resetDraftToDefaults = useCallback(() => {
+    const nextDraft = resetData ?? data;
+    setDraft(nextDraft);
+    setFieldInputs(createFieldInputs(nextDraft));
+    setFieldErrors({});
+  }, [data, resetData]);
+
+  const hasChangesFromResetValues = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(resetData ?? data),
+    [data, draft, resetData],
+  );
 
   useEffect(() => {
     if (mode !== "view") return;
@@ -822,6 +896,18 @@ function JsonInspectorModalContent({
     },
     [],
   );
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsCodeFullscreen(
+        document.fullscreenElement === codeContainerRef.current,
+      );
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
 
   const validationIssues = useMemo(() => {
     const parsingIssues = Object.entries(fieldErrors).map(
@@ -978,6 +1064,23 @@ function JsonInspectorModalContent({
       );
     } catch {
       toast.error("Failed to copy cURL command");
+    }
+  };
+
+  const handleCodeFullscreen = async () => {
+    const codeContainer = codeContainerRef.current;
+    if (!codeContainer) return;
+
+    try {
+      if (document.fullscreenElement === codeContainer) {
+        await document.exitFullscreen();
+        return;
+      }
+
+      if (document.fullscreenElement) await document.exitFullscreen();
+      await codeContainer.requestFullscreen();
+    } catch {
+      toast.error("Unable to open the code preview in full screen");
     }
   };
 
@@ -1203,6 +1306,100 @@ function JsonInspectorModalContent({
     </div>
   );
 
+  const renderCodeFullscreenButton = () => (
+    <Button
+      type="button"
+      size="sm"
+      variant="ghost"
+      onClick={() => void handleCodeFullscreen()}
+      aria-label={isCodeFullscreen ? "Exit full screen" : "Open full screen"}
+      aria-pressed={isCodeFullscreen}
+      className="h-7 px-2 text-[11px]"
+    >
+      {isCodeFullscreen ? (
+        <Minimize2Icon className="size-3.5" />
+      ) : (
+        <Maximize2Icon className="size-3.5" />
+      )}
+      <span className="max-sm:hidden">
+        {isCodeFullscreen ? "Exit full screen" : "Full screen"}
+      </span>
+    </Button>
+  );
+
+  const showsFooterActions = Boolean(
+    viewModeAction ||
+      !(copyActionsInHeaders || requestResponseTabs) ||
+      mode === "edit",
+  );
+
+  const renderFooterActions = () => (
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border/70 bg-card/95 px-4 py-4 sm:px-6">
+      {!copyActionsInHeaders && !requestResponseTabs && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void handleCopy()}
+            disabled={validationIssues.length > 0}
+          >
+            {copiedTarget === "primary" ? (
+              <CheckIcon />
+            ) : (
+              <ClipboardIcon />
+            )}
+            {copiedTarget === "primary"
+              ? "Copied"
+              : (codeSnippet?.copyLabel ??
+                (copyAs === "json" ? "Copy JSON" : "Copy as cURL"))}
+          </Button>
+          {responseData && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void handleCopyResponse()}
+            >
+              {copiedTarget === "response" ? (
+                <CheckIcon />
+              ) : (
+                <ClipboardIcon />
+              )}
+              {copiedTarget === "response" ? "Copied" : "Copy JSON"}
+            </Button>
+          )}
+        </div>
+      )}
+      {mode === "view" && viewModeAction && (
+        <div className="ml-auto">{viewModeAction}</div>
+      )}
+      {mode === "edit" && (
+        <div className="ml-auto flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={resetDraftToDefaults}
+            disabled={!hasChangesFromResetValues || isSaving}
+          >
+            <RotateCcwIcon />
+            Reset
+          </Button>
+          <Button type="button" variant="ghost" onClick={handleCancel}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={validationIssues.length > 0}
+            isLoading={isSaving}
+          >
+            <SaveIcon />
+            Save changes
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <InspectorRoot
       open={open}
@@ -1312,24 +1509,6 @@ function JsonInspectorModalContent({
               )}
               {headerNotice && <div className="mt-3">{headerNotice}</div>}
             </div>
-            {editable && (
-              <div className="mr-5 flex h-8 items-center gap-2 rounded-[10px] border border-border/70 bg-secondary/30 px-2.5 sm:mr-6">
-                <label
-                  htmlFor={editModeSwitchId}
-                  className="cursor-pointer text-xs font-medium text-foreground"
-                >
-                  Edit mode
-                </label>
-                <Switch
-                  id={editModeSwitchId}
-                  checked={mode === "edit"}
-                  onCheckedChange={(checked) =>
-                    handleModeChange(checked ? "edit" : "view")
-                  }
-                  aria-label="Edit mode"
-                />
-              </div>
-            )}
           </div>
         </DialogHeader>
 
@@ -1441,59 +1620,109 @@ function JsonInspectorModalContent({
               {formattedCode ? (
                 !requestResponseTabs || previewTab === "request" ? (
               <div
+                ref={codeContainerRef}
                 role={requestResponseTabs ? "tabpanel" : undefined}
                 aria-label={requestResponseTabs ? "Request" : undefined}
-                className={
-                  requestResponseTabs && tabsInSectionHeader
-                    ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[16px] border border-border/70 bg-background/45 shadow-inner"
-                    : "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-border/70 bg-background/45 shadow-inner"
-                }
+                className={`flex min-h-0 flex-1 flex-col overflow-hidden border border-border/70 bg-background/45 shadow-inner ${
+                  isCodeFullscreen
+                    ? "h-screen w-screen rounded-none border-0 bg-card"
+                    : requestResponseTabs && tabsInSectionHeader
+                      ? "rounded-b-[16px]"
+                      : "rounded-[16px]"
+                } ${
+                  codeSnippetState === "active" && !isCodeFullscreen
+                    ? "border-primary/55 ring-1 ring-primary/15 shadow-xl shadow-primary/10"
+                    : ""
+                }`}
               >
-                {(!requestResponseTabs || codeFiles.length > 1) && (
-                  <div
-                    className={`flex min-h-10 items-center justify-between border-b border-border/70 bg-secondary/35 ${
-                      codeFiles.length > 1 ? "" : "px-4"
-                    }`}
-                  >
-                    {codeFiles.length > 1 ? (
-                      renderCodeFileTabs()
-                    ) : (
-                      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                        <Code2Icon className="size-4 text-primary" />
+                <div
+                  className={`flex min-h-10 items-center justify-between border-b border-border/70 bg-secondary/35 ${
+                    codeFiles.length > 1 ? "" : "pl-4"
+                  } ${
+                    codeSnippetState === "active"
+                      ? "bg-primary/[0.08]"
+                      : ""
+                  }`}
+                >
+                  {codeFiles.length > 1 ? (
+                    renderCodeFileTabs()
+                  ) : (
+                    <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+                      <Code2Icon className="size-4 shrink-0 text-primary" />
+                      <span className="truncate">
                         {activeCodeFile?.name ??
                           codeSnippet?.language ??
                           "Code"}
-                      </div>
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex shrink-0 items-center gap-1 px-2">
+                    {codeSnippetState && (
+                      <span
+                        className={`hidden rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] sm:inline-flex ${
+                          codeSnippetState === "active"
+                            ? "border-primary/35 bg-primary/12 text-primary"
+                            : "border-border/80 bg-background/45 text-muted-foreground"
+                        }`}
+                      >
+                        {codeSnippetState === "active"
+                          ? "Active snippet"
+                          : "Previous snippet"}
+                      </span>
                     )}
-                    {!requestResponseTabs && (
-                      <div className="flex shrink-0 items-center px-2">
-                        {copyActionsInHeaders ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => void handleCopy()}
-                            disabled={validationIssues.length > 0}
-                            className="h-7 px-2 text-[11px]"
-                          >
-                            {copiedTarget === "primary" ? (
-                              <CheckIcon className="size-3.5" />
-                            ) : (
-                              <ClipboardIcon className="size-3.5" />
-                            )}
-                            {copiedTarget === "primary" ? "Copied" : "Copy"}
-                          </Button>
-                        ) : !codeSnippet?.hideStatusLabel ? (
-                          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
-                            {isInlineCodeEdit
-                              ? "Editable snippet"
-                              : "Populated snippet"}
-                          </span>
-                        ) : null}
-                      </div>
+                    {(!requestResponseTabs || isCodeFullscreen) &&
+                      (copyActionsInHeaders ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void handleCopy()}
+                          disabled={validationIssues.length > 0}
+                          className="h-7 px-2 text-[11px]"
+                        >
+                          {copiedTarget === "primary" ? (
+                            <CheckIcon className="size-3.5" />
+                          ) : (
+                            <ClipboardIcon className="size-3.5" />
+                          )}
+                          {copiedTarget === "primary" ? "Copied" : "Copy"}
+                        </Button>
+                      ) : !codeSnippet?.hideStatusLabel ? (
+                        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
+                          {isInlineCodeEdit
+                            ? "Editable snippet"
+                            : "Populated snippet"}
+                        </span>
+                      ) : null)}
+                    {editable && isMainCodeFile && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={mode === "edit" ? "secondary" : "ghost"}
+                        onClick={() =>
+                          handleModeChange(
+                            mode === "edit" ? "view" : "edit",
+                          )
+                        }
+                        aria-label={
+                          mode === "edit"
+                            ? "Exit edit mode"
+                            : "Enter edit mode"
+                        }
+                        aria-pressed={mode === "edit"}
+                        className={`h-7 px-2 text-[11px] ${
+                          mode === "edit"
+                            ? "border border-primary/35 bg-primary/12 text-primary hover:bg-primary/18"
+                            : ""
+                        }`}
+                      >
+                        <PencilIcon className="size-3.5" />
+                        {mode === "edit" ? "Editing" : "Edit"}
+                      </Button>
                     )}
+                    {renderCodeFullscreenButton()}
                   </div>
-                )}
+                </div>
                 <Highlight
                   theme={themes.oneDark}
                   code={formattedCode}
@@ -1534,12 +1763,19 @@ function JsonInspectorModalContent({
                           const colonIndex = line.findIndex(
                             (token) => token.content === ":",
                           );
+                          const assignmentIndex = line.findIndex(
+                            (token) => token.content.includes("="),
+                          );
+                          const valueDelimiterIndex =
+                            colonIndex >= 0
+                              ? colonIndex
+                              : assignmentIndex;
                           const firstContentTokenIndex = line.findIndex(
                             (token) => token.content.trim().length > 0,
                           );
                           const prefixTokenCount =
-                            colonIndex >= 0
-                              ? colonIndex + 1
+                            valueDelimiterIndex >= 0
+                              ? valueDelimiterIndex + 1
                               : Math.max(firstContentTokenIndex, 0);
                           const pathKey = inlineField
                             ? formatPath(inlineField.path)
@@ -1559,6 +1795,9 @@ function JsonInspectorModalContent({
                           const hasTrailingComma = line.some(
                             (token) => token.content === ",",
                           );
+                          const hasTrailingSemicolon = line.some(
+                            (token) => token.content.includes(";"),
+                          );
 
                           const renderToken = (
                             token: (typeof line)[number],
@@ -1566,8 +1805,8 @@ function JsonInspectorModalContent({
                           ) => {
                             const tokenProps = getTokenProps({ token });
                             const isExplainedKey =
-                              colonIndex >= 0 &&
-                              tokenIndex < colonIndex &&
+                              valueDelimiterIndex >= 0 &&
+                              tokenIndex < valueDelimiterIndex &&
                               lineExplanation?.key === token.content.trim();
 
                             if (!isExplainedKey) {
@@ -1631,7 +1870,7 @@ function JsonInspectorModalContent({
                                         .slice(0, prefixTokenCount)
                                         .map(renderToken),
                                     )}
-                                    {colonIndex >= 0 && " "}
+                                    {valueDelimiterIndex >= 0 && " "}
                                     {typeof inlineField.value === "string" && (
                                       <span style={{ color: "#98c379" }}>
                                         &quot;
@@ -1689,6 +1928,9 @@ function JsonInspectorModalContent({
                                     {hasTrailingComma && (
                                       <span style={{ color: "#abb2bf" }}>,</span>
                                     )}
+                                    {hasTrailingSemicolon && (
+                                      <span style={{ color: "#abb2bf" }}>;</span>
+                                    )}
                                   </span>
                                 ) : (
                                   Children.toArray(line.map(renderToken))
@@ -1701,6 +1943,9 @@ function JsonInspectorModalContent({
                     </pre>
                   )}
                 </Highlight>
+                {isCodeFullscreen &&
+                  showsFooterActions &&
+                  renderFooterActions()}
               </div>
                 ) : null
               ) : (
@@ -1844,65 +2089,9 @@ function JsonInspectorModalContent({
           )}
         </div>
 
-        {(viewModeAction ||
-          !(copyActionsInHeaders || requestResponseTabs) ||
-          mode === "edit") && (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 bg-card/95 px-4 py-4 sm:px-6">
-          {!copyActionsInHeaders && !requestResponseTabs && (
-            <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void handleCopy()}
-              disabled={validationIssues.length > 0}
-            >
-              {copiedTarget === "primary" ? (
-                <CheckIcon />
-              ) : (
-                <ClipboardIcon />
-              )}
-              {copiedTarget === "primary"
-                ? "Copied"
-                : (codeSnippet?.copyLabel ??
-                  (copyAs === "json" ? "Copy JSON" : "Copy as cURL"))}
-            </Button>
-            {responseData && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void handleCopyResponse()}
-              >
-                {copiedTarget === "response" ? (
-                  <CheckIcon />
-                ) : (
-                  <ClipboardIcon />
-                )}
-                {copiedTarget === "response" ? "Copied" : "Copy JSON"}
-              </Button>
-            )}
-          </div>
-          )}
-          {mode === "view" && viewModeAction && (
-            <div className="ml-auto">{viewModeAction}</div>
-          )}
-          {mode === "edit" && (
-            <div className="ml-auto flex gap-2">
-              <Button type="button" variant="ghost" onClick={handleCancel}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={validationIssues.length > 0}
-                isLoading={isSaving}
-              >
-                <SaveIcon />
-                Save changes
-              </Button>
-            </div>
-          )}
-          </div>
-        )}
+        {!isCodeFullscreen &&
+          showsFooterActions &&
+          renderFooterActions()}
       </InspectorContent>
     </InspectorRoot>
   );
