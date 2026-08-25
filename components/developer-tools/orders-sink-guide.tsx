@@ -3,7 +3,6 @@
 import Link from "next/link";
 import {
   ArrowLeftIcon,
-  CircleAlertIcon,
   Code2Icon,
   DatabaseIcon,
   HistoryIcon,
@@ -177,10 +176,10 @@ export function OrdersSinkGuide() {
           <span className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
             Developer documentation
           </span>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-foreground sm:text-4xl">
             Create orders with Orders Sink
           </h1>
-          <p className="mt-4 max-w-[760px] text-sm leading-7 text-muted-foreground sm:text-base">
+          <p className="mt-4 max-w-[760px] text-sm leading-6 text-muted-foreground">
             A complete implementation reference for configuration, token
             preparation, EIP-712 signing, submission, order history, and
             cancellation. Use Dev Mode in the trading interface to inspect the
@@ -191,24 +190,6 @@ export function OrdersSinkGuide() {
 
       <div className="mx-auto mt-10 max-w-[1120px]">
         <div className="min-w-0 space-y-8">
-          <section
-            id="security"
-            className="scroll-mt-24 flex items-start gap-3 rounded-[18px] border border-amber-400/35 bg-amber-400/10 p-5"
-          >
-            <CircleAlertIcon className="mt-0.5 size-5 shrink-0 text-amber-300" />
-            <div>
-              <h2 className="font-semibold text-foreground">
-                Treat GET /config as a security boundary
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                It supplies the approval spender and execution contracts. Use
-                only the trusted Orbs Orders Sink HTTPS endpoint and an approved
-                partner configuration. Do not make this endpoint user-editable
-                or silently accept unexpected contract changes.
-              </p>
-            </div>
-          </section>
-
           <section
             id="implementation-rules"
             className="scroll-mt-24 rounded-[20px] border border-primary/35 bg-primary/10 p-5 sm:p-6"

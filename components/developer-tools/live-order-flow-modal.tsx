@@ -1003,7 +1003,7 @@ function LiveOrderFlowModalContent({
         mobilePresentation="fullscreen"
         onInteractOutside={(event) => event.preventDefault()}
         showCloseButton={!isRunning}
-        className="h-[min(1040px,98dvh)] max-w-[960px] grid-rows-[minmax(0,1fr)] gap-0 p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-10 [&>button[data-slot=dialog-close]]:place-items-center"
+        className="h-[min(1040px,98dvh)] max-w-[960px] grid-rows-[minmax(0,1fr)] gap-0 p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
       >
         <div className="h-full min-h-0 overflow-hidden">
           <JsonInspectorPanel
