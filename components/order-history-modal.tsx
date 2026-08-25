@@ -253,7 +253,7 @@ function OrderListItem({
   onSelect,
   order,
 }: {
-  onSelect: (order: Order) => void;
+  onSelect: (orderId: string) => void;
   order: Order;
 }) {
   const orderTitle = getOrderTypeLabel(order.type);
@@ -262,7 +262,7 @@ function OrderListItem({
   return (
     <button
       type="button"
-      onClick={() => onSelect(order)}
+      onClick={() => onSelect(order.id)}
       className="mb-1.5 flex w-full cursor-pointer flex-col gap-2 rounded-[13px] border border-border/50 bg-secondary/30 px-3 py-2 text-left transition-colors hover:border-primary/14 hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
     >
       <div className="flex items-start justify-between gap-3">
@@ -797,7 +797,7 @@ export function OrderHistoryModal({
   const [selectedFilter, setSelectedFilter] = useState<OrderFilter>(
     OrderFilter.All,
   );
-  const [selectedOrder, setSelectedOrder] = useState<Order | undefined>();
+  const [selectedOrderId, setSelectedOrderId] = useState<string>();
   const clearSelectedOrderTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -813,6 +813,11 @@ export function OrderHistoryModal({
     () => filterAndSortOrders(orders.all, selectedFilter),
     [orders.all, selectedFilter],
   );
+  // Store only the stable ID. Resolving against the latest unfiltered order
+  // list keeps details in sync after cancellation or any background refetch.
+  const selectedOrder = selectedOrderId
+    ? orders.all.find((order) => order.id === selectedOrderId)
+    : undefined;
 
   const loading = isLoading;
   const handleOpenChange = useCallback(
@@ -825,7 +830,7 @@ export function OrderHistoryModal({
 
       clearSelectedOrderTimer();
       clearSelectedOrderTimerRef.current = setTimeout(() => {
-        setSelectedOrder(undefined);
+        setSelectedOrderId(undefined);
         clearSelectedOrderTimerRef.current = null;
       }, ORDER_HISTORY_CLOSE_RESET_DELAY);
     },
@@ -842,7 +847,7 @@ export function OrderHistoryModal({
           <SelectedOrderDetails
             key={`${selectedOrder.id}-${selectedOrder.createdAt}`}
             rawOrder={selectedOrder}
-            onBack={() => setSelectedOrder(undefined)}
+            onBack={() => setSelectedOrderId(undefined)}
           />
         ) : (
           <>
@@ -851,7 +856,10 @@ export function OrderHistoryModal({
                 <DialogTitle className="text-[16px] font-semibold leading-none">
                   Order history
                 </DialogTitle>
-                <FetchOrdersDeveloperButton orders={orders.all} />
+                <FetchOrdersDeveloperButton
+                  isLoading={loading}
+                  orders={orders.all}
+                />
               </div>
             </DialogHeader>
 
@@ -879,7 +887,7 @@ export function OrderHistoryModal({
                     itemContent={(_, order) => (
                       <OrderListItem
                         order={order}
-                        onSelect={setSelectedOrder}
+                        onSelect={setSelectedOrderId}
                       />
                     )}
                   />

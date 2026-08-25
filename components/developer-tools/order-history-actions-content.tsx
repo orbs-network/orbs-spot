@@ -8,6 +8,7 @@ import { useConnection } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { useBasePermitData } from "@/lib/hooks/use-base-permit-data";
+import { getActiveSpotPartner } from "@/lib/partners/spot";
 
 import {
   CANCEL_CODE_SNIPPET,
@@ -22,8 +23,10 @@ const ORDER_SINK_URL = "https://order-sink-v2.orbs.network";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export function FetchOrdersDeveloperButtonContent({
+  isLoading,
   orders,
 }: {
+  isLoading?: boolean;
   orders: Order[];
 }) {
   const { address } = useConnection();
@@ -72,6 +75,14 @@ export function FetchOrdersDeveloperButtonContent({
     );
   }
 
+  if (!isLoading && orders.length === 0) {
+    return (
+      <span className="max-w-40 text-[11px] font-medium leading-4 text-muted-foreground">
+        Create an order to inspect developer data
+      </span>
+    );
+  }
+
   if (basePermitDataQuery.isError) {
     return (
       <Button
@@ -116,7 +127,7 @@ export function FetchOrdersDeveloperButtonContent({
           type="button"
           variant="outline"
           size="icon-sm"
-          isLoading={basePermitDataQuery.isLoading}
+          isLoading={isLoading || basePermitDataQuery.isLoading}
           className="rounded-[10px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
           aria-label="Show how to fetch orders"
         >
@@ -138,11 +149,13 @@ export function CancelOrderDeveloperButtonContent({
 }) {
   const { address } = useConnection();
   const isLegacyOrder = rawOrder.version === 1;
+  const partner = getActiveSpotPartner() || "unknown";
   const basePermitDataQuery = useBasePermitData(
     isLegacyOrder ? undefined : rawOrder.chainId,
   );
   const data = useMemo<JsonContainer>(() => {
     return {
+      partner,
       abi: isLegacyOrder
         ? "function cancel(uint64 id)"
         : "function cancel(bytes32[] digests)",
@@ -154,7 +167,7 @@ export function CancelOrderDeveloperButtonContent({
       chain: rawOrder.chainId,
       account: address ?? rawOrder.maker,
     };
-  }, [address, basePermitDataQuery.data, isLegacyOrder, rawOrder]);
+  }, [address, basePermitDataQuery.data, isLegacyOrder, partner, rawOrder]);
 
   if (!isLegacyOrder && basePermitDataQuery.isError) {
     return (
@@ -179,7 +192,7 @@ export function CancelOrderDeveloperButtonContent({
       codeSnippet={CANCEL_CODE_SNIPPET}
       description=""
       explanation="This is the populated Wagmi contract call used to cancel the selected order."
-      explanationDisplay="subtitle"
+      explanationDisplay="tooltip"
       getFieldExplanation={getCancelFieldExplanation}
       requiresDeveloperMode={false}
       title="Cancel order code"
@@ -198,7 +211,7 @@ export function CancelOrderDeveloperButtonContent({
         </Button>
       }
       viewModeAction={
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center justify-between gap-2">
           <OrdersSinkGuideLink section="cancel-order" />
           <Button
             data-submit-button

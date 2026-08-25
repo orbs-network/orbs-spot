@@ -101,6 +101,20 @@ export const useFormTabStore = create<FormTabStore>((set) => ({
   setOrderHistoryOpen: (open: boolean) => set({ orderHistoryOpen: open }),
 }));
 
+type OrderSubmitFlowStore = {
+  pendingWrappedInputAddress?: string;
+  setPendingWrappedInputAddress: (address?: string) => void;
+};
+
+// Wrapping finishes while the submit dialog is still rendering the original
+// native-token order. Queue the form update so that changing the input token
+// cannot reset or alter the in-progress order flow.
+export const useOrderSubmitFlowStore = create<OrderSubmitFlowStore>((set) => ({
+  pendingWrappedInputAddress: undefined,
+  setPendingWrappedInputAddress: (pendingWrappedInputAddress) =>
+    set({ pendingWrappedInputAddress }),
+}));
+
 type BestTradeSwapStore = {
   status?: SwapStatus;
   totalSteps?: number;

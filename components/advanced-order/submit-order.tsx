@@ -16,6 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { useFormatNumber } from "@/lib/hooks/common";
 import { useCurrency } from "@/lib/hooks/use-currencies";
+import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
 import { useTranslations } from "@/lib/use-translations";
 import {
   DISCLAIMER_URL,
@@ -32,9 +33,9 @@ import {
 import { Step, SwapFlow } from "@orbs-network/swap-ui";
 import BN from "bignumber.js";
 import { AlertTriangleIcon, ArrowRightIcon, CheckIcon } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "wagmi";
-import type { Currency } from "@/lib/types";
+import { Field, type Currency } from "@/lib/types";
 import { formatDeadline, formatDuration, getOrderTitle } from "./utils";
 
 function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
@@ -453,10 +454,35 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
     confirmButtonLoading,
   } = spot.orderExecutionPanel;
   const { disabled, loading } = spot.submitOrderButton;
-  const { setInputAmount } = useActionHandlers();
+  const { handleCurrencyChange, setInputAmount } = useActionHandlers();
+  const pendingWrappedInputAddress = useOrderSubmitFlowStore(
+    (state) => state.pendingWrappedInputAddress,
+  );
+  const setPendingWrappedInputAddress = useOrderSubmitFlowStore(
+    (state) => state.setPendingWrappedInputAddress,
+  );
   const { chainId } = useConnection();
   const [open, setOpen] = useState(false);
   const orderTitle = getOrderTitle(orderModule, t);
+
+  useEffect(() => {
+    if (open || !pendingWrappedInputAddress) return;
+
+    // The wrapping callback can finish before or after the user closes the
+    // dialog. Let its close animation finish before mutating the form.
+    const switchTokenTimer = window.setTimeout(() => {
+      handleCurrencyChange(pendingWrappedInputAddress, Field.INPUT);
+      setPendingWrappedInputAddress(undefined);
+    }, 400);
+
+    return () => window.clearTimeout(switchTokenTimer);
+  }, [
+    handleCurrencyChange,
+    open,
+    pendingWrappedInputAddress,
+    setPendingWrappedInputAddress,
+  ]);
+
   const onOpen = useCallback(() => {
     setOpen(true);
     if (status !== SwapStatus.LOADING) {
