@@ -55,30 +55,25 @@ export function FetchOrdersDeveloperButtonContent({
       url: `${ORDER_SINK_URL}/orders?${searchParams.toString()}`,
     };
   }, [address, basePermitDataQuery.data, chainId]);
+  const rePermitOrders = useMemo(
+    () =>
+      orders
+        .filter((order) => order.version === 2)
+        .map((order) => order.rawOrder),
+    [orders],
+  );
   const responseData = useMemo(
     () =>
       JSON.parse(
-        JSON.stringify({
-          orders: orders
-            .filter((order) => order.version === 2)
-            .map((order) => order.rawOrder),
-        }),
+        JSON.stringify({ orders: rePermitOrders }),
       ) as JsonContainer,
-    [orders],
+    [rePermitOrders],
   );
 
   if (!chainId) {
     return (
       <span className="text-[11px] font-medium text-muted-foreground">
         Select network to inspect
-      </span>
-    );
-  }
-
-  if (!isLoading && orders.length === 0) {
-    return (
-      <span className="max-w-40 text-[11px] font-medium leading-4 text-muted-foreground">
-        Create an order to inspect developer data
       </span>
     );
   }
@@ -117,6 +112,11 @@ export function FetchOrdersDeveloperButtonContent({
       responseData={responseData}
       responseInitiallyCollapsed
       responseLabel="Orders JSON response"
+      responseNotice={
+        !isLoading && rePermitOrders.length === 0
+          ? "Create an order to inspect developer data"
+          : undefined
+      }
       tabsInSectionHeader
       title="Fetch orders request"
       viewModeAction={<OrdersSinkGuideLink section="fetch-orders" />}

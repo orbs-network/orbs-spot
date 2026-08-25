@@ -130,6 +130,7 @@ export type JsonInspectorModalProps = {
   responseData?: JsonContainer;
   responseInitiallyCollapsed?: boolean;
   responseLabel?: string;
+  responseNotice?: ReactNode;
   title?: string;
   trigger?: ReactElement | null;
   triggerLabel?: string;
@@ -677,6 +678,7 @@ function JsonInspectorModalContent({
   responseData,
   responseInitiallyCollapsed = false,
   responseLabel = "JSON response",
+  responseNotice,
   title = "JSON payload",
   trigger,
   triggerLabel = "View JSON",
@@ -1989,6 +1991,11 @@ function JsonInspectorModalContent({
                   </div>
                   )}
                   <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
+                    {responseNotice ? (
+                      <InlineMessage className="mb-4 text-sm text-muted-foreground">
+                        {responseNotice}
+                      </InlineMessage>
+                    ) : null}
                     {responseFieldExplanation ? (
                       <ExplainedJsonView
                         data={responseData}

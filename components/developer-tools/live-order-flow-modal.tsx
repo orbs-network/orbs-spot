@@ -14,13 +14,13 @@ import {
   RefreshCwIcon,
 } from "lucide-react";
 import { toast } from "sonner";
-import { maxUint256, parseSignature, toHex } from "viem";
+import { maxUint256, type Hex } from "viem";
 import { useConnection } from "wagmi";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
   isNativeAddress,
   submitOrder,
   useSpot,
-  type Signature,
 } from "@orbs-network/spot-react";
 
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,14 @@ import { OrdersSinkGuideLink } from "./orders-sink-guide-link";
 type LivePermitData = NonNullable<
   ReturnType<typeof useSpot>["derivedFormData"]["rePermitData"]
 >;
+
+// The SDK runtime forwards this value unchanged, but the installed declaration
+// still describes the legacy v/r/s object. Keep that compatibility detail at
+// this boundary while the app and API use the regular EIP-712 hex signature.
+const submitOrderWithEip712Signature = submitOrder as unknown as (
+  order: Parameters<typeof submitOrder>[0],
+  signature: Hex,
+) => ReturnType<typeof submitOrder>;
 
 type DeveloperOrderStep =
   | "flow"
@@ -270,41 +278,64 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Order submission failed.";
 }
 
-const LIVE_FLOW_PHASES = [
-  { label: "Allowance", effect: "Read only" },
-  { label: "Prepare", effect: "Conditional transaction" },
-  { label: "Sign", effect: "Wallet signature" },
-  { label: "Submit", effect: "HTTP request" },
-] as const;
+type LiveFlowPhase = {
+  effect: string;
+  label: string;
+  step: Exclude<DeveloperOrderStep, "flow" | "success">;
+};
 
-function getPhaseIndex(step: DeveloperOrderStep) {
-  if (step === "check") return 0;
-  if (step === "wrap" || step === "approve") return 1;
-  if (step === "sign") return 2;
-  if (step === "submit") return 3;
-  if (step === "success") return LIVE_FLOW_PHASES.length;
-  return -1;
+const ALLOWANCE_PHASE: LiveFlowPhase = {
+  label: "Allowance",
+  effect: "Read only",
+  step: "check",
+};
+const WRAP_PHASE: LiveFlowPhase = {
+  label: "Wrap",
+  effect: "Wallet transaction",
+  step: "wrap",
+};
+const APPROVE_PHASE: LiveFlowPhase = {
+  label: "Approve",
+  effect: "Wallet transaction",
+  step: "approve",
+};
+const SIGN_PHASE: LiveFlowPhase = {
+  label: "Sign",
+  effect: "Wallet signature",
+  step: "sign",
+};
+const SUBMIT_PHASE: LiveFlowPhase = {
+  label: "Submit",
+  effect: "HTTP request",
+  step: "submit",
+};
+
+function getPhaseIndex(
+  step: DeveloperOrderStep,
+  phases: readonly LiveFlowPhase[],
+) {
+  if (step === "success") return phases.length;
+  return phases.findIndex((phase) => phase.step === step);
 }
 
 function LiveFlowNotice({
   actualStep,
   onSelectPhase,
+  phases,
   selectablePhaseIndexes,
   viewedStep,
 }: {
   actualStep: DeveloperOrderStep;
   onSelectPhase: (phaseIndex: number) => void;
+  phases: readonly LiveFlowPhase[];
   selectablePhaseIndexes: readonly number[];
   viewedStep: DeveloperOrderStep;
 }) {
-  const actualPhaseIndex = getPhaseIndex(actualStep);
-  const viewedPhaseIndex = getPhaseIndex(viewedStep);
+  const actualPhaseIndex = getPhaseIndex(actualStep, phases);
+  const viewedPhaseIndex = getPhaseIndex(viewedStep, phases);
   const viewedPhase =
-    viewedPhaseIndex >= 0 && viewedPhaseIndex < LIVE_FLOW_PHASES.length
-      ? (LIVE_FLOW_PHASES as readonly {
-          effect: string;
-          label: string;
-        }[])[viewedPhaseIndex]
+    viewedPhaseIndex >= 0 && viewedPhaseIndex < phases.length
+      ? phases[viewedPhaseIndex]
       : undefined;
 
   return (
@@ -312,21 +343,25 @@ function LiveFlowNotice({
       <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
         <span className="text-foreground">
           {viewedStep === "flow"
-            ? "Four-phase live flow"
+            ? "Live order flow"
             : viewedStep === "success"
               ? "Order complete"
               : viewedPhase?.label}
         </span>
         <span className="text-muted-foreground">
           {viewedStep === "flow"
-            ? "Prepare runs only when needed"
+            ? "Wrap / Approve appear only if needed"
             : viewedStep === "success"
-              ? "4 of 4 complete"
-              : `Step ${viewedPhaseIndex + 1} of 4 · ${viewedPhase?.effect}`}
+              ? `${phases.length} of ${phases.length} complete`
+              : `Step ${viewedPhaseIndex + 1} of ${phases.length} · ${viewedPhase?.effect}`}
         </span>
       </div>
-      <div className="mt-2 grid grid-cols-4 gap-1.5" aria-label="Order creation progress">
-        {LIVE_FLOW_PHASES.map((phase, index) => {
+      <div
+        className="mt-2 grid gap-1.5"
+        style={{ gridTemplateColumns: `repeat(${phases.length}, minmax(0, 1fr))` }}
+        aria-label="Order creation progress"
+      >
+        {phases.map((phase, index) => {
           const canSelect = selectablePhaseIndexes.includes(index);
 
           return (
@@ -390,6 +425,7 @@ function LiveOrderFlowModalContent({
   const flowToastId = useId();
   const actionToastId = useId();
   const { address: connectedAccount } = useConnection();
+  const { openConnectModal } = useConnectModal();
   const partner = getActiveSpotPartner() || "unknown";
   const currentSourceToken = spot.derivedFormData.srcToken;
   const { setInputAmount } = useActionHandlers();
@@ -428,7 +464,7 @@ function LiveOrderFlowModalContent({
   const [approvalRequired, setApprovalRequired] = useState(false);
   const [wrapAmount, setWrapAmount] = useState("0");
   const [isRunning, setIsRunning] = useState(false);
-  const [orderSignature, setOrderSignature] = useState<Signature>();
+  const [orderSignature, setOrderSignature] = useState<Hex>();
   const [createdOrder, setCreatedOrder] = useState<CreatedOrderSummary>();
   const [showCreatedOrder, setShowCreatedOrder] = useState(false);
   const completedStepsRef = useRef({ wrappedAmount: BigInt(0) });
@@ -436,6 +472,20 @@ function LiveOrderFlowModalContent({
   const viewedStep = navigation.history[navigation.viewedIndex] ?? step;
   const isReviewingPreviousStep =
     navigation.viewedIndex < navigation.history.length - 1;
+  const liveFlowPhases = useMemo(() => {
+    const visitedSteps = new Set(navigation.history);
+    const phases: LiveFlowPhase[] = [ALLOWANCE_PHASE];
+
+    if (sourceIsNative || visitedSteps.has("wrap")) {
+      phases.push(WRAP_PHASE);
+    }
+    if (visitedSteps.has("approve")) {
+      phases.push(APPROVE_PHASE);
+    }
+    phases.push(SIGN_PHASE, SUBMIT_PHASE);
+
+    return phases;
+  }, [navigation.history, sourceIsNative]);
 
   useEffect(() => {
     if (!open || isRunning || step === "success") return;
@@ -623,7 +673,7 @@ function LiveOrderFlowModalContent({
         setPermitData(executionPermitData);
         setSignatureData(freshSignatureData);
 
-        const signatureHex = await signTypedData({
+        const signature = await signTypedData({
           account: executionPermitData.order.witness.swapper,
           domain: executionPermitData.domain,
           message: executionPermitData.order as unknown as Record<
@@ -633,17 +683,9 @@ function LiveOrderFlowModalContent({
           primaryType: executionPermitData.primaryType,
           types: executionPermitData.types,
         });
-        const parsedSignature = parseSignature(signatureHex);
-        const parsedV =
-          parsedSignature.v ??
-          BigInt((parsedSignature.yParity ?? 0) + 27);
-        const nextSignature: Signature = {
-          v: toHex(parsedV),
-          r: parsedSignature.r,
-          s: parsedSignature.s,
-        };
 
-        setOrderSignature(nextSignature);
+        // Preserve the complete 65-byte EIP-712 signature returned by the wallet.
+        setOrderSignature(signature);
         advanceToStep("submit");
         toast.success("Order signed", {
           id: actionToastId,
@@ -658,7 +700,7 @@ function LiveOrderFlowModalContent({
           throw new Error("Sign the order before submitting it");
         }
 
-        const order = await submitOrder(
+        const order = await submitOrderWithEip712Signature(
           permitData.order,
           orderSignature,
         );
@@ -745,7 +787,7 @@ function LiveOrderFlowModalContent({
         codeSnippet: FULL_ORDER_FLOW_CODE_SNIPPET,
         data: signatureData,
         explanation:
-          "Run the current order in four phases. Allowance is read-only; Prepare appears only when wrapping or approval is needed; Sign opens the wallet; Submit sends the signed order to Orders Sink.",
+          "Run the current order from allowance through signing and submission. Wrap and Approve appear as separate steps only when those wallet transactions are required.",
         title: "Orders Sink live creation flow",
       };
     }
@@ -794,7 +836,7 @@ function LiveOrderFlowModalContent({
         editable:
           !isReviewingPreviousStep && !isRunning,
         explanation:
-          "Sign the populated EIP-712 order in the wallet. This produces v, r, and s without sending a blockchain transaction; submission remains a separate next step.",
+          "Sign the populated EIP-712 order in the wallet. This produces one standard hex signature without sending a blockchain transaction; submission remains a separate next step.",
         title: "Sign order",
       };
     }
@@ -812,11 +854,8 @@ function LiveOrderFlowModalContent({
     if (viewedStep === "submit" || viewedStep === "success") {
       const signedOrder = JSON.parse(
         JSON.stringify({
-          signature: orderSignature ?? {
-            v: "<signature-v>",
-            r: "<signature-r>",
-            s: "<signature-s>",
-          },
+          signature:
+            orderSignature ?? "0x<65-byte-eip-712-signature>",
           order: permitData.order,
           status: "pending",
         }),
@@ -854,11 +893,9 @@ function LiveOrderFlowModalContent({
   const disabledReason =
     step === "success"
       ? undefined
-      : !connectedAccount
-        ? "Connect a wallet to run the flow. The code remains safe to inspect and copy with a wallet placeholder."
-        : submitDisabled
-          ? "Resolve the current form or quote issue before running this step."
-          : undefined;
+      : submitDisabled
+        ? "Resolve the current form or quote issue before running this step."
+        : undefined;
   const guideSection =
     viewedStep === "check" || viewedStep === "approve"
       ? "allowance"
@@ -874,15 +911,17 @@ function LiveOrderFlowModalContent({
         : Array.from(
             new Set(
               navigation.history
-                .map(getPhaseIndex)
+                .map((historyStep) =>
+                  getPhaseIndex(historyStep, liveFlowPhases),
+                )
                 .filter(
                   (phaseIndex) =>
                     phaseIndex >= 0 &&
-                    phaseIndex < LIVE_FLOW_PHASES.length,
+                    phaseIndex < liveFlowPhases.length,
                 ),
             ),
           ),
-    [isRunning, navigation.history],
+    [isRunning, liveFlowPhases, navigation.history],
   );
   const handleSelectPhase = useCallback(
     (phaseIndex: number) => {
@@ -891,7 +930,9 @@ function LiveOrderFlowModalContent({
       setNavigation((current) => {
         let targetIndex = -1;
         current.history.forEach((historyStep, historyIndex) => {
-          if (getPhaseIndex(historyStep) === phaseIndex) {
+          if (
+            getPhaseIndex(historyStep, liveFlowPhases) === phaseIndex
+          ) {
             targetIndex = historyIndex;
           }
         });
@@ -904,7 +945,7 @@ function LiveOrderFlowModalContent({
             };
       });
     },
-    [isRunning],
+    [isRunning, liveFlowPhases],
   );
 
   useEffect(() => {
@@ -918,6 +959,7 @@ function LiveOrderFlowModalContent({
         <LiveFlowNotice
           actualStep={step}
           onSelectPhase={handleSelectPhase}
+          phases={liveFlowPhases}
           selectablePhaseIndexes={selectablePhaseIndexes}
           viewedStep={viewedStep}
         />
@@ -934,6 +976,7 @@ function LiveOrderFlowModalContent({
   }, [
     flowToastId,
     handleSelectPhase,
+    liveFlowPhases,
     open,
     step,
     selectablePhaseIndexes,
@@ -1023,43 +1066,53 @@ function LiveOrderFlowModalContent({
                         Close
                       </Button>
                     )}
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      if (isReviewingPreviousStep) {
-                        setNavigation((current) => ({
-                          ...current,
-                          viewedIndex: current.history.length - 1,
-                        }));
-                        return;
-                      }
-
-                      if (step === "success") {
-                        if (!showCreatedOrder) {
-                          setShowCreatedOrder(true);
+                  {!connectedAccount ? (
+                    <Button
+                      data-submit-button
+                      type="button"
+                      onClick={() => openConnectModal?.()}
+                    >
+                      Connect Wallet
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (isReviewingPreviousStep) {
+                          setNavigation((current) => ({
+                            ...current,
+                            viewedIndex: current.history.length - 1,
+                          }));
                           return;
                         }
 
-                        handleOpenChange(false);
-                        return;
-                      }
+                        if (step === "success") {
+                          if (!showCreatedOrder) {
+                            setShowCreatedOrder(true);
+                            return;
+                          }
 
-                      void executeCurrentStep();
-                    }}
-                    disabled={
-                      !isReviewingPreviousStep &&
-                      step !== "success" &&
-                      (Boolean(disabledReason) || isRunning)
-                    }
-                    isLoading={!isReviewingPreviousStep && isRunning}
-                  >
-                    {!isReviewingPreviousStep && step === "success" && (
-                      <CheckIcon className="size-4" />
-                    )}
-                    {isReviewingPreviousStep
-                      ? "Return to current step"
-                      : actionLabel}
-                  </Button>
+                          handleOpenChange(false);
+                          return;
+                        }
+
+                        void executeCurrentStep();
+                      }}
+                      disabled={
+                        !isReviewingPreviousStep &&
+                        step !== "success" &&
+                        (Boolean(disabledReason) || isRunning)
+                      }
+                      isLoading={!isReviewingPreviousStep && isRunning}
+                    >
+                      {!isReviewingPreviousStep && step === "success" && (
+                        <CheckIcon className="size-4" />
+                      )}
+                      {isReviewingPreviousStep
+                        ? "Return to current step"
+                        : actionLabel}
+                    </Button>
+                  )}
                 </div>
               </div>
             }

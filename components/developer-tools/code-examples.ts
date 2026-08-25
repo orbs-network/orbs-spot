@@ -62,6 +62,8 @@ function serializeTypeScriptValue(
 }
 
 const SIGNATURE_FIELD_EXPLANATIONS: Record<string, string> = {
+  signature:
+    "The complete 65-byte EIP-712 signature returned directly by the wallet.",
   chainId:
     "The active chain selected by the DEX. It is used to fetch and validate protocol configuration.",
   tokenAddress:
@@ -241,15 +243,9 @@ export function formatOrderTypesCode() {
 export type Address = \`0x\${string}\`;
 export type Hex = \`0x\${string}\`;
 
-// ECDSA signature parts expected by POST /orders/new.
-export type Signature = {
-  // Recovery identifier encoded as hex (normally 0x1b or 0x1c).
-  v: \`0x\${string}\`;
-  // First 32-byte signature scalar.
-  r: \`0x\${string}\`;
-  // Second 32-byte signature scalar.
-  s: \`0x\${string}\`;
-};
+// Complete 65-byte EIP-712 signature returned by the wallet. Keep it intact;
+// POST /orders/new accepts the regular hex signature, not separate v/r/s fields.
+export type Signature = Hex;
 
 // The exact EIP-712 message signed by the wallet and submitted to Orders Sink.
 // Numeric uint values are strings when they can exceed JavaScript's safe range.
@@ -541,9 +537,8 @@ export function formatSignOrderExampleCode(data: JsonContainer) {
   const serializedArgs = formatSignTypedDataArgs(data);
 
   return `import { useCallback } from "react";
-import { parseSignature, toHex } from "viem";
 import { useConnection, useSignTypedData } from "wagmi";
-import type { PermitData, Signature } from "./order-types";
+import type { PermitData } from "./order-types";
 
 // Hooks stay inside a custom hook so this file follows React's Rules of Hooks.
 export function useSignOrder() {
@@ -566,16 +561,8 @@ export function useSignOrder() {
     }
     const signTypedDataArgs = ${serializedArgs} as const;
     const order = signTypedDataArgs.message;
-    const signatureHex = await signTypedDataAsync(signTypedDataArgs);
-    const parsedSignature = parseSignature(signatureHex);
-    const signature: Signature = {
-      v: toHex(
-        parsedSignature.v ??
-          BigInt((parsedSignature.yParity ?? 0) + 27),
-      ),
-      r: parsedSignature.r,
-      s: parsedSignature.s,
-    };
+    // Keep the complete EIP-712 hex signature returned by the wallet.
+    const signature = await signTypedDataAsync(signTypedDataArgs);
 
     // Preserve the exact object that was signed for POST /orders/new.
     return { signature, order };
@@ -608,7 +595,7 @@ export function formatFullOrderFlowCode(data: JsonContainer) {
 // signature -> submit the exact signed object. Replace sample literals with
 // current form, quote, wallet, nonce, and timestamp values from your app.
 import { useCallback } from "react";
-import { erc20Abi, maxUint256, parseAbi, parseSignature, toHex, zeroAddress } from "viem";
+import { erc20Abi, maxUint256, parseAbi, zeroAddress } from "viem";
 import { useConnection, usePublicClient, useSignTypedData, useWalletClient } from "wagmi";
 import type { CreateOrderResponse, OrderResponse, PermitData, PermitOrder, Signature, SignedOrder } from "./order-types";
 
@@ -622,8 +609,8 @@ async function createOrder(
   signature: Signature,
   order: PermitOrder,
 ): Promise<OrderResponse> {
-  // Orders Sink expects the decomposed signature, original message, and the
-  // initial pending status in one JSON request body.
+  // Orders Sink expects the regular EIP-712 hex signature, original message,
+  // and initial pending status in one JSON request body.
   const body: SignedOrder = { signature, order, status: "pending" };
   const response = await fetch(\`${"${ORDERS_SINK_URL}"}/orders/new\`, {
     method: "POST",
@@ -769,17 +756,9 @@ export function useSubmitOrdersSinkOrder() {
 
     // 6. Sign the exact order object created above.
     // EIP-712 signing is not an on-chain transaction and spends no gas.
-    const signatureHex = await signTypedDataAsync(signTypedDataArgs);
-    // Orders Sink expects v/r/s fields instead of one concatenated hex value.
-    const parsedSignature = parseSignature(signatureHex);
-    const signature: Signature = {
-      v: toHex(
-        parsedSignature.v ??
-          BigInt((parsedSignature.yParity ?? 0) + 27),
-      ),
-      r: parsedSignature.r,
-      s: parsedSignature.s,
-    };
+    // Keep the complete 65-byte hex value returned by the wallet. Do not split
+    // it into v/r/s fields before submission.
+    const signature: Signature = await signTypedDataAsync(signTypedDataArgs);
 
     // 7. POST that same order object to Orders Sink.
     // Never reconstruct or normalize order here: any byte-level change can make
@@ -903,10 +882,8 @@ function formatSubmitSignedOrderCode(data: JsonContainer) {
   if (Array.isArray(data)) return JSON.stringify(data, null, 2);
 
   const bodySourceComments: Record<string, string> = {
-    signature: "Wallet: v, r, and s parsed from the EIP-712 signature.",
-    "signature.v": "Wallet signature: parsed recovery identifier.",
-    "signature.r": "Wallet signature: parsed first ECDSA scalar.",
-    "signature.s": "Wallet signature: parsed second ECDSA scalar.",
+    signature:
+      "Wallet: complete 65-byte EIP-712 hex returned by signTypedDataAsync.",
     order: "Exact message object signed in the previous step.",
     "order.permitted.token":
       "DEX state: ERC-20 input token; use WToken when native input was selected.",
@@ -1018,10 +995,9 @@ export function formatLiveCreateOrderCode(data: JsonContainer) {
   const serializedArgs = formatSignTypedDataArgs(data);
 
   return `import { useCallback } from "react";
-import { parseSignature, toHex } from "viem";
 import { useConnection, useSignTypedData } from "wagmi";
 import { createOrder } from "./create-order";
-import type { PermitData, Signature } from "./order-types";
+import type { PermitData } from "./order-types";
 
 export function useSignAndCreateOrder() {
   const { address: account } = useConnection();
@@ -1043,16 +1019,8 @@ export function useSignAndCreateOrder() {
     const signTypedDataArgs = ${serializedArgs} as const;
     const order = signTypedDataArgs.message;
 
-    const signatureHex = await signTypedDataAsync(signTypedDataArgs);
-    const parsedSignature = parseSignature(signatureHex);
-    const signature: Signature = {
-      v: toHex(
-        parsedSignature.v ??
-          BigInt((parsedSignature.yParity ?? 0) + 27),
-      ),
-      r: parsedSignature.r,
-      s: parsedSignature.s,
-    };
+    // Forward the complete EIP-712 signature exactly as the wallet returned it.
+    const signature = await signTypedDataAsync(signTypedDataArgs);
 
     return await createOrder(signature, order);
   }, [account, signTypedDataAsync]);
@@ -1736,11 +1704,8 @@ export const SIGNATURE_EXAMPLE_DATA = {
 } satisfies JsonContainer;
 
 export const CREATE_ORDER_EXAMPLE_DATA = {
-  signature: {
-    v: "0x1b",
-    r: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-    s: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-  },
+  signature:
+    "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc1b",
   order: SIGNATURE_EXAMPLE_DATA.message,
   status: "pending",
 } satisfies JsonContainer;

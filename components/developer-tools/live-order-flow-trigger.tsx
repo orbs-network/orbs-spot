@@ -2,6 +2,7 @@
 
 import { lazy, Suspense } from "react";
 import { Code2Icon } from "lucide-react";
+import { useConnection } from "wagmi";
 
 import { Button } from "@/components/ui/button";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
@@ -19,7 +20,7 @@ function LiveOrderFlowTriggerContent({
 }) {
   const { inputAmount } = useDerivedSwap();
 
-  if (!inputAmount.trim()) return null;
+  if (!inputAmount.trim() || submitDisabled) return null;
 
   return (
     <Suspense fallback={null}>
@@ -49,8 +50,9 @@ export function LiveOrderFlowTrigger({
   submitDisabled?: boolean;
 }) {
   const { isDeveloperMode } = useDeveloperMode();
+  const { address } = useConnection();
 
-  return isDeveloperMode ? (
+  return isDeveloperMode && address ? (
     <LiveOrderFlowTriggerContent submitDisabled={submitDisabled} />
   ) : null;
 }

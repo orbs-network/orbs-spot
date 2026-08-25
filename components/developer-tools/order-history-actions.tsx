@@ -2,6 +2,7 @@
 
 import { lazy, Suspense } from "react";
 import type { Order } from "@orbs-network/spot-react";
+import { useConnection } from "wagmi";
 
 import { useDeveloperMode } from "./use-developer-mode";
 
@@ -23,8 +24,9 @@ export function FetchOrdersDeveloperButton({
   orders: Order[];
 }) {
   const { isDeveloperMode } = useDeveloperMode();
+  const { address } = useConnection();
 
-  return isDeveloperMode ? (
+  return isDeveloperMode && address ? (
     <Suspense fallback={null}>
       <FetchOrdersDeveloperButtonContent
         isLoading={isLoading}
@@ -44,8 +46,9 @@ export function CancelOrderDeveloperButton({
   rawOrder: Order;
 }) {
   const { isDeveloperMode } = useDeveloperMode();
+  const { address } = useConnection();
 
-  return isDeveloperMode ? (
+  return isDeveloperMode && address ? (
     <Suspense fallback={null}>
       <CancelOrderDeveloperButtonContent
         isCancelling={isCancelling}

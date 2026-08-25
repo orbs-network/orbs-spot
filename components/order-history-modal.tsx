@@ -527,7 +527,7 @@ function OrderFillsView({
   const t = useTranslations();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-5 pb-5 pt-5">
+    <div className="flex flex-col px-5 pb-5 pt-5">
       <div className="mb-6 flex items-center gap-4 pr-8">
         <HistoryBackButton label="Back to order details" onClick={onBack} />
         <DialogTitle className="truncate text-[16px] font-semibold leading-none">
@@ -538,9 +538,7 @@ function OrderFillsView({
       <OrderPairHeader order={order} />
 
       {order.fills.length ? (
-        <div
-          className="min-h-0 flex-1 overflow-hidden pr-1"
-        >
+        <div className="h-[460px] max-h-[55dvh] overflow-hidden pr-1">
           <Virtuoso
             style={{ height: "100%" }}
             data={order.fills}
@@ -590,7 +588,7 @@ function SelectedOrderDetails({
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5 pt-5">
+    <div className="px-5 pb-5 pt-5">
       <div className="mb-6 flex items-center gap-4 pr-8">
         <HistoryBackButton label="Back to orders" onClick={onBack} />
         <DialogTitle className="truncate text-[16px] font-semibold leading-none">
@@ -841,7 +839,7 @@ export function OrderHistoryModal({
     <Dialog open={open} onOpenChange={handleOpenChange} responsive={false}>
       <DialogContent
         presentation="center"
-        className="!flex h-[70dvh] max-h-[70dvh] w-[calc(100vw-1.5rem)] max-w-[500px] flex-col gap-0 overflow-hidden rounded-[22px] border-border/80 p-0"
+        className="!flex h-auto w-[calc(100vw-1.5rem)] max-w-[500px] flex-col gap-0 overflow-hidden rounded-[22px] border-border/80 p-0"
       >
         {selectedOrder ? (
           <SelectedOrderDetails
@@ -863,7 +861,7 @@ export function OrderHistoryModal({
               </div>
             </DialogHeader>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-4 px-5 pb-5">
+            <div className="flex flex-col gap-4 px-5 pb-5">
               <div className="sm:w-[144px]">
                 <StyledSelect
                   value={selectedFilter}
@@ -876,11 +874,11 @@ export function OrderHistoryModal({
               </div>
 
               {loading && !filteredOrders.length ? (
-                <div className="flex min-h-0 flex-1 items-center justify-center">
+                <div className="flex min-h-[240px] items-center justify-center">
                   <Spinner className="size-10" />
                 </div>
               ) : filteredOrders.length ? (
-                <div className="min-h-0 flex-1 overflow-hidden">
+                <div className="h-[560px] max-h-[65dvh] overflow-hidden">
                   <Virtuoso
                     style={{ height: "100%" }}
                     data={filteredOrders}
