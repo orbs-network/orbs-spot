@@ -1,13 +1,15 @@
 import type { PartnerConfig } from "./types";
 
+const ORBS_LOGO_SRC = "/orbs-logo.svg";
+
 export const defaultPartner: PartnerConfig = {
   id: "playground",
   brand: {
     name: "Orbs Swap",
-    iconSrc: "/favicon.ico",
+    iconSrc: ORBS_LOGO_SRC,
     appleIconSrc: "/icon.png",
     logoAlt: "Orbs Swap",
-    logoSrc:'https://www.orbs.com/assets/img/common/logo.svg',
+    logoSrc: ORBS_LOGO_SRC,
     externalUrl: "https://www.orbs.com/",
     metadata: {
       title: "Orbs Swap",

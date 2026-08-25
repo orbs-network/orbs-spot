@@ -771,11 +771,7 @@ export function useSubmitOrdersSinkOrder() {
 export function formatWrapNativeTokenCode() {
   return `import { useCallback } from "react";
 import { parseAbi } from "viem";
-import {
-  useConnection,
-  usePublicClient,
-  useWalletClient,
-} from "wagmi";
+import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 
 import type { Address } from "./order-types";
 
@@ -834,12 +830,7 @@ export function useWrapCurrentOrderToken() {
 }
 
 export function formatCreateOrderFetchCode() {
-  return `import type {
-  CreateOrderResponse,
-  PermitOrder,
-  Signature,
-  SignedOrder,
-} from "./order-types";
+  return `import type { CreateOrderResponse, PermitOrder, Signature, SignedOrder } from "./order-types";
 
 export async function createOrder(
   signature: Signature,
@@ -1354,11 +1345,7 @@ export function useApproveExample() {
 
   return `import { useCallback } from "react";
 import { erc20Abi, maxUint256 } from "viem";
-import {
-  useConnection,
-  usePublicClient,
-  useWalletClient,
-} from "wagmi";
+import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 
 import type { Address } from "./order-types";
 
