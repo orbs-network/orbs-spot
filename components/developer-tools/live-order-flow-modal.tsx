@@ -11,8 +11,6 @@ import {
 } from "react";
 import {
   CheckIcon,
-  CircleCheckIcon,
-  InfoIcon,
   RefreshCwIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -41,7 +39,6 @@ import { useRefetchSelectedCurrenciesBalances } from "@/lib/hooks/use-balances";
 import { useSignTypedDataPayload } from "@/lib/hooks/use-sign-typed-data";
 import { useApproveToken } from "@/lib/hooks/use-token-approval";
 import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
-import { useFormTabStore } from "@/lib/hooks/store";
 import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
 import { getActiveSpotPartner } from "@/lib/partners/spot";
 import {
@@ -51,6 +48,7 @@ import {
 
 import {
   CREATE_ORDER_CODE_SNIPPET,
+  CREATED_ORDER_CODE_SNIPPET,
   getSignatureFieldExplanation,
   FULL_ORDER_FLOW_CODE_SNIPPET,
   isApprovalValueEditable,
@@ -95,6 +93,7 @@ type StepPresentation = {
 };
 
 type CreatedOrderSummary = {
+  data: JsonContainer;
   id: string;
   status: "Pending";
 };
@@ -163,6 +162,18 @@ const STEP_ACTION_LABELS: Record<DeveloperOrderStep, string> = {
   success: "View order",
 };
 
+const STEP_LOADING_MESSAGES: Record<
+  Exclude<DeveloperOrderStep, "success">,
+  string
+> = {
+  flow: "Starting the order flow…",
+  check: "Reading the current token allowance…",
+  wrap: "Waiting for the native-token wrap transaction…",
+  approve: "Waiting for the token approval transaction…",
+  sign: "Waiting for the wallet signature…",
+  submit: "Sending the signed order to Orders Sink…",
+};
+
 function createSignatureData(
   permitData: LivePermitData,
   partner: string,
@@ -186,12 +197,6 @@ function createSignatureData(
     JSON.stringify({
       partner,
       sourceTokenAddress,
-      // These values come from Spot's DEX-derived RePermit data. Keeping them
-      // explicit makes their ownership clear in the generated integration code.
-      chainId: order.witness.chainid,
-      tokenAddress: order.permitted.token,
-      inputTokenAddress: order.witness.input.token,
-      requiredAmount: order.permitted.amount,
       message: order,
       domain: permitData.domain,
       primaryType: permitData.primaryType,
@@ -212,32 +217,23 @@ function applySignatureData(
   const input = asRecord(witness.input);
   const output = asRecord(witness.output);
   const chainId =
-    typeof root.chainId === "number" || typeof root.chainId === "string"
-      ? root.chainId
-      : typeof witness.chainid === "number" ||
-          typeof witness.chainid === "string"
-        ? witness.chainid
-        : permitData.order.witness.chainid;
+    typeof witness.chainid === "number" ||
+    typeof witness.chainid === "string"
+      ? witness.chainid
+      : permitData.order.witness.chainid;
   const tokenAddress =
-    typeof root.tokenAddress === "string"
-      ? root.tokenAddress
-      : typeof permitted.token === "string"
-        ? permitted.token
-        : permitData.order.permitted.token;
+    typeof permitted.token === "string"
+      ? permitted.token
+      : permitData.order.permitted.token;
   const inputTokenAddress =
-    typeof root.inputTokenAddress === "string"
-      ? root.inputTokenAddress
-      : typeof input.token === "string"
-        ? input.token
-        : permitData.order.witness.input.token;
+    typeof input.token === "string"
+      ? input.token
+      : permitData.order.witness.input.token;
   const requiredAmount =
-    typeof root.requiredAmount === "string" ||
-    typeof root.requiredAmount === "number"
-      ? root.requiredAmount
-      : typeof permitted.amount === "string" ||
-          typeof permitted.amount === "number"
-        ? permitted.amount
-        : permitData.order.permitted.amount;
+    typeof permitted.amount === "string" ||
+    typeof permitted.amount === "number"
+      ? permitted.amount
+      : permitData.order.permitted.amount;
 
   return JSON.parse(
     JSON.stringify({
@@ -292,17 +288,13 @@ function getPhaseIndex(step: DeveloperOrderStep) {
 
 function LiveFlowNotice({
   actualStep,
-  createdOrder,
-  disabledReason,
-  isReviewing,
-  outcome,
+  onSelectPhase,
+  selectablePhaseIndexes,
   viewedStep,
 }: {
   actualStep: DeveloperOrderStep;
-  createdOrder?: CreatedOrderSummary;
-  disabledReason?: string;
-  isReviewing: boolean;
-  outcome?: string;
+  onSelectPhase: (phaseIndex: number) => void;
+  selectablePhaseIndexes: readonly number[];
   viewedStep: DeveloperOrderStep;
 }) {
   const actualPhaseIndex = getPhaseIndex(actualStep);
@@ -314,30 +306,9 @@ function LiveFlowNotice({
           label: string;
         }[])[viewedPhaseIndex]
       : undefined;
-  const message = createdOrder
-    ? undefined
-    : disabledReason
-      ? {
-          icon: <InfoIcon className="mt-0.5 size-3.5 shrink-0" />,
-          text: disabledReason,
-          tone: "info",
-        }
-      : isReviewing
-        ? {
-            icon: <InfoIcon className="mt-0.5 size-3.5 shrink-0" />,
-            text: "Reviewing a completed step. Returning will not rerun it.",
-            tone: "info",
-          }
-        : outcome
-          ? {
-              icon: <CircleCheckIcon className="mt-0.5 size-3.5 shrink-0" />,
-              text: outcome,
-              tone: "success",
-            }
-          : undefined;
 
   return (
-    <div className="w-[420px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-border/80 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl">
+    <div className="pointer-events-auto w-[420px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-border/80 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl">
       <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
         <span className="text-foreground">
           {viewedStep === "flow"
@@ -355,58 +326,51 @@ function LiveFlowNotice({
         </span>
       </div>
       <div className="mt-2 grid grid-cols-4 gap-1.5" aria-label="Order creation progress">
-        {LIVE_FLOW_PHASES.map((phase, index) => (
-          <div
-            key={phase.label}
-            aria-current={index === viewedPhaseIndex ? "step" : undefined}
-            className={`rounded-md border px-1.5 py-1 transition-colors ${
-              index === viewedPhaseIndex
-                ? "border-primary/40 bg-primary/10"
-                : "border-transparent"
-            }`}
-          >
-            <span
-              className={`block h-1 rounded-full ${
-                index <= actualPhaseIndex
-                  ? "bg-primary"
-                  : index === viewedPhaseIndex
-                    ? "bg-primary/55"
-                    : "bg-secondary"
-              }`}
-            />
-            <span
-              className={`mt-1 block truncate text-[9px] ${
+        {LIVE_FLOW_PHASES.map((phase, index) => {
+          const canSelect = selectablePhaseIndexes.includes(index);
+
+          return (
+            <button
+              key={phase.label}
+              type="button"
+              disabled={!canSelect}
+              onClick={() => onSelectPhase(index)}
+              aria-label={
+                canSelect
+                  ? `View ${phase.label} step`
+                  : `${phase.label} step is not available yet`
+              }
+              aria-current={index === viewedPhaseIndex ? "step" : undefined}
+              className={`rounded-md border px-1.5 py-1 text-left transition-colors disabled:cursor-default ${
                 index === viewedPhaseIndex
-                  ? "font-semibold text-primary"
-                  : "text-muted-foreground"
+                  ? "border-primary/40 bg-primary/10"
+                  : canSelect
+                    ? "border-transparent hover:border-primary/25 hover:bg-primary/[0.06]"
+                    : "border-transparent"
               }`}
             >
-              {phase.label}
-            </span>
-          </div>
-        ))}
+              <span
+                className={`block h-1 rounded-full ${
+                  index <= actualPhaseIndex
+                    ? "bg-primary"
+                    : index === viewedPhaseIndex
+                      ? "bg-primary/55"
+                      : "bg-secondary"
+                }`}
+              />
+              <span
+                className={`mt-1 block truncate text-[9px] ${
+                  index === viewedPhaseIndex
+                    ? "font-semibold text-primary"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {phase.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
-      {createdOrder ? (
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-emerald-400/10 px-2.5 py-2 text-[11px] text-emerald-300">
-          <CircleCheckIcon className="size-3.5 shrink-0" />
-          <span className="font-semibold">Order created</span>
-          <code className="max-w-full truncate text-[10px] text-foreground">
-            {createdOrder.id}
-          </code>
-          <span>{createdOrder.status}</span>
-        </div>
-      ) : message ? (
-        <div
-          className={`mt-2 flex items-start gap-2 text-[11px] leading-4 ${
-            message.tone === "success"
-              ? "text-emerald-300"
-              : "text-muted-foreground"
-          }`}
-        >
-          {message.icon}
-          <span>{message.text}</span>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -424,6 +388,7 @@ function LiveOrderFlowModalContent({
 }) {
   const spot = useSpot();
   const flowToastId = useId();
+  const actionToastId = useId();
   const { address: connectedAccount } = useConnection();
   const partner = getActiveSpotPartner() || "unknown";
   const currentSourceToken = spot.derivedFormData.srcToken;
@@ -434,9 +399,6 @@ function LiveOrderFlowModalContent({
   const { mutateAsync: signTypedData } = useSignTypedDataPayload();
   const { mutateAsync: refetchBalances } =
     useRefetchSelectedCurrenciesBalances();
-  const setOrderHistoryOpen = useFormTabStore(
-    (state) => state.setOrderHistoryOpen,
-  );
   const dexDerivedSignatureData = useMemo(
     () =>
       createSignatureData(
@@ -468,7 +430,7 @@ function LiveOrderFlowModalContent({
   const [isRunning, setIsRunning] = useState(false);
   const [orderSignature, setOrderSignature] = useState<Signature>();
   const [createdOrder, setCreatedOrder] = useState<CreatedOrderSummary>();
-  const [stepOutcome, setStepOutcome] = useState<string>();
+  const [showCreatedOrder, setShowCreatedOrder] = useState(false);
   const completedStepsRef = useRef({ wrappedAmount: BigInt(0) });
   const step = navigation.history.at(-1) ?? "flow";
   const viewedStep = navigation.history[navigation.viewedIndex] ?? step;
@@ -507,12 +469,15 @@ function LiveOrderFlowModalContent({
         setSourceIsNative(
           isNativeAddress(currentSourceToken?.address ?? ""),
         );
-        setNavigation({ history: ["flow"], viewedIndex: 0 });
+        setNavigation({
+          history: ["flow"],
+          viewedIndex: 0,
+        });
         setApprovalRequired(false);
         setWrapAmount(nextPermitData.order.permitted.amount);
         setOrderSignature(undefined);
         setCreatedOrder(undefined);
-        setStepOutcome(undefined);
+        setShowCreatedOrder(false);
         completedStepsRef.current = { wrappedAmount: BigInt(0) };
       } else if (step === "success") {
         setInputAmount("");
@@ -541,12 +506,20 @@ function LiveOrderFlowModalContent({
     if (isRunning || step === "success") return;
 
     setIsRunning(true);
+    toast.loading(STEP_LOADING_MESSAGES[step], {
+      id: actionToastId,
+      position: "bottom-right",
+    });
 
     try {
       if (step === "flow") {
         setWrapAmount(permitData.order.permitted.amount);
-        setStepOutcome(undefined);
         advanceToStep("check");
+        toast.success("Order flow started", {
+          id: actionToastId,
+          description: "Next, check the current token allowance.",
+          position: "bottom-right",
+        });
         return;
       }
 
@@ -566,31 +539,38 @@ function LiveOrderFlowModalContent({
 
         if (sourceIsNative && remainingWrapAmount > BigInt(0)) {
           setWrapAmount(remainingWrapAmount.toString());
-          setStepOutcome(
-            "Allowance checked. Native input must be wrapped before signing.",
-          );
           advanceToStep("wrap");
+          toast.success("Allowance checked", {
+            id: actionToastId,
+            description: "Native input must be wrapped before signing.",
+            position: "bottom-right",
+          });
           return;
         }
 
-        setStepOutcome(
-          nextApprovalRequired
-            ? "Allowance is insufficient. Token approval is required."
-            : "Prepare skipped: the existing allowance is sufficient, so token approval is not required.",
-        );
+        const allowanceOutcome = nextApprovalRequired
+          ? "Allowance is insufficient. Token approval is required."
+          : "The existing allowance is sufficient; approval is skipped.";
         advanceToStep(nextApprovalRequired ? "approve" : "sign");
+        toast.success("Allowance checked", {
+          id: actionToastId,
+          description: allowanceOutcome,
+          position: "bottom-right",
+        });
         return;
       }
 
       if (step === "wrap") {
         await wrapNativeToken(wrapAmount);
         completedStepsRef.current.wrappedAmount += BigInt(wrapAmount);
-        setStepOutcome(
-          approvalRequired
-            ? "Native token wrapped. Token approval is still required."
-            : "Native token wrapped. Token approval is not required.",
-        );
         advanceToStep(approvalRequired ? "approve" : "sign");
+        toast.success("Native token wrapped", {
+          id: actionToastId,
+          description: approvalRequired
+            ? "Token approval is still required."
+            : "The order is ready to sign.",
+          position: "bottom-right",
+        });
         return;
       }
 
@@ -601,8 +581,12 @@ function LiveOrderFlowModalContent({
           tokenAddress: permitData.order.permitted.token,
         });
         setApprovalRequired(false);
-        setStepOutcome("Token approval confirmed on-chain.");
         advanceToStep("sign");
+        toast.success("Token approved", {
+          id: actionToastId,
+          description: "The approval transaction was confirmed on-chain.",
+          position: "bottom-right",
+        });
         return;
       }
 
@@ -626,10 +610,13 @@ function LiveOrderFlowModalContent({
           setPermitData(executionPermitData);
           setSignatureData(freshSignatureData);
           setOrderSignature(undefined);
-          setStepOutcome(
-            "Order amount changed. Allowance and token preparation must be checked again.",
-          );
           advanceToStep("check");
+          toast.success("Order inputs refreshed", {
+            id: actionToastId,
+            description:
+              "The amount changed, so allowance must be checked again before signing.",
+            position: "bottom-right",
+          });
           return;
         }
 
@@ -657,10 +644,12 @@ function LiveOrderFlowModalContent({
         };
 
         setOrderSignature(nextSignature);
-        setStepOutcome(
-          "Wallet signature captured. Review the signed payload before submitting it.",
-        );
         advanceToStep("submit");
+        toast.success("Order signed", {
+          id: actionToastId,
+          description: "Review the signed payload before submitting it.",
+          position: "bottom-right",
+        });
         return;
       }
 
@@ -674,11 +663,17 @@ function LiveOrderFlowModalContent({
           orderSignature,
         );
 
-        setCreatedOrder({ id: String(order.id), status: "Pending" });
-        setStepOutcome(undefined);
+        setCreatedOrder({
+          data: JSON.parse(JSON.stringify(order)) as JsonContainer,
+          id: String(order.id),
+          status: "Pending",
+        });
+        setShowCreatedOrder(false);
         advanceToStep("success");
         toast.success("Order submitted", {
+          id: actionToastId,
           description: `Order ${order.id} was created successfully.`,
+          position: "bottom-right",
         });
         void Promise.allSettled([
           spot.orderHistoryPanel.refetchOrders(),
@@ -688,17 +683,23 @@ function LiveOrderFlowModalContent({
       }
     } catch (executionError) {
       if (isUserRejectedError(executionError)) {
-        showTransactionRejectedToast();
+        showTransactionRejectedToast({
+          id: actionToastId,
+          position: "bottom-right",
+        });
       } else {
         const errorMessage = getErrorMessage(executionError);
         toast.error("Order step failed", {
+          id: actionToastId,
           description: errorMessage,
+          position: "bottom-right",
         });
       }
     } finally {
       setIsRunning(false);
     }
   }, [
+    actionToastId,
     advanceToStep,
     approvalRequired,
     approveToken,
@@ -732,7 +733,6 @@ function LiveOrderFlowModalContent({
       setPermitData(nextPermitData);
       setWrapAmount(nextPermitData.order.permitted.amount);
       setOrderSignature(undefined);
-      setStepOutcome(undefined);
     },
     [currentPermitData, permitData],
   );
@@ -799,6 +799,16 @@ function LiveOrderFlowModalContent({
       };
     }
 
+    if (viewedStep === "success" && showCreatedOrder && createdOrder) {
+      return {
+        codeSnippet: CREATED_ORDER_CODE_SNIPPET,
+        data: createdOrder.data,
+        explanation:
+          "This is the actual order record returned by Orders Sink, including its service-managed ID, metadata, digest, and timestamps.",
+        title: "Created order response",
+      };
+    }
+
     if (viewedStep === "submit" || viewedStep === "success") {
       const signedOrder = JSON.parse(
         JSON.stringify({
@@ -826,16 +836,21 @@ function LiveOrderFlowModalContent({
 
     throw new Error(`Unsupported developer order step: ${viewedStep}`);
   }, [
+    createdOrder,
     isRunning,
     orderSignature,
     permitData,
+    showCreatedOrder,
     signatureData,
     isReviewingPreviousStep,
     viewedStep,
     wrapAmount,
   ]);
 
-  const actionLabel = STEP_ACTION_LABELS[step];
+  const actionLabel =
+    step === "success" && showCreatedOrder
+      ? "Close"
+      : STEP_ACTION_LABELS[step];
   const disabledReason =
     step === "success"
       ? undefined
@@ -852,6 +867,45 @@ function LiveOrderFlowModalContent({
         : viewedStep === "submit" || viewedStep === "success"
           ? "submit"
           : "end-to-end";
+  const selectablePhaseIndexes = useMemo(
+    () =>
+      isRunning
+        ? []
+        : Array.from(
+            new Set(
+              navigation.history
+                .map(getPhaseIndex)
+                .filter(
+                  (phaseIndex) =>
+                    phaseIndex >= 0 &&
+                    phaseIndex < LIVE_FLOW_PHASES.length,
+                ),
+            ),
+          ),
+    [isRunning, navigation.history],
+  );
+  const handleSelectPhase = useCallback(
+    (phaseIndex: number) => {
+      if (isRunning) return;
+
+      setNavigation((current) => {
+        let targetIndex = -1;
+        current.history.forEach((historyStep, historyIndex) => {
+          if (getPhaseIndex(historyStep) === phaseIndex) {
+            targetIndex = historyIndex;
+          }
+        });
+
+        return targetIndex < 0
+          ? current
+          : {
+              ...current,
+              viewedIndex: targetIndex,
+            };
+      });
+    },
+    [isRunning],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -863,14 +917,8 @@ function LiveOrderFlowModalContent({
       () => (
         <LiveFlowNotice
           actualStep={step}
-          createdOrder={
-            viewedStep === "success" ? createdOrder : undefined
-          }
-          disabledReason={
-            !isReviewingPreviousStep ? disabledReason : undefined
-          }
-          isReviewing={isReviewingPreviousStep}
-          outcome={!isReviewingPreviousStep ? stepOutcome : undefined}
+          onSelectPhase={handleSelectPhase}
+          selectablePhaseIndexes={selectablePhaseIndexes}
           viewedStep={viewedStep}
         />
       ),
@@ -884,13 +932,11 @@ function LiveOrderFlowModalContent({
       },
     );
   }, [
-    createdOrder,
-    disabledReason,
     flowToastId,
-    isReviewingPreviousStep,
+    handleSelectPhase,
     open,
     step,
-    stepOutcome,
+    selectablePhaseIndexes,
     viewedStep,
   ]);
 
@@ -912,94 +958,113 @@ function LiveOrderFlowModalContent({
       <DialogContent
         presentation="center"
         mobilePresentation="fullscreen"
+        onInteractOutside={(event) => event.preventDefault()}
         showCloseButton={!isRunning}
         className="h-[min(1040px,98dvh)] max-w-[960px] grid-rows-[minmax(0,1fr)] gap-0 p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-10 [&>button[data-slot=dialog-close]]:place-items-center"
       >
-        <JsonInspectorPanel
-          key={`${viewedStep}-${navigation.viewedIndex}`}
-          data={presentation.data}
-          editable={presentation.editable}
-          codeSnippet={presentation.codeSnippet}
-          codeSnippetState={
-            isReviewingPreviousStep ? "review" : "active"
-          }
-          description=""
-          explanation={presentation.explanation}
-          explanationDisplay="subtitle"
-          headerBackAction={
-            navigation.viewedIndex > 0 && !isRunning
-              ? {
-                  ariaLabel: "View previous order step",
-                  onClick: () =>
-                    setNavigation((current) => ({
-                      ...current,
-                      viewedIndex: Math.max(0, current.viewedIndex - 1),
-                    })),
-                }
-              : undefined
-          }
-          getFieldExplanation={
-            viewedStep === "sign"
-              ? getSignatureFieldExplanation
-              : undefined
-          }
-          isValueEditable={
-            viewedStep === "sign"
-              ? isSignatureValueEditable
-              : viewedStep === "approve"
-                ? isApprovalValueEditable
+        <div className="h-full min-h-0 overflow-hidden">
+          <JsonInspectorPanel
+            data={presentation.data}
+            editable={presentation.editable}
+            codeSnippet={presentation.codeSnippet}
+            codeSnippetState={
+              isReviewingPreviousStep ? "review" : "active"
+            }
+            description=""
+            explanation={presentation.explanation}
+            explanationDisplay="tooltip"
+            headerBackAction={
+              navigation.viewedIndex > 0 && !isRunning
+                ? {
+                    ariaLabel: "View previous order step",
+                    onClick: () =>
+                      setNavigation((current) => ({
+                        ...current,
+                        viewedIndex: Math.max(0, current.viewedIndex - 1),
+                      })),
+                  }
                 : undefined
-          }
-          onSave={
-            !isReviewingPreviousStep && step === "sign"
-              ? handleSaveSignSnippet
-              : undefined
-          }
-          resetData={
-            viewedStep === "sign"
-              ? dexDerivedSignatureData
-              : undefined
-          }
-          title={presentation.title}
-          viewModeAction={
-            <div className="flex items-center justify-end gap-2">
-              <OrdersSinkGuideLink section={guideSection} />
-              <Button
-                type="button"
-                onClick={() => {
-                  if (isReviewingPreviousStep) {
-                    setNavigation((current) => ({
-                      ...current,
-                      viewedIndex: current.history.length - 1,
-                    }));
-                    return;
-                  }
+            }
+            getFieldExplanation={
+              viewedStep === "sign"
+                ? getSignatureFieldExplanation
+                : undefined
+            }
+            isValueEditable={
+              viewedStep === "sign"
+                ? isSignatureValueEditable
+                : viewedStep === "approve"
+                  ? isApprovalValueEditable
+                  : undefined
+            }
+            onSave={
+              !isReviewingPreviousStep && step === "sign"
+                ? handleSaveSignSnippet
+                : undefined
+            }
+            resetData={
+              viewedStep === "sign"
+                ? dexDerivedSignatureData
+                : undefined
+            }
+            title={presentation.title}
+            viewModeAction={
+              <div className="flex w-full flex-wrap items-center justify-between gap-2">
+                <OrdersSinkGuideLink section={guideSection} />
+                <div className="ml-auto flex items-center gap-2">
+                  {!isReviewingPreviousStep &&
+                    step === "success" &&
+                    !showCreatedOrder && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleOpenChange(false)}
+                      >
+                        Close
+                      </Button>
+                    )}
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (isReviewingPreviousStep) {
+                        setNavigation((current) => ({
+                          ...current,
+                          viewedIndex: current.history.length - 1,
+                        }));
+                        return;
+                      }
 
-                  if (step === "success") {
-                    handleOpenChange(false);
-                    setOrderHistoryOpen(true);
-                    return;
-                  }
+                      if (step === "success") {
+                        if (!showCreatedOrder) {
+                          setShowCreatedOrder(true);
+                          return;
+                        }
 
-                  void executeCurrentStep();
-                }}
-                disabled={
-                  !isReviewingPreviousStep &&
-                  step !== "success" &&
-                  (Boolean(disabledReason) || isRunning)
-                }
-                isLoading={!isReviewingPreviousStep && isRunning}
-              >
-                {!isReviewingPreviousStep && step === "success" && (
-                  <CheckIcon className="size-4" />
-                )}
-                {isReviewingPreviousStep
-                  ? "Return to current step"
-                  : actionLabel}
-              </Button>
-            </div>
-          }
-        />
+                        handleOpenChange(false);
+                        return;
+                      }
+
+                      void executeCurrentStep();
+                    }}
+                    disabled={
+                      !isReviewingPreviousStep &&
+                      step !== "success" &&
+                      (Boolean(disabledReason) || isRunning)
+                    }
+                    isLoading={!isReviewingPreviousStep && isRunning}
+                  >
+                    {!isReviewingPreviousStep && step === "success" && (
+                      <CheckIcon className="size-4" />
+                    )}
+                    {isReviewingPreviousStep
+                      ? "Return to current step"
+                      : actionLabel}
+                  </Button>
+                </div>
+              </div>
+            }
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

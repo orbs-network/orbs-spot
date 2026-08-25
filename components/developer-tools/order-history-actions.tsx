@@ -15,12 +15,21 @@ const CancelOrderDeveloperButtonContent = lazy(async () => ({
     .CancelOrderDeveloperButtonContent,
 }));
 
-export function FetchOrdersDeveloperButton({ orders }: { orders: Order[] }) {
+export function FetchOrdersDeveloperButton({
+  isLoading,
+  orders,
+}: {
+  isLoading?: boolean;
+  orders: Order[];
+}) {
   const { isDeveloperMode } = useDeveloperMode();
 
   return isDeveloperMode ? (
     <Suspense fallback={null}>
-      <FetchOrdersDeveloperButtonContent orders={orders} />
+      <FetchOrdersDeveloperButtonContent
+        isLoading={isLoading}
+        orders={orders}
+      />
     </Suspense>
   ) : null;
 }

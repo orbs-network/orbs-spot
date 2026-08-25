@@ -98,7 +98,7 @@ function ExamplePanel({ example }: { example: DeveloperExample }) {
         codeSnippet={FULL_ORDER_FLOW_CODE_SNIPPET}
         description=""
         explanation="The canonical flow: fetch trusted configuration, build one order, prepare funds, sign it, and submit the exact same object to Orders Sink. Replace the sample amounts, nonces, and timestamps with values from your application."
-        explanationDisplay="subtitle"
+        explanationDisplay="tooltip"
         getFieldExplanation={getSignatureFieldExplanation}
         title="Create an order end-to-end"
       />
@@ -113,7 +113,7 @@ function ExamplePanel({ example }: { example: DeveloperExample }) {
         codeSnippet={CANCEL_EXAMPLE_CODE_SNIPPET}
         description=""
         explanation="Cancel a RePermit order on-chain using order.metadata.repermitDigest, then wait for the transaction receipt."
-        explanationDisplay="subtitle"
+        explanationDisplay="tooltip"
         title="Cancel order example"
       />
     );
@@ -131,7 +131,7 @@ function ExamplePanel({ example }: { example: DeveloperExample }) {
       }}
       description=""
       explanation="Fetch orders for the connected wallet and chain. The exchange address comes from the trusted base configuration."
-      explanationDisplay="subtitle"
+      explanationDisplay="tooltip"
       getResponseFieldExplanation={getFetchOrdersResponseFieldExplanation}
       requestResponseTabs
       responseData={FETCH_ORDERS_EXAMPLE_RESPONSE_DATA}

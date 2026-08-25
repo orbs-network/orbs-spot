@@ -2,7 +2,6 @@
 "use client";
 
 import TokensPair from "@/components/tokens-pair";
-import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { useRefetchSelectedCurrenciesBalances } from "@/lib/hooks/use-balances";
 import { useToAmountWei } from "@/lib/hooks/common";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
@@ -11,7 +10,7 @@ import {
   showTransactionRejectedToast,
 } from "@/lib/tx-rejection";
 import { useTranslations } from "@/lib/use-translations";
-import { Currency, Field } from "@/lib/types";
+import { Currency } from "@/lib/types";
 import {
   getExplorerUrl,
   getWrappedNativeCurrency,
@@ -22,6 +21,7 @@ import { useApproveToken } from "@/lib/hooks/use-token-approval";
 import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
+import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
 import {
   isNativeAddress,
   type ApproveTokenProps,
@@ -217,8 +217,10 @@ export function useWalletInteractions() {
 export function useSpotCallbacks() {
   const t = useTranslations();
   const { inputCurrency, outputCurrency } = useDerivedSwap();
-  const { handleCurrencyChange } = useActionHandlers();
   const { chainId } = useConnection();
+  const setPendingWrappedInputAddress = useOrderSubmitFlowStore(
+    (state) => state.setPendingWrappedInputAddress,
+  );
   const { mutateAsync: refetchBalances } =
     useRefetchSelectedCurrenciesBalances();
 
@@ -250,7 +252,9 @@ export function useSpotCallbacks() {
         const wrappedAddress = getWrappedNativeCurrency(chainId)?.address;
 
         if (wrappedAddress) {
-          handleCurrencyChange(wrappedAddress, Field.INPUT);
+          // Keep the native token visible while the submit flow is open.
+          // SubmitOrder applies this queued address after its dialog closes.
+          setPendingWrappedInputAddress(wrappedAddress);
         }
 
         toast.success(
@@ -374,11 +378,11 @@ export function useSpotCallbacks() {
     approvalSymbol,
     chainId,
     explorerLink,
-    handleCurrencyChange,
     inputCurrency?.address,
     inputCurrency?.symbol,
     outputCurrency?.address,
     refetchBalances,
+    setPendingWrappedInputAddress,
     t,
   ]);
 

@@ -24,7 +24,6 @@ import {
   LockIcon,
   Maximize2Icon,
   Minimize2Icon,
-  PencilIcon,
   RotateCcwIcon,
   SaveIcon,
 } from "lucide-react";
@@ -87,9 +86,12 @@ export type CodeSnippetOptions = {
   fileName?: string;
   files?: CodeSnippetFileOptions[];
   format: (data: JsonContainer) => string;
+  getFieldExplanation?: (
+    path: JsonValuePath,
+    value: JsonValue,
+  ) => string | undefined;
   hideStatusLabel?: boolean;
   inlineEditable?: boolean;
-  inlineEditableVariables?: string[];
   language?: string;
   syntaxLanguage?: Language;
 };
@@ -439,10 +441,8 @@ type JsonLineAnnotation = {
 const buildCodeLineAnnotations = (
   code: string,
   data: JsonContainer,
-  editableVariables: readonly string[] = [],
 ) => {
   const annotations = new Map<number, JsonLineAnnotation>();
-  const editableVariableNames = new Set(editableVariables);
   const contexts: Array<{
     indent: number;
     path: JsonValuePath;
@@ -453,24 +453,7 @@ const buildCodeLineAnnotations = (
     const propertyMatch = line.match(
       /^(\s*)([A-Za-z_$][\w$]*):\s*(.*)$/,
     );
-    if (!propertyMatch) {
-      const variableMatch = line.match(
-        /^\s*const\s+([A-Za-z_$][\w$]*)\s*=.*;\s*$/,
-      );
-      const variableName = variableMatch?.[1];
-      if (!variableName || !editableVariableNames.has(variableName)) {
-        return;
-      }
-
-      const value = getValueAtPath(data, [variableName]);
-      if (value !== undefined && !isJsonContainer(value)) {
-        annotations.set(lineIndex, {
-          path: [variableName],
-          value,
-        });
-      }
-      return;
-    }
+    if (!propertyMatch) return;
 
     const indent = propertyMatch[1].length;
     const key = propertyMatch[2];
@@ -680,7 +663,7 @@ function JsonInspectorModalContent({
   embedded = false,
   explanation,
   explanationDisplay = "tooltip",
-  getFieldExplanation,
+  getFieldExplanation: providedFieldExplanation,
   getResponseFieldExplanation,
   headerBackAction,
   headerNotice,
@@ -731,6 +714,8 @@ function JsonInspectorModalContent({
     (codeSnippet
       ? "This view shows runnable code generated from the complete input data. Edit a field to regenerate the snippet."
       : "This view shows the complete JSON payload. Select an object or array label to collapse or expand its fields.");
+  const getFieldExplanation =
+    providedFieldExplanation ?? codeSnippet?.getFieldExplanation;
   const headerSubtitle =
     explanationDisplay === "subtitle"
       ? resolvedExplanation
@@ -776,12 +761,8 @@ function JsonInspectorModalContent({
       return new Map<number, JsonLineAnnotation>();
     }
 
-    return buildCodeLineAnnotations(
-      formattedCode,
-      data,
-      codeSnippet.inlineEditableVariables,
-    );
-  }, [codeSnippet, data, formattedCode, isMainCodeFile]);
+    return buildCodeLineAnnotations(formattedCode, data);
+  }, [codeSnippet?.inlineEditable, data, formattedCode, isMainCodeFile]);
   const codeLineExplanations = useMemo(() => {
     const explanations = new Map<
       number,
@@ -802,30 +783,7 @@ function JsonInspectorModalContent({
 
     formattedCode.split("\n").forEach((line, lineIndex) => {
       const match = line.match(/^(\s*)([A-Za-z_$][\w$]*):/);
-      if (!match) {
-        const variableMatch = line.match(
-          /^\s*const\s+([A-Za-z_$][\w$]*)\s*=/,
-        );
-        const variableName = variableMatch?.[1];
-        if (
-          !variableName ||
-          !codeSnippet?.inlineEditableVariables?.includes(variableName)
-        ) {
-          return;
-        }
-
-        const value = getValueAtPath(draft, [variableName]);
-        if (value === undefined) return;
-        const tooltip = getFieldExplanation([variableName], value);
-        if (tooltip) {
-          explanations.set(lineIndex, {
-            key: variableName,
-            path: variableName,
-            tooltip,
-          });
-        }
-        return;
-      }
+      if (!match) return;
 
       const indent = match[1].length;
       const key = match[2];
@@ -840,11 +798,6 @@ function JsonInspectorModalContent({
       const value = getValueAtPath(draft, path);
       if (value === undefined) return;
 
-      if (isJsonContainer(value)) {
-        sectionStack.push({ indent, key });
-        return;
-      }
-
       const tooltip = getFieldExplanation(path, value);
       if (tooltip) {
         explanations.set(lineIndex, {
@@ -854,16 +807,15 @@ function JsonInspectorModalContent({
         });
       }
 
+      if (isJsonContainer(value)) {
+        sectionStack.push({ indent, key });
+        return;
+      }
+
     });
 
     return explanations;
-  }, [
-    codeSnippet?.inlineEditableVariables,
-    draft,
-    formattedCode,
-    getFieldExplanation,
-    isMainCodeFile,
-  ]);
+  }, [draft, formattedCode, getFieldExplanation, isMainCodeFile]);
 
   const resetDraft = useCallback(() => {
     setDraft(data);
@@ -1003,6 +955,22 @@ function JsonInspectorModalContent({
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to save JSON.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResetToDefaults = async () => {
+    setIsSaving(true);
+    try {
+      const nextDraft = resetData ?? data;
+      await onSave?.(nextDraft);
+      resetDraftToDefaults();
+      toast.success("Changes reset");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to reset changes.",
       );
     } finally {
       setIsSaving(false);
@@ -1370,19 +1338,10 @@ function JsonInspectorModalContent({
         </div>
       )}
       {mode === "view" && viewModeAction && (
-        <div className="ml-auto">{viewModeAction}</div>
+        <div className="flex min-w-0 flex-1">{viewModeAction}</div>
       )}
       {mode === "edit" && (
         <div className="ml-auto flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={resetDraftToDefaults}
-            disabled={!hasChangesFromResetValues || isSaving}
-          >
-            <RotateCcwIcon />
-            Reset
-          </Button>
           <Button type="button" variant="ghost" onClick={handleCancel}>
             Cancel
           </Button>
@@ -1657,18 +1616,25 @@ function JsonInspectorModalContent({
                     </div>
                   )}
                   <div className="flex shrink-0 items-center gap-1 px-2">
-                    {codeSnippetState && (
+                    {codeSnippetState === "review" && (
                       <span
-                        className={`hidden rounded-md border px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] sm:inline-flex ${
-                          codeSnippetState === "active"
-                            ? "border-primary/35 bg-primary/12 text-primary"
-                            : "border-border/80 bg-background/45 text-muted-foreground"
-                        }`}
+                        className="hidden rounded-md border border-border/80 bg-background/45 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:inline-flex"
                       >
-                        {codeSnippetState === "active"
-                          ? "Active snippet"
-                          : "Previous snippet"}
+                        Previous snippet
                       </span>
+                    )}
+                    {editable && hasChangesFromResetValues && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void handleResetToDefaults()}
+                        isLoading={isSaving}
+                        className="h-7 px-2 text-[11px] text-primary hover:text-primary"
+                      >
+                        <RotateCcwIcon className="size-3.5" />
+                        Reset
+                      </Button>
                     )}
                     {(!requestResponseTabs || isCodeFullscreen) &&
                       (copyActionsInHeaders ? (
@@ -1695,30 +1661,23 @@ function JsonInspectorModalContent({
                         </span>
                       ) : null)}
                     {editable && isMainCodeFile && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={mode === "edit" ? "secondary" : "ghost"}
-                        onClick={() =>
-                          handleModeChange(
-                            mode === "edit" ? "view" : "edit",
-                          )
-                        }
-                        aria-label={
+                      <label
+                        className={`flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-[11px] font-medium transition-colors hover:bg-secondary/60 hover:text-foreground ${
                           mode === "edit"
-                            ? "Exit edit mode"
-                            : "Enter edit mode"
-                        }
-                        aria-pressed={mode === "edit"}
-                        className={`h-7 px-2 text-[11px] ${
-                          mode === "edit"
-                            ? "border border-primary/35 bg-primary/12 text-primary hover:bg-primary/18"
-                            : ""
+                            ? "text-foreground"
+                            : "text-muted-foreground"
                         }`}
                       >
-                        <PencilIcon className="size-3.5" />
-                        {mode === "edit" ? "Editing" : "Edit"}
-                      </Button>
+                        <span>Edit</span>
+                        <Switch
+                          size="sm"
+                          checked={mode === "edit"}
+                          onCheckedChange={(checked) =>
+                            handleModeChange(checked ? "edit" : "view")
+                          }
+                          aria-label="Edit snippet"
+                        />
+                      </label>
                     )}
                     {renderCodeFullscreenButton()}
                   </div>
@@ -1763,19 +1722,12 @@ function JsonInspectorModalContent({
                           const colonIndex = line.findIndex(
                             (token) => token.content === ":",
                           );
-                          const assignmentIndex = line.findIndex(
-                            (token) => token.content.includes("="),
-                          );
-                          const valueDelimiterIndex =
-                            colonIndex >= 0
-                              ? colonIndex
-                              : assignmentIndex;
                           const firstContentTokenIndex = line.findIndex(
                             (token) => token.content.trim().length > 0,
                           );
                           const prefixTokenCount =
-                            valueDelimiterIndex >= 0
-                              ? valueDelimiterIndex + 1
+                            colonIndex >= 0
+                              ? colonIndex + 1
                               : Math.max(firstContentTokenIndex, 0);
                           const pathKey = inlineField
                             ? formatPath(inlineField.path)
@@ -1795,9 +1747,10 @@ function JsonInspectorModalContent({
                           const hasTrailingComma = line.some(
                             (token) => token.content === ",",
                           );
-                          const hasTrailingSemicolon = line.some(
-                            (token) => token.content.includes(";"),
-                          );
+                          const inlineComment = line
+                            .map((token) => token.content)
+                            .join("")
+                            .match(/\/\/.*$/)?.[0];
 
                           const renderToken = (
                             token: (typeof line)[number],
@@ -1805,8 +1758,8 @@ function JsonInspectorModalContent({
                           ) => {
                             const tokenProps = getTokenProps({ token });
                             const isExplainedKey =
-                              valueDelimiterIndex >= 0 &&
-                              tokenIndex < valueDelimiterIndex &&
+                              colonIndex >= 0 &&
+                              tokenIndex < colonIndex &&
                               lineExplanation?.key === token.content.trim();
 
                             if (!isExplainedKey) {
@@ -1870,7 +1823,7 @@ function JsonInspectorModalContent({
                                         .slice(0, prefixTokenCount)
                                         .map(renderToken),
                                     )}
-                                    {valueDelimiterIndex >= 0 && " "}
+                                    {colonIndex >= 0 && " "}
                                     {typeof inlineField.value === "string" && (
                                       <span style={{ color: "#98c379" }}>
                                         &quot;
@@ -1928,8 +1881,10 @@ function JsonInspectorModalContent({
                                     {hasTrailingComma && (
                                       <span style={{ color: "#abb2bf" }}>,</span>
                                     )}
-                                    {hasTrailingSemicolon && (
-                                      <span style={{ color: "#abb2bf" }}>;</span>
+                                    {inlineComment && (
+                                      <span style={{ color: "#5c6370" }}>
+                                        {` ${inlineComment}`}
+                                      </span>
                                     )}
                                   </span>
                                 ) : (
