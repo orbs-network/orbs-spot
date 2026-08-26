@@ -1,14 +1,14 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
-import { pushUrlState } from "@/lib/url-state";
+import { updateUrlSearchParams } from "@/lib/url-state";
 
 export const DEVELOPER_MODE_QUERY_PARAM = "devMode";
 
 export const preserveDeveloperModeInHref = (
   href: string,
   isDeveloperMode: boolean,
-) => {
+): string => {
   if (!isDeveloperMode) return href;
 
   const hashIndex = href.indexOf("#");
@@ -33,26 +33,16 @@ export const useDeveloperMode = () => {
 
   const setIsDeveloperMode = useCallback(
     (enabled: boolean) => {
-      const nextParams = new URLSearchParams(searchParams.toString());
-
-      if (enabled) {
-        nextParams.set(DEVELOPER_MODE_QUERY_PARAM, "true");
-      } else {
-        nextParams.delete(DEVELOPER_MODE_QUERY_PARAM);
-      }
-
-      const queryString = nextParams.toString();
-      const hash =
-        typeof window === "undefined" ? "" : window.location.hash;
-      const href = `${pathname}${queryString ? `?${queryString}` : ""}${hash}`;
-
-      pushUrlState(href);
+      updateUrlSearchParams(pathname, searchParams, (nextParams) => {
+        if (enabled) {
+          nextParams.set(DEVELOPER_MODE_QUERY_PARAM, "true");
+        } else {
+          nextParams.delete(DEVELOPER_MODE_QUERY_PARAM);
+        }
+      });
     },
     [pathname, searchParams],
   );
 
-  return useMemo(
-    () => ({ isDeveloperMode, setIsDeveloperMode }),
-    [isDeveloperMode, setIsDeveloperMode],
-  );
+  return { isDeveloperMode, setIsDeveloperMode };
 };

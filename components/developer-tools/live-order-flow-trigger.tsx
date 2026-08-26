@@ -37,7 +37,7 @@ function LiveOrderFlowTriggerContent({
       className="size-12 rounded-[14px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
       aria-label="Submit developer order"
     >
-      <Code2Icon className="size-5" />
+      <Code2Icon aria-hidden="true" className="size-5" />
     </Button>
   );
 
@@ -69,20 +69,18 @@ function LiveOrderFlowTriggerContent({
         ) : (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="inline-flex" tabIndex={0}>
-                <Button
-                  data-developer-trigger
-                  data-developer-order-submit
-                  type="button"
-                  variant="outline"
-                  size="icon-lg"
-                  className="size-12 rounded-[14px] border-primary/35 text-primary"
-                  disabled
-                  aria-label="Enter an amount to submit a developer order"
-                >
-                  <Code2Icon className="size-5" />
-                </Button>
-              </span>
+              <Button
+                data-developer-trigger
+                data-developer-order-submit
+                type="button"
+                variant="outline"
+                size="icon-lg"
+                className="size-12 rounded-[14px] border-primary/35 text-primary opacity-50 !cursor-not-allowed"
+                aria-disabled="true"
+                aria-label="Enter an amount to submit a developer order"
+              >
+                <Code2Icon aria-hidden="true" className="size-5" />
+              </Button>
             </TooltipTrigger>
             <TooltipContent>
               Enter an amount to run the developer order flow
@@ -90,7 +88,7 @@ function LiveOrderFlowTriggerContent({
           </Tooltip>
         )}
       </div>
-      <DeveloperModeSpotlight enabled targetRef={targetRef} />
+      <DeveloperModeSpotlight targetRef={targetRef} />
     </>
   );
 }

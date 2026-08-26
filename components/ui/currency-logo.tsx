@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { Currency } from "@/lib/types";
+import type { Currency } from "@/lib/types";
 import { useCallback, useMemo, useState } from "react";
 import { Avatar, AvatarFallback } from "./avatar";
 import { cn, getFirstAndLastLetter } from "@/lib/utils";
@@ -137,6 +137,8 @@ function CurrencyLogoImage({
       key={src}
       src={src}
       alt={alt}
+      width={40}
+      height={40}
       decoding="async"
       onLoad={onLoad}
       onError={onError}

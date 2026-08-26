@@ -155,7 +155,7 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
 function TxError({ error }: { error?: ParsedError }) {
   return (
     <div className="flex flex-col items-center gap-2 text-center">
-      <AlertTriangleIcon className="size-8 text-destructive" />
+      <AlertTriangleIcon aria-hidden="true" className="size-8 text-destructive" />
       <h3 className="text-lg font-semibold">Transaction failed</h3>
       {error?.code ? (
         <p className="text-sm text-muted-foreground">
@@ -283,7 +283,7 @@ function OrderUsd({ kind }: { kind: "src" | "dst" }) {
 function OrderSuccessIcon() {
   return (
     <div className="flex size-14 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-primary">
-      <CheckIcon className="size-7" strokeWidth={2.4} />
+      <CheckIcon aria-hidden="true" className="size-7" strokeWidth={2.4} />
     </div>
   );
 }
@@ -346,7 +346,7 @@ function OrderFlowSuccess({
               currency={srcCurrency}
               token={srcToken}
             />
-            <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
+            <ArrowRightIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
             <OrderSuccessToken
               amount={dstAmount}
               className="justify-end"
@@ -428,7 +428,7 @@ function SubmitOrderPanel({
             srcToken={srcToken}
           />
         ),
-        SuccessIcon: <OrderSuccessIcon />,
+        SuccessIcon: <OrderSuccessIcon aria-hidden="true" />,
         Main: (
           <OrderFlowMain
             orderTitle={orderTitle}

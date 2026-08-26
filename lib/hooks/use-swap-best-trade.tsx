@@ -110,7 +110,7 @@ const useToasts = () => {
 
   const onWrapRequest = useCallback(() => {
     wrapToastId.current = toast.loading(
-      `Wrapping ${inputCurrency?.symbol ?? "token"}...`,
+      `Wrapping ${inputCurrency?.symbol ?? "token"}…`,
       {
         description: "Confirm the wrap transaction in your wallet.",
       }
@@ -130,7 +130,7 @@ const useToasts = () => {
 
   const onApproveRequest = useCallback(() => {
     approveToastId.current = toast.loading(
-      `Approving ${inputCurrency?.symbol ?? "token"}...`,
+      `Approving ${inputCurrency?.symbol ?? "token"}…`,
       {
         description: "Confirm token spending in your wallet.",
       }

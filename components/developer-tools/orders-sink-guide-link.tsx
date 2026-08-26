@@ -33,7 +33,7 @@ export function OrdersSinkGuideLink({
       )}
     >
       Open full guide
-      <ExternalLinkIcon className="size-3.5" />
+      <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
     </Link>
   );
 }

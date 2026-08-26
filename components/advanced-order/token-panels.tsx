@@ -45,6 +45,8 @@ export function TokenPanel({ isSource }: { isSource: boolean }) {
 function OrderNumericInputPanel<TUnit extends number>({
   decimalScale = 0,
   error,
+  inputLabel,
+  inputName,
   onChange,
   rightHint,
   staticUnitLabel,
@@ -52,11 +54,14 @@ function OrderNumericInputPanel<TUnit extends number>({
   tooltip,
   unit,
   unitOptions,
+  unitSelectLabel,
   onUnitChange,
   value,
 }: {
   decimalScale?: number;
   error?: unknown;
+  inputLabel: string;
+  inputName: string;
   onChange: (value: string) => void;
   rightHint?: ReactNode;
   staticUnitLabel?: string;
@@ -64,6 +69,7 @@ function OrderNumericInputPanel<TUnit extends number>({
   tooltip?: string;
   unit?: TUnit;
   unitOptions?: readonly { text: string; value: TUnit }[];
+  unitSelectLabel?: string;
   onUnitChange?: (value: TUnit) => void;
   value?: string;
 }) {
@@ -88,6 +94,8 @@ function OrderNumericInputPanel<TUnit extends number>({
       <div className="flex items-stretch gap-3">
         <FormNumberField className="h-13 min-w-0 flex-1">
           <NumericInput
+            aria-label={inputLabel}
+            name={inputName}
             value={value ?? ""}
             onChange={onChange}
             decimalScale={decimalScale}
@@ -97,6 +105,7 @@ function OrderNumericInputPanel<TUnit extends number>({
         {hasUnitSelect ? (
           <div className="w-[132px] shrink-0 self-stretch">
             <StyledSelect
+              aria-label={unitSelectLabel ?? `${inputLabel} unit`}
               value={unit}
               options={unitOptions.map((option) => ({
                 label: option.text,
@@ -152,6 +161,8 @@ function TradesPanel() {
   return (
     <OrderNumericInputPanel
       title={t("tradesAmountTitle")}
+      inputLabel="Number of trades"
+      inputName="number-of-trades"
       tooltip={t("totalTradesTooltip")}
       value={totalTrades ? totalTrades.toString() : ""}
       onChange={(value) => onChange(Number(value || 0))}
@@ -170,6 +181,8 @@ function TimeInputPanel({ kind }: { kind: "duration" | "fillDelay" }) {
   return (
     <OrderNumericInputPanel
       title={kind === "duration" ? t("expiry") : t("tradeIntervalTitle")}
+      inputLabel={kind === "duration" ? "Order duration" : "Trade interval"}
+      inputName={kind === "duration" ? "order-duration" : "trade-interval"}
       tooltip={
         kind === "duration" ? t("maxDurationTooltip") : t("tradeIntervalTooltip")
       }
@@ -189,6 +202,7 @@ function TimeInputPanel({ kind }: { kind: "duration" | "fillDelay" }) {
           : fillDelayPanel.fillDelay.unit
       }
       unitOptions={DURATION_OPTIONS}
+      unitSelectLabel={kind === "duration" ? "Duration unit" : "Interval unit"}
       onUnitChange={
         kind === "duration"
           ? durationPanel.onUnitSelect

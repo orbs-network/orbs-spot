@@ -1,5 +1,5 @@
 import { monad } from "viem/chains";
-import { Currency } from "./types";
+import type { Currency } from "./types";
 
 export const wCurrencies: Record<number, Currency> = {
   1: {

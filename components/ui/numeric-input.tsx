@@ -1,10 +1,12 @@
 import { NumericFormat } from "react-number-format";
 import BN from "bignumber.js";
 import { maxUint256 } from "viem";
+import type { Ref } from "react";
+
 import { cn } from "@/lib/utils";
-import { forwardRef } from "react";
 
 type NumericInputProps = {
+  "aria-label": string;
   className?: string;
   allowNegative?: boolean;
   disabled?: boolean;
@@ -13,49 +15,53 @@ type NumericInputProps = {
   onFocus?: () => void;
   placeholder?: string;
   maxValue?: number;
+  name: string;
   prefix?: string;
   suffix?: string;
   value?: string;
   minAmount?: number;
+  ref?: Ref<HTMLInputElement>;
   onChange: (value: string) => void;
   isLoading?: boolean;
 };
 
-export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
-  function NumericInput(
-    {
-      className = "",
-      allowNegative = false,
-      disabled = false,
-      decimalScale = 18,
-      onBlur,
-      onFocus,
-      placeholder,
-      maxValue,
-      prefix,
-      suffix,
-      value,
-      minAmount,
-      onChange,
-      isLoading = false,
-    },
-    ref
-  ) {
-    const inputValue = value || minAmount || "";
+export function NumericInput({
+  "aria-label": ariaLabel,
+  className = "",
+  allowNegative = false,
+  disabled = false,
+  decimalScale = 18,
+  onBlur,
+  onFocus,
+  placeholder,
+  maxValue,
+  name,
+  prefix,
+  ref,
+  suffix,
+  value,
+  minAmount,
+  onChange,
+  isLoading = false,
+}: NumericInputProps) {
+  const inputValue = value || minAmount || "";
 
-    return (
+  return (
     <NumericFormat
       getInputRef={ref}
+      aria-label={ariaLabel}
+      autoComplete="off"
       className={cn(
-        "bg-transparent w-full h-full outline-none text-[18px] placeholder:text-current placeholder:opacity-50",
+        "h-full w-full bg-transparent text-[18px] outline-none placeholder:text-current placeholder:opacity-50",
         isLoading && "animate-pulse text-muted-foreground/35",
-        className
+        className,
       )}
       allowNegative={allowNegative}
       disabled={disabled}
       decimalScale={decimalScale}
+      inputMode="decimal"
       onBlur={onBlur}
-      name="number-input"
+      name={name}
       onFocus={onFocus}
       placeholder={placeholder || "0"}
       max={maxValue}
@@ -73,14 +79,10 @@ export const NumericInput = forwardRef<HTMLInputElement, NumericInputProps>(
       type="text"
       valueIsNumericString
       min={minAmount}
-      onValueChange={(values, _sourceInfo) => {
-        if (_sourceInfo.source !== "event") {
-          return;
-        }
-
+      onValueChange={(values, sourceInfo) => {
+        if (sourceInfo.source !== "event") return;
         onChange(values.value === "." ? "0." : values.value);
       }}
     />
   );
-  }
-);
+}

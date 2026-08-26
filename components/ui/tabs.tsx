@@ -91,7 +91,7 @@ export function SegmentedTabs<TValue extends string | number>({
                 aria-label={option.ariaLabel}
                 onClick={() => onValueChange(option.value)}
                 className={cn(
-                  "relative z-10",
+                  "relative z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40",
                   tabClassName ?? DEFAULT_SEGMENTED_TABS_TAB_CLASS_NAME,
                   selected
                     ? selectedTabClassName ??

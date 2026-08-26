@@ -2,7 +2,6 @@
 
 import {
   type ComponentProps,
-  forwardRef,
   useEffect,
   useMemo,
   useState,
@@ -33,21 +32,24 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 const navPillClass =
   "inline-flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-[var(--nav-pill-hover-background)] focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:outline-none";
 
-const NavPillButton = forwardRef<HTMLButtonElement, ComponentProps<"button">>(
-  function NavPillButton({ children, className, ...props }, ref) {
-    return (
-      <button
-        data-nav-pill
-        ref={ref}
-        type="button"
-        className={cn(navPillClass, className)}
-        {...props}
-      >
-        {children}
-      </button>
-    );
-  },
-);
+function NavPillButton({
+  children,
+  className,
+  ref,
+  ...props
+}: ComponentProps<"button">) {
+  return (
+    <button
+      data-nav-pill
+      ref={ref}
+      type="button"
+      className={cn(navPillClass, className)}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+}
 
 function PopoverMenuButton({
   children,
@@ -109,6 +111,7 @@ const ChainIcon = ({
 }) => {
   return (
     <span
+      aria-hidden="true"
       className={cn(
         "flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 text-[8px] font-bold",
         className,
@@ -117,7 +120,13 @@ const ChainIcon = ({
     >
       {iconUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={iconUrl} alt={name ?? "Network"} className="size-full" />
+        <img
+          src={iconUrl}
+          alt=""
+          width={28}
+          height={28}
+          className="size-full"
+        />
       ) : (
         name?.slice(0, 1) ?? "N"
       )}
@@ -181,6 +190,7 @@ const ChainSelectorPopover = ({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <NavPillButton
+          aria-label={`Select network, current network is ${currentLabel}`}
           className={cn(
             "pr-2.5",
             isWrongNetwork && "border-destructive/60 text-destructive",
@@ -195,6 +205,7 @@ const ChainSelectorPopover = ({
             {currentLabel}
           </span>
           <ChevronDownIcon
+            aria-hidden="true"
             className={cn(
               "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
               open && "rotate-180",
@@ -244,7 +255,7 @@ const ChainSelectorPopover = ({
 const WalletAvatar = ({ label }: { label?: string }) => {
   return (
     <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-      <WalletIcon className="size-3.5" />
+      <WalletIcon aria-hidden="true" className="size-3.5" />
       <span className="sr-only">{label ?? "Wallet"}</span>
     </span>
   );
@@ -278,10 +289,14 @@ const WalletAccountPopover = ({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <NavPillButton className="max-w-[138px] pr-2.5">
+        <NavPillButton
+          className="max-w-[138px] pr-2.5"
+          aria-label={`Open wallet menu for ${displayName}`}
+        >
           <WalletAvatar label={displayName} />
           <span className="min-w-0 truncate">{displayName}</span>
           <ChevronDownIcon
+            aria-hidden="true"
             className={cn(
               "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
               open && "rotate-180",
@@ -296,11 +311,11 @@ const WalletAccountPopover = ({
       >
         <div className="flex flex-col gap-1">
           <PopoverMenuButton onClick={() => void copyAddress()}>
-            <CopyIcon className="size-4 text-muted-foreground" />
+            <CopyIcon aria-hidden="true" className="size-4 text-muted-foreground" />
             <span>Copy address</span>
           </PopoverMenuButton>
           <PopoverMenuButton onClick={disconnectWallet} tone="destructive">
-            <LogOutIcon className="size-4" />
+            <LogOutIcon aria-hidden="true" className="size-4" />
             <span>Disconnect</span>
           </PopoverMenuButton>
         </div>
@@ -391,6 +406,9 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
             <img
               src={brand.logoSrc}
               alt={brand.logoAlt}
+              width={160}
+              height={40}
+              fetchPriority="high"
               className={cn(
                 "h-7 max-w-[112px] object-contain sm:h-10 sm:max-w-none",
                 brand.navLogoClassName,
@@ -421,7 +439,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
                     "w-10 justify-center p-0 sm:w-auto sm:px-3",
                   )}
                 >
-                  <Code2Icon className="size-4" />
+                  <Code2Icon aria-hidden="true" className="size-4" />
                   <span className="hidden sm:inline">Dev guide</span>
                 </Link>
               </TooltipTrigger>

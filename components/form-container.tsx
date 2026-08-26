@@ -11,6 +11,17 @@ import { OrderHistoryTrigger } from "./order-history-trigger";
 import { StyledSelect } from "./ui/styled-select";
 import { SegmentedTabs } from "./ui/tabs";
 
+const MOBILE_FORM_TAB_OPTIONS = FORM_TABS.map((tab) => ({
+  value: tab.value,
+  label: tab.fullLabel,
+}));
+
+const DESKTOP_FORM_TAB_OPTIONS = FORM_TABS.map((tab) => ({
+  value: tab.value,
+  label: tab.label,
+  title: tab.fullLabel,
+}));
+
 const FormHeader = () => {
   const { selectedTab, setSelectedTab } = useSelectedFormTab();
 
@@ -18,22 +29,16 @@ const FormHeader = () => {
     <div data-form-header className="flex items-center">
       <div className="min-w-0 flex-1 sm:hidden">
         <StyledSelect
+          aria-label="Order type"
           value={selectedTab.value}
           onValueChange={setSelectedTab}
-          options={FORM_TABS.map((tab) => ({
-            value: tab.value,
-            label: tab.fullLabel,
-          }))}
+          options={MOBILE_FORM_TAB_OPTIONS}
         />
       </div>
       <SegmentedTabs
         aria-label="Order type"
         value={selectedTab.value}
-        options={FORM_TABS.map((tab) => ({
-          value: tab.value,
-          label: tab.label,
-          title: tab.fullLabel,
-        }))}
+        options={DESKTOP_FORM_TAB_OPTIONS}
         onValueChange={setSelectedTab}
       />
     </div>
@@ -75,6 +80,9 @@ const PoweredBy = () => {
       <img
         src="https://raw.githubusercontent.com/orbs-network/twap-ui/master/logo/orbslogo.svg"
         alt="Orbs"
+        width={25}
+        height={25}
+        loading="lazy"
         className="size-[25px]"
       />
     </a>

@@ -1,5 +1,7 @@
-import React, {
+import {
   memo,
+  type ReactElement,
+  type ReactNode,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -16,8 +18,8 @@ import {
 } from "./ui/dialog";
 import { PlusIcon } from "lucide-react";
 import { Button } from "./ui/button";
-import { Virtuoso } from "react-virtuoso";
-import { Currency } from "@/lib/types";
+import { Virtuoso, type Components } from "react-virtuoso";
+import type { Currency } from "@/lib/types";
 import { useFormatNumber } from "@/lib/hooks/common";
 import BN from "bignumber.js";
 import { useConnection } from "wagmi";
@@ -33,12 +35,13 @@ import { Input } from "./ui/input";
 import { Skeleton } from "./ui/skeleton";
 import { useCurrencies } from "@/lib/hooks/use-currencies";
 import { CurrencyLogo } from "./ui/currency-logo";
+import { EmptyState } from "./ui/empty-state";
 import { useUserStore } from "@/lib/hooks/store";
 import { DEFAULT_CHAIN_ID } from "@/lib/consts";
 
 type Props = {
   onCurrencyChange: (currency: Currency) => void;
-  trigger?: React.ReactNode;
+  trigger?: ReactElement;
 };
 
 const formatTokenSymbol = (symbol?: string) => {
@@ -66,7 +69,7 @@ const limitTokenAmountText = (amount?: string) => {
     return amount;
   }
 
-  return `${amount.slice(0, TOKEN_AMOUNT_VISIBLE_CHARACTERS)}...`;
+  return `${amount.slice(0, TOKEN_AMOUNT_VISIBLE_CHARACTERS)}…`;
 };
 
 const PopularTokens = ({
@@ -83,10 +86,12 @@ const PopularTokens = ({
   return (
     <div className="grid grid-cols-5 gap-2 px-3 pb-3">
       {currencies.map((c) => (
-        <DialogClose key={c.address}>
-          <div
-            className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-border/60 bg-secondary p-3 transition-colors hover:border-primary/25 hover:bg-muted/45"
+        <DialogClose key={c.address} asChild>
+          <button
+            type="button"
+            className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-border/60 bg-secondary p-3 transition-colors hover:border-primary/25 hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
             onClick={() => onCurrencyChange(c)}
+            aria-label={`Select ${formatTokenName(c.name) || formatTokenSymbol(c.symbol)}`}
           >
             <CurrencyLogo
               currency={c}
@@ -98,7 +103,7 @@ const PopularTokens = ({
             <p className="max-w-full cursor-pointer truncate text-center text-xs font-semibold leading-tight">
               {formatTokenSymbol(c.symbol)}
             </p>
-          </div>
+          </button>
         </DialogClose>
       ))}
     </div>
@@ -116,7 +121,10 @@ const SearchInput = ({
     <div className="p-3">
       <Input
         type="text"
-        placeholder="Search"
+        aria-label="Search tokens"
+        autoComplete="off"
+        name="token-search"
+        placeholder="Search tokens…"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -155,37 +163,18 @@ export function CurrencySelector({ onCurrencyChange, trigger }: Props) {
     [chainId, onCurrencyChange, setCustomCurrency],
   );
 
-  const openSelector = useCallback(() => {
-    setOpen(true);
-  }, [setOpen]);
-
   const onOpenChange = useCallback((nextOpen: boolean) => {
     setOpen(nextOpen);
-  }, [setOpen]);
-
-  const openSelectorFromTrigger = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      event.stopPropagation();
-      openSelector();
-    },
-    [openSelector],
-  );
+  }, []);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       {trigger ? (
-        <div
-          role="button"
-          tabIndex={0}
-          className="min-w-0 cursor-pointer"
-          onClick={openSelectorFromTrigger}
-        >
-          {trigger}
-        </div>
+        <DialogTrigger asChild>{trigger}</DialogTrigger>
       ) : (
         <DialogTrigger asChild>
-          <Button>
-            <PlusIcon className="size-4" />
+          <Button aria-label="Select token">
+            <PlusIcon aria-hidden="true" className="size-4" />
           </Button>
         </DialogTrigger>
       )}
@@ -236,7 +225,7 @@ const TokenListShell = ({
   children,
   status,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   status: "loading" | "ready";
 }) => {
   return (
@@ -249,6 +238,24 @@ const TokenListShell = ({
   );
 };
 
+type CurrencyListContext = {
+  currencies: Currency[];
+  onCurrencyChange: (currency: Currency) => void;
+};
+
+function CurrencyListHeader({ context }: { context: CurrencyListContext }) {
+  return (
+    <PopularTokens
+      onCurrencyChange={context.onCurrencyChange}
+      currencies={context.currencies}
+    />
+  );
+}
+
+const CURRENCY_LIST_COMPONENTS: Components<Currency, CurrencyListContext> = {
+  Header: CurrencyListHeader,
+};
+
 const CurrencySelectorList = memo(function CurrencySelectorList({
   search,
   onCurrencyChange,
@@ -257,7 +264,14 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
   onCurrencyChange: (currency: Currency) => void;
 }) {
   const { chainId } = useConnection();
-  const { currencies, isLoading, balances, usdPrices } = useCurrencies(search);
+  const {
+    balances,
+    currencies,
+    isError,
+    isLoading,
+    refetch,
+    usdPrices,
+  } = useCurrencies(search);
   const isEmptyList = !isLoading && currencies.length === 0;
   const popularCurrencies = useMemo(() => {
     if (search) return [];
@@ -284,17 +298,11 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
     },
     [balances, onCurrencyChange, usdPrices],
   );
-  const virtuosoComponents = useMemo(() => {
-    function Header() {
-      return (
-        <PopularTokens
-          onCurrencyChange={onCurrencyChange}
-          currencies={popularCurrencies}
-        />
-      );
-    }
-
-    return { Header };
+  const virtuosoContext = useMemo(() => {
+    return {
+      currencies: popularCurrencies,
+      onCurrencyChange,
+    };
   }, [onCurrencyChange, popularCurrencies]);
   const computeItemKey = useCallback(
     (_: number, currency: Currency) => getTokenKey(currency.address),
@@ -303,10 +311,25 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
 
   return (
     <TokenListShell status="ready">
-      {isEmptyList ? (
-        <div className="flex h-full items-center justify-center">
-          No results found
-        </div>
+      {isError ? (
+        <EmptyState
+          role="alert"
+          className="mx-3 min-h-[300px]"
+          title="Couldn’t load tokens"
+          description="Check your connection, then try loading the token list again."
+          action={
+            <Button size="sm" variant="outline" onClick={() => void refetch()}>
+              Try again
+            </Button>
+          }
+        />
+      ) : isEmptyList ? (
+        <EmptyState
+          role="status"
+          className="mx-3 min-h-[300px]"
+          title="No tokens found"
+          description="Try a token name, symbol, or contract address."
+        />
       ) : isLoading ? (
         <Loader />
       ) : (
@@ -314,7 +337,8 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
           style={{ height: "100%" }}
           data={currencies}
           itemContent={itemContent}
-          components={virtuosoComponents}
+          components={CURRENCY_LIST_COMPONENTS}
+          context={virtuosoContext}
           computeItemKey={computeItemKey}
           defaultItemHeight={66}
           increaseViewportBy={240}
@@ -366,8 +390,9 @@ const CurrencyItem = memo(function CurrencyItem({
 
   return (
     <DialogClose asChild>
-      <div
-        className="group mx-3 mb-2 flex cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 transition-colors hover:border-primary/14 hover:bg-primary/6 data-[highlighted]:bg-primary/6"
+      <button
+        type="button"
+        className="group mx-3 mb-2 flex w-[calc(100%-1.5rem)] cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 text-left transition-colors hover:border-primary/14 hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 data-[highlighted]:bg-primary/6"
         onClick={() => onCurrencyChange(currency)}
       >
         <div className="flex items-center gap-3 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -401,7 +426,7 @@ const CurrencyItem = memo(function CurrencyItem({
             </p>
           </div>
         )}
-      </div>
+      </button>
     </DialogClose>
   );
 });

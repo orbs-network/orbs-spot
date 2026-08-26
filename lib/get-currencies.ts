@@ -1,8 +1,9 @@
-import * as chains from "viem/chains";
-import { Currency } from "./types";
-import { getAddress, isAddress, zeroAddress } from "viem";
 import axios from "axios";
+import { getAddress, isAddress, zeroAddress } from "viem";
+import * as chains from "viem/chains";
+
 import { SUPPORTED_CHAINS } from "./consts";
+import type { Currency } from "./types";
 import {
   dedupeCurrenciesByAddress,
   eqCompare,
@@ -10,7 +11,7 @@ import {
   sortByBaseAssets,
 } from "./utils";
 
-const coingekoChainToName = {
+const coinGeckoChainNames: Readonly<Partial<Record<number, string>>> = {
   [chains.arbitrum.id]: "arbitrum-one",
   [chains.polygon.id]: "polygon-pos",
   [chains.base.id]: "base",
@@ -30,81 +31,82 @@ const coingekoChainToName = {
   [chains.unichain.id]: "unichain",
   [chains.xLayer.id]: "x-layer",
   [chains.megaeth.id]: "megaeth",
-} satisfies Partial<Record<number, string>>;
+};
 
 type CoinGeckoToken = {
   address?: string;
-  symbol?: string;
   decimals?: number;
   logoURI?: string;
   name?: string;
+  symbol?: string;
+};
+
+type ValidCoinGeckoToken = CoinGeckoToken & {
+  address: string;
+  decimals: number;
+  name: string;
+  symbol: string;
 };
 
 const CURRENCY_LIST_LIMIT = 350;
 
-export const getCurrencies = async (
+function isValidCoinGeckoToken(
+  token: CoinGeckoToken,
+): token is ValidCoinGeckoToken {
+  return (
+    typeof token.address === "string" &&
+    isAddress(token.address) &&
+    typeof token.symbol === "string" &&
+    typeof token.name === "string" &&
+    typeof token.decimals === "number"
+  );
+}
+
+export async function getCurrencies(
   chainId: number,
-  signal?: AbortSignal
-): Promise<Currency[]> => {
-  try {
-    const name =
-      coingekoChainToName[chainId as keyof typeof coingekoChainToName];
-    const nativeCurrency = SUPPORTED_CHAINS.find(
-      (chain) => chain.id === chainId,
-    )?.nativeCurrency;
-    const nativeToken = nativeCurrency
-      ? {
-          address: zeroAddress,
-          symbol: nativeCurrency.symbol,
-          decimals: nativeCurrency.decimals,
-          logoUrl: getNativeTokenLogoUrl(chainId),
-          name: nativeCurrency.name,
-        }
-      : undefined;
+  signal?: AbortSignal,
+): Promise<Currency[]> {
+  const name = coinGeckoChainNames[chainId];
+  const nativeCurrency = SUPPORTED_CHAINS.find(
+    (chain) => chain.id === chainId,
+  )?.nativeCurrency;
+  const nativeToken = nativeCurrency
+    ? {
+        address: zeroAddress,
+        symbol: nativeCurrency.symbol,
+        decimals: nativeCurrency.decimals,
+        logoUrl: getNativeTokenLogoUrl(chainId),
+        name: nativeCurrency.name,
+      }
+    : undefined;
 
-    if (!name) {
-      return nativeToken ? [nativeToken] : [];
-    }
-
-    const response = await axios.get(
-      `https://tokens.coingecko.com/${name}/all.json`,
-      { signal }
-    );
-
-    const responseTokens = Array.isArray(response.data?.tokens)
-      ? (response.data.tokens as CoinGeckoToken[])
-      : [];
-
-    const tokens = dedupeCurrenciesByAddress(
-      responseTokens
-        .filter(
-          (token) =>
-            typeof token.address === "string" &&
-            isAddress(token.address) &&
-            typeof token.symbol === "string" &&
-            typeof token.name === "string" &&
-            typeof token.decimals === "number"
-        )
-        .map((token) => ({
-          address: getAddress(token.address!),
-          symbol: token.symbol!,
-          decimals: token.decimals!,
-          logoUrl: "",
-          name: token.name!,
-        }))
-    );
-
-    const tokensWithoutNativeSymbol = tokens.filter(
-      (token: Currency) => !eqCompare(token.symbol, nativeCurrency?.symbol ?? "")
-    );
-
-    let res = sortByBaseAssets(tokensWithoutNativeSymbol, chainId);
-    if (nativeToken) {
-      res = [nativeToken, ...res];
-    }
-    return dedupeCurrenciesByAddress(res).slice(0, CURRENCY_LIST_LIMIT);
-  } catch (error) {
-    console.error("Error fetching tokens:", error);
-    throw error;
+  if (!name) {
+    return nativeToken ? [nativeToken] : [];
   }
-};
+
+  const response = await axios.get<{ tokens?: CoinGeckoToken[] }>(
+    `https://tokens.coingecko.com/${name}/all.json`,
+    { signal },
+  );
+  const responseTokens = Array.isArray(response.data.tokens)
+    ? response.data.tokens
+    : [];
+  const tokens = dedupeCurrenciesByAddress(
+    responseTokens.filter(isValidCoinGeckoToken).map((token) => ({
+      address: getAddress(token.address),
+      symbol: token.symbol,
+      decimals: token.decimals,
+      logoUrl: "",
+      name: token.name,
+    })),
+  );
+  const tokensWithoutNativeSymbol = tokens.filter(
+    (token) => !eqCompare(token.symbol, nativeCurrency?.symbol ?? ""),
+  );
+  const sortedTokens = sortByBaseAssets(tokensWithoutNativeSymbol, chainId);
+  const currencies = nativeToken
+    ? [nativeToken, ...sortedTokens]
+    : sortedTokens;
+
+  return dedupeCurrenciesByAddress(currencies).slice(0, CURRENCY_LIST_LIMIT);
+}

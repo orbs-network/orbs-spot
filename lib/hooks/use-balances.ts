@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { useMemo } from "react";
 import { useFormatNumber, useToAmountUI } from "./common";
-import { Currency } from "../types";
+import type { Currency } from "../types";
 import {
   getDefaultTokensForChain,
   getPopularTokenForChain,

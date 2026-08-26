@@ -53,11 +53,6 @@ const useStep = () => {
   }, [currentStep, explorerUrl, inputCurrency?.symbol, t]);
 };
 
-const formatSafeFixed = (value: BN, decimals = 2) => {
-  if (!value.isFinite() || value.isNaN()) return "0.00";
-  return value.toFixed(decimals);
-};
-
 const formatDynamicDecimals = (value: BN) => {
   if (!value.isFinite() || value.isNaN()) return "0.00";
   return dynamicDecimals(value.toString()) || "0.00";
@@ -143,7 +138,7 @@ const Details = () => {
 function SwapSuccessIcon() {
   return (
     <div className="flex size-14 items-center justify-center rounded-full border border-primary/30 bg-primary/15 text-primary">
-      <CheckIcon className="size-7" strokeWidth={2.4} />
+      <CheckIcon aria-hidden="true" className="size-7" strokeWidth={2.4} />
     </div>
   );
 }
@@ -191,7 +186,7 @@ const Success = ({
         <div className="flex w-full flex-col items-center gap-3">
           <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
             <SwapSuccessToken amount={inputAmountF} currency={inputCurrency} />
-            <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
+            <ArrowRightIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
             <SwapSuccessToken
               amount={outputAmountF}
               className="justify-end"
@@ -267,7 +262,7 @@ const SwapReviewContent = ({
               outputCurrency={outputCurrency}
             />
           ),
-          SuccessIcon: <SwapSuccessIcon />,
+          SuccessIcon: <SwapSuccessIcon aria-hidden="true" />,
           Main: <Main />,
           Loader: <SwapFlowLoader />,
         }}

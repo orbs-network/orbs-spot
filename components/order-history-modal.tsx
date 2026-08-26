@@ -282,7 +282,7 @@ function OrderListItem({
       <OrderProgress status={order.status} value={order.progress} />
       <div className="flex min-w-0 items-center gap-2">
         <OrderToken address={order.srcTokenAddress} />
-        <ArrowRightIcon className="size-4 shrink-0 text-foreground" />
+        <ArrowRightIcon aria-hidden="true" className="size-4 shrink-0 text-foreground" />
         <OrderToken address={order.dstTokenAddress} />
       </div>
     </button>
@@ -347,7 +347,7 @@ function OrderIdRow({ id }: { id?: string }) {
             aria-label="Copy order ID"
             className="flex size-6 shrink-0 items-center justify-center rounded-[8px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
           >
-            <CopyIcon className="size-3.5" />
+            <CopyIcon aria-hidden="true" className="size-3.5" />
           </button>
         ) : null}
       </div>
@@ -373,10 +373,11 @@ function DetailSection({
       <button
         type="button"
         onClick={() => onOpenChange(!open)}
-        className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-3 text-left text-base font-medium text-foreground transition-colors hover:bg-primary/6"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 px-3 py-3 text-left text-base font-medium text-foreground transition-colors hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/35"
+        aria-expanded={open}
       >
         {title}
-        <Icon className="size-5 shrink-0" />
+        <Icon aria-hidden="true" className="size-5 shrink-0" />
       </button>
       {open && <div className="flex flex-col gap-2 px-3 pb-3">{children}</div>}
     </div>
@@ -416,7 +417,7 @@ function OrderPairHeader({ order }: { order: DerivedHistoryOrder }) {
       <p className="min-w-0 truncate text-sm font-semibold text-foreground">
         {order.srcToken?.symbol}
       </p>
-      <ArrowRightIcon className="size-4 shrink-0 text-muted-foreground" />
+      <ArrowRightIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
       <CurrencyLogo
         logoUrl={order.dstToken?.logoUrl}
         symbol={order.dstToken?.symbol}
@@ -487,12 +488,12 @@ function DetailNavigationRow({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-border/60 bg-secondary/30 px-3 py-3 text-left text-base font-medium text-foreground transition-colors hover:border-primary/14 hover:bg-primary/6 disabled:cursor-not-allowed disabled:opacity-55"
+      className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-border/60 bg-secondary/30 px-3 py-3 text-left text-base font-medium text-foreground transition-colors hover:border-primary/14 hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 disabled:cursor-not-allowed disabled:opacity-55"
     >
       <span className="min-w-0 truncate">{title}</span>
       <span className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
         {meta}
-        <ChevronRightIcon className="size-5" />
+        <ChevronRightIcon aria-hidden="true" className="size-5" />
       </span>
     </button>
   );
@@ -510,9 +511,9 @@ function HistoryBackButton({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-border/70 bg-secondary/35 text-foreground transition-colors hover:border-primary/25 hover:bg-secondary/55"
+      className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-border/70 bg-secondary/35 text-foreground transition-colors hover:border-primary/25 hover:bg-secondary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
     >
-      <ArrowLeftIcon className="size-4" />
+      <ArrowLeftIcon aria-hidden="true" className="size-4" />
     </button>
   );
 }
@@ -864,6 +865,7 @@ export function OrderHistoryModal({
             <div className="flex flex-col gap-4 px-5 pb-5">
               <div className="sm:w-[144px]">
                 <StyledSelect
+                  aria-label="Filter orders"
                   value={selectedFilter}
                   onValueChange={setSelectedFilter}
                   options={ORDER_FILTER_OPTIONS.map((filter) => ({

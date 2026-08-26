@@ -339,7 +339,7 @@ function LiveFlowNotice({
       : undefined;
 
   return (
-    <div className="pointer-events-auto w-[420px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-border/80 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl">
+    <div className="pointer-events-auto w-[360px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-border/80 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl">
       <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
         <span className="text-foreground">
           {viewedStep === "flow"
@@ -446,6 +446,7 @@ function LiveOrderFlowModalContent({
   );
 
   const [open, setOpen] = useState(false);
+  const [triggerTooltipOpen, setTriggerTooltipOpen] = useState(false);
   const [navigation, setNavigation] = useState<StepNavigation>({
     history: ["flow"],
     viewedIndex: 0,
@@ -468,6 +469,7 @@ function LiveOrderFlowModalContent({
   const [createdOrder, setCreatedOrder] = useState<CreatedOrderSummary>();
   const [showCreatedOrder, setShowCreatedOrder] = useState(false);
   const completedStepsRef = useRef({ wrappedAmount: BigInt(0) });
+  const suppressTriggerTooltipRef = useRef(false);
   const step = navigation.history.at(-1) ?? "flow";
   const viewedStep = navigation.history[navigation.viewedIndex] ?? step;
   const isReviewingPreviousStep =
@@ -502,9 +504,24 @@ function LiveOrderFlowModalContent({
     return () => window.clearTimeout(refreshTimer);
   }, [currentPermitData, isRunning, open, step]);
 
+  const handleTriggerTooltipOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (nextOpen && suppressTriggerTooltipRef.current) return;
+
+      setTriggerTooltipOpen(nextOpen);
+    },
+    [],
+  );
+
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      if (!nextOpen && isRunning) return;
+      if (nextOpen && isRunning) return;
+
+      setTriggerTooltipOpen(false);
+
+      if (!nextOpen) {
+        suppressTriggerTooltipRef.current = true;
+      }
 
       if (nextOpen) {
         const nextPermitData = clonePermitData(currentPermitData);
@@ -992,8 +1009,19 @@ function LiveOrderFlowModalContent({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <Tooltip>
-        <TooltipTrigger asChild>
+      <Tooltip
+        open={triggerTooltipOpen}
+        onOpenChange={handleTriggerTooltipOpenChange}
+      >
+        <TooltipTrigger
+          asChild
+          onBlur={() => {
+            suppressTriggerTooltipRef.current = false;
+          }}
+          onPointerMove={() => {
+            suppressTriggerTooltipRef.current = false;
+          }}
+        >
           <DialogTrigger asChild>{trigger}</DialogTrigger>
         </TooltipTrigger>
         <TooltipContent>{triggerTooltip}</TooltipContent>
@@ -1002,7 +1030,7 @@ function LiveOrderFlowModalContent({
         presentation="center"
         mobilePresentation="fullscreen"
         onInteractOutside={(event) => event.preventDefault()}
-        showCloseButton={!isRunning}
+        showCloseButton
         className="h-[min(1040px,98dvh)] max-w-[960px] grid-rows-[minmax(0,1fr)] gap-0 p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
       >
         <div className="h-full min-h-0 overflow-hidden">
@@ -1010,6 +1038,7 @@ function LiveOrderFlowModalContent({
             data={presentation.data}
             editable={presentation.editable}
             codeSnippet={presentation.codeSnippet}
+            codeScrollResetKey={viewedStep}
             codeSnippetState={
               isReviewingPreviousStep ? "review" : "active"
             }
@@ -1053,19 +1082,17 @@ function LiveOrderFlowModalContent({
             title={presentation.title}
             viewModeAction={
               <div className="flex w-full flex-wrap items-center justify-between gap-2">
-                <OrdersSinkGuideLink section={guideSection} />
+                <div className="flex items-center gap-2">
+                  <OrdersSinkGuideLink section={guideSection} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => handleOpenChange(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
                 <div className="ml-auto flex items-center gap-2">
-                  {!isReviewingPreviousStep &&
-                    step === "success" &&
-                    !showCreatedOrder && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleOpenChange(false)}
-                      >
-                        Close
-                      </Button>
-                    )}
                   {!connectedAccount ? (
                     <Button
                       data-submit-button
@@ -1106,7 +1133,7 @@ function LiveOrderFlowModalContent({
                       isLoading={!isReviewingPreviousStep && isRunning}
                     >
                       {!isReviewingPreviousStep && step === "success" && (
-                        <CheckIcon className="size-4" />
+                        <CheckIcon aria-hidden="true" className="size-4" />
                       )}
                       {isReviewingPreviousStep
                         ? "Return to current step"
@@ -1149,7 +1176,7 @@ export function LiveOrderFlowModal({
           onClick={() => void retryConfig()}
           className="h-12 rounded-[14px] border-destructive/55 text-destructive hover:border-destructive hover:text-destructive"
         >
-          <RefreshCwIcon className="size-4" />
+          <RefreshCwIcon aria-hidden="true" className="size-4" />
           Retry config
         </Button>
       );

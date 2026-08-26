@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { Loader2 } from "lucide-react"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow,opacity] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
   {
     variants: {
       variant: {
@@ -57,12 +57,13 @@ function Button({
 
   return (
     <Comp
+      {...props}
+      type={asChild ? undefined : props.type ?? "button"}
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }), "cursor-pointer")}
       disabled={isLoading || props.disabled}
-      {...props}
     >
-      {isLoading && <Loader2  className="animate-spin size-4 text-current" />}
+      {isLoading && <Loader2 aria-hidden="true" className="size-4 animate-spin text-current" />}
       {children}
     </Comp>
   )

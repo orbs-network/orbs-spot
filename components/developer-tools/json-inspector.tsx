@@ -8,6 +8,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -98,6 +99,7 @@ export type CodeSnippetOptions = {
 
 export type JsonInspectorModalProps = {
   codeSnippet?: CodeSnippetOptions;
+  codeScrollResetKey?: string | number;
   codeSnippetState?: "active" | "review";
   copyActionsInHeaders?: boolean;
   copyAs?: "curl" | "json";
@@ -292,9 +294,9 @@ function ExplainedJsonView({
                   className="mr-1 inline-flex size-5 items-center justify-center rounded align-middle text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
                 >
                   {isExpanded ? (
-                    <ChevronDownIcon className="size-3.5" />
+                    <ChevronDownIcon aria-hidden="true" className="size-3.5" />
                   ) : (
-                    <ChevronRightIcon className="size-3.5" />
+                    <ChevronRightIcon aria-hidden="true" className="size-3.5" />
                   )}
                 </button>
               )}
@@ -304,7 +306,7 @@ function ExplainedJsonView({
                     <button
                       type="button"
                       onClick={() => togglePath(path)}
-                      className="font-semibold text-foreground hover:text-primary"
+                      className="rounded-sm font-semibold text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
                     >
                       {key}
                     </button>
@@ -318,7 +320,7 @@ function ExplainedJsonView({
                 {openingPunctuation}
               </span>
               {!isExpanded && hasChildren && (
-                <span className="text-muted-foreground">...</span>
+                <span className="text-muted-foreground">…</span>
               )}
               {!isExpanded && (
                 <span className="text-muted-foreground">
@@ -652,6 +654,7 @@ function InspectorContent({
 
 function JsonInspectorModalContent({
   codeSnippet,
+  codeScrollResetKey,
   codeSnippetState,
   copyActionsInHeaders = true,
   copyAs = "curl",
@@ -689,6 +692,7 @@ function JsonInspectorModalContent({
   const descriptionId = useId();
   const fieldIdPrefix = useId();
   const codeContainerRef = useRef<HTMLDivElement>(null);
+  const codeScrollRef = useRef<HTMLPreElement>(null);
   const copyResetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [mode, setMode] = useState<EditorMode>("view");
   const [draft, setDraft] = useState<JsonContainer>(data);
@@ -850,6 +854,12 @@ function JsonInspectorModalContent({
     },
     [],
   );
+
+  useLayoutEffect(() => {
+    if (codeScrollResetKey === undefined) return;
+
+    codeScrollRef.current?.scrollTo({ left: 0, top: 0 });
+  }, [codeScrollResetKey]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -1110,7 +1120,7 @@ function JsonInspectorModalContent({
           <div className="flex items-center gap-1.5">
             {!valueIsEditable && (
               <span className="inline-flex items-center gap-1 rounded-md bg-secondary/45 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                <LockIcon className="size-2.5" />
+                <LockIcon aria-hidden="true" className="size-2.5" />
                 Read only
               </span>
             )}
@@ -1127,6 +1137,7 @@ function JsonInspectorModalContent({
             </span>
             <Switch
               id={inputId}
+              name={inputId}
               checked={Boolean(currentValue)}
               onCheckedChange={(value) => updateBooleanField(path, value)}
               disabled={!valueIsEditable}
@@ -1136,6 +1147,8 @@ function JsonInspectorModalContent({
         ) : (
           <Input
             id={inputId}
+            name={inputId}
+            autoComplete="off"
             type={typeof originalValue === "number" ? "number" : "text"}
             step={typeof originalValue === "number" ? "any" : undefined}
             value={fieldInputs[pathKey] ?? formatFieldInput(currentValue)}
@@ -1219,7 +1232,9 @@ function JsonInspectorModalContent({
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-1 rounded-md bg-secondary/55 px-2 py-1 text-[10px] font-medium text-muted-foreground">
-                  {!sectionIsEditable && <LockIcon className="size-2.5" />}
+                  {!sectionIsEditable && (
+                    <LockIcon aria-hidden="true" className="size-2.5" />
+                  )}
                   {sectionIsEditable ? "Editable values" : "Read only"}
                 </span>
               </div>
@@ -1268,7 +1283,7 @@ function JsonInspectorModalContent({
                 : "text-muted-foreground hover:bg-secondary/45 hover:text-foreground"
             }`}
           >
-            <Code2Icon className="size-3.5 text-primary" />
+            <Code2Icon aria-hidden="true" className="size-3.5 text-primary" />
             {file.name}
           </button>
         );
@@ -1287,9 +1302,9 @@ function JsonInspectorModalContent({
       className="h-7 px-2 text-[11px]"
     >
       {isCodeFullscreen ? (
-        <Minimize2Icon className="size-3.5" />
+        <Minimize2Icon aria-hidden="true" className="size-3.5" />
       ) : (
-        <Maximize2Icon className="size-3.5" />
+        <Maximize2Icon aria-hidden="true" className="size-3.5" />
       )}
       <span className="max-sm:hidden">
         {isCodeFullscreen ? "Exit full screen" : "Full screen"}
@@ -1314,9 +1329,9 @@ function JsonInspectorModalContent({
             disabled={validationIssues.length > 0}
           >
             {copiedTarget === "primary" ? (
-              <CheckIcon />
+              <CheckIcon aria-hidden="true" />
             ) : (
-              <ClipboardIcon />
+              <ClipboardIcon aria-hidden="true" />
             )}
             {copiedTarget === "primary"
               ? "Copied"
@@ -1330,9 +1345,9 @@ function JsonInspectorModalContent({
               onClick={() => void handleCopyResponse()}
             >
               {copiedTarget === "response" ? (
-                <CheckIcon />
+                <CheckIcon aria-hidden="true" />
               ) : (
-                <ClipboardIcon />
+                <ClipboardIcon aria-hidden="true" />
               )}
               {copiedTarget === "response" ? "Copied" : "Copy JSON"}
             </Button>
@@ -1353,7 +1368,7 @@ function JsonInspectorModalContent({
             disabled={validationIssues.length > 0}
             isLoading={isSaving}
           >
-            <SaveIcon />
+            <SaveIcon aria-hidden="true" />
             Save changes
           </Button>
         </div>
@@ -1375,7 +1390,7 @@ function JsonInspectorModalContent({
               <DialogTrigger asChild>
                 {trigger ?? (
                   <Button variant="outline">
-                    <BracesIcon />
+                    <BracesIcon aria-hidden="true" />
                     {triggerLabel}
                   </Button>
                 )}
@@ -1387,7 +1402,7 @@ function JsonInspectorModalContent({
           <DialogTrigger asChild>
             {trigger ?? (
               <Button variant="outline">
-                <BracesIcon />
+                <BracesIcon aria-hidden="true" />
                 {triggerLabel}
               </Button>
             )}
@@ -1417,7 +1432,7 @@ function JsonInspectorModalContent({
                     onClick={headerBackAction.onClick}
                     className="-ml-2"
                   >
-                    <ArrowLeftIcon className="size-4" />
+                    <ArrowLeftIcon aria-hidden="true" className="size-4" />
                   </Button>
                 )}
                 {embedded ? (
@@ -1432,6 +1447,7 @@ function JsonInspectorModalContent({
                       }`}
                     >
                       <BracesIcon
+                        aria-hidden="true"
                         className={
                           isDocumentationDensity ? "size-3.5" : "size-4"
                         }
@@ -1442,7 +1458,7 @@ function JsonInspectorModalContent({
                 ) : (
                   <DialogTitle className="flex items-center gap-2 text-[18px]">
                     <span className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
-                      <BracesIcon className="size-4" />
+                      <BracesIcon aria-hidden="true" className="size-4" />
                     </span>
                     {title}
                   </DialogTitle>
@@ -1489,7 +1505,12 @@ function JsonInspectorModalContent({
               {isInlineCodeEdit && validationIssues.length > 0 && (
                 <InlineMessage
                   variant="error"
-                  icon={<CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-destructive" />}
+                  icon={
+                    <CircleAlertIcon
+                      aria-hidden="true"
+                      className="mt-0.5 size-4 shrink-0 text-destructive"
+                    />
+                  }
                 >
                   <div>
                     <p>
@@ -1545,9 +1566,9 @@ function JsonInspectorModalContent({
                         className="h-7 px-2 text-[11px]"
                       >
                         {copiedTarget === "curl" ? (
-                          <CheckIcon className="size-3.5" />
+                          <CheckIcon aria-hidden="true" className="size-3.5" />
                         ) : (
-                          <ClipboardIcon className="size-3.5" />
+                          <ClipboardIcon aria-hidden="true" className="size-3.5" />
                         )}
                         {copiedTarget === "curl" ? "Copied" : "Copy as cURL"}
                       </Button>
@@ -1568,9 +1589,9 @@ function JsonInspectorModalContent({
                       className="h-7 px-2 text-[11px]"
                     >
                       {copiedTarget === previewCopyTarget ? (
-                        <CheckIcon className="size-3.5" />
+                        <CheckIcon aria-hidden="true" className="size-3.5" />
                       ) : (
-                        <ClipboardIcon className="size-3.5" />
+                        <ClipboardIcon aria-hidden="true" className="size-3.5" />
                       )}
                       {copiedTarget === previewCopyTarget ? "Copied" : "Copy"}
                     </Button>
@@ -1609,7 +1630,10 @@ function JsonInspectorModalContent({
                     renderCodeFileTabs()
                   ) : (
                     <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <Code2Icon className="size-4 shrink-0 text-primary" />
+                      <Code2Icon
+                        aria-hidden="true"
+                        className="size-4 shrink-0 text-primary"
+                      />
                       <span className="truncate">
                         {activeCodeFile?.name ??
                           codeSnippet?.language ??
@@ -1634,7 +1658,7 @@ function JsonInspectorModalContent({
                         isLoading={isSaving}
                         className="h-7 px-2 text-[11px] text-primary hover:text-primary"
                       >
-                        <RotateCcwIcon className="size-3.5" />
+                        <RotateCcwIcon aria-hidden="true" className="size-3.5" />
                         Reset
                       </Button>
                     )}
@@ -1649,9 +1673,9 @@ function JsonInspectorModalContent({
                           className="h-7 px-2 text-[11px]"
                         >
                           {copiedTarget === "primary" ? (
-                            <CheckIcon className="size-3.5" />
+                            <CheckIcon aria-hidden="true" className="size-3.5" />
                           ) : (
-                            <ClipboardIcon className="size-3.5" />
+                            <ClipboardIcon aria-hidden="true" className="size-3.5" />
                           )}
                           {copiedTarget === "primary" ? "Copied" : "Copy"}
                         </Button>
@@ -1697,6 +1721,7 @@ function JsonInspectorModalContent({
                     tokens,
                   }) => (
                     <pre
+                      ref={codeScrollRef}
                       className={`${className} min-h-0 flex-1 overflow-auto p-4 font-mono ${
                         isDocumentationDensity
                           ? "text-[12px] leading-5"
@@ -1834,6 +1859,8 @@ function JsonInspectorModalContent({
                                     <Tooltip>
                                       <TooltipTrigger asChild>
                                         <Input
+                                          name={`json-inline-${pathKey}`}
+                                          autoComplete="off"
                                           type={
                                             typeof inlineField.value ===
                                             "number"
@@ -1910,7 +1937,10 @@ function JsonInspectorModalContent({
                   {copyActionsInHeaders && (
                     <div className="flex items-center justify-between border-b border-border/70 bg-secondary/35 px-4 py-3">
                       <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                        <BracesIcon className="size-4 text-primary" />
+                        <BracesIcon
+                          aria-hidden="true"
+                          className="size-4 text-primary"
+                        />
                         {copyAs === "curl" ? "Request" : "JSON"}
                       </div>
                       <Button
@@ -1922,9 +1952,9 @@ function JsonInspectorModalContent({
                         className="h-7 px-2 text-[11px]"
                       >
                         {copiedTarget === "primary" ? (
-                          <CheckIcon className="size-3.5" />
+                          <CheckIcon aria-hidden="true" className="size-3.5" />
                         ) : (
-                          <ClipboardIcon className="size-3.5" />
+                          <ClipboardIcon aria-hidden="true" className="size-3.5" />
                         )}
                         {copiedTarget === "primary" ? "Copied" : "Copy"}
                       </Button>
@@ -1965,7 +1995,10 @@ function JsonInspectorModalContent({
                   {!requestResponseTabs && (
                     <div className="flex items-center justify-between border-b border-border/70 bg-secondary/35 px-4 py-3">
                     <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <BracesIcon className="size-4 text-primary" />
+                      <BracesIcon
+                        aria-hidden="true"
+                        className="size-4 text-primary"
+                      />
                       {responseLabel}
                     </div>
                     {copyActionsInHeaders ? (
@@ -1977,9 +2010,9 @@ function JsonInspectorModalContent({
                         className="h-7 px-2 text-[11px]"
                       >
                         {copiedTarget === "response" ? (
-                          <CheckIcon className="size-3.5" />
+                          <CheckIcon aria-hidden="true" className="size-3.5" />
                         ) : (
-                          <ClipboardIcon className="size-3.5" />
+                          <ClipboardIcon aria-hidden="true" className="size-3.5" />
                         )}
                         {copiedTarget === "response" ? "Copied" : "Copy"}
                       </Button>
@@ -2026,7 +2059,12 @@ function JsonInspectorModalContent({
               {validationIssues.length > 0 && (
                 <InlineMessage
                   variant="error"
-                  icon={<CircleAlertIcon className="mt-0.5 size-4 shrink-0 text-destructive" />}
+                  icon={
+                    <CircleAlertIcon
+                      aria-hidden="true"
+                      className="mt-0.5 size-4 shrink-0 text-destructive"
+                    />
+                  }
                 >
                   <div>
                     <p>

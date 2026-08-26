@@ -16,7 +16,7 @@ import { Currency, Field } from "@/lib/types";
 import { cn, formatDecimals } from "@/lib/utils";
 import { Module, type Token, useSpot } from "@orbs-network/spot-react";
 import { ArrowLeftRightIcon } from "lucide-react";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 
 export function PriceTokenSelector({
   className,
@@ -43,6 +43,7 @@ export function PriceTokenSelector({
       onCurrencyChange={onCurrencyChange}
       trigger={
         <TokenSelectorTrigger
+          aria-label="Select price token"
           currency={currency}
           symbol={token?.symbol}
           logoUrl={token?.logoUrl || currency?.logoUrl}
@@ -59,6 +60,8 @@ export function PriceTokenSelector({
 }
 
 function SpotPriceInput({
+  inputLabel,
+  inputName,
   token,
   tokenField,
   value,
@@ -67,6 +70,8 @@ function SpotPriceInput({
   onPercentageChange,
   usd,
 }: {
+  inputLabel: string;
+  inputName: string;
   token?: Token;
   tokenField: Field;
   value: string;
@@ -76,22 +81,11 @@ function SpotPriceInput({
   usd?: string;
 }) {
   const usdFormatted = useFormatNumber({ value: usd, decimalScale: 2 });
-  const valueInputRef = useRef<HTMLInputElement>(null);
-  const percentageInputRef = useRef<HTMLInputElement>(null);
-
-  const focusValueInput = useCallback(() => {
-    valueInputRef.current?.focus({ preventScroll: true });
-  }, []);
-
-  const focusPercentageInput = useCallback(() => {
-    percentageInputRef.current?.focus({ preventScroll: true });
-  }, []);
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_90px] gap-2">
       <FormNumberField
         className="flex min-w-0 items-center gap-3 rounded-[12px] border border-border/80 bg-transparent px-3 py-2 text-foreground transition-colors focus-within:border-primary"
-        onClick={focusValueInput}
       >
         <PriceTokenSelector
           token={token}
@@ -102,7 +96,8 @@ function SpotPriceInput({
         />
         <div className="min-w-0 flex-1 text-right">
           <NumericInput
-            ref={valueInputRef}
+            aria-label={inputLabel}
+            name={inputName}
             value={value}
             onChange={onChange}
             className="text-right text-[20px] font-semibold text-foreground"
@@ -114,10 +109,10 @@ function SpotPriceInput({
       </FormNumberField>
       <FormNumberField
         className="cursor-pointer rounded-[12px] border border-border/80 bg-transparent px-2 py-2 text-foreground transition-colors focus-within:border-primary"
-        onClick={focusPercentageInput}
       >
         <NumericInput
-          ref={percentageInputRef}
+          aria-label={`${inputLabel} adjustment percentage`}
+          name={`${inputName}-percentage`}
           value={percentage}
           onChange={onPercentageChange}
           className="text-center text-[18px] font-semibold text-foreground"
@@ -135,7 +130,7 @@ function PriceResetButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="text-sm font-semibold text-muted-foreground transition-colors hover:text-primary"
+      className="rounded-md text-sm font-semibold text-muted-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
     >
       Set to default
     </button>
@@ -175,6 +170,8 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
         <PriceResetButton onClick={onReset} />
       </div>
       <SpotPriceInput
+        inputLabel="Trigger price"
+        inputName="trigger-price"
         token={invertedDstToken}
         tokenField={isInverted ? Field.INPUT : Field.OUTPUT}
         value={isTypedValue ? price : formatDecimals(price, 6)}
@@ -222,6 +219,8 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
       </div>
       {isLimitPrice && (
         <SpotPriceInput
+          inputLabel="Limit price"
+          inputName="limit-price"
           token={invertedDstToken}
           tokenField={isInverted ? Field.INPUT : Field.OUTPUT}
           value={isTypedValue ? priceUI : formatDecimals(priceUI, 6)}
@@ -262,7 +261,7 @@ function PricesHeader() {
           onClick={onInvert}
           aria-label="Invert rate"
         >
-          <ArrowLeftRightIcon className="size-4" />
+          <ArrowLeftRightIcon aria-hidden="true" className="size-4" />
         </Button>
       )}
     </div>
@@ -278,4 +277,3 @@ export function PricesPanel({ orderModule }: { orderModule: Module }) {
     </FormPanel>
   );
 }
-

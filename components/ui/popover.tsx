@@ -38,7 +38,7 @@ function Popover({
 function PopoverTrigger({
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Trigger>) {
-  const { isDrawer } = React.useContext(ResponsivePopoverContext);
+  const { isDrawer } = React.use(ResponsivePopoverContext);
   const Trigger = isDrawer ? DrawerTrigger : PopoverPrimitive.Trigger;
 
   return <Trigger data-slot="popover-trigger" {...props} />;
@@ -56,7 +56,7 @@ function PopoverContent({
   drawerTitle?: string;
   mobilePresentation?: "drawer" | "fullscreen";
 }) {
-  const { isDrawer } = React.useContext(ResponsivePopoverContext);
+  const { isDrawer } = React.use(ResponsivePopoverContext);
 
   if (isDrawer) {
     const isFullscreen = mobilePresentation === "fullscreen";
@@ -65,7 +65,7 @@ function PopoverContent({
       <DrawerContent
         data-slot="popover-content"
         className={cn(
-          "p-4",
+          "overscroll-contain p-4",
           className,
           "bg-card/98 text-card-foreground",
           isFullscreen
@@ -85,7 +85,7 @@ function PopoverContent({
                 className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary/45 hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary/35 focus-visible:outline-none"
                 aria-label="Close"
               >
-                <XIcon className="size-5" />
+                <XIcon aria-hidden="true" className="size-5" />
               </button>
             </DrawerClose>
           </div>

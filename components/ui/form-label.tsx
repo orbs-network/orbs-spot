@@ -29,12 +29,14 @@ export function InfoTooltip({
         <button
           type="button"
           className={cn(
-            "text-muted-foreground transition-colors hover:text-foreground",
+            "rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
             buttonClassName,
           )}
           aria-label={ariaLabel}
         >
-          {children ?? <InfoIcon className={cn("size-4", iconClassName)} />}
+          {children ?? (
+            <InfoIcon aria-hidden="true" className={cn("size-4", iconClassName)} />
+          )}
         </button>
       </TooltipTrigger>
       <TooltipContent>{tooltip}</TooltipContent>

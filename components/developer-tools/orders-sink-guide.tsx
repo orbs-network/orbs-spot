@@ -163,13 +163,13 @@ export function OrdersSinkGuide() {
   }, [activeItem.id]);
 
   return (
-    <main className="w-full max-w-[1440px] pb-20 pt-5 sm:pt-8">
+    <div className="w-full max-w-[1440px] pb-20 pt-5 sm:pt-8">
       <header className="mx-auto max-w-[1120px]">
         <Link
           href={preserveDeveloperModeInHref("/", isDeveloperMode)}
           className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
-          <ArrowLeftIcon className="size-4" />
+          <ArrowLeftIcon aria-hidden="true" className="size-4" />
           Back to trading
         </Link>
         <div className="mt-7 max-w-[820px]">
@@ -196,7 +196,7 @@ export function OrdersSinkGuide() {
           >
             <div className="flex items-center gap-3">
               <span className="flex size-9 items-center justify-center rounded-[11px] bg-primary/18 text-primary">
-                <ShieldCheckIcon className="size-5" />
+                <ShieldCheckIcon aria-hidden="true" className="size-5" />
               </span>
               <h2 className="text-lg font-semibold text-foreground">
                 Implementation rules
@@ -263,7 +263,7 @@ export function OrdersSinkGuide() {
                       )}
                     >
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-primary/12 text-primary">
-                        <Icon className="size-4" />
+                        <Icon aria-hidden="true" className="size-4" />
                       </span>
                       <span className="min-w-0">
                         <span className="block text-xs font-semibold text-foreground">
@@ -292,6 +292,6 @@ export function OrdersSinkGuide() {
           </section>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

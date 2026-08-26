@@ -4,7 +4,7 @@ import { erc20Abi, getAddress, isAddress } from "viem";
 import { useConnection, useReadContracts } from "wagmi";
 import { useBalances } from "./use-balances";
 import { useUSDPrices } from "./use-usd-price";
-import { Currency } from "../types";
+import type { Currency } from "../types";
 import { useCurrenciesQuery } from "./use-currencies-query";
 import { useDataChainId } from "./use-data-chain-id";
 
@@ -53,23 +53,25 @@ const useExternalCurrency = (address?: `0x${string}`) => {
 
 const useAllCurrencies = () => {
   const { chainId } = useConnection();
-  const { data: currencies, isLoading } = useCurrenciesQuery();
+  const {
+    data: currencies,
+    isError,
+    isLoading,
+    refetch,
+  } = useCurrenciesQuery();
 
   const { data: balances } = useBalances();
 
-  const tokensWithBalance = useMemo(
-    () => {
-      if (!currencies?.length || !balances) return [];
+  const tokensWithBalance = useMemo(() => {
+    if (!currencies?.length || !balances) return [];
 
-      return currencies
-        .filter((it) => {
-          const raw = balances[getTokenKey(it.address)]?.toString();
-          return raw !== undefined && raw !== "" && raw !== "0";
-        })
-        .map((it) => it.address);
-    },
-    [currencies, balances]
-  );
+    return currencies
+      .filter((it) => {
+        const raw = balances[getTokenKey(it.address)]?.toString();
+        return raw !== undefined && raw !== "" && raw !== "0";
+      })
+      .map((it) => it.address);
+  }, [currencies, balances]);
 
   const { data: usdPrices } = useUSDPrices(tokensWithBalance);
 
@@ -80,19 +82,19 @@ const useAllCurrencies = () => {
     return sortTokens(currencies, usdPrices, balances, chainId);
   }, [currencies, balances, usdPrices, chainId, tokensWithBalance.length]);
 
-  return useMemo(
-    () => ({
-      currencies: result,
-      isLoading,
-      balances,
-      usdPrices,
-    }),
-    [balances, isLoading, result, usdPrices]
-  );
+  return {
+    balances,
+    currencies: result,
+    isError,
+    isLoading,
+    refetch,
+    usdPrices,
+  };
 };
 
 export const useCurrencies = (query?: string) => {
-  const { currencies, isLoading, balances, usdPrices } = useAllCurrencies();
+  const { balances, currencies, isError, isLoading, refetch, usdPrices } =
+    useAllCurrencies();
   const internalCurrencies = useMemo(() => {
     if (!query) return currencies;
     return filterCurrencies(currencies, [query]);
@@ -105,22 +107,16 @@ export const useCurrencies = (query?: string) => {
     allowExternal ? query : undefined
   );
 
-  const result = useMemo(() => {
-    if (externalCurrency) {
-      return [externalCurrency];
-    }
-    return internalCurrencies;
-  }, [externalCurrency, internalCurrencies]);
+  const result = externalCurrency ? [externalCurrency] : internalCurrencies;
 
-  return useMemo(
-    () => ({
-      currencies: result,
-      isLoading,
-      balances,
-      usdPrices,
-    }),
-    [balances, isLoading, result, usdPrices]
-  );
+  return {
+    balances,
+    currencies: result,
+    isError,
+    isLoading,
+    refetch,
+    usdPrices,
+  };
 };
 
 export const useCurrency = (address?: string) => {
@@ -142,7 +138,5 @@ export const useCurrency = (address?: string) => {
     allowExternal ? address : undefined
   );
 
-  return useMemo(() => {
-    return internalCurrency ?? externalCurrency;
-  }, [externalCurrency, internalCurrency]);
+  return internalCurrency ?? externalCurrency;
 };

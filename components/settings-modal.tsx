@@ -43,10 +43,10 @@ const SettingsHeader = ({
       <DialogClose asChild>
         <button
           type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground"
+          className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
           aria-label="Close settings"
         >
-          <XIcon className="size-5" />
+          <XIcon aria-hidden="true" className="size-5" />
         </button>
       </DialogClose>
     </DialogHeader>
@@ -115,6 +115,8 @@ const PercentSettings = ({
         />
         <FormNumberField className="h-full w-[92px] shrink-0 rounded-[12px] px-2 sm:w-[114px] sm:px-3">
           <NumericInput
+            aria-label="Custom percentage"
+            name="custom-percentage"
             value={value ? value.toString() : ""}
             onChange={(nextValue) => onChange(Number(nextValue), "custom")}
             className="text-center text-[16px] font-semibold"
@@ -210,7 +212,7 @@ const SettingsInlineTrigger = ({
           )}
         >
           {displayValue}
-          <PencilIcon className="size-4 max-sm:size-3.5" />
+          <PencilIcon aria-hidden="true" className="size-4 max-sm:size-3.5" />
         </button>
       </DialogTrigger>
     </div>

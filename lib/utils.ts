@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { Currency, USDPrices } from "./types";
+import type { Currency, USDPrices } from "./types";
 import { Balances } from "./types";
 import { formatUnits, getAddress, isAddress, parseUnits, zeroAddress } from "viem";
 import { wCurrencies } from "./wrapped-currencies";
@@ -380,7 +380,7 @@ export const makeEllipsisAddress = (
   padding?: { start: number; end: number }
 ): string => {
   if (!address) return "";
-  return `${address.substring(0, padding?.start || 6)}...${address.substring(
+  return `${address.substring(0, padding?.start || 6)}…${address.substring(
     address.length - (padding?.end || 5)
   )}`;
 };

@@ -1,8 +1,8 @@
 import { FORM_TABS, SPOT_TABS } from "../consts";
 import { FormTab } from "../types";
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { pushUrlState } from "../url-state";
+import { updateUrlSearchParams } from "../url-state";
 
 const tabParamToFormTab: Record<string, FormTab> = {
   swap: FormTab.SWAP,
@@ -32,32 +32,20 @@ export const useSelectedFormTab = () => {
 
   const setSelectedTab = useCallback(
     (nextTab: FormTab) => {
-      const nextParams = new URLSearchParams(searchParams.toString());
-      const tabParam = formTabToTabParam[nextTab];
+      updateUrlSearchParams(pathname, searchParams, (nextParams) => {
+        const tabParam = formTabToTabParam[nextTab];
 
-      if (tabParam) {
-        nextParams.set("tab", tabParam);
-      } else {
-        nextParams.delete("tab");
-      }
-
-      const queryString = nextParams.toString();
-      const hash =
-        typeof window === "undefined" ? "" : window.location.hash;
-      const href = `${pathname}${queryString ? `?${queryString}` : ""}${hash}`;
-
-      pushUrlState(href);
+        if (tabParam) {
+          nextParams.set("tab", tabParam);
+        } else {
+          nextParams.delete("tab");
+        }
+      });
     },
-    [pathname, searchParams]
+    [pathname, searchParams],
   );
 
-  return useMemo(
-    () => ({
-      selectedTab,
-      setSelectedTab,
-    }),
-    [selectedTab, setSelectedTab]
-  );
+  return { selectedTab, setSelectedTab };
 };
 
 export const useIsSpotTab = () => {

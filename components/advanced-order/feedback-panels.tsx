@@ -22,7 +22,7 @@ export function InputErrorPanel() {
     <InlineMessage
       variant="error"
       icon={
-        <AlertTriangleIcon className="relative top-0.5 size-4 shrink-0 text-destructive" />
+        <AlertTriangleIcon aria-hidden="true" className="relative top-0.5 size-4 shrink-0 text-destructive" />
       }
     >
       <p className="flex-1">{message}</p>
@@ -41,7 +41,7 @@ export function DisclaimerPanel() {
   return (
     <InlineMessage
       icon={
-        <InfoIcon className="relative top-1 size-4 shrink-0 text-muted-foreground" />
+        <InfoIcon aria-hidden="true" className="relative top-1 size-4 shrink-0 text-muted-foreground" />
       }
     >
       <p className="flex-1 text-[14px] text-muted-foreground">

@@ -241,7 +241,7 @@ export function useSpotCallbacks() {
     return {
       onWrapRequest: () => {
         toast.loading(
-          `${t("wrapAction", { symbol: inputCurrency?.symbol ?? "token" })}...`,
+          `${t("wrapAction", { symbol: inputCurrency?.symbol ?? "token" })}…`,
           {
             id: WRAP_TOAST_ID,
             description: t("proceedInWallet"),
@@ -272,7 +272,7 @@ export function useSpotCallbacks() {
       },
       onApproveRequest: () => {
         toast.loading(
-          `${t("approveAction", { symbol: approvalSymbol || "token" })}...`,
+          `${t("approveAction", { symbol: approvalSymbol || "token" })}…`,
           {
             id: APPROVE_TOAST_ID,
             description: t("proceedInWallet"),
@@ -340,7 +340,7 @@ export function useSpotCallbacks() {
         showTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
       },
       onCancelOrderRequest: () => {
-        toast.loading(`${t("cancelOrder")}...`, {
+        toast.loading(`${t("cancelOrder")}…`, {
           id: CANCEL_ORDER_TOAST_ID,
           description: t("proceedInWallet"),
         });

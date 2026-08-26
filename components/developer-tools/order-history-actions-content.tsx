@@ -89,7 +89,7 @@ export function FetchOrdersDeveloperButtonContent({
         className="border-destructive/55 text-destructive hover:border-destructive hover:text-destructive"
         aria-label="Retry Orders Sink configuration"
       >
-        <RefreshCwIcon className="size-3.5" />
+        <RefreshCwIcon aria-hidden="true" className="size-3.5" />
         Retry config
       </Button>
     );
@@ -131,7 +131,7 @@ export function FetchOrdersDeveloperButtonContent({
           className="rounded-[10px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
           aria-label="Show how to fetch orders"
         >
-          <Code2Icon className="size-4" />
+          <Code2Icon aria-hidden="true" className="size-4" />
         </Button>
       }
     />
@@ -180,7 +180,7 @@ export function CancelOrderDeveloperButtonContent({
         className="h-12 rounded-[14px] border-destructive/55 text-destructive hover:border-destructive hover:text-destructive"
         aria-label="Retry Orders Sink configuration"
       >
-        <RefreshCwIcon className="size-4" />
+        <RefreshCwIcon aria-hidden="true" className="size-4" />
         Retry config
       </Button>
     );
@@ -207,7 +207,7 @@ export function CancelOrderDeveloperButtonContent({
           className="size-12 rounded-[14px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
           aria-label="Open cancel order code"
         >
-          <Code2Icon className="size-5" />
+          <Code2Icon aria-hidden="true" className="size-5" />
         </Button>
       }
       viewModeAction={

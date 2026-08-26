@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/lib/providers";
 import { Navigation } from "@/components/navigation";
@@ -60,6 +60,14 @@ export function generateMetadata(): Metadata {
   };
 }
 
+export function generateViewport(): Viewport {
+  const partner = getActivePartnerConfig();
+
+  return {
+    themeColor: partner.styles.colors.background,
+  };
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -79,10 +87,19 @@ export default function RootLayout({
         >
           <Toaster />
           <div className="ef-app-shell flex min-h-screen flex-col font-sans text-foreground">
+            <a
+              href="#main-content"
+              className="fixed left-4 top-4 z-[100] -translate-y-20 rounded-lg bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-lg transition-transform focus-visible:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              Skip to main content
+            </a>
             <Navigation brand={partner.brand} />
-            <div className="flex flex-1 justify-center px-4 pt-[60px] sm:pt-[72px]">
+            <main
+              id="main-content"
+              className="flex flex-1 justify-center px-4 pt-[60px] sm:pt-[72px]"
+            >
               {children}
-            </div>
+            </main>
           </div>
         </Providers>
       </body>

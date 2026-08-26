@@ -29,7 +29,7 @@ function TokensPair({
           {srcTokenData?.symbol}
         </p>
       </div>
-      <ChevronRight className="size-4" />
+      <ChevronRight aria-hidden="true" className="size-4" />
       <div className="flex items-center gap-1">
         <CurrencyLogo currency={dstTokenData} className="size-4" fallbackClassName="text-[8px]" />
         <p className="text-sm whitespace-nowrap font-medium">

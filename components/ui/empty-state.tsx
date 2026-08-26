@@ -1,20 +1,23 @@
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
 export function EmptyState({
+  action,
   children,
   className,
   description,
   title,
-}: {
+  ...props
+}: Omit<ComponentProps<"div">, "title"> & {
+  action?: ReactNode;
   children?: ReactNode;
-  className?: string;
   description?: ReactNode;
   title?: ReactNode;
 }) {
   return (
     <div
+      {...props}
       className={cn(
         "flex min-h-[320px] flex-col items-center justify-center rounded-[18px] border border-dashed border-border/80 bg-secondary/20 px-6 text-center",
         className,
@@ -30,6 +33,7 @@ export function EmptyState({
               {description}
             </p>
           ) : null}
+          {action ? <div className="mt-4">{action}</div> : null}
         </>
       )}
     </div>
