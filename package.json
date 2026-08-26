@@ -31,7 +31,7 @@
     "@gemini-wallet/core": "~0.3.1",
     "@metamask/connect-evm": "~1.4.0",
     "@orbs-network/liquidity-hub-sdk": "^1.0.97",
-    "@orbs-network/spot-react": "^1.1.42",
+    "@orbs-network/spot-react": "^1.1.44",
     "@orbs-network/swap-ui": "^0.0.61",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",

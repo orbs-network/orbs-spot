@@ -1061,25 +1061,25 @@
   resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.0.97.tgz#9a008615ca8977c1647c68b005e6f8cbb4033c55"
   integrity sha512-iQ0hDJqhXFBtZwTsMH2zuVu2y8c+pIiKOBtqgz7qzKTzwmGl+3hixuR3Riw2JJmKf2s7+zwZvku8boXTvGDuNA==
 
-"@orbs-network/spot-react@^1.1.42":
-  version "1.1.42"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.42.tgz#90f6e66a0138d36b5ac12f3e8bc59e35705f201f"
-  integrity sha512-PdLFUJ1cqT2hKW33ZBBdnfUdGau3Nqz32f/muwOrttQd1O9atBRr9AQePoI5H3GZtOzYO7J8+o3wMHX3czlhTQ==
+"@orbs-network/spot-react@^1.1.44":
+  version "1.1.44"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.44.tgz#d5ea330790d035963c0060502d2640dad998b0b4"
+  integrity sha512-dd3q7Y/ahCR72FZ5cyV9XqNfcqNrTiyVHn/TM4OsJbGqy5khNPzs+cA4UNsdllv2bCRix10S8DFCa/8M1Q7dFg==
   dependencies:
-    "@orbs-network/spot-ui" "1.0.24"
+    "@orbs-network/spot-ui" "1.0.26"
 
-"@orbs-network/spot-ui@1.0.24":
-  version "1.0.24"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.24.tgz#3072b0b5f03ecb20dfa6a5010a1b19c62aa304d2"
-  integrity sha512-AL6+8XCum61M1chYpL7lRL4LOoxpVx9VEcnhkzpKwzq1tfh6zGPg55blnPxH0EB+aghKTBvQWWPJOljExSjYUw==
+"@orbs-network/spot-ui@1.0.26":
+  version "1.0.26"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.26.tgz#2d7a2d4aee8f95af3755c231d3c6957c0f6cad28"
+  integrity sha512-0XMRjOez0v/hzQzp3iWIvS7jtfvL5zA5oheq8LVcf15ZiDHyyRK5WW+S4cn6nm/LQt3kWiUguXeq+IL4DPfnRg==
   dependencies:
-    "@orbs-network/spot" "^2.7.2"
+    "@orbs-network/spot" "^2.8.1"
     "@orbs-network/twap" "^2.7.28"
 
-"@orbs-network/spot@^2.7.2":
-  version "2.7.2"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot/-/spot-2.7.2.tgz#3a3a2ee2a33b2afd8b55a38a2ab549a6f204f90d"
-  integrity sha512-GkCgCXAtr7o2OB8hQtR2sG161GoFbu4RGYXyDDqSwkYq/tQnOCzNPFAszBLB941DWdF9dKBHZMZh33LanVWIuQ==
+"@orbs-network/spot@^2.8.1":
+  version "2.8.1"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot/-/spot-2.8.1.tgz#694523da348c4f5bf1ab5aa587024b1065951a11"
+  integrity sha512-EHSXcMMOcPWXxKtF8/w2Qrs7lB2AG4b3vinICjHPga1BFBYft31okYAReWIKAXLKNjun182+q1Dqso+bVqLM1Q==
 
 "@orbs-network/swap-ui@^0.0.61":
   version "0.0.61"
