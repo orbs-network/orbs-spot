@@ -10,6 +10,19 @@ const CANCEL_ABI_PLACEHOLDER = "__CANCEL_ABI__";
 const CANCEL_ADDRESS_PLACEHOLDER = "__CANCEL_ADDRESS__";
 const CANCEL_CHAIN_PLACEHOLDER = "__CANCEL_CHAIN__";
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
+const UNKNOWN_PARTNER_ID = "unknown";
+const DEX_PARTNER_ID_COMMENT =
+  '// Use your DEX partner ID if Orbs provided one; otherwise use "unknown".';
+
+function getExamplePartnerId(value: unknown): string {
+  return typeof value === "string" && value.trim()
+    ? value
+    : UNKNOWN_PARTNER_ID;
+}
+
+function formatPartnerDeclaration(partner: string): string {
+  return `${DEX_PARTNER_ID_COMMENT}\nconst partner = ${JSON.stringify(partner)};`;
+}
 
 function serializeTypeScriptValue(
   value: JsonValue,
@@ -516,8 +529,7 @@ function getPermitConfigExampleParams(data: JsonContainer) {
     root.domain && typeof root.domain === "object" && !Array.isArray(root.domain)
       ? root.domain
       : {};
-  const partner =
-    typeof root.partner === "string" ? root.partner : "unknown";
+  const partner = getExamplePartnerId(root.partner);
   const query =
     root.query && typeof root.query === "object" && !Array.isArray(root.query)
       ? root.query
@@ -545,6 +557,8 @@ export function formatSignOrderExampleCode(data: JsonContainer) {
 import { useConnection, useSignTypedData } from "wagmi";
 import type { PermitData } from "./order-types";
 
+${formatPartnerDeclaration(partner)}
+
 export function useSignOrder() {
   const { address: account } = useConnection();
   const { signTypedDataAsync } = useSignTypedData();
@@ -553,7 +567,7 @@ export function useSignOrder() {
     // Fetch trusted contract fields and layer in fresh form/quote values.
     // Replace the sample amounts, nonces, and timestamps shown below.
     const configRequest = await fetch(
-      ${JSON.stringify(`https://order-sink-v2.orbs.network/config?partner=${partner}&chain=${chainId}`)},
+      \`https://order-sink-v2.orbs.network/config?partner=\${partner}&chain=${chainId}\`,
       { headers: { Accept: "application/json" } },
     );
     if (!configRequest.ok) {
@@ -573,8 +587,7 @@ export function useSignOrder() {
 
 export function formatFullOrderFlowCode(data: JsonContainer) {
   const root = Array.isArray(data) ? {} : data;
-  const partner =
-    typeof root.partner === "string" ? root.partner : "unknown";
+  const partner = getExamplePartnerId(root.partner);
   const chainId = getDexChainId(data);
   const sourceTokenAddress =
     typeof root.sourceTokenAddress === "string"
@@ -596,6 +609,7 @@ import { useConnection, usePublicClient, useSignTypedData, useWalletClient } fro
 import type { CreateOrderResponse, OrderResponse, PermitData, PermitOrder, Signature, SignedOrder } from "./order-types";
 
 const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
+${formatPartnerDeclaration(partner)}
 const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
 
 export function useSubmitOrdersSinkOrder() {
@@ -674,7 +688,7 @@ async function createOrder(
 
 async function getPermitConfig(): Promise<PermitData> {
   const response = await fetch(
-    \`\${ORDERS_SINK_URL}/config?partner=${encodeURIComponent(partner)}&chain=${chainId}\`,
+    \`\${ORDERS_SINK_URL}/config?partner=\${partner}&chain=${chainId}\`,
     { headers: { Accept: "application/json" } },
   );
   if (!response.ok) {
@@ -933,6 +947,8 @@ import { useConnection, useSignTypedData } from "wagmi";
 import { createOrder } from "./create-order";
 import type { PermitData } from "./order-types";
 
+${formatPartnerDeclaration(partner)}
+
 export function useSignAndCreateOrder() {
   const { address: account } = useConnection();
   const { signTypedDataAsync } = useSignTypedData();
@@ -940,7 +956,7 @@ export function useSignAndCreateOrder() {
   return useCallback(async () => {
     // Build one order object and reuse it for both operations.
     const configRequest = await fetch(
-      ${JSON.stringify(`https://order-sink-v2.orbs.network/config?partner=${partner}&chain=${chainId}`)},
+      \`https://order-sink-v2.orbs.network/config?partner=\${partner}&chain=${chainId}\`,
       { headers: { Accept: "application/json" } },
     );
     if (!configRequest.ok) {
@@ -986,8 +1002,7 @@ export function formatFetchOrdersCode(data: JsonContainer) {
 
 // Keep the Orders Sink origin fixed instead of accepting a user-provided host.
 const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
-// Use the partner ID assigned by Orbs, or "unknown" when none was assigned.
-const partner = ${JSON.stringify(partner)};
+${formatPartnerDeclaration(partner)}
 
 export const fetchOrders = async () => {
   // 1. Fetch trusted config for the same partner and chain as the history query.
@@ -1033,8 +1048,7 @@ export function formatPermitConfigFetchCode(data: JsonContainer) {
     typeof data.endpoint === "string"
       ? data.endpoint
       : "https://order-sink-v2.orbs.network/config";
-  const partner =
-    typeof data.partner === "string" ? data.partner : "unknown";
+  const partner = getExamplePartnerId(data.partner);
   const chain =
     typeof data.chain === "string" || typeof data.chain === "number"
       ? data.chain
@@ -1042,8 +1056,7 @@ export function formatPermitConfigFetchCode(data: JsonContainer) {
 
   return `import type { PermitData } from "./order-types";
 
-// Use your Orbs partner ID. If you do not have one, set partner to "unknown".
-const partner = ${JSON.stringify(partner)};
+${formatPartnerDeclaration(partner)}
 const chain = ${JSON.stringify(chain)};
 
 export const fetchPermitConfig = async (): Promise<PermitData> => {
@@ -1074,7 +1087,7 @@ export function formatCancelOrderCode(data: JsonContainer) {
   const abi = typeof data.abi === "string" ? data.abi : "";
   const isLegacyOrder = abi.includes("uint64");
   const chainId = typeof data.chain === "number" ? data.chain : 0;
-  const partner = typeof data.partner === "string" ? data.partner : "unknown";
+  const partner = getExamplePartnerId(data.partner);
   const writeContractArgs = {
     abi: CANCEL_ABI_PLACEHOLDER,
     functionName: data.functionName,
@@ -1118,7 +1131,8 @@ export function formatCancelOrderCode(data: JsonContainer) {
     : `
 
 // Keep the config origin fixed: it supplies the trusted RePermit contract.
-const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";`;
+const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
+${formatPartnerDeclaration(partner)}`;
   const fetchPermitData = isLegacyOrder
     ? ""
     : `
@@ -1126,7 +1140,7 @@ const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";`;
     // 1. Fetch the base permit data for this order's partner and chain.
     // The cancellation contract must come from this trusted configuration.
     const configResponse = await fetch(
-      \`\${ORDERS_SINK_URL}/config?partner=${encodeURIComponent(partner)}&chain=${chainId}\`,
+      \`\${ORDERS_SINK_URL}/config?partner=\${partner}&chain=${chainId}\`,
       {
         method: "GET",
         headers: { Accept: "application/json" },
@@ -1175,8 +1189,7 @@ import { parseAbi } from "viem";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 
 const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
-// Use the same partner identity used to create and query the order.
-const partner = ${JSON.stringify(partner)};
+${formatPartnerDeclaration(partner)}
 // RePermit accepts one or more order digests, hence the bytes32[] argument.
 const cancelAbi = parseAbi(["function cancel(bytes32[] digests)"]);
 
@@ -1638,12 +1651,12 @@ export const CREATE_ORDER_EXAMPLE_URL =
 
 export const PERMIT_CONFIG_REQUEST_DATA = {
   endpoint: "https://order-sink-v2.orbs.network/config",
-  partner: "quickswap",
+  partner: "unknown",
   chain: 137,
 } satisfies JsonContainer;
 
 export const PERMIT_CONFIG_REQUEST_URL =
-  "https://order-sink-v2.orbs.network/config?partner=quickswap&chain=137";
+  "https://order-sink-v2.orbs.network/config?partner=unknown&chain=137";
 
 export const BASE_PERMIT_DATA_RESPONSE = {
   domain: {
@@ -1692,7 +1705,7 @@ export const BASE_PERMIT_DATA_RESPONSE = {
       },
     },
   },
-  partner: "QuickSwap",
+  partner: "unknown",
   primaryType: "RePermitWitnessTransferFrom",
   types: {
     Exchange: [

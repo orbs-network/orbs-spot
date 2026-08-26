@@ -1784,6 +1784,11 @@ function JsonInspectorModalContent({
                             tokenIndex: number,
                           ) => {
                             const tokenProps = getTokenProps({ token });
+                            const tokenClassName = token.types.includes(
+                              "comment",
+                            )
+                              ? `${tokenProps.className} !text-foreground/75`
+                              : tokenProps.className;
                             const isExplainedKey =
                               colonIndex >= 0 &&
                               tokenIndex < colonIndex &&
@@ -1793,7 +1798,7 @@ function JsonInspectorModalContent({
                               return (
                                 <span
                                   key={`token-${lineIndex}-${tokenIndex}`}
-                                  className={tokenProps.className}
+                                  className={tokenClassName}
                                   style={tokenProps.style}
                                 >
                                   {token.content}
@@ -1808,7 +1813,7 @@ function JsonInspectorModalContent({
                             return (
                               <span
                                 key={`token-${lineIndex}-${tokenIndex}`}
-                                className={tokenProps.className}
+                                className={tokenClassName}
                                 style={tokenProps.style}
                               >
                                 {token.content.slice(0, keyStartIndex)}
@@ -1911,7 +1916,7 @@ function JsonInspectorModalContent({
                                       <span style={{ color: "#abb2bf" }}>,</span>
                                     )}
                                     {inlineComment && (
-                                      <span style={{ color: "#5c6370" }}>
+                                      <span className="!text-foreground/75">
                                         {` ${inlineComment}`}
                                       </span>
                                     )}
