@@ -410,6 +410,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
                 <Link
                   data-nav-pill
                   data-developer-trigger
+                  data-developer-guide-link
                   href={preserveDeveloperModeInHref(
                     "/developers/orders-sink",
                     isDeveloperMode,
