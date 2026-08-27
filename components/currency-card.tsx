@@ -3,7 +3,7 @@ import type { Currency } from "@/lib/types";
 import { CurrencySelector } from "./currency-selector";
 import { NumericInput } from "./ui/numeric-input";
 import { useBalance } from "@/lib/hooks/use-balances";
-import { useCallback } from "react";
+import { type ReactNode, useCallback } from "react";
 import BN from "bignumber.js";
 import { formatDecimals } from "@/lib/utils";
 import { USD } from "./ui/usd";
@@ -18,6 +18,7 @@ type Props = {
   amount: string;
   disabled?: boolean;
   title?: string;
+  titleAction?: ReactNode;
   isLoading?: boolean;
   statusText?: string;
 };
@@ -87,6 +88,7 @@ export function CurrencyCard({
   disabled,
   amount,
   title,
+  titleAction,
   isLoading = false,
   statusText,
 }: Props) {
@@ -98,7 +100,10 @@ export function CurrencyCard({
           currency={currency}
         />
       )}
-      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <div className="flex items-center gap-2">
+        <p className="text-sm font-medium text-muted-foreground">{title}</p>
+        {titleAction}
+      </div>
       <div
         className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${
           disabled ? "" : "mt-2 sm:mt-3"

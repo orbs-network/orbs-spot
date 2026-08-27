@@ -88,7 +88,7 @@ function LiveOrderFlowTriggerContent({
           </Tooltip>
         )}
       </div>
-      <DeveloperModeSpotlight targetRef={targetRef} />
+      <DeveloperModeSpotlight targetRef={targetRef} variant="orders-sink" />
     </>
   );
 }

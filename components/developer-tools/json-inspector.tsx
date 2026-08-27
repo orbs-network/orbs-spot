@@ -77,8 +77,15 @@ export type CurlOptions = {
 };
 
 export type CodeSnippetFileOptions = {
+  fieldPathAliases?: Record<string, JsonValuePath>;
   format: (data: JsonContainer) => string;
+  getFallbackFieldExplanation?: (
+    path: JsonValuePath,
+    value: JsonValue,
+  ) => string | undefined;
+  hiddenFieldTooltipDescendantKeys?: string[];
   name: string;
+  showFieldTooltips?: boolean;
   syntaxLanguage?: Language;
 };
 
@@ -268,6 +275,7 @@ function ExplainedJsonView({
 
       if (isJsonContainer(value)) {
         const pathKey = formatPath(path);
+        const explanation = getFieldExplanation(path, value);
         const hasChildren = getEntries(value).length > 0;
         const isExpanded =
           hasChildren &&
@@ -276,6 +284,30 @@ function ExplainedJsonView({
             : !toggledPaths.has(pathKey));
         const openingPunctuation = Array.isArray(value) ? "[" : "{";
         const closingPunctuation = Array.isArray(value) ? "]" : "}";
+        const keyNode = hasChildren ? (
+          <button
+            type="button"
+            onClick={() => togglePath(path)}
+            className={`rounded-sm font-semibold text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 ${
+              explanation
+                ? "cursor-help border-b border-dashed border-muted-foreground/70 hover:border-foreground focus-visible:border-primary"
+                : ""
+            }`}
+          >
+            {key}
+          </button>
+        ) : (
+          <span
+            tabIndex={explanation ? 0 : undefined}
+            className={`font-semibold text-foreground outline-none ${
+              explanation
+                ? "cursor-help border-b border-dashed border-muted-foreground/70 hover:border-foreground focus-visible:border-primary"
+                : ""
+            }`}
+          >
+            {key}
+          </span>
+        );
 
         return (
           <div
@@ -302,16 +334,13 @@ function ExplainedJsonView({
               )}
               {!parentIsArray && (
                 <>
-                  {hasChildren ? (
-                    <button
-                      type="button"
-                      onClick={() => togglePath(path)}
-                      className="rounded-sm font-semibold text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-                    >
-                      {key}
-                    </button>
+                  {explanation ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>{keyNode}</TooltipTrigger>
+                      <TooltipContent>{explanation}</TooltipContent>
+                    </Tooltip>
                   ) : (
-                    <span className="font-semibold text-foreground">{key}</span>
+                    keyNode
                   )}
                   <span className="text-muted-foreground">: </span>
                 </>
@@ -454,13 +483,13 @@ const buildCodeLineAnnotations = (
 
   lines.forEach((line, lineIndex) => {
     const propertyMatch = line.match(
-      /^(\s*)([A-Za-z_$][\w$]*):\s*(.*)$/,
+      /^(\s*)(?:"([^"]+)"|([A-Za-z_$][\w$]*)):\s*(.*)$/,
     );
     if (!propertyMatch) return;
 
     const indent = propertyMatch[1].length;
-    const key = propertyMatch[2];
-    const serializedValue = propertyMatch[3].replace(/,$/, "").trim();
+    const key = propertyMatch[2] ?? propertyMatch[3];
+    const serializedValue = propertyMatch[4].replace(/,$/, "").trim();
     while (
       contexts.length &&
       contexts[contexts.length - 1].indent >= indent
@@ -633,7 +662,7 @@ function InspectorContent({
     return (
       <div
         aria-describedby={ariaDescription}
-        className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden bg-card"
+        className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden bg-card"
       >
         {children}
       </div>
@@ -645,7 +674,7 @@ function InspectorContent({
       presentation="center"
       mobilePresentation="fullscreen"
       aria-describedby={ariaDescription}
-      className="h-[min(1040px,98dvh)] max-w-[960px] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-[22px] bg-card p-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-screen max-sm:rounded-none max-sm:border-0"
+      className="h-[min(1040px,98dvh)] max-w-[960px] grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-[22px] bg-card p-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-screen max-sm:rounded-none max-sm:border-0"
     >
       {children}
     </DialogContent>
@@ -727,7 +756,7 @@ function JsonInspectorModalContent({
       ? resolvedExplanation
       : resolvedDescription;
   const isDocumentationDensity = density === "documentation";
-  const codeFiles = useMemo(
+  const codeFiles = useMemo<CodeSnippetFileOptions[]>(
     () =>
       codeSnippet
         ? [
@@ -756,6 +785,8 @@ function JsonInspectorModalContent({
   const isMainCodeFile = activeCodeFileIndex === 0;
   const responseFieldExplanation =
     getResponseFieldExplanation ?? getFieldExplanation;
+  const hasResponseContent =
+    responseData !== undefined || responseNotice !== undefined;
   const previewCopyTarget =
     previewTab === "request" ? "primary" : "response";
   const inlineCodeFields = useMemo(() => {
@@ -777,22 +808,80 @@ function JsonInspectorModalContent({
     if (
       !formattedCode ||
       !getFieldExplanation ||
-      !isMainCodeFile
+      activeCodeFile?.showFieldTooltips === false
     ) {
       return explanations;
     }
 
     const sectionStack: Array<{
       indent: number;
-      key: string;
+      nextArrayIndex?: number;
+      path: JsonValuePath;
     }> = [];
 
     formattedCode.split("\n").forEach((line, lineIndex) => {
-      const match = line.match(/^(\s*)([A-Za-z_$][\w$]*):/);
+      const assignmentMatch = line.match(
+        /^(\s*)(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\{/,
+      );
+      if (assignmentMatch) {
+        const indent = assignmentMatch[1].length;
+        const key = assignmentMatch[2];
+        const path = activeCodeFile?.fieldPathAliases?.[key] ?? [key];
+        const value = getValueAtPath(draft, path);
+
+        while (
+          sectionStack.length &&
+          sectionStack[sectionStack.length - 1].indent >= indent
+        ) {
+          sectionStack.pop();
+        }
+
+        if (value !== undefined && isJsonContainer(value)) {
+          sectionStack.push({
+            indent,
+            nextArrayIndex: Array.isArray(value) ? 0 : undefined,
+            path,
+          });
+        }
+        return;
+      }
+
+      const arrayItemMatch = line.match(/^(\s*)\{\s*$/);
+      if (arrayItemMatch) {
+        const indent = arrayItemMatch[1].length;
+        while (
+          sectionStack.length &&
+          sectionStack[sectionStack.length - 1].indent >= indent
+        ) {
+          sectionStack.pop();
+        }
+
+        const parent = sectionStack.at(-1);
+        const parentValue = parent
+          ? getValueAtPath(draft, parent.path)
+          : undefined;
+        if (!parent || !Array.isArray(parentValue)) return;
+
+        const itemIndex = parent.nextArrayIndex ?? 0;
+        const itemValue = parentValue[itemIndex];
+        parent.nextArrayIndex = itemIndex + 1;
+        if (itemValue !== undefined && isJsonContainer(itemValue)) {
+          sectionStack.push({
+            indent,
+            nextArrayIndex: Array.isArray(itemValue) ? 0 : undefined,
+            path: [...parent.path, itemIndex],
+          });
+        }
+        return;
+      }
+
+      const match = line.match(
+        /^(\s*)(?:"([^"]+)"|([A-Za-z_$][\w$]*)):/,
+      );
       if (!match) return;
 
       const indent = match[1].length;
-      const key = match[2];
+      const key = match[2] ?? match[3];
       while (
         sectionStack.length &&
         sectionStack[sectionStack.length - 1].indent >= indent
@@ -800,28 +889,44 @@ function JsonInspectorModalContent({
         sectionStack.pop();
       }
 
-      const path = [...sectionStack.map((section) => section.key), key];
+      const path = [...(sectionStack.at(-1)?.path ?? []), key];
       const value = getValueAtPath(draft, path);
       if (value === undefined) return;
 
-      const tooltip = getFieldExplanation(path, value);
+      const formattedPath = formatPath(path);
+      const hidesTooltip = activeCodeFile?.hiddenFieldTooltipDescendantKeys?.some(
+        (hiddenKey) => {
+          const hiddenKeyIndex = path.findIndex(
+            (segment) => segment === hiddenKey,
+          );
+          return hiddenKeyIndex >= 0 && hiddenKeyIndex < path.length - 1;
+        },
+      );
+      const tooltip = hidesTooltip
+        ? undefined
+        : (getFieldExplanation(path, value) ??
+          activeCodeFile?.getFallbackFieldExplanation?.(path, value));
       if (tooltip) {
         explanations.set(lineIndex, {
           key,
-          path: formatPath(path),
+          path: formattedPath,
           tooltip,
         });
       }
 
       if (isJsonContainer(value)) {
-        sectionStack.push({ indent, key });
+        sectionStack.push({
+          indent,
+          nextArrayIndex: Array.isArray(value) ? 0 : undefined,
+          path,
+        });
         return;
       }
 
     });
 
     return explanations;
-  }, [draft, formattedCode, getFieldExplanation, isMainCodeFile]);
+  }, [activeCodeFile, draft, formattedCode, getFieldExplanation]);
 
   const resetDraft = useCallback(() => {
     setDraft(data);
@@ -1319,7 +1424,7 @@ function JsonInspectorModalContent({
   );
 
   const renderFooterActions = () => (
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border/70 bg-card/95 px-4 py-4 sm:px-6">
+    <div className="flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border/70 bg-card/95 px-4 py-4 sm:px-6">
       {!copyActionsInHeaders && !requestResponseTabs && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -1530,7 +1635,7 @@ function JsonInspectorModalContent({
                 </InlineMessage>
               )}
 
-              {requestResponseTabs && formattedCode && responseData && (
+              {requestResponseTabs && formattedCode && hasResponseContent && (
                 <div
                   className={
                     tabsInSectionHeader
@@ -1583,8 +1688,9 @@ function JsonInspectorModalContent({
                           : handleCopyResponse())
                       }
                       disabled={
-                        previewTab === "request" &&
-                        validationIssues.length > 0
+                        (previewTab === "request" &&
+                          validationIssues.length > 0) ||
+                        (previewTab === "response" && !responseData)
                       }
                       className="h-7 px-2 text-[11px]"
                     >
@@ -1792,7 +1898,8 @@ function JsonInspectorModalContent({
                             const isExplainedKey =
                               colonIndex >= 0 &&
                               tokenIndex < colonIndex &&
-                              lineExplanation?.key === token.content.trim();
+                              lineExplanation?.key ===
+                                token.content.trim().replace(/^['"]|['"]$/g, "");
 
                             if (!isExplainedKey) {
                               return (
@@ -1831,6 +1938,9 @@ function JsonInspectorModalContent({
                                     {lineExplanation.tooltip}
                                   </TooltipContent>
                                 </Tooltip>
+                                {token.content.slice(
+                                  keyStartIndex + lineExplanation.key.length,
+                                )}
                               </span>
                             );
                           };
@@ -1986,7 +2096,7 @@ function JsonInspectorModalContent({
                 </div>
               )}
               {formattedCode &&
-                responseData &&
+                hasResponseContent &&
                 (!requestResponseTabs || previewTab === "response") && (
                 <div
                   role={requestResponseTabs ? "tabpanel" : undefined}
@@ -2006,7 +2116,7 @@ function JsonInspectorModalContent({
                       />
                       {responseLabel}
                     </div>
-                    {copyActionsInHeaders ? (
+                    {copyActionsInHeaders && responseData ? (
                       <Button
                         type="button"
                         size="sm"
@@ -2021,11 +2131,11 @@ function JsonInspectorModalContent({
                         )}
                         {copiedTarget === "response" ? "Copied" : "Copy"}
                       </Button>
-                    ) : (
+                    ) : !copyActionsInHeaders ? (
                       <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
                         Response
                       </span>
-                    )}
+                    ) : null}
                   </div>
                   )}
                   <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
@@ -2034,14 +2144,14 @@ function JsonInspectorModalContent({
                         {responseNotice}
                       </InlineMessage>
                     ) : null}
-                    {responseFieldExplanation ? (
+                    {responseData && responseFieldExplanation ? (
                       <ExplainedJsonView
                         data={responseData}
                         getFieldExplanation={responseFieldExplanation}
                         initiallyCollapsed={responseInitiallyCollapsed}
                         ariaLabel={`${title} response JSON tree`}
                       />
-                    ) : (
+                    ) : responseData ? (
                       <JsonView
                         data={responseData}
                         style={jsonViewStyles}
@@ -2054,7 +2164,7 @@ function JsonInspectorModalContent({
                         compactTopLevel
                         aria-label={`${title} response JSON tree`}
                       />
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )}

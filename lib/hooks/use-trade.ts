@@ -53,6 +53,8 @@ const useQuoteLiquidityHub = (
           : inputCurrencyAddress!,
         toToken: outputCurrencyAddress!,
         inAmount: parsedInputAmount,
+        // No DEX router quote exists in this reference app. Production DEXes
+        // should pass their router's slippage-adjusted minimum output here.
         dexMinAmountOut: "-1",
         slippage: slippage,
         signal,

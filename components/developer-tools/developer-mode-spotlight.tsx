@@ -19,39 +19,88 @@ import {
   type SpotlightShape,
 } from "./developer-mode-spotlight-layout";
 
-type SpotlightStep = "submit-order" | "developer-guide";
+export type DeveloperModeSpotlightVariant =
+  | "liquidity-hub"
+  | "orders-sink";
+
+type SpotlightTarget =
+  | "developer-action"
+  | "developer-guide"
+  | "liquidity-hub-quote";
 
 type SpotlightStepConfig = {
   actionLabel: string;
   description: string;
   gap: number;
-  number: number;
   shape: SpotlightShape;
+  target: SpotlightTarget;
   title: string;
 };
 
 const SPOTLIGHT_STEPS = {
-  "submit-order": {
-    actionLabel: "Got it",
-    description:
-      "Use this button to inspect and run the complete Orders Sink flow, one step at a time. It stays visible in Dev mode; enter an amount to enable it.",
-    gap: 8,
-    number: 2,
-    shape: "rounded-rectangle",
-    title: "Submit a developer order",
-  },
-  "developer-guide": {
-    actionLabel: "Next: Submit order",
-    description:
-      "Open the full Orders Sink integration guide for setup, signing, submission, fetching orders, and cancellation examples.",
-    gap: 2,
-    number: 1,
-    shape: "pill",
-    title: "Open the developer guide",
-  },
-} satisfies Record<SpotlightStep, SpotlightStepConfig>;
+  "orders-sink": [
+    {
+      actionLabel: "Next: Submit Order",
+      description:
+        "Open Advanced Order Docs for Orders Sink setup, signing, submission, fetching orders, and cancellation examples.",
+      gap: 2,
+      shape: "pill",
+      target: "developer-guide",
+      title: "Open Advanced Order Docs",
+    },
+    {
+      actionLabel: "Got It",
+      description:
+        "Use this button to inspect and run the complete Orders Sink flow, one step at a time. It stays visible in Dev Mode; enter an amount to enable it.",
+      gap: 8,
+      shape: "rounded-rectangle",
+      target: "developer-action",
+      title: "Submit a Developer Order",
+    },
+  ],
+  "liquidity-hub": [
+    {
+      actionLabel: "Next: Inspect Quote",
+      description:
+        "Open Liquidity Hub Docs for SDK setup, quote freshness, Permit2 approval, EIP-712 signing, swap execution, and confirmation.",
+      gap: 2,
+      shape: "pill",
+      target: "developer-guide",
+      title: "Open Liquidity Hub Docs",
+    },
+    {
+      actionLabel: "Next: Inspect Swap",
+      description:
+        "Use the quote button beside the To token title to inspect the exact Liquidity Hub request and its complete response. You can open it before entering an amount.",
+      gap: 6,
+      shape: "rounded-rectangle",
+      target: "liquidity-hub-quote",
+      title: "Inspect the Live Quote",
+    },
+    {
+      actionLabel: "Got It",
+      description:
+        "This button becomes available after the Swap form has a valid quote. Use it to inspect wrapping, Permit2 approval, quote freshness, signing, swap execution, and confirmation step by step.",
+      gap: 8,
+      shape: "rounded-rectangle",
+      target: "developer-action",
+      title: "Inspect the Liquidity Hub Flow",
+    },
+  ],
+} satisfies Record<
+  DeveloperModeSpotlightVariant,
+  readonly SpotlightStepConfig[]
+>;
 
-const WALKTHROUGH_SEEN_STORAGE_KEY = "developer-mode-walkthrough-v1";
+const WALKTHROUGH_SEEN_STORAGE_KEYS = {
+  "orders-sink": "developer-mode-walkthrough-v1",
+  "liquidity-hub": "developer-mode-liquidity-hub-walkthrough-v2",
+} satisfies Record<DeveloperModeSpotlightVariant, string>;
+
+const SPOTLIGHT_TARGET_SELECTORS = {
+  "developer-guide": "[data-developer-guide-link]",
+  "liquidity-hub-quote": "[data-developer-liquidity-hub-quote]",
+} satisfies Record<Exclude<SpotlightTarget, "developer-action">, string>;
 
 const subscribeToClientReady = () => () => {};
 const getClientSnapshot = () => true;
@@ -161,18 +210,22 @@ function SpotlightScrim({
 
 function SpotlightCard({
   actionButtonRef,
+  activeStepNumber,
   activeStep,
   cardRef,
   layout,
   onAction,
   onDismiss,
+  totalSteps,
 }: {
   actionButtonRef: RefObject<HTMLButtonElement | null>;
+  activeStepNumber: number;
   activeStep: SpotlightStepConfig;
   cardRef: RefObject<HTMLDivElement | null>;
   layout: SpotlightLayout;
   onAction: () => void;
   onDismiss: () => void;
+  totalSteps: number;
 }) {
   return (
     <div
@@ -187,7 +240,7 @@ function SpotlightCard({
           </span>
           <div className="min-w-0">
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary">
-              Developer mode · {activeStep.number} of 2
+              Developer mode · {activeStepNumber} of {totalSteps}
             </p>
             <h2
               id="developer-spotlight-title"
@@ -321,34 +374,38 @@ function useSpotlightDialogBehavior({
 
 function DeveloperModeSpotlightContent({
   targetRef,
+  variant,
 }: {
   targetRef: RefObject<HTMLElement | null>;
+  variant: DeveloperModeSpotlightVariant;
 }) {
+  const walkthroughSeenStorageKey = WALKTHROUGH_SEEN_STORAGE_KEYS[variant];
   const [open, setOpen] = useState(() => {
     try {
       return (
-        window.localStorage.getItem(WALKTHROUGH_SEEN_STORAGE_KEY) !== "true"
+        window.localStorage.getItem(walkthroughSeenStorageKey) !== "true"
       );
     } catch {
       return true;
     }
   });
-  const [step, setStep] = useState<SpotlightStep>("developer-guide");
+  const [stepIndex, setStepIndex] = useState(0);
   const [layout, setLayout] = useState<SpotlightLayout | null>(null);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const activeStep = SPOTLIGHT_STEPS[step];
+  const steps = SPOTLIGHT_STEPS[variant];
+  const activeStep = steps[stepIndex] ?? steps[0];
 
   useEffect(() => {
     if (!open) return;
 
     try {
-      window.localStorage.setItem(WALKTHROUGH_SEEN_STORAGE_KEY, "true");
+      window.localStorage.setItem(walkthroughSeenStorageKey, "true");
     } catch {
       // Keep the walkthrough usable when browser storage is unavailable.
     }
-  }, [open]);
+  }, [open, walkthroughSeenStorageKey]);
 
   const dismiss = useCallback(() => {
     setOpen(false);
@@ -359,9 +416,11 @@ function DeveloperModeSpotlightContent({
     if (!open) return;
 
     const target =
-      step === "submit-order"
+      activeStep.target === "developer-action"
         ? targetRef.current
-        : document.querySelector<HTMLElement>("[data-developer-guide-link]");
+        : document.querySelector<HTMLElement>(
+            SPOTLIGHT_TARGET_SELECTORS[activeStep.target],
+          );
     if (!target) {
       setLayout(null);
       return;
@@ -375,7 +434,7 @@ function DeveloperModeSpotlightContent({
         }),
       );
     };
-    if (step === "submit-order") {
+    if (activeStep.target !== "developer-guide") {
       target.scrollIntoView({
         behavior: "auto",
         block: "center",
@@ -397,7 +456,13 @@ function DeveloperModeSpotlightContent({
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
     };
-  }, [activeStep.gap, activeStep.shape, open, step, targetRef]);
+  }, [
+    activeStep.gap,
+    activeStep.shape,
+    activeStep.target,
+    open,
+    targetRef,
+  ]);
 
   useSpotlightDialogBehavior({
     actionButtonRef,
@@ -423,16 +488,18 @@ function DeveloperModeSpotlightContent({
       <SpotlightCard
         actionButtonRef={actionButtonRef}
         activeStep={activeStep}
+        activeStepNumber={stepIndex + 1}
         cardRef={cardRef}
         layout={layout}
         onAction={() => {
-          if (step === "developer-guide") {
-            setStep("submit-order");
+          if (stepIndex < steps.length - 1) {
+            setStepIndex((current) => current + 1);
           } else {
             dismiss();
           }
         }}
         onDismiss={dismiss}
+        totalSteps={steps.length}
       />
     </div>,
     document.body,
@@ -441,8 +508,10 @@ function DeveloperModeSpotlightContent({
 
 export function DeveloperModeSpotlight({
   targetRef,
+  variant,
 }: {
   targetRef: RefObject<HTMLElement | null>;
+  variant: DeveloperModeSpotlightVariant;
 }) {
   const clientReady = useSyncExternalStore(
     subscribeToClientReady,
@@ -452,5 +521,10 @@ export function DeveloperModeSpotlight({
 
   if (!clientReady) return null;
 
-  return <DeveloperModeSpotlightContent targetRef={targetRef} />;
+  return (
+    <DeveloperModeSpotlightContent
+      targetRef={targetRef}
+      variant={variant}
+    />
+  );
 }

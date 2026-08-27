@@ -20,6 +20,31 @@ const formTabToTabParam: Record<FormTab, string | undefined> = {
   [FormTab.TAKE_PROFIT]: "take-profit",
 };
 
+export const preserveFormTabInHref = (
+  href: string,
+  formTab: FormTab,
+): string => {
+  const hashIndex = href.indexOf("#");
+  const pathAndQuery = hashIndex === -1 ? href : href.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : href.slice(hashIndex);
+  const queryIndex = pathAndQuery.indexOf("?");
+  const pathname =
+    queryIndex === -1 ? pathAndQuery : pathAndQuery.slice(0, queryIndex);
+  const params = new URLSearchParams(
+    queryIndex === -1 ? "" : pathAndQuery.slice(queryIndex + 1),
+  );
+  const tabParam = formTabToTabParam[formTab];
+
+  if (tabParam) {
+    params.set("tab", tabParam);
+  } else {
+    params.delete("tab");
+  }
+
+  const queryString = params.toString();
+  return `${pathname}${queryString ? `?${queryString}` : ""}${hash}`;
+};
+
 export const useSelectedFormTab = () => {
   const pathname = usePathname();
   const searchParams = useSearchParams();

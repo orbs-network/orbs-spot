@@ -1,6 +1,6 @@
 import { DeveloperGuideLink } from "./developer-guide-link";
 
-export function OrdersSinkGuideLink({
+export function LiquidityHubGuideLink({
   className,
   section,
 }: {
@@ -9,7 +9,7 @@ export function OrdersSinkGuideLink({
 }) {
   return (
     <DeveloperGuideLink
-      baseHref="/developers/orders-sink"
+      baseHref="/developers/liquidity-hub"
       className={className}
       section={section}
     />

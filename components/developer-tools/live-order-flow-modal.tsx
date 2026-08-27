@@ -64,6 +64,11 @@ import {
   type JsonContainer,
   type JsonValue,
 } from "./json-inspector";
+import {
+  getLiveFlowPhaseIndex,
+  LiveFlowNotice,
+  type LiveFlowPhase,
+} from "./live-flow-notice";
 import { OrdersSinkGuideLink } from "./orders-sink-guide-link";
 
 type LivePermitData = NonNullable<
@@ -278,137 +283,33 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Order submission failed.";
 }
 
-type LiveFlowPhase = {
-  effect: string;
-  label: string;
-  step: Exclude<DeveloperOrderStep, "flow" | "success">;
-};
+type OrderFlowPhase = LiveFlowPhase<DeveloperOrderStep>;
 
-const ALLOWANCE_PHASE: LiveFlowPhase = {
+const ALLOWANCE_PHASE: OrderFlowPhase = {
   label: "Allowance",
   effect: "Read only",
   step: "check",
 };
-const WRAP_PHASE: LiveFlowPhase = {
+const WRAP_PHASE: OrderFlowPhase = {
   label: "Wrap",
   effect: "Wallet transaction",
   step: "wrap",
 };
-const APPROVE_PHASE: LiveFlowPhase = {
+const APPROVE_PHASE: OrderFlowPhase = {
   label: "Approve",
   effect: "Wallet transaction",
   step: "approve",
 };
-const SIGN_PHASE: LiveFlowPhase = {
+const SIGN_PHASE: OrderFlowPhase = {
   label: "Sign",
   effect: "Wallet signature",
   step: "sign",
 };
-const SUBMIT_PHASE: LiveFlowPhase = {
+const SUBMIT_PHASE: OrderFlowPhase = {
   label: "Submit",
   effect: "HTTP request",
   step: "submit",
 };
-
-function getPhaseIndex(
-  step: DeveloperOrderStep,
-  phases: readonly LiveFlowPhase[],
-) {
-  if (step === "success") return phases.length;
-  return phases.findIndex((phase) => phase.step === step);
-}
-
-function LiveFlowNotice({
-  actualStep,
-  onSelectPhase,
-  phases,
-  selectablePhaseIndexes,
-  viewedStep,
-}: {
-  actualStep: DeveloperOrderStep;
-  onSelectPhase: (phaseIndex: number) => void;
-  phases: readonly LiveFlowPhase[];
-  selectablePhaseIndexes: readonly number[];
-  viewedStep: DeveloperOrderStep;
-}) {
-  const actualPhaseIndex = getPhaseIndex(actualStep, phases);
-  const viewedPhaseIndex = getPhaseIndex(viewedStep, phases);
-  const viewedPhase =
-    viewedPhaseIndex >= 0 && viewedPhaseIndex < phases.length
-      ? phases[viewedPhaseIndex]
-      : undefined;
-
-  return (
-    <div className="pointer-events-auto w-[360px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-border/80 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
-        <span className="text-foreground">
-          {viewedStep === "flow"
-            ? "Live order flow"
-            : viewedStep === "success"
-              ? "Order complete"
-              : viewedPhase?.label}
-        </span>
-        <span className="text-muted-foreground">
-          {viewedStep === "flow"
-            ? "Wrap / Approve appear only if needed"
-            : viewedStep === "success"
-              ? `${phases.length} of ${phases.length} complete`
-              : `Step ${viewedPhaseIndex + 1} of ${phases.length} · ${viewedPhase?.effect}`}
-        </span>
-      </div>
-      <div
-        className="mt-2 grid gap-1.5"
-        style={{ gridTemplateColumns: `repeat(${phases.length}, minmax(0, 1fr))` }}
-        aria-label="Order creation progress"
-      >
-        {phases.map((phase, index) => {
-          const canSelect = selectablePhaseIndexes.includes(index);
-
-          return (
-            <button
-              key={phase.label}
-              type="button"
-              disabled={!canSelect}
-              onClick={() => onSelectPhase(index)}
-              aria-label={
-                canSelect
-                  ? `View ${phase.label} step`
-                  : `${phase.label} step is not available yet`
-              }
-              aria-current={index === viewedPhaseIndex ? "step" : undefined}
-              className={`rounded-md border px-1.5 py-1 text-left transition-colors disabled:cursor-default ${
-                index === viewedPhaseIndex
-                  ? "border-primary/40 bg-primary/10"
-                  : canSelect
-                    ? "border-transparent hover:border-primary/25 hover:bg-primary/[0.06]"
-                    : "border-transparent"
-              }`}
-            >
-              <span
-                className={`block h-1 rounded-full ${
-                  index <= actualPhaseIndex
-                    ? "bg-primary"
-                    : index === viewedPhaseIndex
-                      ? "bg-primary/55"
-                      : "bg-secondary"
-                }`}
-              />
-              <span
-                className={`mt-1 block truncate text-[9px] ${
-                  index === viewedPhaseIndex
-                    ? "font-semibold text-primary"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {phase.label}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function LiveOrderFlowModalContent({
   currentPermitData,
@@ -476,7 +377,7 @@ function LiveOrderFlowModalContent({
     navigation.viewedIndex < navigation.history.length - 1;
   const liveFlowPhases = useMemo(() => {
     const visitedSteps = new Set(navigation.history);
-    const phases: LiveFlowPhase[] = [ALLOWANCE_PHASE];
+    const phases: OrderFlowPhase[] = [ALLOWANCE_PHASE];
 
     if (sourceIsNative || visitedSteps.has("wrap")) {
       phases.push(WRAP_PHASE);
@@ -515,7 +416,7 @@ function LiveOrderFlowModalContent({
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
-      if (nextOpen && isRunning) return;
+      if (!nextOpen && isRunning) return;
 
       setTriggerTooltipOpen(false);
 
@@ -929,7 +830,11 @@ function LiveOrderFlowModalContent({
             new Set(
               navigation.history
                 .map((historyStep) =>
-                  getPhaseIndex(historyStep, liveFlowPhases),
+                  getLiveFlowPhaseIndex(
+                    historyStep,
+                    liveFlowPhases,
+                    "success",
+                  ),
                 )
                 .filter(
                   (phaseIndex) =>
@@ -948,7 +853,11 @@ function LiveOrderFlowModalContent({
         let targetIndex = -1;
         current.history.forEach((historyStep, historyIndex) => {
           if (
-            getPhaseIndex(historyStep, liveFlowPhases) === phaseIndex
+            getLiveFlowPhaseIndex(
+              historyStep,
+              liveFlowPhases,
+              "success",
+            ) === phaseIndex
           ) {
             targetIndex = historyIndex;
           }
@@ -975,9 +884,15 @@ function LiveOrderFlowModalContent({
       () => (
         <LiveFlowNotice
           actualStep={step}
+          flowStep="flow"
+          flowSummary="Wrap / Approve appear only if needed"
+          flowTitle="Live order flow"
           onSelectPhase={handleSelectPhase}
           phases={liveFlowPhases}
+          progressLabel="Order creation progress"
           selectablePhaseIndexes={selectablePhaseIndexes}
+          successStep="success"
+          successTitle="Order complete"
           viewedStep={viewedStep}
         />
       ),
@@ -1031,7 +946,7 @@ function LiveOrderFlowModalContent({
         mobilePresentation="fullscreen"
         onInteractOutside={(event) => event.preventDefault()}
         showCloseButton
-        className="h-[min(1040px,98dvh)] max-w-[960px] grid-rows-[minmax(0,1fr)] gap-0 p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
+        className="h-[min(1040px,98dvh)] max-w-[960px] grid-rows-[minmax(0,1fr)] gap-0 overscroll-contain p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
       >
         <div className="h-full min-h-0 overflow-hidden">
           <JsonInspectorPanel
@@ -1087,6 +1002,7 @@ function LiveOrderFlowModalContent({
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={isRunning}
                     onClick={() => handleOpenChange(false)}
                   >
                     Close

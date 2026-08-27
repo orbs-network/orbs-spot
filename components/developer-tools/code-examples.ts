@@ -5,24 +5,15 @@ import type {
   JsonValue,
   JsonValuePath,
 } from "./json-inspector";
+import {
+  formatPartnerDeclaration,
+  getExamplePartnerId,
+} from "./developer-partner";
 
 const CANCEL_ABI_PLACEHOLDER = "__CANCEL_ABI__";
 const CANCEL_ADDRESS_PLACEHOLDER = "__CANCEL_ADDRESS__";
 const CANCEL_CHAIN_PLACEHOLDER = "__CANCEL_CHAIN__";
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
-const UNKNOWN_PARTNER_ID = "unknown";
-const DEX_PARTNER_ID_COMMENT =
-  '// Use your DEX partner ID if Orbs provided one; otherwise use "unknown".';
-
-function getExamplePartnerId(value: unknown): string {
-  return typeof value === "string" && value.trim()
-    ? value
-    : UNKNOWN_PARTNER_ID;
-}
-
-function formatPartnerDeclaration(partner: string): string {
-  return `${DEX_PARTNER_ID_COMMENT}\nconst partner = ${JSON.stringify(partner)};`;
-}
 
 function serializeTypeScriptValue(
   value: JsonValue,
@@ -722,7 +713,7 @@ Create order flow
 8. Check both the HTTP response and API success value, then return signedOrder
    so the application can display and track the created order.
 */
-}`;
+`;
 }
 
 export function formatWrapNativeTokenCode() {

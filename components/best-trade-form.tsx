@@ -22,6 +22,10 @@ import { SwapFlowLoader } from "./swap-flow-loader";
 import { DetailRow } from "./ui/detail-row";
 import { SwapFlowTokenLogo } from "./ui/swap-flow-token-logo";
 import { ArrowRightIcon, CheckIcon } from "lucide-react";
+import {
+  LiquidityHubDeveloperTrigger,
+  LiquidityHubQuoteDeveloperTrigger,
+} from "./developer-tools/liquidity-hub-developer-trigger";
 
 const useStep = () => {
   const t = useTranslations();
@@ -326,24 +330,29 @@ const SubmitSwap = () => {
   }, [reset, setOpen, status]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <SubmitSwapButton
-        onClick={onOpen}
-        isLoading={isLoadingTrade}
-        text={isLoadingTrade ? t("fetchingQuote") : "Submit Swap"}
-      />
-      <SwapReviewContent
-        status={status}
-        totalSteps={totalSteps}
-        currentStepIndex={currentStepIndex}
-        inputAmountF={inputAmountF}
-        outputAmountF={outputAmountF}
-        inputCurrency={inputCurrency}
-        outputCurrency={outputCurrency}
-        inToken={inToken}
-        outToken={outToken}
-      />
-    </Dialog>
+    <div className="flex w-full items-center gap-2">
+      <div className="min-w-0 flex-1">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <SubmitSwapButton
+            onClick={onOpen}
+            isLoading={isLoadingTrade}
+            text={isLoadingTrade ? t("fetchingQuote") : "Submit Swap"}
+          />
+          <SwapReviewContent
+            status={status}
+            totalSteps={totalSteps}
+            currentStepIndex={currentStepIndex}
+            inputAmountF={inputAmountF}
+            outputAmountF={outputAmountF}
+            inputCurrency={inputCurrency}
+            outputCurrency={outputCurrency}
+            inToken={inToken}
+            outToken={outToken}
+          />
+        </Dialog>
+      </div>
+      <LiquidityHubDeveloperTrigger />
+    </div>
   );
 };
 
@@ -415,6 +424,7 @@ export function SwapBestTradeForm() {
           disabled={true}
           amount={outputAmount}
           title={t("to")}
+          titleAction={<LiquidityHubQuoteDeveloperTrigger />}
           isLoading={isLoadingTrade}
           statusText={noLiquidity ? t("noLiquidity") : undefined}
         />

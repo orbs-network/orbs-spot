@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import {
   ChevronDownIcon,
@@ -23,7 +24,10 @@ import {
 } from "@/components/developer-tools/use-developer-mode";
 import { cn, makeEllipsisAddress } from "@/lib/utils";
 import { CHAIN_LOGO_URLS, MAIN_CHAINS, SPOT_CHAINS, SPOT_TABS } from "@/lib/consts";
-import { useSelectedFormTab } from "@/lib/hooks/use-form-tab";
+import {
+  preserveFormTabInHref,
+  useSelectedFormTab,
+} from "@/lib/hooks/use-form-tab";
 import type { PartnerBrand } from "@/lib/partners/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Switch } from "./ui/switch";
@@ -389,9 +393,23 @@ const NavWalletControls = () => {
 export function Navigation({ brand }: { brand: PartnerBrand }) {
   const { isDeveloperMode, setIsDeveloperMode } = useDeveloperMode();
   const { selectedTab } = useSelectedFormTab();
+  const pathname = usePathname();
+  const isDeveloperGuideRoute =
+    pathname === "/developers" || pathname.startsWith("/developers/");
   const isSpotTab = SPOT_TABS.includes(
     selectedTab.value as (typeof SPOT_TABS)[number],
   );
+  const developerGuide = isSpotTab
+    ? {
+        href: "/developers/orders-sink",
+        linkLabel: "Advanced Order Docs",
+        tooltip: "Open Advanced Order Docs",
+      }
+    : {
+        href: "/developers/liquidity-hub",
+        linkLabel: "Liquidity Hub Docs",
+        tooltip: "Open Liquidity Hub integration guide",
+      };
 
   return (
     <nav className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
@@ -422,7 +440,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
           )}
         </Link>
         <div className="ml-auto flex w-auto shrink-0 items-center justify-end gap-2">
-          {isSpotTab && isDeveloperMode && (
+          {isDeveloperMode && !isDeveloperGuideRoute && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <Link
@@ -430,23 +448,28 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
                   data-developer-trigger
                   data-developer-guide-link
                   href={preserveDeveloperModeInHref(
-                    "/developers/orders-sink",
+                    preserveFormTabInHref(
+                      developerGuide.href,
+                      selectedTab.value,
+                    ),
                     isDeveloperMode,
                   )}
-                  aria-label="Open Orders Sink integration guide"
+                  aria-label={developerGuide.tooltip}
                   className={cn(
                     navPillClass,
                     "w-10 justify-center p-0 sm:w-auto sm:px-3",
                   )}
                 >
                   <Code2Icon aria-hidden="true" className="size-4" />
-                  <span className="hidden sm:inline">Dev guide</span>
+                  <span className="hidden sm:inline">
+                    {developerGuide.linkLabel}
+                  </span>
                 </Link>
               </TooltipTrigger>
-              <TooltipContent>Open Orders Sink integration guide</TooltipContent>
+              <TooltipContent>{developerGuide.tooltip}</TooltipContent>
             </Tooltip>
           )}
-          {isSpotTab && (
+          {!isDeveloperGuideRoute && (
             <div className="flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3">
               <label
                 htmlFor="navbar-developer-mode"
