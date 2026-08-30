@@ -86,6 +86,7 @@ export const MAIN_CHAINS = [
   sonic,
   polygon,
   monad,
+  flare,
 ] as const;
 
 export const SPOT_CHAINS = [

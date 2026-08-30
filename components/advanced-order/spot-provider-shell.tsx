@@ -25,9 +25,9 @@ export function SpotProviderShell({
   orderModule: Module;
 }) {
   const { inputCurrency, outputCurrency, inputAmount } = useDerivedSwap();
-  const { chainId, address } = useConnection();
-  const dataChainId = useDataChainId();
-  const spotChainId = chainId ?? dataChainId;
+  const { chainId, address, isConnected } = useConnection();
+  const spotChainId = isConnected ? chainId : undefined;    
+  
   const spotAccount = chainId ? address : undefined;
   const walletInteractions = useWalletInteractions();
   const callbacks = useSpotCallbacks();
@@ -56,7 +56,7 @@ export function SpotProviderShell({
       priceProtection={priceProtection}
       module={orderModule}
       marketReferencePrice={marketReferencePrice}
-      minChunkSizeUsd={10}
+      minChunkSizeUsd={5}
       callbacks={callbacks}
       fees={0}
       isDev={false}

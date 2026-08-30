@@ -61,7 +61,9 @@ const useQuoteLiquidityHub = (
         account: account,
       });
       return {
-        outAmount: BN(quote.outAmount).plus(BN(quote.gasAmountOut || '0')).toString(),
+        outAmount: BN(quote.outAmount)
+          .plus(BN(quote.gasAmountOut || "0"))
+          .toFixed(0),
         minAmountOut: quote.minAmountOut,
         inToken: inputCurrency!.address,
         outToken: outputCurrency!.address,

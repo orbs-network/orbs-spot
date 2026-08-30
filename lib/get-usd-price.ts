@@ -13,6 +13,7 @@ const chainIdToLlamaName: Record<number, string> = {
   [chains.arbitrum.id]: "arbitrum",
   [chains.sonic.id]: "sonic",
   [chains.monad.id]: "monad",
+  [chains.flare.id]: "flare",
 };
 
 const chainIdToDexScreenerName: Record<number, string> = {
