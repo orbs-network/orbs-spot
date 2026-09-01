@@ -11,53 +11,43 @@ This is the host-owned presentation variant: the DEX supplies its modal shell an
 - [Spot React integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-react-integration) — complete integration guidance for `SpotProvider`, `useSpot()`, wallet adapters, lifecycle, and order history.
 - [Advanced Orders provider-shell example](https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/spot-provider-shell.tsx) — reference implementation of the host DEX adapter and provider boundary.
 
+## Prerequisites
+
+Advanced Orders extends an existing EVM swap form; it does not replace the DEX wallet, token, balance, pricing, quote, or transaction infrastructure. Before installing the SDK, make sure the host application already provides every capability below.
+
+### Required DEX Capabilities
+
+- `Wallet connection and network` — Expose the connected account, connection status, and active chain ID. Keep connect, disconnect, and network switching in the host shell. Provide wallet and public clients for signatures, contract writes, reads, and transaction receipts. Spot receives `account`, `chainId`, and `walletInteractions`.
+- `Token model and native wrapping` — Resolve the selected source and destination tokens on the active chain with address, symbol, decimals, and native-token status. Resolve the wrapped-native token address when native input is supported. Spot receives `srcToken`, `dstToken`, and the wrapped address used by `wrapNativeToken`.
+- `Wallet balances` — Read source and destination balances as raw integer base-unit strings. Also expose native gas balance to the host UI. Refetch after account, chain, or token changes and after successful wrapping or order-progress updates. Spot receives `srcBalance` and `dstBalance`.
+- `USD prices` — Resolve the current USD value of one whole source and destination token. Preserve loading, unavailable, and stale states in the host adapter; do not present a missing price as confirmed market data. Spot receives `srcUsd1Token` and `dstUsd1Token`, while the host supplies `minChunkSizeUsd`.
+- `Market-reference quote` — Produce a destination amount in raw base units for the exact current input, pair, account, and chain. Track the input that produced it, expose loading and no-liquidity states, and clear stale output immediately when any quote input changes. Spot receives `marketReferencePrice.value`, `isLoading`, and `noLiquidity`.
+- `Form state and amount conversion` — Own the selected strategy, token selection, decimal input string, reset action, and conversions between display units and raw token units. Spot receives `module` and `typedInputAmount`.
+- `Wallet operations` — Wrap native input, read ERC-20 allowance, approve the configured spender, sign EIP-712 data, cancel an order, wait for successful receipts, and surface rejection or revert errors through the five `walletInteractions` methods and lifecycle callbacks.
+- `Host UI and lifecycle` — Provide token inputs, network controls, accessible modal and confirmation primitives, notifications, translations, amount formatting, and bounded or virtualized order/fill lists. Keep portals under the provider context and build the UI from `useSpot()` panels.
+- `Integration configuration` — Know the supported chains, Orbs partner, price-protection percentage, minimum chunk value, optional fee, and whether the DEX or SDK owns query parameters. Pass `partner`, `priceProtection`, `minChunkSizeUsd`, `fees`, and `enableQueryParams` explicitly.
+
+### Readiness Test
+
+Before mounting `SpotProvider` in production, confirm this flow on every supported chain:
+
+1. Connect and disconnect a wallet, switch networks, and verify that account-scoped state resets cleanly.
+2. Select either token direction and resolve token metadata, raw balances, native gas balance, and current USD prices.
+3. Enter and edit an amount; each completed quote must belong to the latest amount, pair, account, and chain.
+4. Complete wrap, allowance, approval, typed-data signing, and receipt handling with both success and wallet-rejection paths.
+5. Refresh balances and order history after successful lifecycle events without replacing the DEX form state while a modal is open.
+
+If any item is missing, implement it in the host DEX first. The SDK should receive existing DEX state through a thin adapter rather than becoming a second wallet, pricing, or quote store.
+
 ## Install the React SDK
 
 Install the React SDK with the package manager already used by the host application.
 
 ```bash
-npm install @orbs-network/spot-react@latest @orbs-network/swap-ui@latest @tanstack/react-query bignumber.js react-error-boundary zustand
+npm install @orbs-network/spot-react@latest @orbs-network/swap-ui@latest
 ```
 
 React and React DOM are also peer dependencies; reuse the compatible versions already installed by the host. Keep the wallet library, dialog shell, token input, formatting, and virtualization components the DEX already uses. Import package APIs only from `@orbs-network/spot-react` or `@orbs-network/swap-ui`, never from internal `dist/*` paths.
-
-## Integration Model
-
-Keep the DEX swap form as the source of truth. Do not create a second store that mirrors its tokens, input, quote, or account state.
-
-| The host DEX owns | `spot-react` owns |
-| --- | --- |
-| Selected tokens and typed input | Advanced-order field state and validation |
-| Wallet and connected network | Order construction and signing sequence |
-| Balances, USD prices, and the current quote | Review data and execution progress |
-| Components, styling, translations, and navigation | Order history queries and cancellation state |
-| Modal and portal shells | Module-specific panels exposed by `useSpot()` |
-
-Pass user-facing decimal input to `typedInputAmount` and raw integer strings for balances. Let the DEX adapter supply the completed `marketReferencePrice` object with the current raw quote output, loading state, and no-liquidity state. Quote freshness stays inside the DEX.
-
-Track the input amount that produced each quote. Never expose the previous output after the user edits the input:
-
-```tsx
-const shouldQuote = Boolean(
-  typedInputAmount && inputCurrency && outputCurrency,
-);
-const isQuoteStale =
-  shouldQuote && typedInputAmount !== quotedInputAmount;
-const outputAmount =
-  !shouldQuote || isQuoteStale ? undefined : quoteOutputRaw;
-const isLoading =
-  shouldQuote && (isQuoteStale || isQuoteLoading);
-
-return {
-  value: outputAmount,
-  isLoading,
-  noLiquidity: shouldQuote && !isLoading && !outputAmount,
-};
-```
-
-When the router has no quote at all, derive a display/reference output from `inputAmountUsd / outputTokenUsd`, convert it to destination-token base units, and use that value only while both USD prices are current. This fallback keeps the price fields usable; it is not an executable DEX quote.
-
-Keep adapter objects stable, and memoize `walletInteractions` and `callbacks`. Use the connected wallet chain everywhere Spot needs a chain; do not mix it with a router or quote chain.
 
 ## Advanced Orders Provider
 

@@ -229,7 +229,7 @@ function renderInline(text: string, highlightQuery?: string): ReactNode[] {
       parts.push(
         <code
           key={`${token}-${match.index}`}
-          className="box-decoration-clone break-all rounded bg-secondary px-1.5 py-0.5 font-mono text-[0.9em] text-foreground"
+          className="box-decoration-clone break-words rounded bg-secondary px-1.5 py-0.5 font-mono text-[0.9em] text-foreground"
         >
           <HighlightedText query={highlightQuery} text={code[1]} />
         </code>,

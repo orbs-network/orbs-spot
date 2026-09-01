@@ -41,6 +41,7 @@ import {
   useMarketReferencePrice,
   useWalletInteractions,
 } from "./hooks";
+import { useDexSpotAdapter } from "./use-dex-spot-adapter";
 
 type AdvancedOrderFormProps = {
   module: Module;
@@ -56,16 +57,7 @@ export function AdvancedOrderForm({ module, priceProtection, minChunkSizeUsd, ad
 
   // These stable adapter objects are implemented in the Hooks tab.
   const walletInteractions = useWalletInteractions(dex.wTokenAddress);
-  const marketReferencePrice = useMarketReferencePrice({
-    typedInputAmount: dex.typedInputAmount,
-    quotedInputAmount: dex.quotedInputAmount,
-    quoteOutputRaw: dex.quoteOutputRaw,
-    isQuoteLoading: dex.isQuoteLoading,
-    inputAmountUsd: dex.inputAmountUsd,
-    outputTokenUsd: dex.outputTokenUsd,
-    outputTokenDecimals: dex.dstToken?.decimals,
-    isUsdPriceLoading: dex.isUsdPriceLoading,
-  });
+  const marketReferencePrice = useMarketReferencePrice();
   const callbacks = useAdvancedOrdersCallbacks();
 
   // Provider boundary rules:
@@ -110,6 +102,7 @@ import { usePublicClient, useWalletClient } from "wagmi";
 import { isUserRejectedError, showWalletRejection } from "./wallet-errors";
 import { useRefetchBalances } from "./use-refetch-balances";
 import { useAdvancedOrdersNotifications } from "./use-advanced-orders-notifications";
+import { useDexSpotAdapter } from "./use-dex-spot-adapter";
 import { useQueueWrappedInput } from "./use-queue-wrapped-input";
 import type {
   Callbacks,
@@ -119,41 +112,32 @@ import type {
 
 const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
 
-type MarketReferenceInput = {
-  typedInputAmount: string;
-  quotedInputAmount?: string;
-  quoteOutputRaw?: string;
-  isQuoteLoading: boolean;
-  inputAmountUsd?: string;
-  outputTokenUsd?: string;
-  outputTokenDecimals?: number;
-  isUsdPriceLoading: boolean;
-};
-
 // Never expose a quote produced for a previous typed input amount.
-export function useMarketReferencePrice(input: MarketReferenceInput): MarketReferencePrice {
-  const shouldQuote = Boolean(input.typedInputAmount && input.outputTokenDecimals !== undefined);
-  const isQuoteStale = shouldQuote && input.typedInputAmount !== input.quotedInputAmount;
+export function useMarketReferencePrice(): MarketReferencePrice {
+  const dex = useDexSpotAdapter();
+  const outputTokenDecimals = dex.dstToken?.decimals;
+  const shouldQuote = Boolean(dex.typedInputAmount && outputTokenDecimals !== undefined);
+  const isQuoteStale = shouldQuote && dex.typedInputAmount !== dex.quotedInputAmount;
   const fallbackOutputRaw = useMemo(() => {
-    const inputUsd = new BigNumber(input.inputAmountUsd ?? 0);
-    const outputUsd = new BigNumber(input.outputTokenUsd ?? 0);
-    if (input.outputTokenDecimals === undefined || !inputUsd.isFinite() ||
+    const inputUsd = new BigNumber(dex.inputAmountUsd ?? 0);
+    const outputUsd = new BigNumber(dex.outputTokenUsd ?? 0);
+    if (outputTokenDecimals === undefined || !inputUsd.isFinite() ||
         !outputUsd.isFinite() || inputUsd.lte(0) || outputUsd.lte(0)) {
       return undefined;
     }
     return inputUsd
       .div(outputUsd)
-      .times(new BigNumber(10).pow(input.outputTokenDecimals))
+      .times(new BigNumber(10).pow(outputTokenDecimals))
       .integerValue(BigNumber.ROUND_DOWN)
       .toFixed(0);
-  }, [input.inputAmountUsd, input.outputTokenDecimals, input.outputTokenUsd]);
+  }, [dex.inputAmountUsd, dex.outputTokenUsd, outputTokenDecimals]);
 
   const value = !shouldQuote || isQuoteStale
     ? undefined
-    : input.quoteOutputRaw ?? fallbackOutputRaw;
+    : dex.quoteOutputRaw ?? fallbackOutputRaw;
   const isLoading = shouldQuote && (
-    isQuoteStale || input.isQuoteLoading ||
-    (!input.quoteOutputRaw && input.isUsdPriceLoading)
+    isQuoteStale || dex.isQuoteLoading ||
+    (!dex.quoteOutputRaw && dex.isUsdPriceLoading)
   );
 
   return useMemo(
