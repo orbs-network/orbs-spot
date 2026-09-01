@@ -359,7 +359,7 @@ Keep provider callbacks stable and refresh balances only from `onWrapSuccess` an
 
 Wire the callback surface the product actually exposes: request/success/failure notifications for wrap, approval, signing, submission, and cancellation; `onOrderFilled`; `onOrdersProgressUpdate`; and `onCopy`. Keep order creation silent only when the modal already presents the same success state. Every callback should either perform a named host action or be deliberately omitted—do not publish a provider example full of no-op callbacks.
 
-## Order History, Details, Fills, and Cancellation
+## Order History
 
 Build history from `orderHistoryPanel`, derive display fields with `useDerivedHistoryOrder()`, and cancel open orders with `useCancelOrder()`. Keep the complete modal under the provider or render it through a context-preserving portal.
 
@@ -537,7 +537,7 @@ function CancelOrderButton({ order }: { order: Order }) {
 
 Store the selected order ID, then look up the current order from `orders.all` so an open details view receives live progress updates. Virtualize both the order rows and fill rows with the DEX's existing list library. The current SDK exposes one filtered snapshot rather than an infinite list, but the viewport should still stay bounded. Show a confirmation and failure state for open-order cancellation, then refetch after the transaction succeeds. Do not expose internal Order Sink URLs in the customer-facing modal.
 
-## Package Guardrails and Escape Hatches
+### Package Guardrails and Escape Hatches
 
 - Import from the package roots only. Internal `dist/*` paths are not public API and may change without notice.
 - Do not wrap Spot in a second application Error Boundary. `spot-react` ships its own boundary; surface adapter failures by throwing and using callbacks.

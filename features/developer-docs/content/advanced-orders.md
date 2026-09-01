@@ -115,7 +115,7 @@ Top-level signed fields:
 
 Use plain integer decimal strings for every amount, nonce, and timestamp that is serialized as a string. Do not use scientific notation, decimal points, or locale formatting. `deadline` and `start` are Unix seconds; the sample nonce is Unix milliseconds so it remains distinct from those timestamps.
 
-## Witness Fields
+### Witness Fields
 
 The witness is signed with the token permission. There are no extra order-type, duration, or helper-trigger fields in the EIP-712 message or the `POST /orders/new` body.
 
@@ -137,7 +137,7 @@ The witness is signed with the token permission. There are no extra order-type, 
 | `witness.output.token` | Destination ERC-20 address. |
 | `witness.output.recipient` | Address that receives filled destination tokens, normally the connected account. |
 
-## Output Limit and Trigger Rules
+### Output Limit and Trigger Rules
 
 All 3 output strategy fields are destination-token amounts per fill, serialized as plain integer base-unit strings.
 
@@ -244,7 +244,7 @@ The endpoint returns raw Order Sink objects. If you normalize them in your own s
 
 ## Cancel Order Sink Orders
 
-Cancelling a RePermit order is an on-chain transaction. Do not send a cancel request to Order Sink. The copyable example at the top resolves the trusted RePermit contract, verifies that the connected account and chain match the signed order, submits `metadata.repermitDigest` from the owner address, checks the receipt, and then refreshes history.
+Cancelling a RePermit order is an on-chain transaction. Do not send a cancel request to Order Sink. The copyable example at the top resolves the trusted RePermit contract for the active wallet chain, submits `metadata.repermitDigest`, checks the receipt, and then refreshes history.
 
 `orderSinkOrder` is one item from the submitted or fetched Order Sink response. The cancellation digest comes from `orderSinkOrder.metadata.repermitDigest`. Do not use the Order Sink `hash` as the cancel digest. Use the same `permitDataResponse.domain.verifyingContract` that was fetched for the order; retain that address with local order metadata if cancellation may happen later.
 
@@ -259,41 +259,6 @@ Cancellation flow:
 
 The transaction sender should be the same address that signed the original order. In the signed order this is `order.witness.swapper`.
 
-```ts
-import { isAddressEqual, parseAbi } from "viem";
-
-const repermitCancelAbi = parseAbi([
-  "function cancel(bytes32[] digests)",
-]);
-
-async function cancelOrder(orderSinkOrder) {
-  const expectedOwner = orderSinkOrder.order.witness.swapper;
-  const expectedChainId = Number(orderSinkOrder.order.witness.chainid);
-  if (!isAddressEqual(account, expectedOwner)) {
-    throw new Error("Connected wallet does not own this order");
-  }
-  if (walletClient.chain.id !== expectedChainId) {
-    throw new Error("Connected chain does not match this order");
-  }
-
-  const digest = orderSinkOrder.metadata.repermitDigest;
-  const hash = await walletClient.writeContract({
-    address: permitDataResponse.domain.verifyingContract,
-    abi: repermitCancelAbi,
-    functionName: "cancel",
-    args: [[digest]],
-    account,
-    chain: walletClient.chain,
-  });
-  const receipt = await publicClient.waitForTransactionReceipt({ hash });
-  if (receipt.status !== "success") {
-    throw new Error("Order cancellation reverted");
-  }
-  await refetchOrders();
-  return hash;
-}
-```
-
 ## Operational Checklist
 
 | Check | Action | Expected result | If it fails |
@@ -304,6 +269,6 @@ async function cancelOrder(orderSinkOrder) {
 | Signature | Set `witness.swapper` to the signer and sign the final message once. | The exact signed message is retained unchanged. | Discard the signature and rebuild from current state. |
 | Submission | POST `{ signature, order, status: "pending" }` and require HTTP success plus `result.success`. | A `signedOrder` with hash and metadata is stored. | Show the API error without silently marking creation successful. |
 | History | Fetch orders using the stored chain and adapter. | The UI receives the matching orders and keeps raw metadata. | Offer retry and preserve the last known list. |
-| Cancellation | Verify owner and chain, call `cancel([metadata.repermitDigest])`, confirm the receipt, then refetch. | Order Sink eventually reports the terminal cancelled state. | Show the on-chain failure and leave the order open. |
+| Cancellation | Resolve RePermit for the active wallet chain, call `cancel([metadata.repermitDigest])`, confirm the receipt, then refetch. | Order Sink eventually reports the terminal cancelled state. | Show the on-chain failure and leave the order open. |
 
 Ready to launch when every row passes on each supported chain.

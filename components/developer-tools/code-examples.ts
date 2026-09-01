@@ -1230,7 +1230,7 @@ export function formatCancelOrderExampleCode(data: JsonContainer) {
 
   return `import { useCallback } from "react";
 import type { OrderResponse, PermitData } from "./order-types";
-import { isAddress, isAddressEqual, parseAbi, zeroAddress } from "viem";
+import { parseAbi } from "viem";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 
 const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
@@ -1248,20 +1248,11 @@ export function useCancelOrderExample(
 
   // Pass the complete selected history item to access its RePermit digest.
   return useCallback(async (order: OrderResponse) => {
-    // 1. Verify the connected owner and chain before resolving the contract.
-    if (!isAddress(order.order.witness.swapper) ||
-        !isAddressEqual(account, order.order.witness.swapper)) {
-      throw new Error("Connected wallet does not own this order");
-    }
-    if (walletClient.chain.id !== Number(order.order.witness.chainid)) {
-      throw new Error("Connected chain does not match this order");
-    }
-
-    // 2. Resolve the trusted RePermit contract for the wallet's active chain.
+    // 1. Resolve the trusted RePermit contract for the wallet's active chain.
     // Never accept this contract address from editable UI input.
     const permitDataResponse = await fetchRePermitData(walletClient.chain.id);
 
-    // 3. Call cancel with an array containing the selected order's digest.
+    // 2. Call cancel with an array containing the selected order's digest.
     const hash = await walletClient.writeContract({
       address: permitDataResponse.domain.verifyingContract,
       abi: cancelAbi,
@@ -1271,7 +1262,7 @@ export function useCancelOrderExample(
       chain: walletClient.chain,
     });
 
-    // 4. Wait for confirmation, then refresh the service-owned order status.
+    // 3. Wait for confirmation, then refresh the service-owned order status.
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") throw new Error("Order cancellation reverted");
     await refetchOrders();
@@ -1289,16 +1280,7 @@ async function fetchRePermitData(chainId: number): Promise<PermitData> {
     throw new Error(\`Failed to fetch RePermit data (\${response.status})\`);
   }
 
-  const permitData = (await response.json()) as PermitData;
-  const repermit = permitData.domain?.verifyingContract;
-  if (!isAddress(repermit) || isAddressEqual(repermit, zeroAddress)) {
-    throw new Error("Base permit data is missing the RePermit contract");
-  }
-  if (Number(permitData.domain.chainId) !== chainId ||
-      Number(permitData.order.witness.chainid) !== chainId) {
-    throw new Error("Base permit data does not match the selected chain");
-  }
-  return permitData;
+  return (await response.json()) as PermitData;
 }`;
 }
 

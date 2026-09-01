@@ -67,6 +67,10 @@ const INTERACTIVE_STEP_KEYS = new Set([
   "advanced-orders-core:cancel-order-sink-orders",
   "advanced-orders-react:advanced-orders-provider",
 ]);
+const LIMITED_CODE_STEP_KEYS = new Set([
+  "advanced-orders-react:order-history",
+  "advanced-orders-react:submit-modal-and-lifecycle",
+]);
 
 const INTERACTIVE_STEP_PURPOSES: Record<string, string> = {
   "liquidity-hub:request-quotes": "Fetch a wallet-bound candidate without blocking the host DEX quote.",
@@ -177,17 +181,6 @@ function isModifiedClick(event: MouseEvent<HTMLAnchorElement>): boolean {
     event.shiftKey ||
     event.altKey
   );
-}
-
-function getStepPhase(step: DeveloperGuideStep): string {
-  if (/checklist/.test(step.id)) return "Verify";
-  if (/history|fetch-order|cancel|fallback|errors/.test(step.id)) return "Operate";
-  if (/execute|submit|lifecycle|refresh-and-sign/.test(step.id)) return "Submit";
-  if (/protocol-reference|witness-fields|output-limit/.test(step.id)) return "Reference";
-  if (/provider/.test(step.id)) return "Provider";
-  if (/compare|wrap|strategy|create-order|build-the-order|build-the-form/.test(step.id)) return "Build";
-  if (/wallet|request-quotes|integration-model|fetch-partner-config/.test(step.id)) return "Connect";
-  return "Start";
 }
 
 function getSearchText(
@@ -390,13 +383,8 @@ function StepNavigation({
             >
               {index + 1}
             </span>
-            <span className="min-w-0">
-              <span className="block text-[9px] font-semibold uppercase tracking-[0.12em] text-primary/80">
-                {getStepPhase(step)}
-              </span>
-              <span className="block whitespace-normal break-words leading-5 max-lg:text-xs max-lg:leading-4">
-                {step.title}
-              </span>
+            <span className="min-w-0 whitespace-normal break-words leading-5 max-lg:text-xs max-lg:leading-4">
+              {step.title}
             </span>
           </a>
         );
@@ -922,10 +910,9 @@ export function DeveloperGuideShell({
             <MarkdownContent
               codeBlocksFirst
               highlightQuery={highlightQuery}
-              limitCodeBlockHeight={
-                activeGuide.id === "advanced-orders-react" &&
-                activeStep.id === "submit-modal-and-lifecycle"
-              }
+              limitCodeBlockHeight={LIMITED_CODE_STEP_KEYS.has(
+                `${activeGuide.id}:${activeStep.id}`,
+              )}
               markdown={activeStep.content}
             />
           </article>
