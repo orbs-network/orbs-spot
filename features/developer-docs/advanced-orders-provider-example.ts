@@ -25,6 +25,7 @@ export const ADVANCED_ORDERS_PROVIDER_EXAMPLE_DATA: JsonContainer = {
   srcUsd1Token: "dex.srcTokenUsd",
   dstUsd1Token: "dex.dstTokenUsd",
   fees: "advancedOrdersFeePercent",
+  enableQueryParams: false,
   callbacks: "callbacks",
 };
 
@@ -49,13 +50,22 @@ type AdvancedOrderFormProps = {
   advancedOrdersFeePercent?: number;
 };
 
-export function AdvancedOrderForm({ module, priceProtection, minChunkSizeUsd, advancedOrdersFeePercent }: AdvancedOrderFormProps) {
+export function AdvancedOrderForm({ module, priceProtection, minChunkSizeUsd, advancedOrdersFeePercent = 0 }: AdvancedOrderFormProps) {
   // Keep the existing DEX adapter as the only source of wallet, form, and quote state.
   const dex = useDexSpotAdapter();
 
   // These stable adapter objects are implemented in the Hooks tab.
   const walletInteractions = useWalletInteractions(dex.wTokenAddress);
-  const marketReferencePrice = useMarketReferencePrice(dex.marketReferencePrice);
+  const marketReferencePrice = useMarketReferencePrice({
+    typedInputAmount: dex.typedInputAmount,
+    quotedInputAmount: dex.quotedInputAmount,
+    quoteOutputRaw: dex.quoteOutputRaw,
+    isQuoteLoading: dex.isQuoteLoading,
+    inputAmountUsd: dex.inputAmountUsd,
+    outputTokenUsd: dex.outputTokenUsd,
+    outputTokenDecimals: dex.dstToken?.decimals,
+    isUsdPriceLoading: dex.isUsdPriceLoading,
+  });
   const callbacks = useAdvancedOrdersCallbacks();
 
   // Provider boundary rules:
@@ -82,6 +92,7 @@ export function AdvancedOrderForm({ module, priceProtection, minChunkSizeUsd, ad
       srcUsd1Token={dex.srcTokenUsd}
       dstUsd1Token={dex.dstTokenUsd}
       fees={advancedOrdersFeePercent}
+      enableQueryParams={false}
       callbacks={callbacks}
     >
       {/* Provider consumers, including portalled modals, must remain in this scope. */}
@@ -92,10 +103,14 @@ export function AdvancedOrderForm({ module, priceProtection, minChunkSizeUsd, ad
 }
 
 function formatAdvancedOrdersHooksCode() {
-  return `import { useCallback, useMemo } from "react";
-import { erc20Abi, parseAbi, type Address, type Hash } from "viem";
+  return `import BigNumber from "bignumber.js";
+import { useCallback, useMemo } from "react";
+import { erc20Abi, maxUint256, parseAbi, type Address, type Hash } from "viem";
 import { usePublicClient, useWalletClient } from "wagmi";
+import { isUserRejectedError, showWalletRejection } from "./wallet-errors";
 import { useRefetchBalances } from "./use-refetch-balances";
+import { useAdvancedOrdersNotifications } from "./use-advanced-orders-notifications";
+import { useQueueWrappedInput } from "./use-queue-wrapped-input";
 import type {
   Callbacks,
   MarketReferencePrice,
@@ -104,11 +119,46 @@ import type {
 
 const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
 
-// Keep the provider's quote object stable while the DEX quote fields are unchanged.
-export function useMarketReferencePrice({ value, isLoading, noLiquidity }: MarketReferencePrice): MarketReferencePrice {
+type MarketReferenceInput = {
+  typedInputAmount: string;
+  quotedInputAmount?: string;
+  quoteOutputRaw?: string;
+  isQuoteLoading: boolean;
+  inputAmountUsd?: string;
+  outputTokenUsd?: string;
+  outputTokenDecimals?: number;
+  isUsdPriceLoading: boolean;
+};
+
+// Never expose a quote produced for a previous typed input amount.
+export function useMarketReferencePrice(input: MarketReferenceInput): MarketReferencePrice {
+  const shouldQuote = Boolean(input.typedInputAmount && input.outputTokenDecimals !== undefined);
+  const isQuoteStale = shouldQuote && input.typedInputAmount !== input.quotedInputAmount;
+  const fallbackOutputRaw = useMemo(() => {
+    const inputUsd = new BigNumber(input.inputAmountUsd ?? 0);
+    const outputUsd = new BigNumber(input.outputTokenUsd ?? 0);
+    if (input.outputTokenDecimals === undefined || !inputUsd.isFinite() ||
+        !outputUsd.isFinite() || inputUsd.lte(0) || outputUsd.lte(0)) {
+      return undefined;
+    }
+    return inputUsd
+      .div(outputUsd)
+      .times(new BigNumber(10).pow(input.outputTokenDecimals))
+      .integerValue(BigNumber.ROUND_DOWN)
+      .toFixed(0);
+  }, [input.inputAmountUsd, input.outputTokenDecimals, input.outputTokenUsd]);
+
+  const value = !shouldQuote || isQuoteStale
+    ? undefined
+    : input.quoteOutputRaw ?? fallbackOutputRaw;
+  const isLoading = shouldQuote && (
+    isQuoteStale || input.isQuoteLoading ||
+    (!input.quoteOutputRaw && input.isUsdPriceLoading)
+  );
+
   return useMemo(
-    () => ({ value, isLoading, noLiquidity }),
-    [value, isLoading, noLiquidity],
+    () => ({ value, isLoading, noLiquidity: shouldQuote && !isLoading && !value }),
+    [isLoading, shouldQuote, value],
   );
 }
 
@@ -129,50 +179,71 @@ export function useWalletInteractions(wTokenAddress?: Address): WalletInteractio
     return hash;
   }, [publicClient]);
 
+  const runWalletOperation = useCallback(async <T,>(
+    action: "wrap" | "approve" | "cancel" | "sign",
+    operation: () => Promise<T>,
+  ): Promise<T> => {
+    try {
+      return await operation();
+    } catch (error) {
+      if (isUserRejectedError(error)) showWalletRejection(action);
+      throw error;
+    }
+  }, []);
+
   const wrapNativeToken = useCallback<WalletInteractions["wrapNativeToken"]>(async (amount) => {
     if (!wTokenAddress) throw new Error("Wrapped native token is unavailable");
     const wallet = requireWallet();
-    const hash = await wallet.writeContract({
-      address: wTokenAddress,
-      abi: wrappedNativeAbi,
-      functionName: "deposit",
-      value: BigInt(amount),
-      account: wallet.account,
-      chain: wallet.chain,
+    return runWalletOperation("wrap", async () => {
+      const hash = await wallet.writeContract({
+        address: wTokenAddress,
+        abi: wrappedNativeAbi,
+        functionName: "deposit",
+        value: BigInt(amount),
+        account: wallet.account,
+        chain: wallet.chain,
+      });
+      return waitForSuccess(hash);
     });
-    return waitForSuccess(hash);
-  }, [requireWallet, waitForSuccess, wTokenAddress]);
+  }, [requireWallet, runWalletOperation, waitForSuccess, wTokenAddress]);
 
-  const approveToken = useCallback<WalletInteractions["approveToken"]>(async ({ tokenAddress, amount, spenderAddress }) => {
+  const approveToken = useCallback<WalletInteractions["approveToken"]>(async ({ tokenAddress, spenderAddress }) => {
     const wallet = requireWallet();
-    const hash = await wallet.writeContract({
-      address: tokenAddress as Address,
-      abi: erc20Abi,
-      functionName: "approve",
-      args: [spenderAddress as Address, BigInt(amount)],
-      account: wallet.account,
-      chain: wallet.chain,
+    return runWalletOperation("approve", async () => {
+      const hash = await wallet.writeContract({
+        address: tokenAddress as Address,
+        abi: erc20Abi,
+        functionName: "approve",
+        // Spot passes an amount, but recurring chunks need durable allowance.
+        args: [spenderAddress as Address, maxUint256],
+        account: wallet.account,
+        chain: wallet.chain,
+      });
+      return waitForSuccess(hash);
     });
-    return waitForSuccess(hash);
-  }, [requireWallet, waitForSuccess]);
+  }, [requireWallet, runWalletOperation, waitForSuccess]);
 
   const cancelOrder = useCallback<WalletInteractions["cancelOrder"]>(async ({ contractAddress, args, abi }) => {
     const wallet = requireWallet();
-    const hash = await wallet.writeContract({
-      address: contractAddress as Address,
-      abi,
-      functionName: "cancel",
-      args,
-      account: wallet.account,
-      chain: wallet.chain,
+    return runWalletOperation("cancel", async () => {
+      const hash = await wallet.writeContract({
+        address: contractAddress as Address,
+        abi,
+        functionName: "cancel",
+        args,
+        account: wallet.account,
+        chain: wallet.chain,
+      });
+      return waitForSuccess(hash);
     });
-    return waitForSuccess(hash);
-  }, [requireWallet, waitForSuccess]);
+  }, [requireWallet, runWalletOperation, waitForSuccess]);
 
   const signOrder = useCallback<WalletInteractions["signOrder"]>(({ domain, types, primaryType, message, account }) => {
     // Return the complete wallet signature unchanged; Spot submits it as-is.
-    return requireWallet().signTypedData({ domain, types, primaryType, message, account });
-  }, [requireWallet]);
+    return runWalletOperation("sign", () =>
+      requireWallet().signTypedData({ domain, types, primaryType, message, account }),
+    );
+  }, [requireWallet, runWalletOperation]);
 
   const getAllowance = useCallback<WalletInteractions["getAllowance"]>(async ({ tokenAddress, spenderAddress }) => {
     if (!publicClient) throw new Error("Public client is unavailable");
@@ -191,38 +262,37 @@ export function useWalletInteractions(wTokenAddress?: Address): WalletInteractio
   );
 }
 
-// Keep the full callback surface visible. Only these two lifecycle events
-// refetch balances by default; replace other no-ops when the host needs them.
-export function useAdvancedOrdersCallbacks(): Required<Callbacks> {
+// Wire the user-visible lifecycle; omit callbacks the host does not use.
+export function useAdvancedOrdersCallbacks(): Callbacks {
   // Read this action from the host balance hook instead of threading DEX state
   // through the provider component.
   const refetchBalances = useRefetchBalances();
+  const notifications = useAdvancedOrdersNotifications();
+  const queueWrappedInput = useQueueWrappedInput();
 
   return useMemo(() => ({
-    onCancelOrderRequest: () => {},
-    onCancelOrderSuccess: () => {},
-    onCancelOrderFailed: () => {},
-    onOrdersProgressUpdate: refetchBalances,
-    onSignOrderRequest: () => {},
-    onOrderCreated: () => {},
-    onSignOrderSuccess: () => {},
-    onSignOrderError: () => {},
-    onApproveRequest: () => {},
-    onApproveSuccess: () => {},
-    onWrapRequest: () => {},
-    onWrapSuccess: refetchBalances,
-    onOrderFilled: () => {},
-    onCopy: () => {},
-    onSubmitOrderFailed: () => {},
-    onSubmitOrderRejected: () => {},
-    onLimitPriceChange: () => {},
-    onTriggerPriceChange: () => {},
-    onTriggerPricePercentChange: () => {},
-    onLimitPricePercentChange: () => {},
-    onDurationChange: () => {},
-    onFillDelayChange: () => {},
-    onChunksChange: () => {},
-  }), [refetchBalances]);
+    onCancelOrderRequest: notifications.cancelRequest,
+    onCancelOrderSuccess: notifications.cancelSuccess,
+    onCancelOrderFailed: notifications.cancelFailed,
+    onOrdersProgressUpdate: () => void refetchBalances(),
+    onSignOrderRequest: notifications.signRequest,
+    onOrderCreated: notifications.orderCreated,
+    onSignOrderSuccess: notifications.signSuccess,
+    onSignOrderError: notifications.signFailed,
+    onApproveRequest: notifications.approveRequest,
+    onApproveSuccess: notifications.approveSuccess,
+    onWrapRequest: notifications.wrapRequest,
+    onWrapSuccess: async (result) => {
+      // Keep native input visible until the submit modal exit completes.
+      queueWrappedInput();
+      notifications.wrapSuccess(result);
+      await refetchBalances();
+    },
+    onOrderFilled: notifications.orderFilled,
+    onCopy: notifications.copied,
+    onSubmitOrderFailed: notifications.submitFailed,
+    onSubmitOrderRejected: notifications.submitRejected,
+  }), [notifications, queueWrappedInput, refetchBalances]);
 }`;
 }
 

@@ -141,7 +141,7 @@ export function InteractiveGuideExample({
 
   if (
     guideId === "advanced-orders-core" &&
-    stepId === "protocol-reference"
+    stepId === "fetch-partner-config"
   ) {
     return (
       <ExampleFrame label="Interactive HTTP reference">
@@ -155,7 +155,7 @@ export function InteractiveGuideExample({
             url: PERMIT_DATA_REQUEST_URL,
           }}
           description=""
-          explanation="Request the server-controlled EIP-712 template for one partner and chain. The response tab shows the complete language-independent schema."
+          explanation="Request and validate the server-controlled EIP-712 template for one partner and chain. The response tab shows the complete language-independent schema."
           explanationDisplay="tooltip"
           requestResponseTabs
           responseData={PERMIT_DATA_RESPONSE}

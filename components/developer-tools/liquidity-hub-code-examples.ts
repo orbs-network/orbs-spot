@@ -66,6 +66,7 @@ ${formatLiquidityHubPartnerDeclaration(partner)}
 export const liquidityHub = constructSDK({
   chainId,
   partner,
+  blockAnalytics: false,
 });`;
 }
 
@@ -84,7 +85,8 @@ export type LiquidityHubQuote = Quote & {
 }
 
 export function formatLiquidityHubPermitSigningCode(): string {
-  return `import type { Address, Hex, WalletClient } from "viem";
+  return `import { _TypedDataEncoder } from "@ethersproject/hash";
+import type { Address, Hex, WalletClient } from "viem";
 
 import type { LiquidityHubQuote } from "./liquidity-hub-types";
 
@@ -92,13 +94,26 @@ export async function signLiquidityHubPermit(
   quote: LiquidityHubQuote,
   walletClient: WalletClient,
 ): Promise<Hex> {
+  const permitData = quote.permitData;
+  const populated = await _TypedDataEncoder.resolveNames(
+    permitData.domain,
+    permitData.types,
+    permitData.values,
+    async (name: string) => name,
+  );
+  const payload = _TypedDataEncoder.getPayload(
+    populated.domain,
+    permitData.types,
+    populated.value,
+  );
+
   return walletClient.signTypedData({
     account: quote.user as Address,
-    // Use the wallet-ready EIP-712 fields exactly as returned with this quote.
-    domain: quote.eip712.domain,
-    types: quote.eip712.types,
-    primaryType: quote.eip712.primaryType,
-    message: quote.eip712.message,
+    // Liquidity Hub permit data needs ethers normalization before wallet signing.
+    domain: payload.domain,
+    types: payload.types,
+    primaryType: payload.primaryType,
+    message: payload.message,
   });
 }`;
 }
@@ -129,20 +144,25 @@ const liquidityHub = constructSDK({ chainId, partner });
 let quotePayload = ${formatJsonObject(quotePayload)} as LiquidityHubQuote;
 
 export function getLatestQuote(): LiquidityHubQuote | Promise<LiquidityHubQuote> {
-  if (!isFreshQuote(quotePayload)) {
+  if (!isFreshQuote(quotePayload, 60)) {
+    const originalQuote = quotePayload;
     return liquidityHub
       .getQuote({
-        fromToken: quotePayload.inToken,
-        toToken: quotePayload.outToken,
-        inAmount: quotePayload.inAmount,
+        fromToken: originalQuote.inToken,
+        toToken: originalQuote.outToken,
+        inAmount: originalQuote.inAmount,
         dexMinAmountOut: "-1",
-        slippage: quotePayload.slippage,
-        account: quotePayload.user,
+        slippage: originalQuote.slippage,
+        account: originalQuote.user,
       })
-      .then((quote) => {
-        quotePayload = quote;
+      .then((freshQuote) => {
+        if (BigInt(freshQuote.minAmountOut) < BigInt(originalQuote.minAmountOut)) {
+          return originalQuote;
+        }
+        quotePayload = freshQuote;
         return quotePayload;
-      });
+      })
+      .catch(() => originalQuote);
   }
 
   return quotePayload;
@@ -155,8 +175,9 @@ Latest quote flow
 2. Use the SDK's isFreshQuote() check to keep that payload while it is valid.
 3. When stale, request the same tokens, total input amount, slippage, and wallet.
    dexMinAmountOut is -1 because this flow executes Liquidity Hub only.
-4. Replace quotePayload with the response so signing and swap use the same quote.
-5. Callers await getLatestQuote(); the fresh path returns immediately, while the
+4. Keep the original quote if refresh fails or returns a lower minAmountOut.
+5. Otherwise replace quotePayload so signing and swap use the same quote.
+6. Callers await getLatestQuote(); the fresh path returns immediately, while the
    stale path resolves after the replacement quote is fetched.
 */`;
 }
@@ -178,11 +199,11 @@ export function useFetchLiquidityHubQuote() {
   return useCallback(async () => {
     const quote = await getLiquidityHubQuote();
 
-    const selectedRoute = quoteArgs.dexMinAmountOut
+    const selectedRoute = quoteArgs.dexMinAmountOut && quoteArgs.dexMinAmountOut !== "-1"
       ? BigInt(quote.minAmountOut) > BigInt(quoteArgs.dexMinAmountOut)
         ? "liquidity-hub"
         : "dex"
-      : "compare-after-dex-quote";
+      : "no-dex-quote";
 
     return { quote, selectedRoute };
   }, []);
@@ -397,23 +418,16 @@ export function useCheckLiquidityHubAllowance() {
 
 export function formatLiquidityHubSignCode(): string {
   return `import { useCallback } from "react";
-import type { Address } from "viem";
 import { useWalletClient } from "wagmi";
 import { getLatestQuote } from "./get-latest-quote";
+import { signLiquidityHubPermit } from "./sign-liquidity-hub-permit";
 
 export function useSignLiquidityHubQuote() {
   const { data: walletClient } = useWalletClient();
 
   return useCallback(async () => {
     const quote = await getLatestQuote();
-    const signature = await walletClient!.signTypedData({
-      account: quote.user as Address,
-      // Use the wallet-ready EIP-712 fields exactly as returned with this quote.
-      domain: quote.eip712.domain,
-      types: quote.eip712.types,
-      primaryType: quote.eip712.primaryType,
-      message: quote.eip712.message,
-    });
+    const signature = await signLiquidityHubPermit(quote, walletClient!);
 
     return { quote, signature };
   }, [walletClient]);
@@ -442,11 +456,19 @@ export function useSwapAndConfirmLiquidityHub() {
 
   return useCallback(async () => {
     const quote = await getLatestQuote();
-    const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
-    const receipt = await publicClient!.waitForTransactionReceipt({ hash: txHash });
-    if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
+    try {
+      const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
+      const receipt = await publicClient!.waitForTransactionReceipt({ hash: txHash });
+      if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
+      const details = await liquidityHub.getTransactionDetails(txHash, quote);
+      liquidityHub.analytics.swap.onSuccess();
 
-    return receipt;
+      return { details, receipt, txHash };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      liquidityHub.analytics.swap.onFailed(message);
+      throw error;
+    }
   }, [publicClient]);
 }`;
 }
@@ -454,7 +476,8 @@ export function useSwapAndConfirmLiquidityHub() {
 export function formatLiquidityHubFullFlowCode(data: JsonContainer): string {
   const { chainId, partner } = getExampleParams(data);
 
-  return `import {
+  return `import { _TypedDataEncoder } from "@ethersproject/hash";
+import {
   constructSDK,
   isFreshQuote,
   nativeTokenAddresses,
@@ -478,6 +501,10 @@ function isNative(address: string): boolean {
   );
 }
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function useExecuteLiquidityHubFlow() {
   // The host renders this flow only after the wallet clients and quote are ready.
   const account = useConnection().address!;
@@ -485,74 +512,118 @@ export function useExecuteLiquidityHubFlow() {
   const walletClient = useWalletClient().data!;
   // Replace these examples with the host's existing swap, quote, and token hooks.
   const { inputToken } = useDerivedData();
-  const { quote: currentQuote, refetch } = useQuote();
+  const { quote: currentQuote, refetch, setPollingPaused } = useQuote();
   const wToken = useWrappedNativeToken();
 
   return async function executeLiquidityHubFlow() {
     let quote = currentQuote;
     let inputTokenAddress = inputToken;
+    setPollingPaused(true);
 
-    if (isNative(inputTokenAddress)) {
-      const wrapHash = await walletClient.writeContract({
-        address: wToken as Address,
-        abi: wrappedNativeAbi,
-        functionName: "deposit",
-        value: BigInt(quote.inAmount),
-        account,
-        chain: walletClient.chain,
-      });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: wrapHash });
-      if (receipt.status !== "success") throw new Error("Native token wrap reverted");
+    try {
+      if (isNative(inputTokenAddress)) {
+        liquidityHub.analytics.wrap.onRequest();
+        try {
+          const wrapHash = await walletClient.writeContract({
+            address: wToken as Address,
+            abi: wrappedNativeAbi,
+            functionName: "deposit",
+            value: BigInt(quote.inAmount),
+            account,
+            chain: walletClient.chain,
+          });
+          const receipt = await publicClient.waitForTransactionReceipt({ hash: wrapHash });
+          if (receipt.status !== "success") throw new Error("Native token wrap reverted");
+          liquidityHub.analytics.wrap.onSuccess(wrapHash);
+        } catch (error) {
+          liquidityHub.analytics.wrap.onFailed(getErrorMessage(error));
+          throw error;
+        }
 
-      // Liquidity Hub receives the wrapped ERC-20 address after wrapping.
-      inputTokenAddress = wToken;
-    }
+        // Liquidity Hub receives the wrapped ERC-20 address after wrapping.
+        inputTokenAddress = wToken;
+      }
 
-    // The host has already selected Liquidity Hub before calling this flow.
-    // This example never submits a DEX transaction.
-
-    const allowance = await publicClient.readContract({
-      address: inputTokenAddress as Address,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [account, permit2Address as Address],
-    });
-
-    if (allowance < BigInt(quote.inAmount)) {
-      const approvalHash = await walletClient.writeContract({
+      // The host selected Liquidity Hub before this flow; no DEX fallback runs here.
+      const allowance = await publicClient.readContract({
         address: inputTokenAddress as Address,
         abi: erc20Abi,
-        functionName: "approve",
-        // Approve exactly the prepared quote amount.
-        args: [permit2Address as Address, BigInt(quote.inAmount)],
-        account,
-        chain: walletClient.chain,
+        functionName: "allowance",
+        args: [account, permit2Address as Address],
       });
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
-      if (receipt.status !== "success") throw new Error("Permit2 approval reverted");
-    }
 
-    // Preparation takes time, so refetch only when the current quote is stale.
-    if (!isFreshQuote(quote, 60)) {
-      const previousMinAmountOut = quote.minAmountOut;
-      quote = await refetch();
-      if (BigInt(quote.minAmountOut) < BigInt(previousMinAmountOut)) {
-        throw new Error("Price changed. Review the updated quote and confirm again.");
+      if (allowance < BigInt(quote.inAmount)) {
+        liquidityHub.analytics.approval.onRequest();
+        try {
+          const approvalHash = await walletClient.writeContract({
+            address: inputTokenAddress as Address,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [permit2Address as Address, BigInt(quote.inAmount)],
+            account,
+            chain: walletClient.chain,
+          });
+          const receipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+          if (receipt.status !== "success") throw new Error("Permit2 approval reverted");
+          liquidityHub.analytics.approval.onSuccess(approvalHash);
+        } catch (error) {
+          liquidityHub.analytics.approval.onFailed(getErrorMessage(error));
+          throw error;
+        }
       }
-    }
-    const signature = await walletClient.signTypedData({
-      account,
-      // Use the wallet-ready EIP-712 fields exactly as returned with this quote.
-      domain: quote.eip712.domain,
-      types: quote.eip712.types,
-      primaryType: quote.eip712.primaryType,
-      message: quote.eip712.message,
-    });
 
-    const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-    if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
-    return { quote, receipt, route: "liquidity-hub" as const, signature };
+      // Keep a fresh original. Replace a stale one only with an equal-or-better quote.
+      if (!isFreshQuote(quote, 60)) {
+        const originalQuote = quote;
+        const freshQuote = await refetch().catch(() => undefined);
+        if (freshQuote &&
+            BigInt(freshQuote.minAmountOut) >= BigInt(originalQuote.minAmountOut)) {
+          quote = freshQuote;
+        }
+      }
+
+      liquidityHub.analytics.signature.onRequest();
+      let signature: string;
+      try {
+        const permitData = quote.permitData;
+        const populated = await _TypedDataEncoder.resolveNames(
+          permitData.domain,
+          permitData.types,
+          permitData.values,
+          async (name: string) => name,
+        );
+        const payload = _TypedDataEncoder.getPayload(
+          populated.domain,
+          permitData.types,
+          populated.value,
+        );
+        signature = await walletClient.signTypedData({
+          account,
+          domain: payload.domain,
+          types: payload.types,
+          primaryType: payload.primaryType,
+          message: payload.message,
+        });
+        liquidityHub.analytics.signature.onSuccess(signature);
+      } catch (error) {
+        liquidityHub.analytics.signature.onFailed(getErrorMessage(error));
+        throw error;
+      }
+
+      try {
+        const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+        if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
+        const details = await liquidityHub.getTransactionDetails(txHash, quote);
+        liquidityHub.analytics.swap.onSuccess();
+        return { details, quote, receipt, route: "liquidity-hub" as const, signature, txHash };
+      } catch (error) {
+        liquidityHub.analytics.swap.onFailed(getErrorMessage(error));
+        throw error;
+      }
+    } finally {
+      setPollingPaused(false);
+    }
   };
 }
 
@@ -562,14 +633,12 @@ Liquidity Hub flow
 1. Enter after the host has already selected Liquidity Hub as the winning route.
 2. When the selected source is native, wrap the requested input amount and then
    replace inputTokenAddress with wToken for the rest of the flow.
-3. Use the current quote returned by the host's useQuote hook.
-4. Read the resulting ERC-20 input token's Permit2 allowance for quote.inAmount.
-5. When allowance is insufficient, approve the exact input and wait.
-6. Before signing, call the query hook's refetch only when the quote is stale. Stop with
-   "Price changed. Review the updated quote and confirm again." when its
-   minAmountOut is lower than the original quote.
-7. Pass the signed quote and signature to swap(), then wait for a successful
-   on-chain receipt.
+3. Pause quote polling until every execution stage settles.
+4. Report wrap and approval lifecycle analytics around confirmed transactions.
+5. Keep a fresh original quote; replace a stale quote only with an equal-or-better refresh.
+6. Normalize permitData through ethers, then report the signature lifecycle.
+7. Pass the same quote and signature to swap(), confirm its receipt, request
+   transaction details, report swap analytics, and finally resume quote polling.
 */
 `;
 }
@@ -762,7 +831,7 @@ export const LIQUIDITY_HUB_ALLOWANCE_CODE_SNIPPET: CodeSnippetOptions = {
 export const LIQUIDITY_HUB_SIGN_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "sign-liquidity-hub-quote.ts",
-  files: [GET_LATEST_QUOTE_FILE, COMPACT_TYPES_FILE],
+  files: [GET_LATEST_QUOTE_FILE, PERMIT_SIGNING_FILE, COMPACT_TYPES_FILE],
   format: formatLiquidityHubSignCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -824,6 +893,10 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
     "An optional AbortSignal used to cancel a quote request when the form inputs change.",
   "quoteArgs.timeout":
     "An optional quote-request timeout override expressed in milliseconds.",
+  "quoteArgs.inAmountUsd":
+    "Optional USD value of the source amount used for analytics and diagnostics.",
+  "quoteArgs.disabled":
+    "Host-controlled state that marks this quote stage disabled in SDK analytics.",
   quote:
     "The complete wallet-bound Liquidity Hub quote. Preserve it unchanged through signing and swap submission.",
   inToken: "The wrapped ERC-20 input token used by the accepted quote.",
@@ -841,7 +914,7 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   serializedOrder:
     "The opaque serialized solver order returned by Liquidity Hub. Submit it unchanged as part of the quote.",
   permitData:
-    "Opaque EIP-712 Permit2 data returned by Liquidity Hub. Pass it through unchanged to the isolated signing adapter.",
+    "Raw EIP-712 Permit2 data returned by Liquidity Hub. Preserve it, then normalize it with ethers _TypedDataEncoder in the signing adapter.",
   "permitData.domain":
     "The EIP-712 domain supplied by Liquidity Hub for the Permit2 signature.",
   "permitData.domain.name":
@@ -881,7 +954,7 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   "permitData.values.witness":
     "The raw Dutch-order witness bound to the Permit2 authorization.",
   eip712:
-    "The wallet-ready EIP-712 representation of permitData. Pass it to the wallet unchanged.",
+    "The SDK-provided EIP-712 representation of permitData. This guide signs the ethers-normalized raw permitData payload for wallet compatibility.",
   "eip712.domain":
     "The wallet-ready EIP-712 domain for the Permit2 signature.",
   "eip712.types":
@@ -889,7 +962,7 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   "eip712.primaryType":
     "The root EIP-712 type the wallet signs for this Liquidity Hub quote.",
   "eip712.message":
-    "The normalized Permit2 message the wallet signs unchanged.",
+    "The SDK representation of the Permit2 message. The reference signer derives its final wallet payload from raw permitData.",
   "eip712.message.permitted":
     "The input-token permission covered by this Permit2 signature.",
   "eip712.message.permitted.token":
@@ -959,7 +1032,7 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   outTokenUsd:
     "The destination token USD reference price used by the quote service.",
   timestamp: "The quote creation time used to reject stale execution data.",
-  error: "A Liquidity Hub quote error. Stop this execution flow and return the error to the host application.",
+  error: "A non-executable quote error. Only 'not supported' and 'ldv' stop polling; other failures follow the host retry policy.",
 };
 
 export function getLiquidityHubFieldExplanation(
@@ -1043,13 +1116,13 @@ const EXAMPLE_EIP712_MESSAGE = {
     amount: "1000000000000000000",
   },
   spender: EXAMPLE_REACTOR,
-  nonce: "42",
+  nonce: "1788217200123",
   deadline: 1788220800,
   witness: {
     info: {
       reactor: EXAMPLE_REACTOR,
       swapper: DEFAULT_ACCOUNT,
-      nonce: "42",
+      nonce: "1788217200123",
       deadline: 1788220800,
       additionalValidationContract: EXAMPLE_VALIDATION_CONTRACT,
       additionalValidationData: "0x",

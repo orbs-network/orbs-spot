@@ -46,9 +46,9 @@ The optional full-flow TypeScript example uses Wagmi v3 and Viem for wallet inte
 
 The RePermit contract, reactor, executor, exchange adapter, and fee reference addresses come from the fetched partner configuration. Do not hardcode them in the integration.
 
-## Protocol Reference
+## Fetch Partner Config
 
-Use this section as the language-independent contract. The HTTP reference at the top shows the complete `GET /config` request and response; the TypeScript tab is an optional implementation of the same request.
+Use this section as the language-independent HTTP contract. The reference at the top shows the complete `GET /config` request and response; the TypeScript tab is an optional implementation of the same request.
 
 | Operation | Contract |
 | --- | --- |
@@ -57,7 +57,53 @@ Use this section as the language-independent contract. The HTTP reference at the
 | Fetch history | `GET https://order-sink-v2.orbs.network/orders?swapper={account}&chainId={chainId}&exchange={adapter}`. The adapter comes from the configuration response. |
 | Cancel | Send the on-chain transaction `cancel([metadata.repermitDigest])` to `domain.verifyingContract`; cancellation is not an Order Sink HTTP request. |
 
-`GET /config` returns `domain`, `types`, `primaryType`, and an `order` template. Preserve the domain and types unchanged. Copy every server-controlled field from the returned template, then fill only the integration-owned values described below.
+`GET /config` returns `domain`, `types`, `primaryType`, and an `order` template. Preserve the domain and types unchanged. Reject the response when `domain.verifyingContract` or `order.witness.exchange.adapter` is missing or the zero address, or when either signed chain ID differs from the connected chain. Encode the partner as a query value and cache a valid response for the lifetime of that partner/chain selection.
+
+## Build the Order
+
+Start with the fetched template and override only integration-owned fields. Spread every nested server object before applying local token, account, amount, timing, and strategy values. This keeps the RePermit contract, reactor, executor, adapter, fee reference, share, adapter data, and exclusivity supplied by the service.
+
+Do not construct a message literal with copied sample addresses. The copyable end-to-end example uses this shape:
+
+```js
+const order = {
+  ...permitDataResponse.order,
+  permitted: {
+    ...permitDataResponse.order.permitted,
+    token: inputTokenAddress,
+    amount: totalInputAmount,
+  },
+  nonce,
+  deadline,
+  witness: {
+    ...permitDataResponse.order.witness,
+    swapper: account,
+    nonce,
+    start,
+    deadline,
+    chainid: activeChainId,
+    epoch,
+    slippage: slippageBps,
+    freshness: freshnessSeconds,
+    input: {
+      ...permitDataResponse.order.witness.input,
+      token: inputTokenAddress,
+      amount: srcAmountPerFill,
+      maxAmount: totalInputAmount,
+    },
+    output: {
+      ...permitDataResponse.order.witness.output,
+      token: dstToken,
+      limit: dstMinAmountPerFill,
+      triggerLower,
+      triggerUpper,
+      recipient: account,
+    },
+  },
+};
+```
+
+Top-level signed fields:
 
 | Signed path | Source and units |
 | --- | --- |
@@ -66,6 +112,15 @@ Use this section as the language-independent contract. The HTTP reference at the
 | `spender` | Copy `permitDataResponse.order.spender`. This is the reactor encoded in the signature, not the ERC-20 allowance spender. |
 | `nonce` | Fresh unsigned integer for this permit. The live builder uses the current Unix time in milliseconds and encodes it as a decimal string. |
 | `deadline` | Permit expiration as Unix time in seconds, encoded as a decimal string. |
+
+Use plain integer decimal strings for every amount, nonce, and timestamp that is serialized as a string. Do not use scientific notation, decimal points, or locale formatting. `deadline` and `start` are Unix seconds; the sample nonce is Unix milliseconds so it remains distinct from those timestamps.
+
+## Witness Fields
+
+The witness is signed with the token permission. There are no extra order-type, duration, or helper-trigger fields in the EIP-712 message or the `POST /orders/new` body.
+
+| Signed path | Source and units |
+| --- | --- |
 | `witness.reactor`, `witness.executor` | Copy the corresponding `permitDataResponse.order.witness` fields. |
 | `witness.exchange.adapter`, `ref`, `share`, `data` | Copy the complete exchange object from `permitDataResponse`. `share` is a server-configured unsigned integer; do not invent a fee value. |
 | `witness.swapper` | Connected account that owns the funds and produces the EIP-712 signature. |
@@ -75,16 +130,24 @@ Use this section as the language-independent contract. The HTTP reference at the
 | `witness.exclusivity` | Copy the server-configured unsigned integer from `permitDataResponse`; do not infer its policy locally. |
 | `witness.epoch` | Seconds between eligible fills. For TWAP, derive it from the selected fill interval. |
 | `witness.slippage` | Allowed execution slippage in basis points; `100` means 1%. |
-| `witness.freshness` | Maximum accepted age of execution price data in seconds. |
+| `witness.freshness` | Maximum accepted age of execution price data in seconds. Default to `60` unless Orbs explicitly provides another value. |
 | `witness.input.token` | Source ERC-20 address; it must equal `permitted.token`. |
 | `witness.input.amount` | Source amount allocated to one fill, in source-token base units. |
 | `witness.input.maxAmount` | Maximum total source amount across fills, in source-token base units; normally equal to `permitted.amount`. |
 | `witness.output.token` | Destination ERC-20 address. |
-| `witness.output.limit` | Minimum destination amount accepted per fill, in destination-token base units. |
-| `witness.output.triggerLower`, `triggerUpper` | Strategy trigger thresholds in destination-token base units. Use `0` when the selected module does not use that boundary. |
 | `witness.output.recipient` | Address that receives filled destination tokens, normally the connected account. |
 
-`POST /orders/new` returns a success envelope containing `signedOrder`, or an API error. Preserve the returned order `hash`, service `metadata`, original `order`, `signature`, and timestamp. Transport success alone is insufficient: also require the response body's `success` value before treating creation as complete.
+## Output Limit and Trigger Rules
+
+All 3 output strategy fields are destination-token amounts per fill, serialized as plain integer base-unit strings.
+
+| Signed field | Rule |
+| --- | --- |
+| `witness.output.limit` | Minimum destination amount required per fill. Use `"0"` for market-style execution. |
+| `witness.output.triggerLower` | Stop-loss trigger threshold. Set it only for stop-loss orders; otherwise use `"0"`. |
+| `witness.output.triggerUpper` | Take-profit trigger threshold. Set it only for take-profit orders; otherwise use `"0"`. |
+
+Only these final fields are signed. Module names and UI helpers are builder inputs, not extra EIP-712 or Order Sink fields.
 
 ## Strategy Recipes
 
@@ -104,7 +167,7 @@ Build the order close to signing time. The live Spot builder generates one nonce
 The optional Wagmi v3 reference at the top contains the complete package-free flow. The default `create-order-flow.ts` tab reads current swap values from the host's `useDerivedData()` hook, fetches permit data, prepares funds, builds `signTypedDataArgs` inline, signs, and submits. `order-types.ts` contains the shared contracts. Replace the example hook import with the DEX's existing derived swap-data hook.
 
 1. Fetch the trusted partner and active-chain permit template.
-2. Check allowance, wrap native input when needed, and approve RePermit when allowance is insufficient.
+2. Check allowance, wrap native input when needed, and approve RePermit for `order.permitted.amount` when allowance is insufficient. This Direct API reference uses an exact allowance; use a maximum allowance only as an explicit host security decision.
 3. Build `signTypedDataArgs` inline from the template, connected account, and values returned by `useDerivedData()`, then pass it directly to `walletClient.signTypedData`.
 4. Submit `signTypedDataArgs.message` unchanged as `{ signature, order, status: "pending" }` to `POST /orders/new`.
 5. Require HTTP and API success, then keep the returned `signedOrder` for progress, history, fills, and cancellation.
@@ -112,6 +175,8 @@ The optional Wagmi v3 reference at the top contains the complete package-free fl
 Use the partner identifier provided by Orbs. If none was provided, send the exact value `"unknown"`. Token amounts must be integer strings in base units, the signer must match `order.witness.swapper`, and the active chain must match both the EIP-712 domain and witness chain IDs.
 
 Do not recreate the EIP-712 domain, types, protocol contracts, or exchange fields locally. Do not rebuild or mutate the order after signing. Store the returned order hash for tracking and `metadata.repermitDigest` for cancellation.
+
+`POST /orders/new` returns a success envelope containing `signedOrder`, or an API error. Preserve the returned order `hash`, service `metadata`, original `order`, `signature`, and timestamp. Transport success alone is insufficient: also require the response body's `success` value before treating creation as complete.
 
 ### `useDerivedData()` Fields
 
@@ -127,7 +192,7 @@ Do not recreate the EIP-712 domain, types, protocol contracts, or exchange field
 | `fillDelayMillis` | Delay between eligible fills in milliseconds. The helper converts it to `witness.epoch` seconds. |
 | `totalTrades` | Number of expected fills. Values of `0` or `1` produce `witness.epoch = 0`. |
 | `slippageBps` | Execution slippage in basis points; `100` means 1%. |
-| `freshnessSeconds` | Maximum accepted age of execution price data in seconds. |
+| `freshnessSeconds` | Maximum accepted age of execution price data in seconds. Use `60` unless Orbs explicitly supplied another value. |
 | `triggerLower` | Lower strategy trigger in destination-token base units. Use `"0"` when unused. |
 | `triggerUpper` | Upper strategy trigger in destination-token base units. Use `"0"` when unused. |
 
@@ -193,6 +258,41 @@ Cancellation flow:
 6. Refetch the same Order Sink endpoint until metadata reflects the cancelled state.
 
 The transaction sender should be the same address that signed the original order. In the signed order this is `order.witness.swapper`.
+
+```ts
+import { isAddressEqual, parseAbi } from "viem";
+
+const repermitCancelAbi = parseAbi([
+  "function cancel(bytes32[] digests)",
+]);
+
+async function cancelOrder(orderSinkOrder) {
+  const expectedOwner = orderSinkOrder.order.witness.swapper;
+  const expectedChainId = Number(orderSinkOrder.order.witness.chainid);
+  if (!isAddressEqual(account, expectedOwner)) {
+    throw new Error("Connected wallet does not own this order");
+  }
+  if (walletClient.chain.id !== expectedChainId) {
+    throw new Error("Connected chain does not match this order");
+  }
+
+  const digest = orderSinkOrder.metadata.repermitDigest;
+  const hash = await walletClient.writeContract({
+    address: permitDataResponse.domain.verifyingContract,
+    abi: repermitCancelAbi,
+    functionName: "cancel",
+    args: [[digest]],
+    account,
+    chain: walletClient.chain,
+  });
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  if (receipt.status !== "success") {
+    throw new Error("Order cancellation reverted");
+  }
+  await refetchOrders();
+  return hash;
+}
+```
 
 ## Operational Checklist
 

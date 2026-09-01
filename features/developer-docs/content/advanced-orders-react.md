@@ -4,7 +4,7 @@ Use `@orbs-network/spot-react` to add Advanced Orders to an existing React DEX w
 
 Use the `Partners` value supplied by Orbs, or `Partners.Unknown` by default. If the partner configuration is unavailable, contact [@dTWAPSupportGroup](https://t.me/dTWAPSupportGroup).
 
-This is the host-owned presentation variant: the DEX supplies its own modal and progress components while `spot-react` owns Advanced Orders state. The upstream skill also documents the optional `@orbs-network/swap-ui` presentation, but this guide intentionally requires only `@orbs-network/spot-react`.
+This is the host-owned presentation variant: the DEX supplies its modal shell and field components while `spot-react` owns Advanced Orders state. Use `@orbs-network/swap-ui` for the order-creation and progress content, styled or wrapped to match the host.
 
 ## Integration Resources
 
@@ -16,10 +16,10 @@ This is the host-owned presentation variant: the DEX supplies its own modal and 
 Install the React SDK with the package manager already used by the host application.
 
 ```bash
-npm install @orbs-network/spot-react@latest
+npm install @orbs-network/spot-react@latest @orbs-network/swap-ui@latest @tanstack/react-query bignumber.js react-error-boundary zustand
 ```
 
-No additional Orbs package is required by this guide. Keep the wallet library, dialog, progress, token input, formatting, and virtualization components the DEX already uses.
+React and React DOM are also peer dependencies; reuse the compatible versions already installed by the host. Keep the wallet library, dialog shell, token input, formatting, and virtualization components the DEX already uses. Import package APIs only from `@orbs-network/spot-react` or `@orbs-network/swap-ui`, never from internal `dist/*` paths.
 
 ## Integration Model
 
@@ -35,6 +35,28 @@ Keep the DEX swap form as the source of truth. Do not create a second store that
 
 Pass user-facing decimal input to `typedInputAmount` and raw integer strings for balances. Let the DEX adapter supply the completed `marketReferencePrice` object with the current raw quote output, loading state, and no-liquidity state. Quote freshness stays inside the DEX.
 
+Track the input amount that produced each quote. Never expose the previous output after the user edits the input:
+
+```tsx
+const shouldQuote = Boolean(
+  typedInputAmount && inputCurrency && outputCurrency,
+);
+const isQuoteStale =
+  shouldQuote && typedInputAmount !== quotedInputAmount;
+const outputAmount =
+  !shouldQuote || isQuoteStale ? undefined : quoteOutputRaw;
+const isLoading =
+  shouldQuote && (isQuoteStale || isQuoteLoading);
+
+return {
+  value: outputAmount,
+  isLoading,
+  noLiquidity: shouldQuote && !isLoading && !outputAmount,
+};
+```
+
+When the router has no quote at all, derive a display/reference output from `inputAmountUsd / outputTokenUsd`, convert it to destination-token base units, and use that value only while both USD prices are current. This fallback keeps the price fields usable; it is not an executable DEX quote.
+
 Keep adapter objects stable, and memoize `walletInteractions` and `callbacks`. Use the connected wallet chain everywhere Spot needs a chain; do not mix it with a router or quote chain.
 
 ## Advanced Orders Provider
@@ -42,6 +64,8 @@ Keep adapter objects stable, and memoize `walletInteractions` and `callbacks`. U
 The interactive example keeps the provider boundary in the `provider.tsx` tab and the reusable host adapters in `hooks.ts`. Alias the package export `SpotProvider` as `AdvancedOrdersProvider` so its purpose is explicit inside the host application.
 
 The Hooks tab includes the complete optional Wagmi/Viem `useWalletInteractions` adapter, stable `marketReferencePrice`, and lifecycle callbacks. `useAdvancedOrdersCallbacks()` reads the refresh action from the host balance hook, so the provider does not pass balance state into it. Other wallet stacks can implement the same five operations. Transaction methods must wait for a successful receipt, throw when a transaction reverts, and then return its hash. Return the original `0x`-prefixed signature from `signOrder`; do not split or rewrite it.
+
+Approve `maxUint256` in the React adapter even though Spot passes an `amount` to `approveToken`. Advanced Orders, especially TWAP, may pull multiple chunks over time; an exact per-call approval can allow the first fill and break later fills. Surface wallet rejection for wrap, approval, cancellation, and signing through the host notification system, then rethrow the original error so Spot can update its execution state.
 
 The larger bounded example lets developers inspect both files without making the page unbounded. Scroll inside the code area or use Full Screen when comparing it with the host application.
 
@@ -63,9 +87,10 @@ Provider fields:
 | `srcBalance`, `dstBalance` | Wallet balances as raw integer strings in token base units. |
 | `srcUsd1Token`, `dstUsd1Token` | USD value of one whole source or destination token. |
 | `fees` | Optional Advanced Orders fee percentage supplied by the Orbs partner configuration. |
+| `enableQueryParams` | Set `false` when the host owns URL state such as `?order=twap`; this prevents the SDK and host from competing for query parameters. |
 | `callbacks` | Stable lifecycle callbacks; balance refreshes run only after wrapping and order-progress updates. |
 
-Pass `priceProtection` and `minChunkSizeUsd` from the host integration configuration instead of copying sample constants. `priceProtection` is a percentage (`3` means 3%), not swap slippage. The public `getMinChunkSizeUsd(configuredValue)` helper preserves the package's supported URL-query override; it does not discover a minimum from the server, so the host must still supply the configured USD value. Pass `fees` only when the Orbs partner configuration defines an Advanced Orders fee; the review's fee fields derive from that provider prop.
+Pass `priceProtection` and `minChunkSizeUsd` from the host integration configuration instead of copying sample constants. `priceProtection` is a percentage (`3` means 3%), not swap slippage. The public `getMinChunkSizeUsd(configuredValue)` helper preserves the package's supported URL-query override; it does not discover a minimum from the server, so the host must still supply the configured USD value. Pass `fees={0}` explicitly when the partner configuration defines no Advanced Orders fee; otherwise pass the agreed percentage.
 
 Use the connected wallet chain as the UI source of truth. Keep wallet connection and network selection in the host application's existing shell; this form only blocks submission and explains the missing state.
 
@@ -326,11 +351,13 @@ export function SubmitOrderSection() {
 }
 ```
 
-`Dialog`, `OrderReview`, and `OrderProgress` are host application components. Map `onExitComplete` to the host modal's animation-finished callback (or run it immediately when the modal has no exit animation). The progress view must cover wrap, approve, create, success, and failure states from `orderExecutionPanel`.
+`Dialog` is a host application component. Build `OrderReview` and `OrderProgress` on `@orbs-network/swap-ui` so wrap, approve, create, success, and failure states from `orderExecutionPanel` remain aligned with the supported execution model. Map `onExitComplete` to the host modal's animation-finished callback (or run it immediately when the modal has no exit animation).
 
 Once `execution.status` is set, progress owns the modal: hide the review, confirm button, duplicate title, and footer actions. On close, clear the DEX input and call `resetState()` only after success. After failure or wallet rejection, keep the input and call `resetCurrentSwap()` so the user can retry.
 
-Keep provider callbacks stable and refresh balances only from `onWrapSuccess` and `onOrdersProgressUpdate`. Keep order creation silent because the modal already shows success; use the remaining callbacks for fills, cancellation, copy feedback, errors, analytics, or field synchronization as needed.
+Keep provider callbacks stable and refresh balances only from `onWrapSuccess` and `onOrdersProgressUpdate`. When wrapping succeeds, queue the wrapped input-token address but keep the native token visible while the submit modal is open. Apply the queued address only after the modal exit completes, then clear the queue. This avoids mutating the source token underneath the active execution view.
+
+Wire the callback surface the product actually exposes: request/success/failure notifications for wrap, approval, signing, submission, and cancellation; `onOrderFilled`; `onOrdersProgressUpdate`; and `onCopy`. Keep order creation silent only when the modal already presents the same success state. Every callback should either perform a named host action or be deliberately omitted—do not publish a provider example full of no-op callbacks.
 
 ## Order History, Details, Fills, and Cancellation
 
@@ -510,16 +537,25 @@ function CancelOrderButton({ order }: { order: Order }) {
 
 Store the selected order ID, then look up the current order from `orders.all` so an open details view receives live progress updates. Virtualize both the order rows and fill rows with the DEX's existing list library. The current SDK exposes one filtered snapshot rather than an infinite list, but the viewport should still stay bounded. Show a confirmation and failure state for open-order cancellation, then refetch after the transaction succeeds. Do not expose internal Order Sink URLs in the customer-facing modal.
 
+## Package Guardrails and Escape Hatches
+
+- Import from the package roots only. Internal `dist/*` paths are not public API and may change without notice.
+- Do not wrap Spot in a second application Error Boundary. `spot-react` ships its own boundary; surface adapter failures by throwing and using callbacks.
+- Prefer `SpotProvider` and `useSpot()` for the supported integration. The exported `useRePermitData`, `useSignOrder`, `useSubmitOrder`, and `useSwapExecution` hooks are escape hatches for advanced host orchestration, not replacements for the provider lifecycle.
+- Set `enableQueryParams={false}` when the DEX owns module/query navigation.
+- Render “Powered by Orbs” attribution when required by the partner integration agreement.
+- Keep modals and portals under the provider context, including their exit-complete cleanup.
+
 ## Integration Checklist
 
 | Check | Action | Expected result | If it fails |
 | --- | --- | --- | --- |
-| Provider | Pass host tokens, decimal input, raw balances, one-token USD prices, memoized quote state, wallet chain, partner, fee, and callbacks. | `AdvancedOrdersProvider` renders without duplicating DEX state. | Compare the provider field table with the host adapter and fix the mismatched unit or source. |
-| Wallet | Implement all 5 interactions with the host wallet stack and wait for successful receipts. | Wrap, approve, cancel, sign, and allowance reads use the connected account and chain. | Throw from the adapter so Spot shows the failed execution step. |
+| Provider | Pass host tokens, decimal input, raw balances, one-token USD prices, memoized non-stale quote state, wallet chain, partner, explicit fee, callbacks, and `enableQueryParams={false}` when the host owns URL state. | `AdvancedOrdersProvider` renders without duplicating DEX state or query parameters. | Compare the provider field table with the host adapter and fix the mismatched unit or source. |
+| Wallet | Implement all 5 interactions with the host wallet stack, approve `maxUint256`, handle user rejection, and wait for successful receipts. | Wrap, approve, cancel, sign, and allowance reads use the connected account and chain. | Notify, rethrow, and let Spot show the failed execution step. |
 | Form | Render the module-specific panels from `useSpot()` with host-native components. | TWAP, Limit, Stop Loss, and Take Profit show only their applicable controls. | Compare the panel visibility table and translated validation keys. |
 | Submit | Retry configuration errors, review `derivedFormData`, and replace review with progress after submission starts. | Wrap, approve, create, success, and failure appear in one bounded modal. | Keep review closed until configuration recovers. |
-| Lifecycle | Reset after the modal exit completes; clear DEX input only on success. | Failed or rejected attempts retain input for retry. | Move cleanup to the host modal's actual exit callback. |
-| Callbacks | Refetch balances only on wrap success and orders-progress updates; keep other callbacks available. | Balance refreshes are stable and non-duplicated. | Check memoization and callback ownership. |
+| Lifecycle | Reset after the modal exit completes; clear DEX input only on success; apply a queued wrapped-token swap only after close. | Failed or rejected attempts retain input for retry and the modal never changes token mid-flow. | Move cleanup and wrapped-token application to the host modal's actual exit callback. |
+| Callbacks | Refetch balances only on wrap success and orders-progress updates; wire request, success, failure, fill, cancellation, and copy feedback. | Balance refreshes are stable and every user-visible lifecycle has feedback. | Check memoization and callback ownership. |
 | History | Render every `OrderFilter`, live details, virtualized rows/fills, confirmation, cancellation failure, and success refetch under provider scope. | Open orders update in place and terminal orders cannot cancel. | Verify portal context, selected ID lookup, and post-cancel refetch. |
 
 Ready to launch when every row passes on each supported chain.
@@ -527,4 +563,4 @@ Ready to launch when every row passes on each supported chain.
 Reference the source package when upgrading:
 
 - [Spot React package](https://github.com/orbs-network/spot-ui/tree/master/packages/spot-react)
-- [Reference React integration](https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx)
+- [Reference React integration](https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/spot-provider-shell.tsx)

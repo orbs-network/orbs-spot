@@ -62,7 +62,7 @@ const INTERACTIVE_STEP_KEYS = new Set([
   "liquidity-hub:request-quotes",
   "liquidity-hub:execute-the-full-flow",
   "advanced-orders-core:create-order",
-  "advanced-orders-core:protocol-reference",
+  "advanced-orders-core:fetch-partner-config",
   "advanced-orders-core:fetch-order-sink-orders",
   "advanced-orders-core:cancel-order-sink-orders",
   "advanced-orders-react:advanced-orders-provider",
@@ -72,7 +72,7 @@ const INTERACTIVE_STEP_PURPOSES: Record<string, string> = {
   "liquidity-hub:request-quotes": "Fetch a wallet-bound candidate without blocking the host DEX quote.",
   "liquidity-hub:execute-the-full-flow": "Prepare, sign, submit, and confirm the selected Liquidity Hub route.",
   "advanced-orders-core:create-order": "Create, fund, sign, and submit one order from live host inputs.",
-  "advanced-orders-core:protocol-reference": "Inspect the trusted configuration and exact EIP-712 schema.",
+  "advanced-orders-core:fetch-partner-config": "Inspect and validate the trusted configuration and exact EIP-712 schema.",
   "advanced-orders-core:fetch-order-sink-orders": "Load order history for the connected owner and configured adapter.",
   "advanced-orders-core:cancel-order-sink-orders": "Verify ownership and chain, submit the on-chain digest cancellation, then refresh history.",
   "advanced-orders-react:advanced-orders-provider": "Connect host-owned swap, quote, token, wallet, and lifecycle state to Spot.",
@@ -90,21 +90,21 @@ const GUIDE_INTEGRATION_EXAMPLES: Partial<
   "liquidity-hub": [
     {
       href: "https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx",
-      label: "orbs-spot",
+      label: "orbs-spot example",
     },
     {
-      href: "https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/best-trade-form.tsx",
-      label: "spot-ui",
+      href: "https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-integration",
+      label: "Integration skill",
     },
   ],
   "advanced-orders-react": [
     {
-      href: "https://github.com/orbs-network/spot-ui/blob/master/apps/web/components/spot/spot-form.tsx",
-      label: "spot-ui",
+      href: "https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order/spot-provider-shell.tsx",
+      label: "orbs-spot example",
     },
     {
-      href: "https://github.com/orbs-network/orbs-spot/blob/main/components/advanced-order-form.tsx",
-      label: "orbs-spot",
+      href: "https://github.com/orbs-network/spot-ui/tree/master/skills/spot-react-integration",
+      label: "Integration skill",
     },
   ],
 };
@@ -183,10 +183,10 @@ function getStepPhase(step: DeveloperGuideStep): string {
   if (/checklist/.test(step.id)) return "Verify";
   if (/history|fetch-order|cancel|fallback|errors/.test(step.id)) return "Operate";
   if (/execute|submit|lifecycle|refresh-and-sign/.test(step.id)) return "Submit";
-  if (/protocol-reference/.test(step.id)) return "Reference";
+  if (/protocol-reference|witness-fields|output-limit/.test(step.id)) return "Reference";
   if (/provider/.test(step.id)) return "Provider";
-  if (/compare|wrap|strategy|create-order|build-the-form/.test(step.id)) return "Build";
-  if (/wallet|request-quotes|integration-model/.test(step.id)) return "Connect";
+  if (/compare|wrap|strategy|create-order|build-the-order|build-the-form/.test(step.id)) return "Build";
+  if (/wallet|request-quotes|integration-model|fetch-partner-config/.test(step.id)) return "Connect";
   return "Start";
 }
 
@@ -564,7 +564,7 @@ export function DeveloperGuideShell({
           primaryHref: "https://orbs-spot.vercel.app",
           primaryLabel: "Open live Liquidity Hub UI",
           sourceHref:
-            "https://github.com/orbs-network/spot-ui/tree/master/skills/liquidity-hub-integration",
+            "https://github.com/orbs-network/orbs-spot/blob/main/components/best-trade-form.tsx",
         }
       : activeGuide.id === "advanced-orders-react"
         ? {
@@ -874,7 +874,7 @@ export function DeveloperGuideShell({
                 Tested: {GUIDE_METADATA[activeGuide.id]}
               </span>
               <span className="rounded-full border border-border/75 bg-card/55 px-2.5 py-1 max-sm:hidden">
-                Updated Aug 30, 2026
+                Updated Sep 1, 2026
               </span>
               <span className="rounded-full border border-border/75 bg-card/55 px-2.5 py-1 max-sm:hidden">
                 Sample addresses are illustrative
