@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { LiquidityHubGuide } from "@/components/developer-tools/liquidity-hub-guide";
+import { DeveloperGuidePage } from "@/features/developer-docs/developer-guide-page";
 
 export const metadata: Metadata = {
   title: "Liquidity Hub integration guide",
@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function LiquidityHubGuidePage() {
-  return <LiquidityHubGuide />;
+  return <DeveloperGuidePage activeGuideId="liquidity-hub" />;
 }

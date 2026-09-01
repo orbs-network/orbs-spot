@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-
-import { OrdersSinkGuide } from "@/components/developer-tools/orders-sink-guide";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "Advanced Order Docs",
+  title: "Advanced Orders Docs — Direct API",
   description:
-    "Implement Orders Sink configuration, token approval, EIP-712 signing, order submission, history, and cancellation.",
+    "Integrate Orbs Advanced Orders directly through the Order Sink APIs.",
 };
 
 export default function OrdersSinkGuidePage() {
-  return <OrdersSinkGuide />;
+  redirect("/developers/orders-sink/direct");
 }

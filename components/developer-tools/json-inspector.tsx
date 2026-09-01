@@ -5,6 +5,7 @@ import {
   type ComponentProps,
   type ReactElement,
   type ReactNode,
+  type WheelEvent,
   useCallback,
   useEffect,
   useId,
@@ -175,7 +176,7 @@ const jsonViewStyles: ComponentProps<typeof JsonView>["style"] = {
   clickableLabel: "cursor-pointer hover:text-primary",
   collapseIcon:
     "mr-1 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground",
-  collapsedContent: "mr-1 text-muted-foreground",
+  collapsedContent: "mr-1 text-muted-foreground after:content-['…']",
   container:
     "font-mono text-[13px] leading-6 text-foreground [overflow-wrap:anywhere]",
   expandIcon:
@@ -731,6 +732,7 @@ function JsonInspectorModalContent({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [isSaving, setIsSaving] = useState(false);
   const [isCodeFullscreen, setIsCodeFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState<string>();
   const [previewTab, setPreviewTab] = useState<PreviewTab>("request");
   const [codeFileSelection, setCodeFileSelection] = useState<{
     codeSnippet?: CodeSnippetOptions;
@@ -749,13 +751,18 @@ function JsonInspectorModalContent({
     (codeSnippet
       ? "This view shows runnable code generated from the complete input data. Edit a field to regenerate the snippet."
       : "This view shows the complete JSON payload. Select an object or array label to collapse or expand its fields.");
-  const getFieldExplanation =
+  const isDocumentationDensity = density === "documentation";
+  const configuredFieldExplanation =
     providedFieldExplanation ?? codeSnippet?.getFieldExplanation;
+  // Documentation keeps field guidance in code comments or the reference
+  // content below the snippet, never in hover-only field tooltips.
+  const getFieldExplanation = isDocumentationDensity
+    ? undefined
+    : configuredFieldExplanation;
   const headerSubtitle =
     explanationDisplay === "subtitle"
       ? resolvedExplanation
       : resolvedDescription;
-  const isDocumentationDensity = density === "documentation";
   const codeFiles = useMemo<CodeSnippetFileOptions[]>(
     () =>
       codeSnippet
@@ -783,8 +790,9 @@ function JsonInspectorModalContent({
     [activeCodeFile, draft],
   );
   const isMainCodeFile = activeCodeFileIndex === 0;
-  const responseFieldExplanation =
-    getResponseFieldExplanation ?? getFieldExplanation;
+  const responseFieldExplanation = isDocumentationDensity
+    ? undefined
+    : (getResponseFieldExplanation ?? getFieldExplanation);
   const hasResponseContent =
     responseData !== undefined || responseNotice !== undefined;
   const previewCopyTarget =
@@ -843,6 +851,58 @@ function JsonInspectorModalContent({
             path,
           });
         }
+        return;
+      }
+
+      const jsxPropMatch = line.match(
+        /^(\s+)([A-Za-z_$][\w$]*)=(?:\{.*\}|".*"|'.*')\s*$/,
+      );
+      if (jsxPropMatch) {
+        const key = jsxPropMatch[2];
+        const path: JsonValuePath = [key];
+        const value = getValueAtPath(draft, path);
+        if (value === undefined) return;
+
+        const tooltip =
+          getFieldExplanation(path, value) ??
+          activeCodeFile?.getFallbackFieldExplanation?.(path, value);
+        if (tooltip) {
+          explanations.set(lineIndex, {
+            key,
+            path: key,
+            tooltip,
+          });
+        }
+        return;
+      }
+
+      const jsxObjectPropMatch = line.match(
+        /^(\s+)([A-Za-z_$][\w$]*)=\{\{\s*$/,
+      );
+      if (jsxObjectPropMatch) {
+        const indent = jsxObjectPropMatch[1].length;
+        const key = jsxObjectPropMatch[2];
+        const path: JsonValuePath = [key];
+        const value = getValueAtPath(draft, path);
+        if (value === undefined || !isJsonContainer(value)) return;
+
+        const tooltip =
+          getFieldExplanation(path, value) ??
+          activeCodeFile?.getFallbackFieldExplanation?.(path, value);
+        if (tooltip) {
+          explanations.set(lineIndex, { key, path: key, tooltip });
+        }
+        while (
+          sectionStack.length &&
+          sectionStack[sectionStack.length - 1].indent >= indent
+        ) {
+          sectionStack.pop();
+        }
+        sectionStack.push({
+          indent,
+          nextArrayIndex: Array.isArray(value) ? 0 : undefined,
+          path,
+        });
         return;
       }
 
@@ -971,6 +1031,7 @@ function JsonInspectorModalContent({
       setIsCodeFullscreen(
         document.fullscreenElement === codeContainerRef.current,
       );
+      setFullscreenError(undefined);
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -1157,6 +1218,7 @@ function JsonInspectorModalContent({
     if (!codeContainer) return;
 
     try {
+      setFullscreenError(undefined);
       if (document.fullscreenElement === codeContainer) {
         await document.exitFullscreen();
         return;
@@ -1165,8 +1227,26 @@ function JsonInspectorModalContent({
       if (document.fullscreenElement) await document.exitFullscreen();
       await codeContainer.requestFullscreen();
     } catch {
-      toast.error("Unable to open the code preview in full screen");
+      const message = "Full screen is unavailable in this browser.";
+      setFullscreenError(message);
+      toast.error(message);
     }
+  };
+
+  const handleCodeWheel = (event: WheelEvent<HTMLPreElement>) => {
+    if (isCodeFullscreen || event.deltaY === 0) return;
+    const scroller = event.currentTarget;
+    const atTop = scroller.scrollTop <= 0;
+    const atBottom =
+      scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1;
+    if ((event.deltaY < 0 && !atTop) || (event.deltaY > 0 && !atBottom)) {
+      return;
+    }
+
+    // Hand unused wheel movement to the document once the code reaches an edge.
+    const previousScrollY = window.scrollY;
+    window.scrollBy({ top: event.deltaY });
+    if (window.scrollY !== previousScrollY) event.preventDefault();
   };
 
   const handleOpenChange = (nextOpen: boolean) => {
@@ -1404,7 +1484,7 @@ function JsonInspectorModalContent({
       onClick={() => void handleCodeFullscreen()}
       aria-label={isCodeFullscreen ? "Exit full screen" : "Open full screen"}
       aria-pressed={isCodeFullscreen}
-      className="h-7 px-2 text-[11px]"
+      className="h-10 px-2.5 text-[11px]"
     >
       {isCodeFullscreen ? (
         <Minimize2Icon aria-hidden="true" className="size-3.5" />
@@ -1572,7 +1652,7 @@ function JsonInspectorModalContent({
                   <InfoTooltip
                     tooltip={resolvedExplanation}
                     ariaLabel={`${title} explanation`}
-                    buttonClassName="flex size-7 shrink-0 items-center justify-center rounded-full hover:bg-secondary/60"
+                    buttonClassName="flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-secondary/60"
                     iconClassName="size-4"
                   />
                 )}
@@ -1590,6 +1670,11 @@ function JsonInspectorModalContent({
                 </p>
               )}
               {headerNotice && <div className="mt-3">{headerNotice}</div>}
+              {(getFieldExplanation || getResponseFieldExplanation) && (
+                <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
+                  Tip: hover or focus underlined fields to see their integration contract.
+                </p>
+              )}
             </div>
           </div>
         </DialogHeader>
@@ -1668,7 +1753,7 @@ function JsonInspectorModalContent({
                         size="sm"
                         variant="ghost"
                         onClick={() => void handleCopyCurl()}
-                        className="h-7 px-2 text-[11px]"
+                        className="h-10 px-2.5 text-[11px]"
                       >
                         {copiedTarget === "curl" ? (
                           <CheckIcon aria-hidden="true" className="size-3.5" />
@@ -1692,7 +1777,7 @@ function JsonInspectorModalContent({
                           validationIssues.length > 0) ||
                         (previewTab === "response" && !responseData)
                       }
-                      className="h-7 px-2 text-[11px]"
+                      className="h-10 px-2.5 text-[11px]"
                     >
                       {copiedTarget === previewCopyTarget ? (
                         <CheckIcon aria-hidden="true" className="size-3.5" />
@@ -1724,7 +1809,7 @@ function JsonInspectorModalContent({
                 }`}
               >
                 <div
-                  className={`flex min-h-10 items-center justify-between border-b border-border/70 bg-secondary/35 ${
+                  className={`flex min-h-11 items-center justify-between border-b border-border/70 bg-secondary/35 ${
                     codeFiles.length > 1 ? "" : "pl-4"
                   } ${
                     codeSnippetState === "active"
@@ -1748,6 +1833,14 @@ function JsonInspectorModalContent({
                     </div>
                   )}
                   <div className="flex shrink-0 items-center gap-1 px-2">
+                    {fullscreenError ? (
+                      <span
+                        role="status"
+                        className="max-w-44 truncate px-1 text-[10px] font-medium text-destructive"
+                      >
+                        {fullscreenError}
+                      </span>
+                    ) : null}
                     {codeSnippetState === "review" && (
                       <span
                         className="hidden rounded-md border border-border/80 bg-background/45 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:inline-flex"
@@ -1762,7 +1855,7 @@ function JsonInspectorModalContent({
                         variant="ghost"
                         onClick={() => void handleResetToDefaults()}
                         isLoading={isSaving}
-                        className="h-7 px-2 text-[11px] text-primary hover:text-primary"
+                        className="h-10 px-2.5 text-[11px] text-primary hover:text-primary"
                       >
                         <RotateCcwIcon aria-hidden="true" className="size-3.5" />
                         Reset
@@ -1776,7 +1869,7 @@ function JsonInspectorModalContent({
                           variant="ghost"
                           onClick={() => void handleCopy()}
                           disabled={validationIssues.length > 0}
-                          className="h-7 px-2 text-[11px]"
+                          className="h-10 px-2.5 text-[11px]"
                         >
                           {copiedTarget === "primary" ? (
                             <CheckIcon aria-hidden="true" className="size-3.5" />
@@ -1794,7 +1887,7 @@ function JsonInspectorModalContent({
                       ) : null)}
                     {editable && isMainCodeFile && (
                       <label
-                        className={`flex h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-[11px] font-medium transition-colors hover:bg-secondary/60 hover:text-foreground ${
+                        className={`flex h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[11px] font-medium transition-colors hover:bg-secondary/60 hover:text-foreground ${
                           mode === "edit"
                             ? "text-foreground"
                             : "text-muted-foreground"
@@ -1828,7 +1921,7 @@ function JsonInspectorModalContent({
                   }) => (
                     <pre
                       ref={codeScrollRef}
-                      className={`${className} min-h-0 flex-1 overflow-auto p-4 font-mono ${
+                      className={`${className} min-h-0 flex-1 overflow-auto overscroll-x-contain overscroll-y-auto p-4 font-mono ${
                         isDocumentationDensity
                           ? "text-[12px] leading-5"
                           : "text-[13px] leading-6"
@@ -1836,6 +1929,7 @@ function JsonInspectorModalContent({
                       style={{ ...style, background: "transparent" }}
                       aria-label={`${title} code snippet`}
                       tabIndex={0}
+                      onWheel={handleCodeWheel}
                     >
                       <code className="block w-max min-w-full">
                         {Children.toArray(tokens.map((line, lineIndex) => {
@@ -1855,6 +1949,11 @@ function JsonInspectorModalContent({
                           const colonIndex = line.findIndex(
                             (token) => token.content === ":",
                           );
+                          const equalsIndex = line.findIndex((token) =>
+                            token.content.includes("="),
+                          );
+                          const fieldSeparatorIndex =
+                            colonIndex >= 0 ? colonIndex : equalsIndex;
                           const firstContentTokenIndex = line.findIndex(
                             (token) => token.content.trim().length > 0,
                           );
@@ -1896,8 +1995,8 @@ function JsonInspectorModalContent({
                               ? `${tokenProps.className} !text-foreground/75`
                               : tokenProps.className;
                             const isExplainedKey =
-                              colonIndex >= 0 &&
-                              tokenIndex < colonIndex &&
+                              fieldSeparatorIndex >= 0 &&
+                              tokenIndex < fieldSeparatorIndex &&
                               lineExplanation?.key ===
                                 token.content.trim().replace(/^['"]|['"]$/g, "");
 
@@ -1926,13 +2025,13 @@ function JsonInspectorModalContent({
                                 {token.content.slice(0, keyStartIndex)}
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <span
-                                      tabIndex={0}
-                                      className="cursor-help border-b border-dashed border-current outline-none focus-visible:border-primary"
+                                    <button
+                                      type="button"
+                                      className="cursor-help border-0 border-b border-dashed border-current bg-transparent p-0 font-[inherit] text-inherit outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
                                       aria-label={`Explain ${lineExplanation.path}`}
                                     >
                                       {lineExplanation.key}
-                                    </span>
+                                    </button>
                                   </TooltipTrigger>
                                   <TooltipContent>
                                     {lineExplanation.tooltip}
@@ -2064,7 +2163,7 @@ function JsonInspectorModalContent({
                         variant="ghost"
                         onClick={() => void handleCopy()}
                         disabled={validationIssues.length > 0}
-                        className="h-7 px-2 text-[11px]"
+                        className="h-10 px-2.5 text-[11px]"
                       >
                         {copiedTarget === "primary" ? (
                           <CheckIcon aria-hidden="true" className="size-3.5" />
@@ -2122,7 +2221,7 @@ function JsonInspectorModalContent({
                         size="sm"
                         variant="ghost"
                         onClick={() => void handleCopyResponse()}
-                        className="h-7 px-2 text-[11px]"
+                        className="h-10 px-2.5 text-[11px]"
                       >
                         {copiedTarget === "response" ? (
                           <CheckIcon aria-hidden="true" className="size-3.5" />

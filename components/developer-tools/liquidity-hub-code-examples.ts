@@ -6,8 +6,8 @@ import type {
   JsonValuePath,
 } from "./json-inspector";
 import {
-  formatPartnerDeclaration,
-  getExamplePartnerId,
+  formatLiquidityHubPartnerDeclaration,
+  getLiquidityHubExamplePartnerId,
 } from "./developer-partner";
 
 const DEFAULT_CHAIN_ID = 137;
@@ -30,7 +30,7 @@ function getExampleParams(data: JsonContainer) {
   const quoteArgs = getRecord(root.quoteArgs);
   const chainId =
     typeof root.chainId === "number" ? root.chainId : DEFAULT_CHAIN_ID;
-  const partner = getExamplePartnerId(root.partner);
+  const partner = getLiquidityHubExamplePartnerId(root.partner);
   const inputIsNative = root.inputIsNative === true;
 
   return { chainId, inputIsNative, partner, quoteArgs };
@@ -61,7 +61,7 @@ export function formatLiquidityHubSetupCode(data: JsonContainer): string {
   return `import { constructSDK } from "@orbs-network/liquidity-hub-sdk";
 
 const chainId = ${chainId};
-${formatPartnerDeclaration(partner)}
+${formatLiquidityHubPartnerDeclaration(partner)}
 
 export const liquidityHub = constructSDK({
   chainId,
@@ -70,54 +70,16 @@ export const liquidityHub = constructSDK({
 }
 
 export function formatLiquidityHubTypesCode(): string {
-  return `import type { Address, Hex } from "viem";
+  return `import type { Quote, QuoteArgs } from "@orbs-network/liquidity-hub-sdk";
 
-export type LiquidityHubQuoteArgs = {
-  fromToken: string;
-  toToken: string;
-  inAmount: string;
-  dexMinAmountOut: string;
-  account?: string;
-  slippage: number;
-  signal?: AbortSignal;
-  timeout?: number;
-};
+export type { Address, Hash } from "viem";
 
-export type LiquidityHubQuote = {
-  inToken: string;
-  outToken: string;
-  inAmount: string;
-  outAmount: string;
-  minAmountOut: string;
-  user: string;
-  slippage: number;
-  qs: string;
-  partner: string;
-  exchange: string;
-  sessionId: string;
-  serializedOrder: string;
-  permitData: any;
-  eip712: unknown;
-  userMinOutAmountWithGas: string;
-  outAmountWsMinusGas: string;
-  outAmountWS: string;
-  timestamp: number;
-  error?: string;
-  gasAmountOut?: string;
-  referencePrice?: string;
-};
+export type LiquidityHubQuoteArgs = QuoteArgs;
 
-// Quote data and the DEX-protected minimum already owned by the review flow.
-export type ExistingQuoteData = {
-  liquidityHubQuote: LiquidityHubQuote;
-  // Pass the DEX router's slippage-adjusted minimum output, not its raw quote.
-  dexMinAmountOut: string;
-};
-
-// Optional calldata for a DEX router route submitted through Liquidity Hub.
-export type DexRouterData = {
-  data?: Hex;
-  to?: Address;
+export type LiquidityHubQuote = Quote & {
+  amountOutUI?: string;
+  inTokenUsd?: number;
+  outTokenUsd?: number;
 };`;
 }
 
@@ -132,10 +94,11 @@ export async function signLiquidityHubPermit(
 ): Promise<Hex> {
   return walletClient.signTypedData({
     account: quote.user as Address,
-    domain: quote.permitData.domain,
-    types: quote.permitData.types,
-    primaryType: quote.permitData.primaryType,
-    message: quote.permitData.values,
+    // Use the wallet-ready EIP-712 fields exactly as returned with this quote.
+    domain: quote.eip712.domain,
+    types: quote.eip712.types,
+    primaryType: quote.eip712.primaryType,
+    message: quote.eip712.message,
   });
 }`;
 }
@@ -161,7 +124,7 @@ export function formatLiquidityHubGetLatestQuoteCode(
 import type { LiquidityHubQuote } from "./types";
 
 const chainId = ${chainId};
-${formatPartnerDeclaration(partner)}
+${formatLiquidityHubPartnerDeclaration(partner)}
 const liquidityHub = constructSDK({ chainId, partner });
 let quotePayload = ${formatJsonObject(quotePayload)} as LiquidityHubQuote;
 
@@ -215,10 +178,11 @@ export function useFetchLiquidityHubQuote() {
   return useCallback(async () => {
     const quote = await getLiquidityHubQuote();
 
-    const selectedRoute =
-      BigInt(quote.minAmountOut) > BigInt(quoteArgs.dexMinAmountOut)
+    const selectedRoute = quoteArgs.dexMinAmountOut
+      ? BigInt(quote.minAmountOut) > BigInt(quoteArgs.dexMinAmountOut)
         ? "liquidity-hub"
-        : "dex";
+        : "dex"
+      : "compare-after-dex-quote";
 
     return { quote, selectedRoute };
   }, []);
@@ -244,8 +208,8 @@ export function formatLiquidityHubLiveQuoteCode(data: JsonContainer): string {
   return `import { constructSDK } from "@orbs-network/liquidity-hub-sdk";
 import type { LiquidityHubQuote, LiquidityHubQuoteArgs } from "./types";
 
-const chainId = ${chainId};
-${formatPartnerDeclaration(partner)}
+const chainId = ${chainId}; // Use the connected wallet's active chain ID.
+${formatLiquidityHubPartnerDeclaration(partner)}
 const quoteArgs = ${serializedQuoteArgs} satisfies LiquidityHubQuoteArgs;
 const liquidityHub = constructSDK({ chainId, partner });
 
@@ -260,35 +224,6 @@ Quote flow
 2. Use the wrapped ERC-20 address when the selected source is native currency.
 3. Fetch and preserve the complete wallet-bound Liquidity Hub quote.
 */`;
-}
-
-export function formatLiquidityHubCompareCode(data: JsonContainer): string {
-  const root = Array.isArray(data) ? {} : data;
-  const quote = getRecord(root.quote);
-  const liquidityHubMinAmountOut = getString(
-    quote.minAmountOut,
-    "<liquidity-hub-min-output>",
-  );
-
-  return `import type { ExistingQuoteData } from "./liquidity-hub-types";
-
-export function selectBestRoute(
-  { liquidityHubQuote, dexMinAmountOut }: ExistingQuoteData,
-): "dex" | "liquidity-hub" {
-  if (dexMinAmountOut === "-1") {
-    throw new Error(
-      "Replace -1 with the DEX router minimum output before selecting a route",
-    );
-  }
-
-  // Current Liquidity Hub minimum: ${liquidityHubMinAmountOut} base units.
-  return BigInt(liquidityHubQuote.minAmountOut) > BigInt(dexMinAmountOut)
-    ? "liquidity-hub"
-    : "dex";
-}
-
-// Call selectBestRoute with the quote data already loaded by the review UI.
-// Continue through Liquidity Hub only when it wins; otherwise use the DEX.`;
 }
 
 function getFlowValues(data: JsonContainer) {
@@ -373,21 +308,23 @@ export function useWrapLiquidityHubInput() {
       account,
       chain: walletClient.chain,
     });
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== "success") throw new Error("Native token wrap reverted");
     return txHash;
   }, [connectedAccount, publicClient, walletClient]);
 }`;
 }
 
 export function formatLiquidityHubApprovalCode(data: JsonContainer): string {
-  const { account, inputToken } = getFlowValues(data);
+  const { account, inAmount, inputToken } = getFlowValues(data);
 
   return `import { permit2Address } from "@orbs-network/liquidity-hub-sdk";
 import { useCallback } from "react";
-import { erc20Abi, maxUint256, type Address } from "viem";
+import { erc20Abi, type Address } from "viem";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 
 const inputToken = ${JSON.stringify(inputToken)} as Address;
+const requiredAmount = ${JSON.stringify(inAmount)};
 const account = ${JSON.stringify(account)} as Address;
 
 export function useApproveLiquidityHubInput() {
@@ -407,11 +344,13 @@ export function useApproveLiquidityHubInput() {
       address: inputToken,
       abi: erc20Abi,
       functionName: "approve",
-      args: [permit2Address as Address, maxUint256],
+      // This reference approves the exact quoted input amount.
+      args: [permit2Address as Address, BigInt(requiredAmount)],
       account,
       chain: walletClient.chain,
     });
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== "success") throw new Error("Permit2 approval reverted");
     return txHash;
   }, [connectedAccount, publicClient, walletClient]);
 }`;
@@ -469,10 +408,11 @@ export function useSignLiquidityHubQuote() {
     const quote = await getLatestQuote();
     const signature = await walletClient!.signTypedData({
       account: quote.user as Address,
-      domain: quote.permitData.domain,
-      types: quote.permitData.types,
-      primaryType: quote.permitData.primaryType,
-      message: quote.permitData.values,
+      // Use the wallet-ready EIP-712 fields exactly as returned with this quote.
+      domain: quote.eip712.domain,
+      types: quote.eip712.types,
+      primaryType: quote.eip712.primaryType,
+      message: quote.eip712.message,
     });
 
     return { quote, signature };
@@ -493,7 +433,7 @@ import { usePublicClient } from "wagmi";
 import { getLatestQuote } from "./get-latest-quote";
 
 const chainId = ${chainId};
-${formatPartnerDeclaration(partner)}
+${formatLiquidityHubPartnerDeclaration(partner)}
 const liquidityHub = constructSDK({ chainId, partner });
 const signature = ${JSON.stringify(signature)};
 
@@ -504,6 +444,7 @@ export function useSwapAndConfirmLiquidityHub() {
     const quote = await getLatestQuote();
     const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
     const receipt = await publicClient!.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
 
     return receipt;
   }, [publicClient]);
@@ -511,137 +452,151 @@ export function useSwapAndConfirmLiquidityHub() {
 }
 
 export function formatLiquidityHubFullFlowCode(data: JsonContainer): string {
-  const { chainId, inputIsNative, partner } = getExampleParams(data);
+  const { chainId, partner } = getExampleParams(data);
 
-  return `import { useCallback } from "react";
-import { constructSDK, permit2Address } from "@orbs-network/liquidity-hub-sdk";
-import { erc20Abi, maxUint256, parseAbi, type Address } from "viem";
+  return `import {
+  constructSDK,
+  isFreshQuote,
+  nativeTokenAddresses,
+  permit2Address,
+} from "@orbs-network/liquidity-hub-sdk";
+import { erc20Abi, parseAbi } from "viem";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
-import { getLatestQuote } from "./get-latest-quote";
+import { useDerivedData } from "./use-derived-data";
+import { useQuote } from "./use-quote";
+import { useWrappedNativeToken } from "./use-wrapped-native-token";
+import type { Address, Hash } from "./types";
 
 const chainId = ${chainId};
-${formatPartnerDeclaration(partner)}
-const sourceIsNative = ${inputIsNative};
+${formatLiquidityHubPartnerDeclaration(partner)}
 const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
 const liquidityHub = constructSDK({ chainId, partner });
 
+function isNative(address: string): boolean {
+  return nativeTokenAddresses.some(
+    (nativeAddress) => nativeAddress.toLowerCase() === address.toLowerCase(),
+  );
+}
+
 export function useExecuteLiquidityHubFlow() {
-  const { address: account } = useConnection();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
+  // The host renders this flow only after the wallet clients and quote are ready.
+  const account = useConnection().address!;
+  const publicClient = usePublicClient()!;
+  const walletClient = useWalletClient().data!;
+  // Replace these examples with the host's existing swap, quote, and token hooks.
+  const { inputToken } = useDerivedData();
+  const { quote: currentQuote, refetch } = useQuote();
+  const wToken = useWrappedNativeToken();
 
-  return useCallback(async () => {
-    const connectedAccount = account as Address;
-    const reader = publicClient!;
-    const signer = walletClient!;
-    let quote = await getLatestQuote();
+  return async function executeLiquidityHubFlow() {
+    let quote = currentQuote;
+    let inputTokenAddress = inputToken;
 
-    const allowance = await reader.readContract({
-      address: quote.inToken as Address,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [connectedAccount, permit2Address as Address],
-    });
-
-    if (sourceIsNative) {
-      const wrapHash = await signer.writeContract({
-        address: quote.inToken as Address,
+    if (isNative(inputTokenAddress)) {
+      const wrapHash = await walletClient.writeContract({
+        address: wToken as Address,
         abi: wrappedNativeAbi,
         functionName: "deposit",
         value: BigInt(quote.inAmount),
-        account: connectedAccount,
-        chain: signer.chain,
+        account,
+        chain: walletClient.chain,
       });
-      await reader.waitForTransactionReceipt({ hash: wrapHash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: wrapHash });
+      if (receipt.status !== "success") throw new Error("Native token wrap reverted");
+
+      // Liquidity Hub receives the wrapped ERC-20 address after wrapping.
+      inputTokenAddress = wToken;
     }
+
+    // The host has already selected Liquidity Hub before calling this flow.
+    // This example never submits a DEX transaction.
+
+    const allowance = await publicClient.readContract({
+      address: inputTokenAddress as Address,
+      abi: erc20Abi,
+      functionName: "allowance",
+      args: [account, permit2Address as Address],
+    });
 
     if (allowance < BigInt(quote.inAmount)) {
-      const approvalHash = await signer.writeContract({
-        address: quote.inToken as Address,
+      const approvalHash = await walletClient.writeContract({
+        address: inputTokenAddress as Address,
         abi: erc20Abi,
         functionName: "approve",
-        args: [permit2Address as Address, maxUint256],
-        account: connectedAccount,
-        chain: signer.chain,
+        // Approve exactly the prepared quote amount.
+        args: [permit2Address as Address, BigInt(quote.inAmount)],
+        account,
+        chain: walletClient.chain,
       });
-      await reader.waitForTransactionReceipt({ hash: approvalHash });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+      if (receipt.status !== "success") throw new Error("Permit2 approval reverted");
     }
 
-    quote = await getLatestQuote();
-
-    const signature = await signer.signTypedData({
-      account: quote.user as Address,
-      domain: quote.permitData.domain,
-      types: quote.permitData.types,
-      primaryType: quote.permitData.primaryType,
-      message: quote.permitData.values,
+    // Preparation takes time, so refetch only when the current quote is stale.
+    if (!isFreshQuote(quote, 60)) {
+      const previousMinAmountOut = quote.minAmountOut;
+      quote = await refetch();
+      if (BigInt(quote.minAmountOut) < BigInt(previousMinAmountOut)) {
+        throw new Error("Price changed. Review the updated quote and confirm again.");
+      }
+    }
+    const signature = await walletClient.signTypedData({
+      account,
+      // Use the wallet-ready EIP-712 fields exactly as returned with this quote.
+      domain: quote.eip712.domain,
+      types: quote.eip712.types,
+      primaryType: quote.eip712.primaryType,
+      message: quote.eip712.message,
     });
-    const txHash = await (liquidityHub.swap(quote, signature) as Promise<Address>);
 
-    const receipt = await reader.waitForTransactionReceipt({ hash: txHash });
-    return receipt;
-  }, [account, publicClient, walletClient]);
+    const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
+    return { quote, receipt, route: "liquidity-hub" as const, signature };
+  };
 }
 
 /*
 Liquidity Hub flow
 
-1. Load the wallet-bound Liquidity Hub quote from getLatestQuote(). The helper
-   returns the current payload when the SDK considers it fresh and replaces it
-   with a newly fetched quote when it is stale.
-2. Read the wrapped input token's Permit2 allowance for quote.inAmount.
-3. Liquidity Hub does not support a native asset as inToken. When the selected
-   source is native, wrap quote.inAmount into quote.inToken and wait for the
-   transaction to confirm.
-4. When the allowance is insufficient, approve Permit2 and wait for the
-   approval transaction to confirm.
-5. Call getLatestQuote() again immediately before signing so it fetches a new
-   quote only when the current payload is stale.
-6. Sign the fresh quote's opaque permit data with the connected wallet.
-7. Pass the same fresh quote and signature to liquidityHub.swap().
-8. Wait for the returned transaction hash to receive an on-chain receipt.
+1. Enter after the host has already selected Liquidity Hub as the winning route.
+2. When the selected source is native, wrap the requested input amount and then
+   replace inputTokenAddress with wToken for the rest of the flow.
+3. Use the current quote returned by the host's useQuote hook.
+4. Read the resulting ERC-20 input token's Permit2 allowance for quote.inAmount.
+5. When allowance is insufficient, approve the exact input and wait.
+6. Before signing, call the query hook's refetch only when the quote is stale. Stop with
+   "Price changed. Review the updated quote and confirm again." when its
+   minAmountOut is lower than the original quote.
+7. Pass the signed quote and signature to swap(), then wait for a successful
+   on-chain receipt.
 */
 `;
 }
 
 export function formatLiquidityHubSwapCode(data: JsonContainer): string {
-  const { inputIsNative, quoteArgs } = getExampleParams(data);
-  const serializedQuoteArgs = formatTypeScriptObject(quoteArgs);
+  const { inputIsNative } = getExampleParams(data);
 
   return `import { permit2Address } from "@orbs-network/liquidity-hub-sdk";
 import { useCallback } from "react";
-import { erc20Abi, maxUint256, parseAbi, type Address, type Hex } from "viem";
+import { erc20Abi, parseAbi, type Address, type Hash } from "viem";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 
 import { liquidityHub } from "./liquidity-hub";
 import { currentLiquidityHubQuote } from "./liquidity-hub-quote";
-import type { DexRouterData, LiquidityHubQuote, LiquidityHubQuoteArgs } from "./liquidity-hub-types";
 import { signLiquidityHubPermit } from "./sign-liquidity-hub-permit";
 
 const sourceIsNative = ${inputIsNative};
 const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
-const quoteArgs = ${serializedQuoteArgs} satisfies LiquidityHubQuoteArgs;
-const dexRouterData = {
-  to: "<dex-router-address>" as Address,
-  data: "<dex-router-calldata>" as Hex,
-} satisfies Required<DexRouterData>;
 
-export function useExecuteBestRoute() {
+export function useExecuteLiquidityHubRoute() {
   const { address: account } = useConnection();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
 
   return useCallback(async () => {
+    // The host already selected Liquidity Hub before opening this submit flow.
     const quote = currentLiquidityHubQuote;
-
-    if (BigInt(quote.minAmountOut) <= BigInt(quoteArgs.dexMinAmountOut)) {
-      const txHash = await walletClient.sendTransaction({
-        ...dexRouterData,
-        account,
-        chain: walletClient.chain,
-      });
-      return { quote, route: "dex" as const, txHash };
-    }
 
     if (sourceIsNative) {
       const wrapHash = await walletClient.writeContract({
@@ -652,7 +607,8 @@ export function useExecuteBestRoute() {
         account,
         chain: walletClient.chain,
       });
-      await publicClient.waitForTransactionReceipt({ hash: wrapHash });
+      const wrapReceipt = await publicClient.waitForTransactionReceipt({ hash: wrapHash });
+      if (wrapReceipt.status !== "success") throw new Error("Native token wrap reverted");
     }
 
     const allowance = await publicClient.readContract({
@@ -666,17 +622,19 @@ export function useExecuteBestRoute() {
         address: quote.inToken as Address,
         abi: erc20Abi,
         functionName: "approve",
-        args: [permit2Address as Address, maxUint256],
+        args: [permit2Address as Address, BigInt(quote.inAmount)],
         account,
         chain: walletClient.chain,
       });
-      await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+      const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
+      if (approvalReceipt.status !== "success") throw new Error("Permit2 approval reverted");
     }
 
     const signature = await signLiquidityHubPermit(quote, walletClient);
-    const txHash = await (liquidityHub.swap(quote, signature) as Promise<Address>);
+    const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
 
     const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+    if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
     return {
       quote,
       receipt,
@@ -687,22 +645,18 @@ export function useExecuteBestRoute() {
 }
 
 /*
-Liquidity Hub best-route swap flow
+Liquidity Hub swap flow
 
-1. Start with the Liquidity Hub quote and the DEX router's slippage-adjusted
-   minimum output already available in the DEX review or submit flow.
-2. Compare protected minimum outputs. Continue through Liquidity Hub only when
-   quote.minAmountOut is higher; otherwise execute and report the normal DEX
-   route.
-3. Liquidity Hub does not support a native asset as inToken. When the DEX source
+1. Start with the Liquidity Hub quote already selected by the host review flow.
+2. Liquidity Hub does not support a native asset as inToken. When the DEX source
    is native, use its wrapped ERC-20 address in the quote, wrap quote.inAmount
    into quote.inToken, and wait for the transaction to confirm.
-4. Read the quote input token's Permit2 allowance. When it is insufficient,
+3. Read the quote input token's Permit2 allowance. When it is insufficient,
    approve Permit2 and wait for confirmation.
-5. Pass the existing quote unchanged to signLiquidityHubPermit(). The isolated
+4. Pass the existing quote unchanged to signLiquidityHubPermit(). The isolated
    adapter owns the SDK-returned EIP-712 signing data.
-6. Pass the same quote and signature to liquidityHub.swap().
-7. Wait for the returned transaction hash to receive an on-chain receipt.
+5. Pass the same quote and signature to liquidityHub.swap().
+6. Wait for the returned transaction hash to receive an on-chain receipt.
 */
 `;
 }
@@ -779,15 +733,6 @@ export const LIQUIDITY_HUB_LIVE_QUOTE_CODE_SNIPPET: CodeSnippetOptions = {
   syntaxLanguage: "typescript",
 };
 
-export const LIQUIDITY_HUB_COMPARE_CODE_SNIPPET: CodeSnippetOptions = {
-  copyLabel: "Copy code",
-  fileName: "select-best-route.ts",
-  files: [TYPES_FILE],
-  format: formatLiquidityHubCompareCode,
-  language: "TypeScript",
-  syntaxLanguage: "typescript",
-};
-
 export const LIQUIDITY_HUB_WRAP_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "wrap-native-input.ts",
@@ -835,7 +780,7 @@ export const LIQUIDITY_HUB_SWAP_AND_CONFIRM_CODE_SNIPPET: CodeSnippetOptions = {
 export const LIQUIDITY_HUB_FULL_FLOW_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "full-flow.ts",
-  files: [GET_LATEST_QUOTE_FILE, COMPACT_TYPES_FILE],
+  files: [COMPACT_TYPES_FILE],
   format: formatLiquidityHubFullFlowCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -857,7 +802,7 @@ export const LIQUIDITY_HUB_SWAP_CODE_SNIPPET: CodeSnippetOptions = {
 
 const FIELD_EXPLANATIONS: Record<string, string> = {
   partner:
-    'The DEX partner ID provided by Orbs. Use "unknown" when no ID was assigned.',
+    'The partner name provided by Orbs. Use "unknown" when no partner name was provided.',
   chainId: "The connected EVM chain used to initialize the SDK.",
   inputIsNative:
     "Whether the DEX source selection is native currency. Liquidity Hub accepts only its wrapped ERC-20 address as inToken, so the quoted amount must be wrapped before approval.",
@@ -890,7 +835,7 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   slippage: "The slippage percentage applied to the quote.",
   qs: "Opaque quote metadata returned by Liquidity Hub. Preserve it unchanged with the quote.",
   exchange:
-    "The Liquidity Hub exchange contract selected for this quote. Preserve it unchanged.",
+    "The Liquidity Hub execution source selected for this quote. Preserve it unchanged.",
   sessionId:
     "The Liquidity Hub session identifier used to correlate the quote, swap, and transaction details.",
   serializedOrder:
@@ -919,10 +864,8 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
     "The exact EIP-712 field name in the token-permission type definition.",
   "permitData.types.TokenPermissions.type":
     "The exact Solidity/EIP-712 type paired with this token-permission field.",
-  "permitData.primaryType":
-    "The root EIP-712 type the wallet signs for this Liquidity Hub quote.",
   "permitData.values":
-    "The exact Permit2 message values returned by Liquidity Hub. Sign them unchanged.",
+    "The raw Permit2 message values returned by Liquidity Hub. Preserve them unchanged.",
   "permitData.values.permitted":
     "The input-token permission covered by this signature.",
   "permitData.values.permitted.token":
@@ -935,62 +878,70 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
     "The Permit2 nonce that prevents this signature from being replayed.",
   "permitData.values.deadline":
     "The Unix timestamp after which the Permit2 signature expires.",
-  "permitData.message":
-    "The complete EIP-712 Permit2 message returned by Liquidity Hub. Pass it to the wallet unchanged.",
-  "permitData.message.permitted":
-    "The input-token permission covered by this Permit2 signature.",
-  "permitData.message.permitted.token":
-    "The ERC-20 input token authorized by the Permit2 signature.",
-  "permitData.message.permitted.amount":
-    "The maximum input-token amount authorized by the signature, in base units.",
-  "permitData.message.spender":
-    "The contract authorized to consume the signed Permit2 transfer.",
-  "permitData.message.nonce":
-    "The Permit2 nonce that prevents this signature from being replayed.",
-  "permitData.message.deadline":
-    "The Unix timestamp after which the Permit2 signature expires.",
-  "permitData.message.witness":
-    "The order data bound to the Permit2 signature. Preserve the complete witness unchanged.",
-  "permitData.message.witness.info":
-    "The order identity, expiry, and additional-validation settings bound to the witness.",
-  "permitData.message.witness.info.reactor":
-    "The reactor contract responsible for executing the signed order.",
-  "permitData.message.witness.info.swapper":
-    "The wallet that owns and signs the witnessed order.",
-  "permitData.message.witness.info.nonce":
-    "The witnessed order nonce used to prevent replay.",
-  "permitData.message.witness.info.deadline":
-    "The Unix timestamp after which the witnessed order can no longer execute.",
-  "permitData.message.witness.info.additionalValidationContract":
-    "The contract that performs any extra validation required by this order.",
-  "permitData.message.witness.info.additionalValidationData":
-    "Opaque validation data passed unchanged to the additional-validation contract.",
-  "permitData.message.witness.decayStartTime":
-    "The Unix timestamp when the order’s Dutch-auction amount begins decaying.",
-  "permitData.message.witness.decayEndTime":
-    "The Unix timestamp when the order’s Dutch-auction amount finishes decaying.",
-  "permitData.message.witness.exclusiveFiller":
-    "The address granted exclusive fill rights during the exclusivity window.",
-  "permitData.message.witness.exclusivityOverrideBps":
-    "The output adjustment, in basis points, required for a non-exclusive filler to execute during the exclusivity window.",
-  "permitData.message.witness.inputToken":
-    "The ERC-20 input token consumed by the witnessed order.",
-  "permitData.message.witness.inputStartAmount":
-    "The input amount at the start of the decay period, in token base units.",
-  "permitData.message.witness.inputEndAmount":
-    "The input amount at the end of the decay period, in token base units.",
-  "permitData.message.witness.outputs":
-    "The ordered output transfers produced when the witnessed order executes.",
-  "permitData.message.witness.outputs.token":
-    "The ERC-20 token transferred by this output entry.",
-  "permitData.message.witness.outputs.startAmount":
-    "This output’s amount at the start of the decay period, in token base units.",
-  "permitData.message.witness.outputs.endAmount":
-    "This output’s amount at the end of the decay period, in token base units.",
-  "permitData.message.witness.outputs.recipient":
-    "The address that receives this output transfer.",
+  "permitData.values.witness":
+    "The raw Dutch-order witness bound to the Permit2 authorization.",
   eip712:
-    "Additional opaque EIP-712 metadata returned by Liquidity Hub. Preserve it unchanged.",
+    "The wallet-ready EIP-712 representation of permitData. Pass it to the wallet unchanged.",
+  "eip712.domain":
+    "The wallet-ready EIP-712 domain for the Permit2 signature.",
+  "eip712.types":
+    "The complete wallet-ready EIP-712 type definitions.",
+  "eip712.primaryType":
+    "The root EIP-712 type the wallet signs for this Liquidity Hub quote.",
+  "eip712.message":
+    "The normalized Permit2 message the wallet signs unchanged.",
+  "eip712.message.permitted":
+    "The input-token permission covered by this Permit2 signature.",
+  "eip712.message.permitted.token":
+    "The ERC-20 input token authorized by the Permit2 signature.",
+  "eip712.message.permitted.amount":
+    "The maximum input-token amount authorized by the signature, in base units.",
+  "eip712.message.spender":
+    "The contract authorized to consume the signed Permit2 transfer.",
+  "eip712.message.nonce":
+    "The Permit2 nonce that prevents this signature from being replayed.",
+  "eip712.message.deadline":
+    "The Unix timestamp after which the Permit2 signature expires.",
+  "eip712.message.witness":
+    "The order data bound to the Permit2 signature. Preserve the complete witness unchanged.",
+  "eip712.message.witness.info":
+    "The order identity, expiry, and additional-validation settings bound to the witness.",
+  "eip712.message.witness.info.reactor":
+    "The reactor contract responsible for executing the signed order.",
+  "eip712.message.witness.info.swapper":
+    "The wallet that owns and signs the witnessed order.",
+  "eip712.message.witness.info.nonce":
+    "The witnessed order nonce used to prevent replay.",
+  "eip712.message.witness.info.deadline":
+    "The Unix timestamp after which the witnessed order can no longer execute.",
+  "eip712.message.witness.info.additionalValidationContract":
+    "The contract that performs any extra validation required by this order.",
+  "eip712.message.witness.info.additionalValidationData":
+    "Opaque validation data passed unchanged to the additional-validation contract.",
+  "eip712.message.witness.decayStartTime":
+    "The Unix timestamp when the order’s Dutch-auction amount begins decaying.",
+  "eip712.message.witness.decayEndTime":
+    "The Unix timestamp when the order’s Dutch-auction amount finishes decaying.",
+  "eip712.message.witness.exclusiveFiller":
+    "The address granted exclusive fill rights during the exclusivity window.",
+  "eip712.message.witness.exclusivityOverrideBps":
+    "The output adjustment, in basis points, required for a non-exclusive filler to execute during the exclusivity window.",
+  "eip712.message.witness.inputToken":
+    "The ERC-20 input token consumed by the witnessed order.",
+  "eip712.message.witness.inputStartAmount":
+    "The input amount at the start of the decay period, in token base units.",
+  "eip712.message.witness.inputEndAmount":
+    "The input amount at the end of the decay period, in token base units.",
+  "eip712.message.witness.outputs":
+    "The ordered output transfers produced when the witnessed order executes.",
+  "eip712.message.witness.outputs.token":
+    "The ERC-20 token transferred by this output entry.",
+  "eip712.message.witness.outputs.startAmount":
+    "This output’s amount at the start of the decay period, in token base units.",
+  "eip712.message.witness.outputs.endAmount":
+    "This output’s amount at the end of the decay period, in token base units.",
+  "eip712.message.witness.outputs.recipient":
+    "The address that receives this output transfer.",
   userMinOutAmountWithGas:
     "The user's protected minimum output after Liquidity Hub accounts for gas effects.",
   outAmountWsMinusGas:
@@ -1001,8 +952,14 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
     "The estimated gas cost expressed in destination-token base units.",
   referencePrice:
     "The reference market price recorded with the quote for diagnostics.",
+  amountOutUI:
+    "The comparison amount echoed by the quote service for UI diagnostics.",
+  inTokenUsd:
+    "The source token USD reference price used by the quote service.",
+  outTokenUsd:
+    "The destination token USD reference price used by the quote service.",
   timestamp: "The quote creation time used to reject stale execution data.",
-  error: "A Liquidity Hub quote error. Fall back to the normal DEX route when present.",
+  error: "A Liquidity Hub quote error. Stop this execution flow and return the error to the host application.",
 };
 
 export function getLiquidityHubFieldExplanation(
@@ -1031,54 +988,162 @@ export const LIQUIDITY_HUB_EXAMPLE_DATA = {
   },
 } satisfies JsonContainer;
 
+const EXAMPLE_REACTOR = "0x2222222222222222222222222222222222222222";
+const EXAMPLE_FILLER = "0x3333333333333333333333333333333333333333";
+const EXAMPLE_FEE_RECIPIENT =
+  "0x4444444444444444444444444444444444444444";
+const EXAMPLE_VALIDATION_CONTRACT =
+  "0x7777777777777777777777777777777777777777";
+const EXAMPLE_PERMIT2_DOMAIN = {
+  name: "Permit2",
+  chainId: DEFAULT_CHAIN_ID,
+  verifyingContract: "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+};
+const EXAMPLE_PERMIT_TYPES = {
+  PermitWitnessTransferFrom: [
+    { name: "permitted", type: "TokenPermissions" },
+    { name: "spender", type: "address" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+    { name: "witness", type: "ExclusiveDutchOrder" },
+  ],
+  TokenPermissions: [
+    { name: "token", type: "address" },
+    { name: "amount", type: "uint256" },
+  ],
+  ExclusiveDutchOrder: [
+    { name: "info", type: "OrderInfo" },
+    { name: "decayStartTime", type: "uint256" },
+    { name: "decayEndTime", type: "uint256" },
+    { name: "exclusiveFiller", type: "address" },
+    { name: "exclusivityOverrideBps", type: "uint256" },
+    { name: "inputToken", type: "address" },
+    { name: "inputStartAmount", type: "uint256" },
+    { name: "inputEndAmount", type: "uint256" },
+    { name: "outputs", type: "DutchOutput[]" },
+  ],
+  OrderInfo: [
+    { name: "reactor", type: "address" },
+    { name: "swapper", type: "address" },
+    { name: "nonce", type: "uint256" },
+    { name: "deadline", type: "uint256" },
+    { name: "additionalValidationContract", type: "address" },
+    { name: "additionalValidationData", type: "bytes" },
+  ],
+  DutchOutput: [
+    { name: "token", type: "address" },
+    { name: "startAmount", type: "uint256" },
+    { name: "endAmount", type: "uint256" },
+    { name: "recipient", type: "address" },
+  ],
+};
+const EXAMPLE_EIP712_MESSAGE = {
+  permitted: {
+    token: DEFAULT_INPUT_TOKEN,
+    amount: "1000000000000000000",
+  },
+  spender: EXAMPLE_REACTOR,
+  nonce: "42",
+  deadline: 1788220800,
+  witness: {
+    info: {
+      reactor: EXAMPLE_REACTOR,
+      swapper: DEFAULT_ACCOUNT,
+      nonce: "42",
+      deadline: 1788220800,
+      additionalValidationContract: EXAMPLE_VALIDATION_CONTRACT,
+      additionalValidationData: "0x",
+    },
+    decayStartTime: 1788217200,
+    decayEndTime: 1788217260,
+    exclusiveFiller: EXAMPLE_FILLER,
+    exclusivityOverrideBps: "0",
+    inputToken: DEFAULT_INPUT_TOKEN,
+    inputStartAmount: "1000000000000000000",
+    inputEndAmount: "1000000000000000000",
+    outputs: [
+      {
+        token: DEFAULT_OUTPUT_TOKEN,
+        startAmount: "1000000",
+        endAmount: "1000000",
+        recipient: EXAMPLE_FEE_RECIPIENT,
+      },
+      {
+        token: DEFAULT_OUTPUT_TOKEN,
+        startAmount: "2495000000",
+        endAmount: "2482525000",
+        recipient: DEFAULT_ACCOUNT,
+      },
+    ],
+  },
+};
+
 export const LIQUIDITY_HUB_QUOTE_EXAMPLE_RESPONSE_DATA = {
   inToken: DEFAULT_INPUT_TOKEN,
   outToken: DEFAULT_OUTPUT_TOKEN,
   inAmount: "1000000000000000000",
   outAmount: "2495000000",
-  minAmountOut: "2482525000",
   user: DEFAULT_ACCOUNT,
   slippage: 0.5,
-  qs: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  qs: "%3FinputCurrency%3D0x1111%26outputCurrency%3D0x6666%26swapType%3D1",
   partner: "unknown",
-  exchange: "0x8888888888888888888888888888888888888888",
-  sessionId: "example-liquidity-hub-session",
+  exchange: "lh",
+  sessionId: "example-session_137",
   serializedOrder: "0x1234",
   permitData: {
-    domain: {
-      name: "Permit2",
-      chainId: DEFAULT_CHAIN_ID,
-      verifyingContract: "0x000000000022D473030F116dDEE9F6B43aC78BA3",
-    },
-    types: {
-      PermitWitnessTransferFrom: [
-        { name: "permitted", type: "TokenPermissions" },
-        { name: "spender", type: "address" },
-        { name: "nonce", type: "uint256" },
-        { name: "deadline", type: "uint256" },
-        { name: "witness", type: "Order" },
-      ],
-      TokenPermissions: [
-        { name: "token", type: "address" },
-        { name: "amount", type: "uint256" },
-      ],
-    },
-    primaryType: "PermitWitnessTransferFrom",
+    domain: EXAMPLE_PERMIT2_DOMAIN,
+    types: EXAMPLE_PERMIT_TYPES,
     values: {
+      ...EXAMPLE_EIP712_MESSAGE,
       permitted: {
         token: DEFAULT_INPUT_TOKEN,
-        amount: "1000000000000000000",
+        amount: { type: "BigNumber", hex: "0x0de0b6b3a7640000" },
       },
-      spender: "0x2222222222222222222222222222222222222222",
-      nonce: "42",
-      deadline: "1788220800",
+      nonce: { type: "BigNumber", hex: "0x2a" },
+      witness: {
+        ...EXAMPLE_EIP712_MESSAGE.witness,
+        info: {
+          ...EXAMPLE_EIP712_MESSAGE.witness.info,
+          nonce: { type: "BigNumber", hex: "0x2a" },
+        },
+        exclusivityOverrideBps: { type: "BigNumber", hex: "0x00" },
+        inputStartAmount: {
+          type: "BigNumber",
+          hex: "0x0de0b6b3a7640000",
+        },
+        inputEndAmount: {
+          type: "BigNumber",
+          hex: "0x0de0b6b3a7640000",
+        },
+        outputs: [
+          {
+            ...EXAMPLE_EIP712_MESSAGE.witness.outputs[0],
+            startAmount: { type: "BigNumber", hex: "0x0f4240" },
+            endAmount: { type: "BigNumber", hex: "0x0f4240" },
+          },
+          {
+            ...EXAMPLE_EIP712_MESSAGE.witness.outputs[1],
+            startAmount: { type: "BigNumber", hex: "0x94b6adc0" },
+            endAmount: { type: "BigNumber", hex: "0x93f85348" },
+          },
+        ],
+      },
     },
   },
-  eip712: {},
-  userMinOutAmountWithGas: "2482525000",
-  outAmountWsMinusGas: "2494000000",
+  eip712: {
+    domain: EXAMPLE_PERMIT2_DOMAIN,
+    types: EXAMPLE_PERMIT_TYPES,
+    primaryType: "PermitWitnessTransferFrom",
+    message: EXAMPLE_EIP712_MESSAGE,
+  },
   outAmountWS: "2495000000",
+  outAmountWsMinusGas: "2494000000",
+  minAmountOut: "2482525000",
+  amountOutUI: "-1",
+  inTokenUsd: 2500,
+  outTokenUsd: 1,
   gasAmountOut: "1000000",
-  referencePrice: "2495",
+  referencePrice: "2495000000",
+  userMinOutAmountWithGas: "2482525000",
   timestamp: 1788217200000,
 } satisfies JsonContainer;

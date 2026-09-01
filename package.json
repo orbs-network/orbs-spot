@@ -82,5 +82,8 @@
   "resolutions": {
     "qr": "0.5.5"
   },
-  "packageManager": "yarn@1.22.22"
+  "packageManager": "yarn@1.22.22",
+  "volta": {
+    "node": "20.19.0"
+  }
 }

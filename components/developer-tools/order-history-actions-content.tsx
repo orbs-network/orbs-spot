@@ -14,7 +14,6 @@ import {
   CANCEL_CODE_SNIPPET,
   FETCH_ORDERS_CODE_SNIPPET,
   getCancelFieldExplanation,
-  getFetchOrdersResponseFieldExplanation,
 } from "./code-examples";
 import { JsonInspectorModal, type JsonContainer } from "./json-inspector";
 import { OrdersSinkGuideLink } from "./orders-sink-guide-link";
@@ -106,7 +105,6 @@ export function FetchOrdersDeveloperButtonContent({
       }}
       description=""
       explanation="The Request tab shows the actual HTTP GET request used by Order history. The Response tab shows the current raw RePermit orders returned for the connected wallet, chain, and active exchange."
-      getResponseFieldExplanation={getFetchOrdersResponseFieldExplanation}
       requestResponseTabs
       requiresDeveloperMode={false}
       responseData={responseData}

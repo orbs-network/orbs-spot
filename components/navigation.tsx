@@ -401,7 +401,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
   );
   const developerGuide = isSpotTab
     ? {
-        href: "/developers/orders-sink",
+        href: "/developers/orders-sink/direct",
         linkLabel: "Advanced Order Docs",
         tooltip: "Open Advanced Order Docs",
       }
@@ -494,7 +494,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
               </Tooltip>
             </div>
           )}
-          <NavWalletControls />
+          {!isDeveloperGuideRoute && <NavWalletControls />}
         </div>
       </div>
     </nav>

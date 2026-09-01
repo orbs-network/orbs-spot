@@ -9,7 +9,7 @@ export function OrdersSinkGuideLink({
 }) {
   return (
     <DeveloperGuideLink
-      baseHref="/developers/orders-sink"
+      baseHref="/developers/orders-sink/direct"
       className={className}
       section={section}
     />
