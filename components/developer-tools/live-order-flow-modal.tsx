@@ -705,7 +705,7 @@ function LiveOrderFlowModalContent({
         codeSnippet: FULL_ORDER_FLOW_CODE_SNIPPET,
         data: signatureData,
         explanation:
-          "Run the current order from allowance through signing and submission. Wrap and Approve appear as separate steps only when those wallet transactions are required.",
+          "Run the current order from allowance through signing and submission. useSignOrder takes no permit-data argument; its supporting tabs fetch the default template and build the order from current derived values.",
         title: "Orders Sink live creation flow",
       };
     }
@@ -754,7 +754,7 @@ function LiveOrderFlowModalContent({
         editable:
           !isReviewingPreviousStep && !isRunning,
         explanation:
-          "Sign the populated EIP-712 order in the wallet. This produces one standard hex signature without sending a blockchain transaction; submission remains a separate next step.",
+          "Call useSignOrder with no arguments. The Build Order tab fetches the default permit template and builds the EIP-712 order from current DEX-derived values before signing.",
         title: "Sign order",
       };
     }

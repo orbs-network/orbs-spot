@@ -28,6 +28,7 @@ import {
   preserveFormTabInHref,
   useSelectedFormTab,
 } from "@/lib/hooks/use-form-tab";
+import { getSpotDocsHref } from "@/lib/developer-docs";
 import type { PartnerBrand } from "@/lib/partners/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Switch } from "./ui/switch";
@@ -401,12 +402,12 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
   );
   const developerGuide = isSpotTab
     ? {
-        href: "/developers/orders-sink/direct",
+        href: getSpotDocsHref("/advanced-orders/direct"),
         linkLabel: "Advanced Order Docs",
         tooltip: "Open Advanced Order Docs",
       }
     : {
-        href: "/developers/liquidity-hub",
+        href: getSpotDocsHref("/liquidity-hub"),
         linkLabel: "Liquidity Hub Docs",
         tooltip: "Open Liquidity Hub integration guide",
       };
@@ -454,6 +455,8 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
                     ),
                     isDeveloperMode,
                   )}
+                  target="_blank"
+                  rel="noreferrer"
                   aria-label={developerGuide.tooltip}
                   className={cn(
                     navPillClass,

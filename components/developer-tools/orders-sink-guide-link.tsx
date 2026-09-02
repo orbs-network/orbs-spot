@@ -1,4 +1,5 @@
 import { DeveloperGuideLink } from "./developer-guide-link";
+import { getSpotDocsHref } from "@/lib/developer-docs";
 
 export function OrdersSinkGuideLink({
   className,
@@ -9,7 +10,7 @@ export function OrdersSinkGuideLink({
 }) {
   return (
     <DeveloperGuideLink
-      baseHref="/developers/orders-sink/direct"
+      baseHref={getSpotDocsHref("/advanced-orders/direct")}
       className={className}
       section={section}
     />

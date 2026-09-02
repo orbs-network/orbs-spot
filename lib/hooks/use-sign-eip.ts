@@ -1,27 +1,23 @@
-import { Quote } from "@orbs-network/liquidity-hub-sdk";
+import type { Quote } from "@orbs-network/liquidity-hub-sdk";
 import { useMutation } from "@tanstack/react-query";
-import { _TypedDataEncoder } from "@ethersproject/hash";
+import { useAccount } from "wagmi";
+
 import { useSignTypedDataPayload } from "./use-sign-typed-data";
 
 export const useSignEip = () => {
   const { mutateAsync: signTypedData } = useSignTypedDataPayload();
+  const { address: account } = useAccount();
 
   return useMutation({
     mutationFn: async (quote: Quote) => {
-        const permitData = quote.permitData;
-        const populated = await _TypedDataEncoder.resolveNames(
-            permitData.domain,
-            permitData.types,
-            permitData.values,
-            async (name: string) => name
-          );
-          const payload = _TypedDataEncoder.getPayload(
-            populated.domain,
-            permitData.types,
-            populated.value
-          );
-
-      const signature = await signTypedData(payload);
+      const permitData = quote.eip712;
+      const signature = await signTypedData({
+        domain: permitData.domain,
+        types: permitData.types,
+        primaryType: permitData.primaryType,
+        message: permitData.message,
+        account,
+      });
       return signature;
     },
   });

@@ -1,4 +1,5 @@
 import { DeveloperGuideLink } from "./developer-guide-link";
+import { getSpotDocsHref } from "@/lib/developer-docs";
 
 export function LiquidityHubGuideLink({
   className,
@@ -9,7 +10,7 @@ export function LiquidityHubGuideLink({
 }) {
   return (
     <DeveloperGuideLink
-      baseHref="/developers/liquidity-hub"
+      baseHref={getSpotDocsHref("/liquidity-hub")}
       className={className}
       section={section}
     />
