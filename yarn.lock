@@ -1076,6 +1076,11 @@
     "@orbs-network/spot" "^2.8.1"
     "@orbs-network/twap" "^2.7.28"
 
+"@orbs-network/spot-ui@2.1.2":
+  version "2.1.2"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-2.1.2.tgz#380ad51f124c6027477c95d99ae3eae87382c44d"
+  integrity sha512-AxgWETjCa6CQ7dduFOGFeeGpAc+oEh5fhPz3uBouAK1mVPcvnCNKSeV337oFlYqhQ8brXIwI5fNh26M6/l+1vQ==
+
 "@orbs-network/spot@^2.8.1":
   version "2.8.1"
   resolved "https://registry.yarnpkg.com/@orbs-network/spot/-/spot-2.8.1.tgz#694523da348c4f5bf1ab5aa587024b1065951a11"

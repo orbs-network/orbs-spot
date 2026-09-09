@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { ExternalLinkIcon } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -14,10 +15,12 @@ import {
 
 export function DeveloperGuideLink({
   baseHref,
+  children = "Open Full Guide",
   className,
   section,
 }: {
   baseHref: string;
+  children?: ReactNode;
   className?: string;
   section?: string;
 }) {
@@ -42,7 +45,7 @@ export function DeveloperGuideLink({
         className,
       )}
     >
-      Open Full Guide
+      {children}
       <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
     </Link>
   );

@@ -1,3 +1,4 @@
+import { LIQUIDITY_HUB_SDK_FLOW, formatLiquidityHubSdkFlow, formatLiquidityHubSdkStep } from "./sdk-flow-examples";
 import type {
   CodeSnippetFileOptions,
   CodeSnippetOptions,
@@ -45,14 +46,6 @@ function formatTypeScriptObject(value: Record<string, JsonValue>): string {
 
 function formatJsonObject(value: Record<string, JsonValue>): string {
   return JSON.stringify(value, null, 2);
-}
-
-function getQuotePayloadFallbackExplanation(path: JsonValuePath): string {
-  const field = path.findLast(
-    (segment): segment is string => typeof segment === "string",
-  );
-
-  return `The SDK-provided ${field ?? "quote"} field in this wallet-bound quote. Preserve it unchanged through signing and swap submission.`;
 }
 
 export function formatLiquidityHubSetupCode(data: JsonContainer): string {
@@ -441,179 +434,7 @@ export function useSwapAndConfirmLiquidityHub() {
 }`;
 }
 
-export function formatLiquidityHubFullFlowCode(data: JsonContainer): string {
-  const { chainId, partner } = getExampleParams(data);
-
-  return `import type { Quote } from "@orbs-network/liquidity-hub-sdk";
-import {
-  constructSDK,
-  isFreshQuote,
-  nativeTokenAddresses,
-  permit2Address,
-} from "@orbs-network/liquidity-hub-sdk";
-import { useMutation } from "@tanstack/react-query";
-import { erc20Abi, parseAbi } from "viem";
-import { useAccount, useConnection, usePublicClient, useWalletClient } from "wagmi";
-import { useDerivedData } from "./use-derived-data";
-import { useQuote } from "./use-quote";
-import { useSignTypedDataPayload } from "./use-sign-typed-data";
-import { useWrappedNativeToken } from "./use-wrapped-native-token";
-import type { Address, Hash } from "./types";
-
-const chainId = ${chainId};
-${formatLiquidityHubPartnerDeclaration(partner)}
-const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
-const liquidityHub = constructSDK({ chainId, partner });
-
-function isNative(address: string): boolean {
-  return nativeTokenAddresses.some(
-    (nativeAddress) => nativeAddress.toLowerCase() === address.toLowerCase(),
-  );
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-export function useExecuteLiquidityHubFlow() {
-  // The host renders this flow only after the wallet clients and quote are ready.
-  const account = useConnection().address!;
-  const publicClient = usePublicClient()!;
-  const walletClient = useWalletClient().data!;
-  // Replace these examples with the host's existing swap, quote, and token hooks.
-  const { inputToken } = useDerivedData();
-  const { quote: currentQuote, refetch, setPollingPaused } = useQuote();
-  const wToken = useWrappedNativeToken();
-  const { mutateAsync: signQuote } = useSignEip();
-
-  return async function executeLiquidityHubFlow() {
-    let quote = currentQuote;
-    let inputTokenAddress = inputToken;
-    setPollingPaused(true);
-
-    try {
-      if (isNative(inputTokenAddress)) {
-        liquidityHub.analytics.wrap.onRequest();
-        try {
-          const wrapHash = await walletClient.writeContract({
-            address: wToken as Address,
-            abi: wrappedNativeAbi,
-            functionName: "deposit",
-            value: BigInt(quote.inAmount),
-            account,
-            chain: walletClient.chain,
-          });
-          const receipt = await publicClient.waitForTransactionReceipt({ hash: wrapHash });
-          if (receipt.status !== "success") throw new Error("Native token wrap reverted");
-          liquidityHub.analytics.wrap.onSuccess(wrapHash);
-        } catch (error) {
-          liquidityHub.analytics.wrap.onFailed(getErrorMessage(error));
-          throw error;
-        }
-
-        // Liquidity Hub receives the wrapped ERC-20 address after wrapping.
-        inputTokenAddress = wToken;
-      }
-
-      // The host selected Liquidity Hub before this flow; no DEX fallback runs here.
-      const allowance = await publicClient.readContract({
-        address: inputTokenAddress as Address,
-        abi: erc20Abi,
-        functionName: "allowance",
-        args: [account, permit2Address as Address],
-      });
-
-      if (allowance < BigInt(quote.inAmount)) {
-        liquidityHub.analytics.approval.onRequest();
-        try {
-          const approvalHash = await walletClient.writeContract({
-            address: inputTokenAddress as Address,
-            abi: erc20Abi,
-            functionName: "approve",
-            args: [permit2Address as Address, BigInt(quote.inAmount)],
-            account,
-            chain: walletClient.chain,
-          });
-          const receipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
-          if (receipt.status !== "success") throw new Error("Permit2 approval reverted");
-          liquidityHub.analytics.approval.onSuccess(approvalHash);
-        } catch (error) {
-          liquidityHub.analytics.approval.onFailed(getErrorMessage(error));
-          throw error;
-        }
-      }
-
-      // Keep a fresh original. Replace a stale one only with an equal-or-better quote.
-      if (!isFreshQuote(quote, 60)) {
-        const originalQuote = quote;
-        const freshQuote = await refetch().catch(() => undefined);
-        if (freshQuote &&
-            BigInt(freshQuote.minAmountOut) >= BigInt(originalQuote.minAmountOut)) {
-          quote = freshQuote;
-        }
-      }
-
-      liquidityHub.analytics.signature.onRequest();
-      let signature: string;
-      try {
-        signature = await signQuote(quote);
-        liquidityHub.analytics.signature.onSuccess(signature);
-      } catch (error) {
-        liquidityHub.analytics.signature.onFailed(getErrorMessage(error));
-        throw error;
-      }
-
-      try {
-        const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
-        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-        if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
-        const details = await liquidityHub.getTransactionDetails(txHash, quote);
-        liquidityHub.analytics.swap.onSuccess();
-        return { details, quote, receipt, route: "liquidity-hub" as const, signature, txHash };
-      } catch (error) {
-        liquidityHub.analytics.swap.onFailed(getErrorMessage(error));
-        throw error;
-      }
-    } finally {
-      setPollingPaused(false);
-    }
-  };
-}
-
-export const useSignEip = () => {
-  const { mutateAsync: signTypedData } = useSignTypedDataPayload();
-  const { address: account } = useAccount();
-
-  return useMutation({
-    mutationFn: async (quote: Quote) => {
-      const permitData = quote.eip712;
-      const signature = await signTypedData({
-        domain: permitData.domain,
-        types: permitData.types,
-        primaryType: permitData.primaryType,
-        message: permitData.message,
-        account,
-      });
-      return signature;
-    },
-  });
-};
-
-/*
-Liquidity Hub flow
-
-1. Enter after the host has already selected Liquidity Hub as the winning route.
-2. When the selected source is native, wrap the requested input amount and then
-   replace inputTokenAddress with wToken for the rest of the flow.
-3. Pause quote polling until every execution stage settles.
-4. Report wrap and approval lifecycle analytics around confirmed transactions.
-5. Keep a fresh original quote; replace a stale quote only with an equal-or-better refresh.
-6. Sign quote.eip712 through useSignEip, then report the signature lifecycle.
-7. Pass the same quote and signature to swap(), confirm its receipt, request
-   transaction details, report swap analytics, and finally resume quote polling.
-*/
-`;
-}
+export const formatLiquidityHubFullFlowCode = formatLiquidityHubSdkFlow;
 
 export function formatLiquidityHubSwapCode(data: JsonContainer): string {
   const { inputIsNative } = getExampleParams(data);
@@ -703,44 +524,10 @@ Liquidity Hub swap flow
 `;
 }
 
-const SETUP_FILE: CodeSnippetFileOptions = {
-  format: formatLiquidityHubSetupCode,
-  name: "liquidity-hub.ts",
-  syntaxLanguage: "typescript",
-};
-
-const TYPES_FILE: CodeSnippetFileOptions = {
-  format: formatLiquidityHubTypesCode,
-  name: "liquidity-hub-types.ts",
-  showFieldTooltips: false,
-  syntaxLanguage: "typescript",
-};
-
 const COMPACT_TYPES_FILE: CodeSnippetFileOptions = {
   format: formatLiquidityHubTypesCode,
   name: "types.ts",
   showFieldTooltips: false,
-  syntaxLanguage: "typescript",
-};
-
-const GET_LATEST_QUOTE_FILE: CodeSnippetFileOptions = {
-  fieldPathAliases: { quotePayload: ["quote"] },
-  format: formatLiquidityHubGetLatestQuoteCode,
-  getFallbackFieldExplanation: getQuotePayloadFallbackExplanation,
-  hiddenFieldTooltipDescendantKeys: ["types"],
-  name: "get-latest-quote.ts",
-  syntaxLanguage: "typescript",
-};
-
-const SIGN_EIP_FILE: CodeSnippetFileOptions = {
-  format: formatLiquidityHubPermitSigningCode,
-  name: "use-sign-eip.ts",
-  syntaxLanguage: "typescript",
-};
-
-const CURRENT_QUOTE_FILE: CodeSnippetFileOptions = {
-  format: formatLiquidityHubCurrentQuoteCode,
-  name: "liquidity-hub-quote.ts",
   syntaxLanguage: "typescript",
 };
 
@@ -752,19 +539,7 @@ export const LIQUIDITY_HUB_SETUP_CODE_SNIPPET: CodeSnippetOptions = {
   syntaxLanguage: "typescript",
 };
 
-export const LIQUIDITY_HUB_QUOTE_CODE_SNIPPET: CodeSnippetOptions = {
-  copyLabel: "Copy code",
-  fileName: "use-liquidity-hub-quote.ts",
-  files: [
-    SETUP_FILE,
-    CURRENT_QUOTE_FILE,
-    TYPES_FILE,
-    SIGN_EIP_FILE,
-  ],
-  format: formatLiquidityHubQuoteCode,
-  language: "TypeScript",
-  syntaxLanguage: "typescript",
-};
+export const LIQUIDITY_HUB_QUOTE_CODE_SNIPPET = LIQUIDITY_HUB_SDK_FLOW;
 
 export const LIQUIDITY_HUB_LIVE_QUOTE_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
@@ -777,67 +552,50 @@ export const LIQUIDITY_HUB_LIVE_QUOTE_CODE_SNIPPET: CodeSnippetOptions = {
 
 export const LIQUIDITY_HUB_WRAP_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "wrap-native-input.ts",
-  files: [SETUP_FILE],
-  format: formatLiquidityHubWrapCode,
+  fileName: "wrap.ts",
+  format: () => formatLiquidityHubSdkStep("wrap"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
 
 export const LIQUIDITY_HUB_APPROVAL_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "approve-permit2.ts",
-  files: [SETUP_FILE],
-  format: formatLiquidityHubApprovalCode,
+  fileName: "approve.ts",
+  format: () => formatLiquidityHubSdkStep("approve"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
 
 export const LIQUIDITY_HUB_ALLOWANCE_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "check-permit2-allowance.ts",
-  format: formatLiquidityHubAllowanceCode,
+  fileName: "check.ts",
+  format: () => formatLiquidityHubSdkStep("check"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
 
 export const LIQUIDITY_HUB_SIGN_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "sign-liquidity-hub-quote.ts",
-  files: [GET_LATEST_QUOTE_FILE, SIGN_EIP_FILE, COMPACT_TYPES_FILE],
-  format: formatLiquidityHubSignCode,
+  fileName: "sign.ts",
+  format: () => formatLiquidityHubSdkStep("sign"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
 
 export const LIQUIDITY_HUB_SWAP_AND_CONFIRM_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "swap-and-confirm-liquidity-hub.ts",
-  files: [GET_LATEST_QUOTE_FILE, COMPACT_TYPES_FILE],
-  format: formatLiquidityHubSwapAndConfirmCode,
+  fileName: "swap.ts",
+  format: () => formatLiquidityHubSdkStep("swap"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
 
-export const LIQUIDITY_HUB_FULL_FLOW_CODE_SNIPPET: CodeSnippetOptions = {
-  copyLabel: "Copy code",
-  fileName: "full-flow.ts",
-  files: [COMPACT_TYPES_FILE],
-  format: formatLiquidityHubFullFlowCode,
-  language: "TypeScript",
-  syntaxLanguage: "typescript",
-};
+export const LIQUIDITY_HUB_FULL_FLOW_CODE_SNIPPET = LIQUIDITY_HUB_SDK_FLOW;
 
 export const LIQUIDITY_HUB_SWAP_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "use-liquidity-hub-swap.ts",
-  files: [
-    CURRENT_QUOTE_FILE,
-    SIGN_EIP_FILE,
-    TYPES_FILE,
-    SETUP_FILE,
-  ],
-  format: formatLiquidityHubSwapCode,
+  fileName: "swap.ts",
+  format: () => formatLiquidityHubSdkStep("swap"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };

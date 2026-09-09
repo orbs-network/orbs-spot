@@ -78,8 +78,10 @@ export type CurlOptions = {
 };
 
 export type CodeSnippetFileOptions = {
+  inlineEditable?: boolean;
   fieldPathAliases?: Record<string, JsonValuePath>;
   format: (data: JsonContainer) => string;
+  formatEdit?: (data: JsonContainer) => string;
   getFallbackFieldExplanation?: (
     path: JsonValuePath,
     value: JsonValue,
@@ -91,10 +93,12 @@ export type CodeSnippetFileOptions = {
 };
 
 export type CodeSnippetOptions = {
+  showFieldTooltips?: boolean;
   copyLabel?: string;
   fileName?: string;
   files?: CodeSnippetFileOptions[];
   format: (data: JsonContainer) => string;
+  formatEdit?: (data: JsonContainer) => string;
   getFieldExplanation?: (
     path: JsonValuePath,
     value: JsonValue,
@@ -721,6 +725,7 @@ function JsonInspectorModalContent({
 }: JsonInspectorContentProps) {
   const descriptionId = useId();
   const fieldIdPrefix = useId();
+  const codeTabsId = useId();
   const codeContainerRef = useRef<HTMLDivElement>(null);
   const codeScrollRef = useRef<HTMLPreElement>(null);
   const copyResetTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -769,10 +774,12 @@ function JsonInspectorModalContent({
         ? [
             {
               format: codeSnippet.format,
+              formatEdit: codeSnippet.formatEdit,
               name:
                 codeSnippet.fileName ?? codeSnippet.language ?? "Code",
               syntaxLanguage:
                 codeSnippet.syntaxLanguage ?? ("typescript" as Language),
+              showFieldTooltips: codeSnippet.showFieldTooltips,
             },
             ...(codeSnippet.files ?? []),
           ]
@@ -786,10 +793,16 @@ function JsonInspectorModalContent({
   const activeCodeFile =
     codeFiles[activeCodeFileIndex] ?? codeFiles[0];
   const formattedCode = useMemo(
-    () => activeCodeFile?.format(draft),
-    [activeCodeFile, draft],
+    () => (mode === "edit" && activeCodeFile?.formatEdit
+      ? activeCodeFile.formatEdit(draft)
+      : activeCodeFile?.format(draft)),
+    [activeCodeFile, draft, mode],
   );
   const isMainCodeFile = activeCodeFileIndex === 0;
+  const activeCodeIsInlineEditable = activeCodeFile?.inlineEditable ?? (isMainCodeFile && Boolean(codeSnippet?.inlineEditable));
+  const activeCodeIsEditable = isMainCodeFile
+    ? !codeSnippet?.files?.some((file) => file.inlineEditable) || Boolean(codeSnippet?.inlineEditable)
+    : Boolean(activeCodeFile?.inlineEditable);
   const responseFieldExplanation = isDocumentationDensity
     ? undefined
     : (getResponseFieldExplanation ?? getFieldExplanation);
@@ -800,14 +813,13 @@ function JsonInspectorModalContent({
   const inlineCodeFields = useMemo(() => {
     if (
       !formattedCode ||
-      !codeSnippet?.inlineEditable ||
-      !isMainCodeFile
+      !activeCodeIsInlineEditable
     ) {
       return new Map<number, JsonLineAnnotation>();
     }
 
     return buildCodeLineAnnotations(formattedCode, data);
-  }, [codeSnippet?.inlineEditable, data, formattedCode, isMainCodeFile]);
+  }, [activeCodeIsInlineEditable, data, formattedCode]);
   const codeLineExplanations = useMemo(() => {
     const explanations = new Map<
       number,
@@ -1437,17 +1449,16 @@ function JsonInspectorModalContent({
 
   const isInlineCodeEdit =
     mode === "edit" &&
-    isMainCodeFile &&
-    Boolean(formattedCode && codeSnippet?.inlineEditable);
+    activeCodeIsInlineEditable && Boolean(formattedCode);
   const keepsCodeVisibleWhileEditing = Boolean(
-    codeSnippet?.inlineEditable,
+    codeSnippet?.inlineEditable || codeSnippet?.files?.some((file) => file.inlineEditable),
   );
 
   const renderCodeFileTabs = () => (
     <div
       role="tablist"
-      aria-label="Code files"
-      className="flex min-w-0 flex-1 self-stretch overflow-x-auto"
+      aria-label="Code examples"
+      className="flex w-full min-w-0 self-stretch overflow-x-auto sm:w-auto sm:flex-1"
     >
       {codeFiles.map((file, index) => {
         const isActive = index === activeCodeFileIndex;
@@ -1457,7 +1468,26 @@ function JsonInspectorModalContent({
             key={`${file.name}-${index}`}
             type="button"
             role="tab"
+            id={`${codeTabsId}-tab-${index}`}
             aria-selected={isActive}
+            aria-controls={`${codeTabsId}-panel`}
+            tabIndex={isActive ? 0 : -1}
+            onKeyDown={(event) => {
+              const nextIndex = event.key === "ArrowRight"
+                ? (index + 1) % codeFiles.length
+                : event.key === "ArrowLeft"
+                  ? (index - 1 + codeFiles.length) % codeFiles.length
+                  : event.key === "Home"
+                    ? 0
+                    : event.key === "End"
+                      ? codeFiles.length - 1
+                      : undefined;
+              if (nextIndex === undefined) return;
+              event.preventDefault();
+              setCodeFileSelection({ codeSnippet, index: nextIndex });
+              setCopiedTarget(undefined);
+              document.getElementById(`${codeTabsId}-tab-${nextIndex}`)?.focus();
+            }}
             onClick={() => {
               setCodeFileSelection({ codeSnippet, index });
               setCopiedTarget(undefined);
@@ -1672,7 +1702,7 @@ function JsonInspectorModalContent({
               {headerNotice && <div className="mt-3">{headerNotice}</div>}
               {(getFieldExplanation || getResponseFieldExplanation) && (
                 <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                  Tip: hover or focus underlined fields to see their integration contract.
+                  Tip: hover over or focus an underlined field to see its explanation.
                 </p>
               )}
             </div>
@@ -1692,7 +1722,7 @@ function JsonInspectorModalContent({
                   : "gap-4"
               }`}
             >
-              {isInlineCodeEdit && validationIssues.length > 0 && (
+              {mode === "edit" && keepsCodeVisibleWhileEditing && validationIssues.length > 0 && (
                 <InlineMessage
                   variant="error"
                   icon={
@@ -1809,7 +1839,7 @@ function JsonInspectorModalContent({
                 }`}
               >
                 <div
-                  className={`flex min-h-11 items-center justify-between border-b border-border/70 bg-secondary/35 ${
+                  className={`flex min-h-11 flex-wrap items-center justify-between border-b border-border/70 bg-secondary/35 sm:flex-nowrap ${
                     codeFiles.length > 1 ? "" : "pl-4"
                   } ${
                     codeSnippetState === "active"
@@ -1832,7 +1862,7 @@ function JsonInspectorModalContent({
                       </span>
                     </div>
                   )}
-                  <div className="flex shrink-0 items-center gap-1 px-2">
+                  <div className="ml-auto flex shrink-0 items-center gap-1 px-2">
                     {fullscreenError ? (
                       <span
                         role="status"
@@ -1885,7 +1915,7 @@ function JsonInspectorModalContent({
                             : "Populated snippet"}
                         </span>
                       ) : null)}
-                    {editable && isMainCodeFile && (
+                    {editable && activeCodeIsEditable && (
                       <label
                         className={`flex h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[11px] font-medium transition-colors hover:bg-secondary/60 hover:text-foreground ${
                           mode === "edit"
@@ -1921,6 +1951,9 @@ function JsonInspectorModalContent({
                   }) => (
                     <pre
                       ref={codeScrollRef}
+                      id={`${codeTabsId}-panel`}
+                      role={codeFiles.length > 1 ? "tabpanel" : undefined}
+                      aria-labelledby={codeFiles.length > 1 ? `${codeTabsId}-tab-${activeCodeFileIndex}` : undefined}
                       className={`${className} min-h-0 flex-1 overflow-auto overscroll-x-contain overscroll-y-auto p-4 font-mono ${
                         isDocumentationDensity
                           ? "text-[12px] leading-5"

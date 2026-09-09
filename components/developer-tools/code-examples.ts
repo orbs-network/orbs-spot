@@ -1,3 +1,4 @@
+import { ADVANCED_ORDERS_SDK_FLOW, formatAdvancedOrdersSdkFlow, formatAdvancedOrdersSdkStep } from "./sdk-flow-examples";
 import type {
   CodeSnippetOptions,
   JsonContainer,
@@ -217,6 +218,13 @@ export function isSignatureValueEditable(
 
 export function getSignatureFieldExplanation(path: JsonValuePath) {
   return SIGNATURE_FIELD_EXPLANATIONS[path.join(".")];
+}
+
+export function getSignatureMessageFieldExplanation(path: JsonValuePath, value: JsonValue) {
+  if (path[0] !== "message" || (typeof value !== "string" && typeof value !== "number")) {
+    return undefined;
+  }
+  return getSignatureFieldExplanation(path);
 }
 
 export function getPermitDataFieldExplanation(path: JsonValuePath) {
@@ -487,7 +495,6 @@ function getPermitConfigExampleParams(data: JsonContainer) {
   return { chain, partner };
 }
 
-
 export function formatBuildOrderFromDerivedValuesCode(data: JsonContainer) {
   const root = Array.isArray(data) ? {} : data;
   const partner = getExamplePartnerId(root.partner);
@@ -586,209 +593,17 @@ export async function fetchDefaultPermitData(
 }
 
 export function formatSignOrderExampleCode() {
-  return `import { useCallback } from "react";
-import { useConnection, useWalletClient } from "wagmi";
-
-import { useBuildOrderFromDerivedValues } from "./build-order";
-
-export function useSignOrder() {
-  const account = useConnection().address!;
-  const walletClient = useWalletClient().data!;
-  const buildOrder = useBuildOrderFromDerivedValues();
-
-  return useCallback(async () => {
-    const { order, permitData } = await buildOrder();
-    const signTypedDataArgs = {
-      account,
-      domain: permitData.domain,
-      message: order,
-      primaryType: permitData.primaryType,
-      types: permitData.types,
-    } as const;
-
-    // Keep the complete EIP-712 hex signature returned by the wallet.
-    const signature = await walletClient.signTypedData(signTypedDataArgs);
-
-    // Preserve the exact object that was signed for POST /orders/new.
-    return { signature, order };
-  }, [account, buildOrder, walletClient]);
-}`;
+  return formatAdvancedOrdersSdkStep("sign");
 }
 
-export function formatFullOrderFlowCode(data: JsonContainer) {
-  const root = Array.isArray(data) ? {} : data;
-  const partner = getExamplePartnerId(root.partner);
-
-  return `import { erc20Abi, parseAbi } from "viem";
-import { useConnection, usePublicClient, useWalletClient } from "wagmi";
-import { fetchDefaultPermitData } from "./build-order";
-import { useSignOrder } from "./use-sign-order";
-import { useDerivedData } from "./use-derived-data";
-import { useWtokenAddress } from "./use-wtoken-address";
-import type { CreateOrderResponse, OrderResponse, PermitOrder, Signature, SignedOrder } from "./order-types";
-
-const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
-${formatPartnerDeclaration(partner)}
-const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
-
-export function useSubmitOrdersSinkOrder() {
-  // The host renders this flow only after the account and wallet clients are ready.
-  const account = useConnection().address!;
-  const publicClient = usePublicClient()!;
-  const walletClient = useWalletClient().data!;
-  // Replace this import with the DEX's existing derived swap-data hook.
-  const orderInput = useDerivedData();
-  // Replace this with the host hook for the active chain's wrapped native token.
-  const wTokenAddress = useWtokenAddress();
-  const signOrder = useSignOrder();
-
-  return async function submitOrdersSinkOrder() {
-    // 1. Fetch the trusted default template for this partner and active chain.
-    const permitData = await fetchDefaultPermitData(partner, walletClient.chain.id);
-
-    // 2. Prepare the complete source amount before asking for a signature.
-    // Allowance belongs to RePermit, not to order.spender (the reactor).
-    const spender = permitData.domain.verifyingContract;
-    const requiredAmount = BigInt(orderInput.totalInputAmount);
-    let inputTokenAddress = orderInput.inputToken.address;
-
-    if (orderInput.sourceIsNative) {
-      // Wrap the complete amount, then use WToken everywhere in the signed order.
-      const wrapHash = await walletClient.writeContract({
-        address: wTokenAddress,
-        abi: wrappedNativeAbi,
-        functionName: "deposit",
-        value: requiredAmount,
-        account,
-        chain: walletClient.chain,
-      });
-      const wrapReceipt = await publicClient.waitForTransactionReceipt({ hash: wrapHash });
-      if (wrapReceipt.status !== "success") throw new Error("Native token wrap reverted");
-      inputTokenAddress = wTokenAddress;
-    }
-
-    const allowance = await publicClient.readContract({
-      address: inputTokenAddress,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [account, spender],
-    });
-
-    if (allowance < requiredAmount) {
-      // This direct-integration reference grants only the complete order amount.
-      // A maximum allowance must be an explicit host security decision.
-      const approveHash = await walletClient.writeContract({
-        address: inputTokenAddress,
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [spender, requiredAmount],
-        account,
-        chain: walletClient.chain,
-      });
-      const approveReceipt = await publicClient.waitForTransactionReceipt({ hash: approveHash });
-      if (approveReceipt.status !== "success") throw new Error("Token approval reverted");
-    }
-
-    // 3. useSignOrder fetches the default template, builds from the
-    // latest derived values, and signs without accepting permit data as input.
-    const { order, signature } = await signOrder();
-    return submitOrder(order, signature);
-  };
-}
-
-async function submitOrder(
-  order: PermitOrder,
-  signature: Signature,
-): Promise<OrderResponse> {
-  const body: SignedOrder = { signature, order, status: "pending" };
-  const response = await fetch(\`${"${ORDERS_SINK_URL}"}/orders/new\`, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const result = (await response.json().catch(() => ({}))) as CreateOrderResponse;
-
-  if (!response.ok || !result.success) {
-    const message = "message" in result ? result.message : undefined;
-    throw new Error(message ?? response.statusText ?? "Order creation failed");
-  }
-
-  return result.signedOrder;
-}
-
-/*
-Create order flow
-
-1. Fetch the default permit template for the partner and active chain.
-2. Check allowance, wrap native input when needed, and approve RePermit when
-   allowance does not cover the complete order amount.
-3. Call useSignOrder() with no arguments. It fetches the default permit
-   data, builds the order from current derived values, and signs it.
-4. Submit the exact signed order and require HTTP and API success, then keep the returned signedOrder
-   for progress, history, fills, and cancellation.
-*/
-`;
-}
+export const formatFullOrderFlowCode = formatAdvancedOrdersSdkFlow;
 
 export function formatWrapNativeTokenCode() {
-  return `import { useCallback } from "react";
-import { parseAbi } from "viem";
-import { useConnection, usePublicClient, useWalletClient } from "wagmi";
-
-import type { Address } from "./order-types";
-
-// The wrapped-native contract exposes a payable deposit() function.
-const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
-
-export function useWrapNativeTokenExample() {
-  const publicClient = usePublicClient()!;
-  const walletClient = useWalletClient().data!;
-  const account = useConnection().address!;
-
-  return useCallback(async (amount: string, tokenAddress: Address) => {
-    const hash = await walletClient.writeContract({
-      address: tokenAddress,
-      abi: wrappedNativeAbi,
-      functionName: "deposit",
-      value: BigInt(amount),
-      account,
-      chain: walletClient.chain,
-    });
-
-    // Wait until the wrapped balance is available for the next step.
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== "success") throw new Error("Native token wrap reverted");
-    return hash;
-  }, [account, publicClient, walletClient]);
-}`;
+  return formatAdvancedOrdersSdkStep("wrap");
 }
 
-export function formatLiveWrapNativeTokenCode(data: JsonContainer) {
-  const amount =
-    !Array.isArray(data) && typeof data.amount === "string"
-      ? data.amount
-      : "0";
-  const tokenAddress =
-    !Array.isArray(data) && typeof data.tokenAddress === "string"
-      ? data.tokenAddress
-      : "0x0000000000000000000000000000000000000000";
-  return `${formatWrapNativeTokenCode()}
-
-// This hook exposes the current live order as an event-safe callback.
-export function useWrapCurrentOrderToken() {
-  const wrapNativeToken = useWrapNativeTokenExample();
-
-  return useCallback(
-    () => wrapNativeToken(
-      ${JSON.stringify(amount)},
-      ${JSON.stringify(tokenAddress)},
-    ),
-    [wrapNativeToken],
-  );
-}`;
+export function formatLiveWrapNativeTokenCode() {
+  return formatAdvancedOrdersSdkStep("wrap");
 }
 
 export function formatCreateOrderFetchCode() {
@@ -831,105 +646,6 @@ export async function createOrder(
 }`;
 }
 
-function formatSubmitSignedOrderCode(data: JsonContainer) {
-  if (Array.isArray(data)) return JSON.stringify(data, null, 2);
-
-  const bodySourceComments: Record<string, string> = {
-    signature:
-      "Wallet: complete 65-byte EIP-712 hex returned by signTypedDataAsync.",
-    order: "Exact message object signed in the previous step.",
-    "order.permitted.token":
-      "DEX state: ERC-20 input token; use WToken when native input was selected.",
-    "order.permitted.amount":
-      "DEX state: total required input amount in token base units.",
-    "order.spender": "permitDataResponse.order.spender.",
-    "order.nonce": "Application: fresh permit nonce generated for this order.",
-    "order.deadline":
-      "Application: permit expiration timestamp in Unix seconds.",
-    "order.witness.reactor": "permitDataResponse.order.witness.reactor.",
-    "order.witness.executor": "permitDataResponse.order.witness.executor.",
-    "order.witness.exchange.adapter":
-      "permitDataResponse.order.witness.exchange.adapter.",
-    "order.witness.exchange.ref":
-      "permitDataResponse.order.witness.exchange.ref.",
-    "order.witness.exchange.share":
-      "permitDataResponse.order.witness.exchange.share.",
-    "order.witness.exchange.data":
-      "permitDataResponse.order.witness.exchange.data.",
-    "order.witness.swapper": "Connected wallet address.",
-    "order.witness.nonce":
-      "Application: fresh witness nonce generated for this order.",
-    "order.witness.start":
-      "Application: earliest execution timestamp in Unix seconds.",
-    "order.witness.deadline":
-      "Application: order expiration timestamp in Unix seconds.",
-    "order.witness.chainid": "DEX state: selected EVM chain ID.",
-    "order.witness.exclusivity":
-      "permitDataResponse.order.witness.exclusivity.",
-    "order.witness.epoch":
-      "Application order settings: interval between eligible fills.",
-    "order.witness.slippage":
-      "Application order settings: allowed slippage in basis points.",
-    "order.witness.freshness":
-      "Application order settings: maximum execution-data age.",
-    "order.witness.input.token":
-      "DEX state: ERC-20 input token; must match permitted.token.",
-    "order.witness.input.amount":
-      "DEX calculation: input amount allocated to each fill.",
-    "order.witness.input.maxAmount":
-      "DEX calculation: maximum total input available to the order.",
-    "order.witness.output.token": "DEX state: selected destination token.",
-    "order.witness.output.limit":
-      "DEX quote: minimum destination amount accepted per fill.",
-    "order.witness.output.stop":
-      "permitDataResponse.order.witness.output.stop.",
-    "order.witness.output.triggerLower":
-      "Application strategy form: lower execution trigger.",
-    "order.witness.output.triggerUpper":
-      "Application strategy form: upper execution trigger.",
-    "order.witness.output.recipient":
-      "Connected wallet, unless the application selected another recipient.",
-    status: 'Fixed POST /orders/new value: new orders start as "pending".',
-  };
-  const serializedBody = serializeTypeScriptValue(
-    data,
-    () => undefined,
-    [],
-    2,
-    (path) => bodySourceComments[path.join(".")],
-  );
-
-  return `import type { CreateOrderResponse, SignedOrder } from "./order-types";
-
-export async function createOrder() {
-  // Submit the exact signature and order shown in this live flow.
-  const body: SignedOrder = ${serializedBody};
-
-  const response = await fetch(${JSON.stringify(CREATE_ORDER_EXAMPLE_URL)}, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  const result = (await response.json().catch(() => ({}))) as CreateOrderResponse;
-
-  // Surface transport and API errors separately.
-  if (!response.ok) {
-    throw new Error(\`Request failed (\${response.status})\`);
-  }
-
-  if (!result.success) {
-    throw new Error(result.message ?? "Order creation failed");
-  }
-
-  // Return the created order from the successful response.
-  return result.signedOrder;
-}`;
-}
-
 function formatCreatedOrderCode(data: JsonContainer) {
   const serializedOrder = serializeTypeScriptValue(
     data,
@@ -943,18 +659,7 @@ export const createdOrder = ${serializedOrder} as const;`;
 }
 
 export function formatLiveCreateOrderCode() {
-  return `import { useCallback } from "react";
-import { createOrder } from "./create-order";
-import { useSignOrder } from "./use-sign-order";
-
-export function useSignAndCreateOrder() {
-  const signOrder = useSignOrder();
-
-  return useCallback(async () => {
-    const { order, signature } = await signOrder();
-    return await createOrder(signature, order);
-  }, [signOrder]);
-}`;
+  return formatAdvancedOrdersSdkStep("sign");
 }
 
 export function formatFetchOrdersCode(data: JsonContainer) {
@@ -1251,157 +956,16 @@ async function fetchRePermitData(chainId: number): Promise<PermitData> {
 }`;
 }
 
-export function formatApproveTokenCode(
-  data: JsonContainer,
-  includeUsage = true,
-) {
-  const amount =
-    !Array.isArray(data) && typeof data.amount === "string"
-      ? data.amount
-      : "<required-amount>";
-  const tokenAddress =
-    !Array.isArray(data) && typeof data.tokenAddress === "string"
-      ? data.tokenAddress
-      : "0x0000000000000000000000000000000000000000";
-  const spender =
-    !Array.isArray(data) && typeof data.spender === "string"
-      ? data.spender
-      : "0x0000000000000000000000000000000000000000";
-  const usage = includeUsage
-    ? `
-
-export function useApproveExample() {
-  const { checkApproval, approveToken } = useTokenApproval();
-
-  return useCallback(async () => {
-    const approvalRequired = await checkApproval(
-      ${JSON.stringify(amount)},
-      ${JSON.stringify(tokenAddress)},
-      ${JSON.stringify(spender)},
-    );
-
-    // Only request a wallet transaction when allowance is insufficient.
-    if (approvalRequired) {
-      return await approveToken(
-        ${JSON.stringify(tokenAddress)},
-        ${JSON.stringify(spender)},
-        ${JSON.stringify(amount)},
-      );
-    }
-  }, [approveToken, checkApproval]);
-}`
-    : "";
-
-  return `import { useCallback } from "react";
-import { erc20Abi } from "viem";
-import { useConnection, usePublicClient, useWalletClient } from "wagmi";
-
-import type { Address } from "./order-types";
-
-export function useTokenApproval() {
-  const publicClient = usePublicClient()!;
-  const walletClient = useWalletClient().data!;
-  const account = useConnection().address!;
-
-  const checkApproval = useCallback(async (
-    amount: string,
-    tokenAddress: Address,
-    spender: Address,
-  ) => {
-    const allowance = await publicClient.readContract({
-      address: tokenAddress,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [account, spender],
-    });
-
-    return allowance < BigInt(amount);
-  }, [account, publicClient]);
-
-  const approveToken = useCallback(async (
-    tokenAddress: Address,
-    spender: Address,
-    amount: string,
-  ) => {
-    const hash = await walletClient.writeContract({
-      address: tokenAddress,
-      abi: erc20Abi,
-      functionName: "approve",
-      // The Direct API guide uses an exact complete-order allowance.
-      args: [spender, BigInt(amount)],
-      account,
-      chain: walletClient.chain,
-    });
-
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== "success") throw new Error("Token approval reverted");
-    return hash;
-  }, [account, publicClient, walletClient]);
-
-  return { approveToken, checkApproval };
-}${usage}`;
+export function formatApproveTokenCode() {
+  return formatAdvancedOrdersSdkStep("approve");
 }
 
-export function formatLiveApproveTokenCode(data: JsonContainer) {
-  const amount =
-    !Array.isArray(data) && typeof data.amount === "string"
-      ? data.amount
-      : "0";
-  const tokenAddress =
-    !Array.isArray(data) && typeof data.tokenAddress === "string"
-      ? data.tokenAddress
-      : "0x0000000000000000000000000000000000000000";
-  const spender =
-    !Array.isArray(data) && typeof data.spender === "string"
-      ? data.spender
-      : "0x0000000000000000000000000000000000000000";
-
-  return `${formatApproveTokenCode(data, false)}
-
-// This callback is safe to call from a button or mutation handler.
-export function useApproveCurrentOrder() {
-  const { approveToken } = useTokenApproval();
-
-  return useCallback(
-    () => approveToken(
-      ${JSON.stringify(tokenAddress)},
-      ${JSON.stringify(spender)},
-      ${JSON.stringify(amount)},
-    ),
-    [approveToken],
-  );
-}`;
+export function formatLiveApproveTokenCode() {
+  return formatAdvancedOrdersSdkStep("approve");
 }
 
-export function formatLiveCheckApprovalCode(data: JsonContainer) {
-  const amount =
-    !Array.isArray(data) && typeof data.amount === "string"
-      ? data.amount
-      : "0";
-  const tokenAddress =
-    !Array.isArray(data) && typeof data.tokenAddress === "string"
-      ? data.tokenAddress
-      : "0x0000000000000000000000000000000000000000";
-  const spender =
-    !Array.isArray(data) && typeof data.spender === "string"
-      ? data.spender
-      : "0x0000000000000000000000000000000000000000";
-
-  return `${formatApproveTokenCode(data, false)}
-
-// Read allowance without opening the wallet or sending a transaction.
-export function useCheckCurrentOrderApproval() {
-  const { checkApproval } = useTokenApproval();
-
-  return useCallback(
-    () => checkApproval(
-      ${JSON.stringify(amount)},
-      ${JSON.stringify(tokenAddress)},
-      ${JSON.stringify(spender)},
-    ),
-    [checkApproval],
-  );
-}`;
+export function formatLiveCheckApprovalCode() {
+  return formatAdvancedOrdersSdkStep("check");
 }
 
 const ORDER_TYPES_FILE = {
@@ -1410,31 +974,12 @@ const ORDER_TYPES_FILE = {
   syntaxLanguage: "typescript",
 } as const;
 
-const CREATE_ORDER_FILE = {
-  format: formatCreateOrderFetchCode,
-  name: "create-order.ts",
-  syntaxLanguage: "typescript",
-} as const;
-
-const BUILD_ORDER_FILE = {
-  fieldPathAliases: { order: ["message"] as JsonValuePath },
-  format: formatBuildOrderFromDerivedValuesCode,
-  name: "build-order.ts",
-  syntaxLanguage: "typescript",
-} as const;
-
-const SIGN_ORDER_FILE = {
-  format: formatSignOrderExampleCode,
-  name: "use-sign-order.ts",
-  syntaxLanguage: "typescript",
-} as const;
-
 export const SIGNATURE_EXAMPLE_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "use-sign-order.ts",
-  files: [BUILD_ORDER_FILE, ORDER_TYPES_FILE],
-  format: formatSignOrderExampleCode,
-  getFieldExplanation: getSignatureFieldExplanation,
+  fileName: "sign-order.ts",
+  format: () => formatAdvancedOrdersSdkStep("sign"),
+  formatEdit: (data) => formatAdvancedOrdersSdkStep("sign", data),
+  getFieldExplanation: getSignatureMessageFieldExplanation,
   inlineEditable: true,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -1461,8 +1006,7 @@ export const CANCEL_EXAMPLE_CODE_SNIPPET: CodeSnippetOptions = {
 export const APPROVE_TOKEN_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "approve-token.ts",
-  files: [ORDER_TYPES_FILE],
-  format: formatApproveTokenCode,
+  format: () => formatAdvancedOrdersSdkStep("approve"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
@@ -1470,8 +1014,7 @@ export const APPROVE_TOKEN_CODE_SNIPPET: CodeSnippetOptions = {
 export const LIVE_APPROVE_TOKEN_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "approve-token.ts",
-  files: [ORDER_TYPES_FILE],
-  format: formatLiveApproveTokenCode,
+  format: () => formatAdvancedOrdersSdkStep("approve"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
@@ -1479,8 +1022,7 @@ export const LIVE_APPROVE_TOKEN_CODE_SNIPPET: CodeSnippetOptions = {
 export const LIVE_CHECK_APPROVAL_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "check-approval.ts",
-  files: [ORDER_TYPES_FILE],
-  format: formatLiveCheckApprovalCode,
+  format: () => formatAdvancedOrdersSdkStep("check"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
@@ -1488,39 +1030,28 @@ export const LIVE_CHECK_APPROVAL_CODE_SNIPPET: CodeSnippetOptions = {
 export const LIVE_WRAP_NATIVE_TOKEN_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "wrap-native-token.ts",
-  files: [ORDER_TYPES_FILE],
-  format: formatLiveWrapNativeTokenCode,
+  format: () => formatAdvancedOrdersSdkStep("wrap"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
 
 export const LIVE_CREATE_ORDER_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "sign-and-create-order.ts",
-  files: [SIGN_ORDER_FILE, BUILD_ORDER_FILE, CREATE_ORDER_FILE, ORDER_TYPES_FILE],
-  format: formatLiveCreateOrderCode,
-  getFieldExplanation: getSignatureFieldExplanation,
+  fileName: "sign-order.ts",
+  format: () => formatAdvancedOrdersSdkStep("sign"),
+  formatEdit: (data) => formatAdvancedOrdersSdkStep("sign", data),
+  getFieldExplanation: getSignatureMessageFieldExplanation,
   inlineEditable: true,
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
 
-export const FULL_ORDER_FLOW_CODE_SNIPPET: CodeSnippetOptions = {
-  copyLabel: "Copy code",
-  fileName: "create-order-flow.ts",
-  files: [SIGN_ORDER_FILE, BUILD_ORDER_FILE, ORDER_TYPES_FILE],
-  format: formatFullOrderFlowCode,
-  getFieldExplanation: getSignatureFieldExplanation,
-  language: "TypeScript",
-  syntaxLanguage: "typescript",
-};
+export const FULL_ORDER_FLOW_CODE_SNIPPET = ADVANCED_ORDERS_SDK_FLOW;
 
 export const CREATE_ORDER_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
-  fileName: "create-order.ts",
-  files: [ORDER_TYPES_FILE],
-  format: formatSubmitSignedOrderCode,
-  getFieldExplanation: getPermitDataFieldExplanation,
+  fileName: "submit-order.ts",
+  format: () => formatAdvancedOrdersSdkStep("submit"),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };

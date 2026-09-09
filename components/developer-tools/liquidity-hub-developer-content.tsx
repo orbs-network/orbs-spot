@@ -1,5 +1,7 @@
 "use client";
 
+import { remainingWrapAmount, rewindFlow } from "./flow-navigation";
+
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
   isFreshQuote,
@@ -178,8 +180,8 @@ function getPresentation({
       codeSnippet: LIQUIDITY_HUB_FULL_FLOW_CODE_SNIPPET,
       data,
       explanation:
-        "Run the existing quote payload through allowance, optional wrap and approval, fetch a fresh quote immediately before EIP-712 signing, then submit that refreshed quote and wait for confirmation. Wrap and Approve appear only when required.",
-      title: "Liquidity Hub live swap flow",
+        "Use the TypeScript SDK to refresh, sign, and execute the selected quote, with wrapping and approval when needed.",
+      title: "Liquidity Hub SDK flow",
     };
   }
   if (step === "check") {
@@ -281,10 +283,9 @@ export function LiquidityHubDeveloperContent({
   const [signature, setSignature] = useState<string>();
   const [txHash, setTxHash] = useState<`0x${string}`>();
   const suppressTriggerTooltipRef = useRef(false);
+  const wrappedAmountRef = useRef(BigInt(0));
   const step = navigation.history.at(-1) ?? "flow";
   const viewedStep = navigation.history[navigation.viewedIndex] ?? step;
-  const isReviewingPreviousStep =
-    navigation.viewedIndex < navigation.history.length - 1;
   const liveQuote = trade?.originalQuote as Quote | undefined;
   const partner = getActiveLiquidityHubPartnerId();
   const inputIsNative = isNativeAddress(inputCurrency?.address);
@@ -366,6 +367,7 @@ export function LiquidityHubDeveloperContent({
 
       if (nextOpen) {
         setNavigation({ history: ["flow"], viewedIndex: 0 });
+        wrappedAmountRef.current = BigInt(0);
         setExecutionQuote(liveQuote);
         setSourceIsNative(inputIsNative);
         setApprovalRequired(false);
@@ -410,7 +412,10 @@ export function LiquidityHubDeveloperContent({
         const nextApprovalRequired = !hasAllowance;
         setApprovalRequired(nextApprovalRequired);
 
-        const nextStep = sourceIsNative
+        const needsWrap = sourceIsNative && remainingWrapAmount(
+          BigInt(executionQuote?.inAmount ?? parsedInputAmount), wrappedAmountRef.current,
+        ) > BigInt(0);
+        const nextStep = needsWrap
           ? "wrap"
           : nextApprovalRequired
             ? "approve"
@@ -418,7 +423,7 @@ export function LiquidityHubDeveloperContent({
         advanceToStep(nextStep);
         toast.success("Allowance checked", {
           id: actionToastId,
-          description: sourceIsNative
+          description: needsWrap
             ? "Native input must be wrapped before signing."
             : nextApprovalRequired
               ? "Permit2 approval is required."
@@ -429,7 +434,14 @@ export function LiquidityHubDeveloperContent({
       }
 
       if (step === "wrap") {
-        await wrap(executionQuote?.inAmount ?? parsedInputAmount);
+        const amount = remainingWrapAmount(
+          BigInt(executionQuote?.inAmount ?? parsedInputAmount), wrappedAmountRef.current,
+        );
+        if (amount > BigInt(0)) {
+          const receipt = await wrap(amount.toString());
+          if (receipt.status !== "success") throw new Error("Native token wrapping reverted");
+          wrappedAmountRef.current += amount;
+        }
 
         advanceToStep(approvalRequired ? "approve" : "sign");
         toast.success("Native token wrapped", {
@@ -443,7 +455,7 @@ export function LiquidityHubDeveloperContent({
       }
 
       if (step === "approve") {
-        await approve();
+        if (!await ensureAllowance()) await approve();
 
         setApprovalRequired(false);
         advanceToStep("sign");
@@ -598,34 +610,26 @@ export function LiquidityHubDeveloperContent({
           ),
     [isRunning, liveFlowPhases, navigation.history],
   );
-  const handleSelectPhase = useCallback(
-    (phaseIndex: number) => {
-      if (isRunning) return;
+  const handleReturnToStep = useCallback((targetIndex: number) => {
+    if (isRunning) return;
+    const next = rewindFlow(navigation, targetIndex);
+    if (next === navigation) return;
+    if (next.history.at(-1) !== "swap") {
+      setSignature(undefined);
+      setTxHash(undefined);
+    }
+    setNavigation(next);
+  }, [isRunning, navigation]);
 
-      setNavigation((current) => {
-        let targetIndex = -1;
-        current.history.forEach((historyStep, historyIndex) => {
-          if (
-            getLiveFlowPhaseIndex(
-              historyStep,
-              liveFlowPhases,
-              "success",
-            ) === phaseIndex
-          ) {
-            targetIndex = historyIndex;
-          }
-        });
-
-        return targetIndex < 0
-          ? current
-          : { ...current, viewedIndex: targetIndex };
-      });
-    },
-    [isRunning, liveFlowPhases],
-  );
+  const handleSelectPhase = useCallback((phaseIndex: number) => {
+    const targetIndex = navigation.history.findLastIndex((historyStep) =>
+      getLiveFlowPhaseIndex(historyStep, liveFlowPhases, "success") === phaseIndex,
+    );
+    handleReturnToStep(targetIndex);
+  }, [handleReturnToStep, liveFlowPhases, navigation.history]);
 
   useEffect(() => {
-    if (!open) {
+    if (!open || viewedStep === "flow") {
       toast.dismiss(flowToastId);
       return;
     }
@@ -705,9 +709,7 @@ export function LiquidityHubDeveloperContent({
             data={presentation.data}
             codeSnippet={presentation.codeSnippet}
             codeScrollResetKey={viewedStep}
-            codeSnippetState={
-              isReviewingPreviousStep ? "review" : "active"
-            }
+            codeSnippetState="active"
             description=""
             explanation={presentation.explanation}
             explanationDisplay="tooltip"
@@ -717,11 +719,7 @@ export function LiquidityHubDeveloperContent({
               navigation.viewedIndex > 0 && !isRunning
                 ? {
                     ariaLabel: "View previous Liquidity Hub step",
-                    onClick: () =>
-                      setNavigation((current) => ({
-                        ...current,
-                        viewedIndex: Math.max(0, current.viewedIndex - 1),
-                      })),
+                    onClick: () => handleReturnToStep(navigation.viewedIndex - 1),
                   }
                 : undefined
             }
@@ -752,14 +750,6 @@ export function LiquidityHubDeveloperContent({
                     <Button
                       type="button"
                       onClick={() => {
-                        if (isReviewingPreviousStep) {
-                          setNavigation((current) => ({
-                            ...current,
-                            viewedIndex: current.history.length - 1,
-                          }));
-                          return;
-                        }
-
                         if (step === "success") {
                           handleOpenChange(false);
                           return;
@@ -768,18 +758,15 @@ export function LiquidityHubDeveloperContent({
                         void executeCurrentStep();
                       }}
                       disabled={
-                        !isReviewingPreviousStep &&
                         step !== "success" &&
                         (Boolean(disabledReason) || isRunning)
                       }
-                      isLoading={!isReviewingPreviousStep && isRunning}
+                      isLoading={isRunning}
                     >
-                      {!isReviewingPreviousStep && step === "success" ? (
+                      {step === "success" ? (
                         <CheckIcon aria-hidden="true" className="size-4" />
                       ) : null}
-                      {isReviewingPreviousStep
-                        ? "Return to current step"
-                        : actionLabel}
+                      {actionLabel}
                     </Button>
                   )}
                 </div>
