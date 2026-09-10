@@ -1,7 +1,9 @@
 "use client";
 import React, { Suspense, useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import { darkTheme, lightTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import { useTheme } from "./theme";
+import { getThemeStyles } from "./partners/themes";
 import { Spinner } from "@/components/ui/spinner";
 import dynamic from "next/dynamic";
 import { useConnect, useConnection, useReconnect, WagmiProvider } from "wagmi";
@@ -184,6 +186,12 @@ export function Providers({
   partnerBrand: PartnerBrand;
   partnerStyles: PartnerStyles;
 }) {
+  const { theme } = useTheme();
+  const themeStyles = getThemeStyles(partnerStyles, theme);
+  useEffect(() => {
+    const background = getComputedStyle(document.documentElement).getPropertyValue("--background").trim();
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background);
+  }, [theme]);
   return (
     <Suspense fallback={<Fallback />}>
       <QueryProvider>
@@ -191,9 +199,9 @@ export function Providers({
           <QueryClientProvider client={queryClient}>
             <WalletReturnReconnect />
             <RainbowKitProvider
-              theme={darkTheme({
-                accentColor: partnerStyles.colors.primary,
-                accentColorForeground: partnerStyles.colors.primaryForeground,
+              theme={(theme === "dark" ? darkTheme : lightTheme)({
+                accentColor: themeStyles.colors.primary,
+                accentColorForeground: themeStyles.colors.primaryForeground,
                 borderRadius: "small",
                 fontStack: "system",
                 overlayBlur: "small",

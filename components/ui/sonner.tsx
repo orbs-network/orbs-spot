@@ -1,6 +1,7 @@
 "use client"
 
 import type { CSSProperties } from "react"
+import { useTheme } from "@/lib/theme"
 import {
   CircleCheckIcon,
   InfoIcon,
@@ -13,9 +14,10 @@ import { Toaster as Sonner, type ToasterProps } from "sonner"
 const TOAST_Z_INDEX = 100
 
 const Toaster = ({ ...props }: ToasterProps) => {
+  const { theme } = useTheme()
   return (
     <Sonner
-      theme="light"
+      theme={theme}
       className="toaster group"
       position="top-right"
       closeButton

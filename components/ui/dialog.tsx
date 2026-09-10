@@ -80,7 +80,7 @@ function DialogOverlay({
       data-slot="dialog-overlay"
       className={cn(
         "fixed inset-0 z-50 bg-black/50",
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:duration-200 data-[state=closed]:duration-150 data-[state=open]:ease-out data-[state=closed]:ease-in",
+        "dialog-overlay-motion",
         className
       )}
       {...props}
@@ -110,7 +110,7 @@ function DialogContent({
   const drawerMotionClasses =
     "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom data-[state=open]:duration-200 data-[state=closed]:duration-150 data-[state=open]:ease-out data-[state=closed]:ease-in sm:data-[state=open]:zoom-in-95 sm:data-[state=closed]:zoom-out-95"
   const centerMotionClasses =
-    "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[state=open]:duration-200 data-[state=closed]:duration-150 data-[state=open]:ease-out data-[state=closed]:ease-in"
+    "dialog-center-motion"
   const desktopContentClasses = cn(
     "fixed z-50 grid gap-4 overflow-hidden overscroll-contain border border-border/80 bg-card/98 text-card-foreground",
     presentation === "center" ? centerClasses : drawerClasses,

@@ -6,7 +6,7 @@ import { Navigation } from "@/components/navigation";
 import "@rainbow-me/rainbowkit/styles.css";
 import { Toaster } from "@/components/ui/sonner";
 import { getActivePartnerConfig } from "@/lib/partners/server";
-import { getPartnerStyleVariables } from "@/lib/partners/styles";
+import { getDefaultTheme, getPartnerThemeCss } from "@/lib/partners/themes";
 import type { PartnerBrand } from "@/lib/partners/types";
 
 function getIconType(url: string) {
@@ -76,11 +76,12 @@ export default function RootLayout({
   const partner = getActivePartnerConfig();
 
   return (
-    <html lang="en" data-partner={partner.id}>
-      <body
-        className="antialiased dark"
-        style={getPartnerStyleVariables(partner.styles)}
-      >
+    <html lang="en" data-partner={partner.id} className={getDefaultTheme(partner.styles)} suppressHydrationWarning>
+      <head>
+        <style dangerouslySetInnerHTML={{ __html: getPartnerThemeCss(partner.styles) }} />
+        <script dangerouslySetInnerHTML={{ __html: `try{const t=localStorage.getItem("orbs-color-theme");if(t==="light"||t==="dark")document.documentElement.className=t;}catch{}` }} />
+      </head>
+      <body className="antialiased">
         <Providers
           partnerBrand={partner.brand}
           partnerStyles={partner.styles}

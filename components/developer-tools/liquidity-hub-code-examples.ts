@@ -51,15 +51,14 @@ function formatJsonObject(value: Record<string, JsonValue>): string {
 export function formatLiquidityHubSetupCode(data: JsonContainer): string {
   const { chainId, partner } = getExampleParams(data);
 
-  return `import { constructSDK } from "@orbs-network/liquidity-hub-sdk";
+  return `import { createClient } from "@orbs-network/liquidity-hub-sdk";
 
 const chainId = ${chainId};
 ${formatLiquidityHubPartnerDeclaration(partner)}
 
-export const liquidityHub = constructSDK({
+export const liquidityHub = createClient({
   chainId,
   partner,
-  blockAnalytics: false,
 });`;
 }
 
@@ -78,30 +77,7 @@ export type LiquidityHubQuote = Quote & {
 }
 
 export function formatLiquidityHubPermitSigningCode(): string {
-  return `import type { Quote } from "@orbs-network/liquidity-hub-sdk";
-import { useMutation } from "@tanstack/react-query";
-import { useAccount } from "wagmi";
-
-import { useSignTypedDataPayload } from "./use-sign-typed-data";
-
-export const useSignEip = () => {
-  const { mutateAsync: signTypedData } = useSignTypedDataPayload();
-  const { address: account } = useAccount();
-
-  return useMutation({
-    mutationFn: async (quote: Quote) => {
-      const permitData = quote.eip712;
-      const signature = await signTypedData({
-        domain: permitData.domain,
-        types: permitData.types,
-        primaryType: permitData.primaryType,
-        message: permitData.message,
-        account,
-      });
-      return signature;
-    },
-  });
-};`;
+  return formatLiquidityHubSdkStep("sign");
 }
 
 export function formatLiquidityHubCurrentQuoteCode(
@@ -121,12 +97,12 @@ export function formatLiquidityHubGetLatestQuoteCode(
   const quotePayload = getRecord(root.quote);
   const { chainId, partner } = getExampleParams(data);
 
-  return `import { constructSDK, isFreshQuote } from "@orbs-network/liquidity-hub-sdk";
+  return `import { createClient, isFreshQuote } from "@orbs-network/liquidity-hub-sdk";
 import type { LiquidityHubQuote } from "./types";
 
 const chainId = ${chainId};
 ${formatLiquidityHubPartnerDeclaration(partner)}
-const liquidityHub = constructSDK({ chainId, partner });
+const liquidityHub = createClient({ chainId, partner });
 let quotePayload = ${formatJsonObject(quotePayload)} as LiquidityHubQuote;
 
 export function getLatestQuote(): LiquidityHubQuote | Promise<LiquidityHubQuote> {
@@ -169,56 +145,20 @@ Latest quote flow
 }
 
 export function formatLiquidityHubQuoteCode(data: JsonContainer): string {
-  const { quoteArgs } = getExampleParams(data);
-  const serializedQuoteArgs = formatTypeScriptObject(quoteArgs);
-
-  return `import { useCallback } from "react";
-import { liquidityHub } from "./liquidity-hub";
-import type {
-  LiquidityHubQuote,
-  LiquidityHubQuoteArgs,
-} from "./liquidity-hub-types";
-
-const quoteArgs = ${serializedQuoteArgs} satisfies LiquidityHubQuoteArgs;
-
-export function useFetchLiquidityHubQuote() {
-  return useCallback(async () => {
-    const quote = await getLiquidityHubQuote();
-
-    const selectedRoute = quoteArgs.dexMinAmountOut && quoteArgs.dexMinAmountOut !== "-1"
-      ? BigInt(quote.minAmountOut) > BigInt(quoteArgs.dexMinAmountOut)
-        ? "liquidity-hub"
-        : "dex"
-      : "no-dex-quote";
-
-    return { quote, selectedRoute };
-  }, []);
-}
-
-async function getLiquidityHubQuote(): Promise<LiquidityHubQuote> {
-  return liquidityHub.getQuote(quoteArgs);
-}
-
-/*
-Quote flow
-
-1. Build quoteArgs from the quote data already owned by the DEX swap form.
-2. Use the wrapped ERC-20 address when the DEX source is native currency.
-3. Fetch the Liquidity Hub quote and compare protected minimum outputs.
-*/`;
+  return formatLiquidityHubLiveQuoteCode(data);
 }
 
 export function formatLiquidityHubLiveQuoteCode(data: JsonContainer): string {
   const { chainId, partner, quoteArgs } = getExampleParams(data);
   const serializedQuoteArgs = formatTypeScriptObject(quoteArgs);
 
-  return `import { constructSDK } from "@orbs-network/liquidity-hub-sdk";
+  return `import { createClient } from "@orbs-network/liquidity-hub-sdk";
 import type { LiquidityHubQuote, LiquidityHubQuoteArgs } from "./types";
 
 const chainId = ${chainId}; // Use the connected wallet's active chain ID.
 ${formatLiquidityHubPartnerDeclaration(partner)}
 const quoteArgs = ${serializedQuoteArgs} satisfies LiquidityHubQuoteArgs;
-const liquidityHub = constructSDK({ chainId, partner });
+const liquidityHub = createClient({ chainId, partner });
 
 export async function getLiquidityHubQuote(): Promise<LiquidityHubQuote> {
   return liquidityHub.getQuote(quoteArgs);
@@ -231,33 +171,6 @@ Quote flow
 2. Use the wrapped ERC-20 address when the selected source is native currency.
 3. Fetch and preserve the complete wallet-bound Liquidity Hub quote.
 */`;
-}
-
-function getFlowValues(data: JsonContainer) {
-  const root = Array.isArray(data) ? {} : data;
-  const quoteArgs = getRecord(root.quoteArgs);
-  const quote = getRecord(root.quote);
-
-  return {
-    account: getString(
-      quote.user ?? quoteArgs.account,
-      "<connected-wallet-address>",
-    ),
-    inAmount: getString(
-      quote.inAmount ?? quoteArgs.inAmount,
-      "<input-amount-base-units>",
-    ),
-    inputIsNative: root.inputIsNative === true,
-    inputToken: getString(
-      quote.inToken ?? quoteArgs.fromToken,
-      "<wrapped-input-token-address>",
-    ),
-    minAmountOut: getString(
-      quote.minAmountOut,
-      "<liquidity-hub-min-output>",
-    ),
-    sessionId: getString(quote.sessionId, "<liquidity-hub-session-id>"),
-  };
 }
 
 function getLiveFlowCodeValues(data: JsonContainer) {
@@ -275,253 +188,43 @@ function getLiveFlowCodeValues(data: JsonContainer) {
   };
 }
 
-export function formatLiquidityHubWrapCode(data: JsonContainer): string {
-  const {
-    account,
-    inAmount,
-    inputIsNative: sourceIsNative,
-    inputToken,
-  } = getFlowValues(data);
-
-  return `import { useCallback } from "react";
-import { parseAbi, type Address } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
-
-const sourceIsNative = ${sourceIsNative};
-const wrappedInputToken = ${JSON.stringify(inputToken)} as Address;
-const inAmount = ${JSON.stringify(inAmount)};
-const account = ${JSON.stringify(account)} as Address;
-const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
-
-export function useWrapLiquidityHubInput() {
-  const publicClient = usePublicClient()!;
-  const walletClient = useWalletClient().data!;
-
-  return useCallback(async () => {
-    if (!sourceIsNative) return;
-    const txHash = await walletClient.writeContract({
-      address: wrappedInputToken,
-      abi: wrappedNativeAbi,
-      functionName: "deposit",
-      value: BigInt(inAmount),
-      account,
-      chain: walletClient.chain,
-    });
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-    if (receipt.status !== "success") throw new Error("Native token wrap reverted");
-    return txHash;
-  }, [publicClient, walletClient]);
-}`;
+export function formatLiquidityHubWrapCode(): string {
+  return formatLiquidityHubSdkStep("wrap");
 }
 
-export function formatLiquidityHubApprovalCode(data: JsonContainer): string {
-  const { account, inAmount, inputToken } = getFlowValues(data);
-
-  return `import { permit2Address } from "@orbs-network/liquidity-hub-sdk";
-import { useCallback } from "react";
-import { erc20Abi, type Address } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
-
-const inputToken = ${JSON.stringify(inputToken)} as Address;
-const requiredAmount = ${JSON.stringify(inAmount)};
-const account = ${JSON.stringify(account)} as Address;
-
-export function useApproveLiquidityHubInput() {
-  const publicClient = usePublicClient()!;
-  const walletClient = useWalletClient().data!;
-
-  return useCallback(async () => {
-    const txHash = await walletClient.writeContract({
-      address: inputToken,
-      abi: erc20Abi,
-      functionName: "approve",
-      // This reference approves the exact quoted input amount.
-      args: [permit2Address as Address, BigInt(requiredAmount)],
-      account,
-      chain: walletClient.chain,
-    });
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-    if (receipt.status !== "success") throw new Error("Permit2 approval reverted");
-    return txHash;
-  }, [publicClient, walletClient]);
-}`;
+export function formatLiquidityHubApprovalCode(): string {
+  return formatLiquidityHubSdkStep("approve");
 }
 
-export function formatLiquidityHubAllowanceCode(data: JsonContainer): string {
-  const { account, inAmount, inputToken } = getFlowValues(data);
+export function formatLiquidityHubAllowanceCode(data: JsonContainer = {}): string {
+  const root = Array.isArray(data) ? {} : data;
+  const quote = getRecord(root.quote);
+  const quoteArgs = getRecord(root.quoteArgs);
+  const code = formatLiquidityHubSdkStep("check");
+  if (!Object.keys(quote).length && !Object.keys(quoteArgs).length) return code;
+  const token = getString(quote.inToken, getString(quoteArgs.fromToken, DEFAULT_INPUT_TOKEN));
+  const account = getString(quote.user, getString(quoteArgs.account, DEFAULT_ACCOUNT));
+  const amount = getString(quote.inAmount, getString(quoteArgs.inAmount, "0"));
+  return code
+    .replace("  account: Address,", `  account: Address, // ${JSON.stringify(account)}`)
+    .replace("  token: Address,", `  token: Address, // ${JSON.stringify(token)}`)
+    .replace("  spender: Address,", '  spender: Address, // Permit2: 0x000000000022D473030F116dDEE9F6B43aC78BA3')
+    .replace("  amount: bigint,", `  amount: bigint, // ${JSON.stringify(amount)} (token base units)`);
 
-  return `import { permit2Address } from "@orbs-network/liquidity-hub-sdk";
-import { useCallback } from "react";
-import { erc20Abi, type Address } from "viem";
-import { usePublicClient } from "wagmi";
-
-const inputToken = ${JSON.stringify(inputToken)} as Address;
-const requiredAmount = ${JSON.stringify(inAmount)};
-const account = ${JSON.stringify(account)} as Address;
-
-export function useCheckLiquidityHubAllowance() {
-  const publicClient = usePublicClient()!;
-
-  return useCallback(async () => {
-    const allowance = await publicClient.readContract({
-      address: inputToken,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [account, permit2Address as Address],
-    });
-
-    return {
-      allowance: allowance.toString(),
-      approvalRequired: allowance < BigInt(requiredAmount),
-    };
-  }, [publicClient]);
-}`;
 }
 
 export function formatLiquidityHubSignCode(): string {
-  return `import { useCallback } from "react";
-import { getLatestQuote } from "./get-latest-quote";
-import { useSignEip } from "./use-sign-eip";
-
-export function useSignLiquidityHubQuote() {
-  const { mutateAsync: signQuote } = useSignEip();
-
-  return useCallback(async () => {
-    const quote = await getLatestQuote();
-    const signature = await signQuote(quote);
-
-    return { quote, signature };
-  }, [signQuote]);
-}`;
+  return formatLiquidityHubSdkStep("sign");
 }
 
-export function formatLiquidityHubSwapAndConfirmCode(
-  data: JsonContainer,
-): string {
-  const { chainId, partner } = getExampleParams(data);
-  const { signature } = getLiveFlowCodeValues(data);
-
-  return `import { constructSDK } from "@orbs-network/liquidity-hub-sdk";
-import { useCallback } from "react";
-import type { Hash } from "viem";
-import { usePublicClient } from "wagmi";
-import { getLatestQuote } from "./get-latest-quote";
-
-const chainId = ${chainId};
-${formatLiquidityHubPartnerDeclaration(partner)}
-const liquidityHub = constructSDK({ chainId, partner });
-const signature = ${JSON.stringify(signature)};
-
-export function useSwapAndConfirmLiquidityHub() {
-  const publicClient = usePublicClient();
-
-  return useCallback(async () => {
-    const quote = await getLatestQuote();
-    try {
-      const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
-      const receipt = await publicClient!.waitForTransactionReceipt({ hash: txHash });
-      if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
-      const details = await liquidityHub.getTransactionDetails(txHash, quote);
-      liquidityHub.analytics.swap.onSuccess();
-
-      return { details, receipt, txHash };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      liquidityHub.analytics.swap.onFailed(message);
-      throw error;
-    }
-  }, [publicClient]);
-}`;
+export function formatLiquidityHubSwapAndConfirmCode(): string {
+  return formatLiquidityHubSdkStep("swap");
 }
 
 export const formatLiquidityHubFullFlowCode = formatLiquidityHubSdkFlow;
 
-export function formatLiquidityHubSwapCode(data: JsonContainer): string {
-  const { inputIsNative } = getExampleParams(data);
-
-  return `import { permit2Address } from "@orbs-network/liquidity-hub-sdk";
-import { useCallback } from "react";
-import { erc20Abi, parseAbi, type Address, type Hash } from "viem";
-import { useConnection, usePublicClient, useWalletClient } from "wagmi";
-
-import { liquidityHub } from "./liquidity-hub";
-import { currentLiquidityHubQuote } from "./liquidity-hub-quote";
-import { useSignEip } from "./use-sign-eip";
-
-const sourceIsNative = ${inputIsNative};
-const wrappedNativeAbi = parseAbi(["function deposit() payable"]);
-
-export function useExecuteLiquidityHubRoute() {
-  const { address: account } = useConnection();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
-  const { mutateAsync: signQuote } = useSignEip();
-
-  return useCallback(async () => {
-    // The host already selected Liquidity Hub before opening this submit flow.
-    const quote = currentLiquidityHubQuote;
-
-    if (sourceIsNative) {
-      const wrapHash = await walletClient.writeContract({
-        address: quote.inToken as Address,
-        abi: wrappedNativeAbi,
-        functionName: "deposit",
-        value: BigInt(quote.inAmount),
-        account,
-        chain: walletClient.chain,
-      });
-      const wrapReceipt = await publicClient.waitForTransactionReceipt({ hash: wrapHash });
-      if (wrapReceipt.status !== "success") throw new Error("Native token wrap reverted");
-    }
-
-    const allowance = await publicClient.readContract({
-      address: quote.inToken as Address,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [account, permit2Address as Address],
-    });
-    if (allowance < BigInt(quote.inAmount)) {
-      const approvalHash = await walletClient.writeContract({
-        address: quote.inToken as Address,
-        abi: erc20Abi,
-        functionName: "approve",
-        args: [permit2Address as Address, BigInt(quote.inAmount)],
-        account,
-        chain: walletClient.chain,
-      });
-      const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
-      if (approvalReceipt.status !== "success") throw new Error("Permit2 approval reverted");
-    }
-
-    const signature = await signQuote(quote);
-    const txHash = await (liquidityHub.swap(quote, signature) as Promise<Hash>);
-
-    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-    if (receipt.status !== "success") throw new Error("Liquidity Hub swap reverted");
-    return {
-      quote,
-      receipt,
-      signature,
-      txHash,
-    };
-  }, [account, publicClient, signQuote, walletClient]);
-}
-
-/*
-Liquidity Hub swap flow
-
-1. Start with the Liquidity Hub quote already selected by the host review flow.
-2. Liquidity Hub does not support a native asset as inToken. When the DEX source
-   is native, use its wrapped ERC-20 address in the quote, wrap quote.inAmount
-   into quote.inToken, and wait for the transaction to confirm.
-3. Read the quote input token's Permit2 allowance. When it is insufficient,
-   approve Permit2 and wait for confirmation.
-4. Pass the existing quote unchanged to signQuote(). useSignEip reads and signs
-   the SDK-returned, wallet-ready quote.eip712 payload.
-5. Pass the same quote and signature to liquidityHub.swap().
-6. Wait for the returned transaction hash to receive an on-chain receipt.
-*/
-`;
+export function formatLiquidityHubSwapCode(): string {
+  return formatLiquidityHubSdkStep("swap");
 }
 
 const COMPACT_TYPES_FILE: CodeSnippetFileOptions = {
@@ -569,7 +272,7 @@ export const LIQUIDITY_HUB_APPROVAL_CODE_SNIPPET: CodeSnippetOptions = {
 export const LIQUIDITY_HUB_ALLOWANCE_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "check.ts",
-  format: () => formatLiquidityHubSdkStep("check"),
+  format: formatLiquidityHubAllowanceCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
@@ -578,6 +281,8 @@ export const LIQUIDITY_HUB_SIGN_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "sign.ts",
   format: () => formatLiquidityHubSdkStep("sign"),
+  formatEdit: (data) => formatLiquidityHubSdkStep("sign", data),
+  inlineEditable: true,
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
@@ -625,11 +330,9 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   "quoteArgs.timeout":
     "An optional quote-request timeout override expressed in milliseconds.",
   "quoteArgs.inAmountUsd":
-    "Optional USD value of the source amount used for analytics and diagnostics.",
+    "Optional USD value of the source amount.",
   "quoteArgs.disabled":
-    "Host-controlled state that marks this quote stage disabled in SDK analytics.",
-  quote:
-    "The complete wallet-bound Liquidity Hub quote. Preserve it unchanged through signing and swap submission.",
+    "Deprecated. Prevent disabled quote requests in the host application instead.",
   inToken: "The wrapped ERC-20 input token used by the accepted quote.",
   outToken: "The ERC-20 output token returned by the quote.",
   inAmount: "The quoted input amount in base units.",
@@ -685,7 +388,7 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   "permitData.values.witness":
     "The raw Dutch-order witness bound to the Permit2 authorization.",
   eip712:
-    "The SDK-provided, wallet-ready EIP-712 payload signed directly by useSignEip.",
+    "The SDK-provided, wallet-ready EIP-712 payload signed directly by walletClient.signTypedData.",
   "eip712.domain":
     "The wallet-ready EIP-712 domain for the Permit2 signature.",
   "eip712.types":

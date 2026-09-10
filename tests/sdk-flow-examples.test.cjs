@@ -20,6 +20,124 @@ const liquidityHub = load('liquidity-hub-code-examples');
 const examples = load('sdk-flow-examples');
 const normalize = (code) => code.split('\n').map((line) => line.trim()).filter(Boolean).join('\n');
 
+test('Liquidity Hub signing expands the message only for editing and signs the edited values', async () => {
+  const snippet = liquidityHub.LIQUIDITY_HUB_SIGN_CODE_SNIPPET;
+  const data = { message: { permitted: { token: '0x1111111111111111111111111111111111111111', amount: '42' }, nonce: '7' } };
+  const view = snippet.format(data);
+  assert.equal(snippet.inlineEditable, true);
+  assert.match(view, /async function signQuote\(quote: Quote, account: Address, refetchQuote:/);
+  assert.match(view, /message: quote.eip712.message,/);
+  assert.doesNotMatch(view, /"permitted"/);
+  data.message.permitted.amount = '99';
+  const edit = snippet.formatEdit(data);
+  assert.match(edit, /\/\/ message: quote.eip712.message,/);
+  const compiled = ts.transpileModule(edit, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+  let signed;
+  const quote = { eip712: { domain: { name: 'Permit2' }, types: {}, primaryType: 'PermitWitnessTransferFrom', message: {} } };
+  await vm.runInNewContext(`${compiled}\nsignQuote(quote, '0x2222222222222222222222222222222222222222')`, {
+    quote,
+    exports: {},
+    window: { ethereum: {} },
+    require: (name) => {
+      if (name === '@orbs-network/liquidity-hub-sdk') return { isFreshQuote: () => true };
+      assert.equal(name, 'viem');
+      return {
+        custom: (provider) => provider,
+        createWalletClient: () => ({ signTypedData: async (args) => { signed = args; return '0x1234'; } }),
+      };
+    },
+  });
+  assert.equal(signed.message.permitted.amount, '99');
+  assert.equal(signed.domain, quote.eip712.domain);
+});
+
+test('signing refetches only stale quotes and returns the signed quote', async () => {
+  const code = liquidityHub.LIQUIDITY_HUB_SIGN_CODE_SNIPPET.format({});
+  const compiled = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+  for (const [fresh, minimum] of [[true, '9007199254740993'], [false, '9007199254740993'], [false, '9007199254740994'], [false, '9007199254740992']]) {
+    const original = { minAmountOut: '9007199254740993', eip712: { message: { nonce: '1' } } };
+    const replacement = { minAmountOut: minimum, eip712: { message: { nonce: '2' } } };
+    let refetches = 0;
+    let signed;
+    const pending = vm.runInNewContext(`${compiled}\nsignQuote(quote, '0x1234', refetchQuote)`, {
+      quote: original,
+      refetchQuote: async () => { refetches += 1; return replacement; },
+      exports: {},
+      window: { ethereum: {} },
+      require: (name) => name === '@orbs-network/liquidity-hub-sdk'
+        ? { isFreshQuote: (quote, seconds) => { assert.equal(seconds, 60); return fresh; } }
+        : { custom: (provider) => provider, createWalletClient: () => ({ signTypedData: async (args) => { signed = args; return '0x1234'; } }) },
+    });
+    if (!fresh && BigInt(minimum) < BigInt(original.minAmountOut)) {
+      await assert.rejects(pending, /Please approve the new price before signing/);
+      assert.equal(signed, undefined);
+      assert.equal(refetches, 1);
+      continue;
+    }
+    const result = await pending;
+    assert.equal(refetches, fresh ? 0 : 1);
+    assert.equal(result.quote, fresh ? original : replacement);
+    assert.equal(signed.message, result.quote.eip712.message);
+    assert.equal(result.signature, '0x1234');
+  }
+});
+
+test('the allowance step reads the displayed quote values and compares the required amount', async () => {
+  const quote = {
+    inToken: '0x1111111111111111111111111111111111111111',
+    user: '0x2222222222222222222222222222222222222222',
+    inAmount: '12345678901234567890',
+  };
+  const code = liquidityHub.LIQUIDITY_HUB_ALLOWANCE_CODE_SNIPPET.format({
+    quote,
+    quoteArgs: { fromToken: 'old-token', account: 'old-account', inAmount: '1' },
+  });
+  assert.match(code, /account: Address, \/\//);
+  assert.doesNotMatch(code, /const PERMIT2_ADDRESS|await approveTokenIfNeeded\(/);
+  for (const allowance of [BigInt(quote.inAmount) - 1n, BigInt(quote.inAmount)]) {
+    let request;
+    let approvals = 0;
+    const compiled = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+    await vm.runInNewContext(`${compiled}\napproveTokenIfNeeded(quote.user, quote.inToken, "0x000000000022D473030F116dDEE9F6B43aC78BA3", BigInt(quote.inAmount))`, {
+      quote,
+      erc20Abi: [],
+      publicClient: { readContract: async (args) => { request = args; return approvals ? BigInt(quote.inAmount) : allowance; } },
+      walletClient: { writeContract: async (args) => { approvals += 1; assert.equal(args.functionName, "approve"); assert.equal(args.args[1], BigInt(quote.inAmount)); return "0x1234"; } },
+      waitForTransactionConfirmation: async () => ({}),
+    });
+    assert.equal(request.address, quote.inToken);
+    assert.equal(request.functionName, 'allowance');
+    assert.deepEqual(Array.from(request.args), [quote.user, '0x000000000022D473030F116dDEE9F6B43aC78BA3']);
+    assert.equal(approvals, allowance >= BigInt(quote.inAmount) ? 0 : 1);
+  }
+});
+
+test('the generated Liquidity Hub flow type-checks against the installed SDK', () => {
+  const file = path.resolve(__dirname, '../liquidity-hub.generated.ts');
+  const source = examples.formatLiquidityHubSdkFlow({ chainId: 137, partner: 'playground' });
+  const options = {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    strict: true,
+    skipLibCheck: true,
+    noEmit: true,
+    types: [],
+  };
+  const host = ts.createCompilerHost(options);
+  const getSourceFile = host.getSourceFile.bind(host);
+  host.getSourceFile = (name, languageVersion, ...args) => name === file
+    ? ts.createSourceFile(name, source, languageVersion, true)
+    : getSourceFile(name, languageVersion, ...args);
+  const program = ts.createProgram([file], options, host);
+  const diagnostics = ts.getPreEmitDiagnostics(program);
+  assert.equal(diagnostics.length, 0, ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+    getCurrentDirectory: () => process.cwd(),
+    getCanonicalFileName: (name) => name,
+    getNewLine: () => '\n',
+  }));
+});
+
 for (const [label, module, fullFlow, names] of [
   ['Advanced Orders', advanced, examples.ADVANCED_ORDERS_SDK_FLOW, [
     'LIVE_CHECK_APPROVAL_CODE_SNIPPET', 'LIVE_WRAP_NATIVE_TOKEN_CODE_SNIPPET',
@@ -39,9 +157,17 @@ for (const [label, module, fullFlow, names] of [
       assert.doesNotMatch(code, /\buse[A-Z]\w*|from ["'](?:react|wagmi|@orbs-network\/spot-react)["']/);
       const excerptCode = name === 'SIGNATURE_EXAMPLE_CODE_SNIPPET'
         ? code.slice(code.indexOf('const prepared = client.prepareOrder('), code.indexOf('  return { prepared, signature };'))
+        : name === 'LIQUIDITY_HUB_SIGN_CODE_SNIPPET'
+        ? code.slice(code.indexOf('async function signQuote('))
+        : name === 'LIQUIDITY_HUB_SWAP_AND_CONFIRM_CODE_SNIPPET'
+        ? code.slice(code.indexOf('const publicClient ='))
         : code.split('\n').slice(1).join('\n');
-      const excerpt = normalize(excerptCode);
-      assert.ok(full.includes(excerpt), `${name} should match its full-flow section`);
+      const excerpts = name === 'LIQUIDITY_HUB_SWAP_AND_CONFIRM_CODE_SNIPPET'
+        ? excerptCode.split('\n\n')
+        : [excerptCode];
+      for (const excerpt of excerpts) {
+        assert.ok(full.includes(normalize(excerpt)), `${name} should match its full-flow section`);
+      }
       for (const file of snippet.files ?? []) {
         assert.doesNotMatch(file.format({}), /\buse[A-Z]\w*|from ["'](?:react|wagmi)["']/);
       }
@@ -96,4 +222,18 @@ test('the message expands only in edit mode', () => {
   assert.doesNotMatch(view, /"permitted":/);
   assert.match(edit, /"permitted":/);
   assert.match(edit, /\/\/ message: message.message,/);
+});
+
+test('all Liquidity Hub generators and supporting files are TypeScript without React hooks', () => {
+  const noReact = /\buse[A-Z]\w*|from ["'](?:react|wagmi|@tanstack\/react-query)["']/;
+  for (const [name, value] of Object.entries(liquidityHub)) {
+    if (name.startsWith('formatLiquidityHub') && typeof value === 'function') {
+      assert.doesNotMatch(value({}), noReact, name);
+    }
+    if (name.endsWith('_CODE_SNIPPET')) {
+      assert.equal(value.language, 'TypeScript', name);
+      assert.doesNotMatch(value.format({}), noReact, name);
+      for (const file of value.files ?? []) assert.doesNotMatch(file.format({}), noReact, file.name);
+    }
+  }
 });

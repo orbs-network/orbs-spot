@@ -1,6 +1,7 @@
 "use client";
 
 import { remainingWrapAmount, rewindFlow } from "./flow-navigation";
+import { QuotePriceChangeDialog } from "./quote-price-change-dialog";
 
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
@@ -22,6 +23,8 @@ import { toast } from "sonner";
 import { useConnection } from "wagmi";
 
 import { Button } from "@/components/ui/button";
+import { getSpotDocsHref } from "@/lib/developer-docs";
+import { DeveloperGuideLink } from "./developer-guide-link";
 import {
   Dialog,
   DialogContent,
@@ -95,8 +98,8 @@ type LiquidityHubFlowPhase = LiveFlowPhase<LiquidityHubFlowStep>;
 const EMPTY_QUOTE_RESPONSE = {} satisfies JsonContainer;
 
 const ALLOWANCE_PHASE: LiquidityHubFlowPhase = {
-  effect: "Read only",
-  label: "Allowance",
+  effect: "Wallet transaction if needed",
+  label: "Approve token",
   step: "check",
 };
 const WRAP_PHASE: LiquidityHubFlowPhase = {
@@ -110,8 +113,8 @@ const APPROVE_PHASE: LiquidityHubFlowPhase = {
   step: "approve",
 };
 const SIGN_PHASE: LiquidityHubFlowPhase = {
-  effect: "Freshness check + wallet signature",
-  label: "Get latest & sign",
+  effect: "Review message + wallet signature",
+  label: "Sign quote",
   step: "sign",
 };
 const SWAP_PHASE: LiquidityHubFlowPhase = {
@@ -122,10 +125,10 @@ const SWAP_PHASE: LiquidityHubFlowPhase = {
 
 const STEP_ACTION_LABELS: Record<LiquidityHubFlowStep, string> = {
   flow: "Start",
-  check: "Check allowance",
+  check: "Approve token if needed",
   wrap: "Wrap token",
   approve: "Approve token",
-  sign: "Get latest & sign",
+  sign: "Sign quote",
   swap: "Swap & confirm",
   success: "Close",
 };
@@ -135,10 +138,10 @@ const STEP_LOADING_MESSAGES: Record<
   string
 > = {
   flow: "Starting the Liquidity Hub flow…",
-  check: "Reading the current Permit2 allowance…",
+  check: "Checking Permit2 allowance and approving if needed…",
   wrap: "Waiting for the native-token wrap transaction…",
   approve: "Waiting for the Permit2 approval transaction…",
-  sign: "Checking quote freshness and waiting for its signature…",
+  sign: "Waiting for the quote signature…",
   swap: "Submitting the signed quote and waiting for confirmation…",
 };
 
@@ -181,7 +184,7 @@ function getPresentation({
       data,
       explanation:
         "Use the TypeScript SDK to refresh, sign, and execute the selected quote, with wrapping and approval when needed.",
-      title: "Liquidity Hub SDK flow",
+      title: "Liquidity Hub TypeScript SDK flow",
     };
   }
   if (step === "check") {
@@ -189,8 +192,8 @@ function getPresentation({
       codeSnippet: LIQUIDITY_HUB_ALLOWANCE_CODE_SNIPPET,
       data,
       explanation:
-        "Read the input token’s current Permit2 allowance and compare it with the quoted input amount. This step is read-only and does not open the wallet.",
-      title: "Check Permit2 allowance",
+        "Check the input token’s Permit2 allowance. If it is below the quoted input amount, approve the token and wait for confirmation.",
+      title: "Approve token if needed",
     };
   }
   if (step === "wrap") {
@@ -212,12 +215,13 @@ function getPresentation({
     };
   }
   if (step === "sign") {
+    const quote = asRecord(asRecord(data).quote);
     return {
       codeSnippet: LIQUIDITY_HUB_SIGN_CODE_SNIPPET,
-      data,
+      data: { message: asRecord(asRecord(quote.eip712).message) },
       explanation:
-        "Call getLatestQuote() immediately before signing. It returns the current payload when isFreshQuote() passes or fetches a replacement, then keeps that exact quote paired with its signature for swap.",
-      title: "Get the latest quote and sign",
+        "signQuote() refetches the quote if it is stale before signing. Click Edit to inspect and change quote.eip712.message, then save before signing. Submit the same quote with its signature.",
+      title: "Sign the quote",
     };
   }
   if (step === "swap") {
@@ -254,7 +258,6 @@ export function LiquidityHubDeveloperContent({
     isLoadingTrade,
     outputCurrency,
     parsedInputAmount,
-    refetchTrade,
     trade,
   } = useDerivedSwap();
   const liquidityHub = useLiquidityHub();
@@ -277,6 +280,7 @@ export function LiquidityHubDeveloperContent({
     viewedIndex: 0,
   });
   const [executionQuote, setExecutionQuote] = useState<Quote>();
+  const [priceChange, setPriceChange] = useState<{ previous: Quote; next: Quote }>();
   const [sourceIsNative, setSourceIsNative] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
@@ -322,6 +326,15 @@ export function LiquidityHubDeveloperContent({
     [executionQuote, liveQuote],
   );
   const quoteData = currentQuote ?? EMPTY_QUOTE_RESPONSE;
+  const handleSaveSigningMessage = useCallback((data: JsonContainer) => {
+    const quote = executionQuote ?? liveQuote;
+    const message = asRecord(data).message;
+    if (!quote || !message || typeof message !== "object" || Array.isArray(message)) {
+      throw new Error("A quote and an EIP-712 message object are required");
+    }
+    setExecutionQuote({ ...quote, eip712: { ...quote.eip712, message } });
+    setSignature(undefined);
+  }, [executionQuote, liveQuote]);
   const integrationData = useMemo<JsonContainer>(
     () => ({
       ...asRecord(requestData),
@@ -361,6 +374,7 @@ export function LiquidityHubDeveloperContent({
       if (!nextOpen && isRunning) return;
 
       setTriggerTooltipOpen(false);
+      setPriceChange(undefined);
       if (!nextOpen) {
         suppressTriggerTooltipRef.current = true;
       }
@@ -387,6 +401,12 @@ export function LiquidityHubDeveloperContent({
     }));
   }, []);
 
+  const returnToSigning = useCallback(() => {
+    setSignature(undefined);
+    setTxHash(undefined);
+    setNavigation((current) => rewindFlow(current, current.history.lastIndexOf("sign")));
+  }, []);
+
   const executeCurrentStep = useCallback(async () => {
     if (isRunning || step === "success") return;
 
@@ -394,6 +414,15 @@ export function LiquidityHubDeveloperContent({
     toast.loading(STEP_LOADING_MESSAGES[step], {
       id: actionToastId,
       position: "bottom-right",
+    });
+
+    const fetchReplacementQuote = (quote: Quote) => liquidityHub.getQuote({
+      fromToken: quote.inToken,
+      toToken: quote.outToken,
+      inAmount: quote.inAmount,
+      dexMinAmountOut: "-1",
+      slippage: quote.slippage,
+      account: quote.user,
     });
 
     try {
@@ -409,25 +438,18 @@ export function LiquidityHubDeveloperContent({
 
       if (step === "check") {
         const hasAllowance = await ensureAllowance();
-        const nextApprovalRequired = !hasAllowance;
-        setApprovalRequired(nextApprovalRequired);
+        if (!hasAllowance) await approve();
+        setApprovalRequired(false);
 
         const needsWrap = sourceIsNative && remainingWrapAmount(
           BigInt(executionQuote?.inAmount ?? parsedInputAmount), wrappedAmountRef.current,
         ) > BigInt(0);
-        const nextStep = needsWrap
-          ? "wrap"
-          : nextApprovalRequired
-            ? "approve"
-            : "sign";
-        advanceToStep(nextStep);
-        toast.success("Allowance checked", {
+        advanceToStep(needsWrap ? "wrap" : "sign");
+        toast.success("Token ready", {
           id: actionToastId,
           description: needsWrap
             ? "Native input must be wrapped before signing."
-            : nextApprovalRequired
-              ? "Permit2 approval is required."
-              : "The existing Permit2 allowance is sufficient.",
+            : "The Permit2 allowance is sufficient.",
           position: "bottom-right",
         });
         return;
@@ -448,7 +470,7 @@ export function LiquidityHubDeveloperContent({
           id: actionToastId,
           description: approvalRequired
             ? "Permit2 approval is still required."
-            : "Quote freshness will be checked before signing.",
+            : "Next, review and sign the quote.",
           position: "bottom-right",
         });
         return;
@@ -462,7 +484,7 @@ export function LiquidityHubDeveloperContent({
         toast.success("Permit2 approved", {
           id: actionToastId,
           description:
-            "Approval confirmed. Next, get the latest quote and sign it.",
+            "Approval confirmed. Next, review and sign the quote.",
           position: "bottom-right",
         });
         return;
@@ -476,17 +498,14 @@ export function LiquidityHubDeveloperContent({
           );
         }
 
-        if (!isFreshQuote(quoteToSign)) {
-          const refreshedTrade = await refetchTrade();
-          if (refreshedTrade.error) {
-            throw refreshedTrade.error;
+        if (!isFreshQuote(quoteToSign, 60)) {
+          const freshQuote = await fetchReplacementQuote(quoteToSign);
+          if (BigInt(freshQuote.minAmountOut) < BigInt(quoteToSign.minAmountOut)) {
+            setPriceChange({ previous: quoteToSign, next: freshQuote });
+            toast.dismiss(actionToastId);
+            return;
           }
-          quoteToSign = refreshedTrade.data?.originalQuote as Quote | undefined;
-          if (!quoteToSign || quoteToSign.error) {
-            throw new Error(
-              quoteToSign?.error || "A fresh Liquidity Hub quote is required",
-            );
-          }
+          quoteToSign = freshQuote;
         }
 
         setExecutionQuote(quoteToSign);
@@ -497,7 +516,7 @@ export function LiquidityHubDeveloperContent({
         toast.success("Quote signed", {
           id: actionToastId,
           description:
-            "The freshness-checked quote and signature are paired for submission.",
+            "The quote and signature are paired for submission.",
           position: "bottom-right",
         });
         return;
@@ -506,6 +525,24 @@ export function LiquidityHubDeveloperContent({
       if (step === "swap") {
         if (!executionQuote || !signature) {
           throw new Error("Sign the quote payload before submitting the swap");
+        }
+
+        // A quote can expire while the wallet is open or before this step is run.
+        // A replacement must be signed again; never reuse its predecessor's signature.
+        if (!txHash && !isFreshQuote(executionQuote, 60)) {
+          const freshQuote = await fetchReplacementQuote(executionQuote);
+          returnToSigning();
+          if (BigInt(freshQuote.minAmountOut) < BigInt(executionQuote.minAmountOut)) {
+            setPriceChange({ previous: executionQuote, next: freshQuote });
+            toast.dismiss(actionToastId);
+          } else {
+            setExecutionQuote(freshQuote);
+            toast.info("Quote refreshed. Sign the updated quote to continue.", {
+              id: actionToastId,
+              position: "bottom-right",
+            });
+          }
+          return;
         }
 
         const hash =
@@ -555,7 +592,7 @@ export function LiquidityHubDeveloperContent({
     liveQuote,
     parsedInputAmount,
     refetchBalances,
-    refetchTrade,
+    returnToSigning,
     signQuote,
     signature,
     sourceIsNative,
@@ -707,6 +744,9 @@ export function LiquidityHubDeveloperContent({
         <div className="h-full min-h-0 overflow-hidden">
           <JsonInspectorPanel
             data={presentation.data}
+            editable={viewedStep === "sign" && step === "sign" && !isRunning}
+            isValueEditable={(path) => path[0] === "message"}
+            onSave={viewedStep === "sign" ? handleSaveSigningMessage : undefined}
             codeSnippet={presentation.codeSnippet}
             codeScrollResetKey={viewedStep}
             codeSnippetState="active"
@@ -725,9 +765,14 @@ export function LiquidityHubDeveloperContent({
             }
             title={presentation.title}
             viewModeAction={
-              <div className="flex w-full flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+              <div className="flex w-full min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+                  <DeveloperGuideLink baseHref={getSpotDocsHref("/liquidity-hub/direct")}>
+                    Direct API
+                  </DeveloperGuideLink>
                   <LiquidityHubGuideLink section={guideSection} />
+                </div>
+                <div className="ml-auto flex shrink-0 items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -736,8 +781,6 @@ export function LiquidityHubDeveloperContent({
                   >
                     Close
                   </Button>
-                </div>
-                <div className="ml-auto flex items-center gap-2">
                   {!account ? (
                     <Button
                       data-submit-button
@@ -775,6 +818,20 @@ export function LiquidityHubDeveloperContent({
           />
         </div>
       </DialogContent>
+      {priceChange && (
+        <QuotePriceChangeDialog
+          previousMinimum={priceChange.previous.minAmountOut}
+          newMinimum={priceChange.next.minAmountOut}
+          outputDecimals={outputCurrency?.decimals}
+          outputSymbol={outputCurrency?.symbol}
+          onClose={() => setPriceChange(undefined)}
+          onAccept={() => {
+            setExecutionQuote(priceChange.next);
+            returnToSigning();
+            setPriceChange(undefined);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

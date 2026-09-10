@@ -12,7 +12,7 @@ export const useSignEip = () => {
     mutationFn: async (quote: Quote) => {
       const permitData = quote.eip712;
       const signature = await signTypedData({
-        domain: permitData.domain,
+        domain: { ...permitData.domain },
         types: permitData.types,
         primaryType: permitData.primaryType,
         message: permitData.message,

@@ -15,6 +15,8 @@ import {
   CopyIcon,
   LogOutIcon,
   WalletIcon,
+  SunIcon,
+  MoonIcon,
 } from "lucide-react";
 import { useDisconnect, useSwitchChain } from "wagmi";
 import { toast } from "sonner";
@@ -29,6 +31,7 @@ import {
   useSelectedFormTab,
 } from "@/lib/hooks/use-form-tab";
 import { getSpotDocsHref } from "@/lib/developer-docs";
+import { useTheme } from "@/lib/theme";
 import type { PartnerBrand } from "@/lib/partners/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Switch } from "./ui/switch";
@@ -360,10 +363,12 @@ const NavWalletControls = () => {
           return (
             <NavPillButton
               data-primary-nav-pill
+              aria-label="Connect Wallet"
               onClick={openConnectModal}
-              className="bg-primary px-4 text-primary-foreground hover:bg-primary/74"
+              className="w-10 justify-center bg-primary p-0 text-primary-foreground hover:bg-primary/74 sm:w-auto sm:px-4"
             >
-              Connect Wallet
+              <WalletIcon aria-hidden="true" className="size-4 sm:hidden" />
+              <span className="hidden sm:inline">Connect Wallet</span>
             </NavPillButton>
           );
         }
@@ -497,9 +502,26 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
               </Tooltip>
             </div>
           )}
+          <ThemeToggle />
           {!isDeveloperGuideRoute && <NavWalletControls />}
         </div>
       </div>
     </nav>
+  );
+}
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme();
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <NavPillButton aria-label={label} onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-10 shrink-0 justify-center p-0">
+          <SunIcon aria-hidden="true" className="hidden size-4 dark:block" />
+          <MoonIcon aria-hidden="true" className="size-4 dark:hidden" />
+        </NavPillButton>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   );
 }

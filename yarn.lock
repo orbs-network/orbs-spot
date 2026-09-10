@@ -1056,10 +1056,10 @@
   resolved "https://registry.yarnpkg.com/@nolyfill/is-core-module/-/is-core-module-1.0.39.tgz#3dc35ba0f1e66b403c00b39344f870298ebb1c8e"
   integrity sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==
 
-"@orbs-network/liquidity-hub-sdk@^1.0.97":
-  version "1.0.97"
-  resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.0.97.tgz#9a008615ca8977c1647c68b005e6f8cbb4033c55"
-  integrity sha512-iQ0hDJqhXFBtZwTsMH2zuVu2y8c+pIiKOBtqgz7qzKTzwmGl+3hixuR3Riw2JJmKf2s7+zwZvku8boXTvGDuNA==
+"@orbs-network/liquidity-hub-sdk@^1.1.1":
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.1.1.tgz#aad579e18cb035a8a44973ae67f0f72663ea624f"
+  integrity sha512-Kq7EN1i3RFpwrI7N24S39Pqyqn1zWt01OSVrZB527iiokKiOPeY1VtUYkKo4zzWWI2MptI6/R8x1Evmzf0DnDQ==
 
 "@orbs-network/spot-react@^1.1.45":
   version "1.1.45"

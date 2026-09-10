@@ -6,6 +6,27 @@ const spotDocsUrl = (
 ).replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
+  async rewrites() {
+    const hosts: Record<number, string> = {
+      1: "hub.orbs.network",
+      56: "bsc.hub.orbs.network",
+      137: "polygon.hub.orbs.network",
+      146: "sonic.hub.orbs.network",
+      250: "ftm.hub.orbs.network",
+      1101: "zkevm.hub.orbs.network",
+      8453: "base.hub.orbs.network",
+      42161: "arbi.hub.orbs.network",
+      59144: "linea.hub.orbs.network",
+      81457: "blast.hub.orbs.network",
+    };
+
+    return Object.entries(hosts).flatMap(([chainId, host]) =>
+      ["quote", "swap-async", "swap/status/:sessionId"].map((path) => ({
+        source: `/api/liquidity-hub/${chainId}/${path}`,
+        destination: `https://${host}/${path}`,
+      })),
+    );
+  },
   async redirects() {
     return [
       {

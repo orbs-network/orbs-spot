@@ -30,7 +30,7 @@
     "@ethersproject/hash": "^5.8.0",
     "@gemini-wallet/core": "~0.3.1",
     "@metamask/connect-evm": "~1.4.0",
-    "@orbs-network/liquidity-hub-sdk": "^1.0.97",
+    "@orbs-network/liquidity-hub-sdk": "^1.1.1",
     "@orbs-network/spot-react": "^1.1.45",
     "@orbs-network/spot-ui": "2.1.2",
     "@orbs-network/swap-ui": "^0.0.61",

@@ -1,4 +1,5 @@
 "use client";
+import { useTheme } from "@/lib/theme";
 
 import {
   Children,
@@ -723,6 +724,7 @@ function JsonInspectorModalContent({
   validate,
   viewModeAction,
 }: JsonInspectorContentProps) {
+  const { theme } = useTheme();
   const descriptionId = useId();
   const fieldIdPrefix = useId();
   const codeTabsId = useId();
@@ -1700,11 +1702,6 @@ function JsonInspectorModalContent({
                 </p>
               )}
               {headerNotice && <div className="mt-3">{headerNotice}</div>}
-              {(getFieldExplanation || getResponseFieldExplanation) && (
-                <p className="mt-2 text-[11px] leading-5 text-muted-foreground">
-                  Tip: hover over or focus an underlined field to see its explanation.
-                </p>
-              )}
             </div>
           </div>
         </DialogHeader>
@@ -1938,7 +1935,7 @@ function JsonInspectorModalContent({
                   </div>
                 </div>
                 <Highlight
-                  theme={themes.oneDark}
+                  theme={theme === "dark" ? themes.oneDark : themes.github}
                   code={formattedCode}
                   language={activeCodeFile?.syntaxLanguage ?? "typescript"}
                 >
