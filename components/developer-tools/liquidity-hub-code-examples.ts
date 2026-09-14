@@ -290,7 +290,7 @@ export const LIQUIDITY_HUB_SIGN_CODE_SNIPPET: CodeSnippetOptions = {
 export const LIQUIDITY_HUB_SWAP_AND_CONFIRM_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "swap.ts",
-  format: () => formatLiquidityHubSdkStep("swap"),
+  format: (data) => formatLiquidityHubSdkStep("swap", data),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
@@ -300,14 +300,14 @@ export const LIQUIDITY_HUB_FULL_FLOW_CODE_SNIPPET = LIQUIDITY_HUB_SDK_FLOW;
 export const LIQUIDITY_HUB_SWAP_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "swap.ts",
-  format: () => formatLiquidityHubSdkStep("swap"),
+  format: (data) => formatLiquidityHubSdkStep("swap", data),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
 
 const FIELD_EXPLANATIONS: Record<string, string> = {
   partner:
-    'The partner name provided by Orbs. Use "unknown" when no partner name was provided.',
+    'The partner name provided by Orbs. Use "external" when no partner name was provided.',
   chainId: "The connected EVM chain used to initialize the SDK.",
   inputIsNative:
     "Whether the DEX source selection is native currency. Liquidity Hub accepts only its wrapped ERC-20 address as inToken, so the quoted amount must be wrapped before approval.",
@@ -482,7 +482,7 @@ export function getLiquidityHubFieldExplanation(
 }
 
 export const LIQUIDITY_HUB_EXAMPLE_DATA = {
-  partner: "unknown",
+  partner: "external",
   chainId: DEFAULT_CHAIN_ID,
   inputIsNative: false,
   quoteArgs: {
@@ -593,7 +593,7 @@ export const LIQUIDITY_HUB_QUOTE_EXAMPLE_RESPONSE_DATA = {
   user: DEFAULT_ACCOUNT,
   slippage: 0.5,
   qs: "%3FinputCurrency%3D0x1111%26outputCurrency%3D0x6666%26swapType%3D1",
-  partner: "unknown",
+  partner: "external",
   exchange: "lh",
   sessionId: "example-session_137",
   serializedOrder: "0x1234",

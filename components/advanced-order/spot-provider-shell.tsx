@@ -1,5 +1,7 @@
 "use client";
 
+import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
+import { useDeveloperMode } from "../developer-tools/use-developer-mode";
 import { useBalance } from "@/lib/hooks/use-balances";
 import { getWrappedNativeCurrency } from "@/lib/utils";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
@@ -26,13 +28,15 @@ export function SpotProviderShell({
 }) {
   const { inputCurrency, outputCurrency, inputAmount } = useDerivedSwap();
   const { chainId, address, isConnected } = useConnection();
-  const spotChainId = isConnected ? chainId : undefined;    
+  const dataChainId = useDataChainId();
+  const { isDeveloperMode } = useDeveloperMode();
+  const spotChainId = isConnected ? chainId : isDeveloperMode ? dataChainId : undefined;
   
   const spotAccount = chainId ? address : undefined;
   const walletInteractions = useWalletInteractions();
   const callbacks = useSpotCallbacks();
   const inputBalance = useBalance(inputCurrency).wei;
-  const wrappedNativeToken = useSpotToken(getWrappedNativeCurrency(chainId));
+  const wrappedNativeToken = useSpotToken(getWrappedNativeCurrency(spotChainId));
   const inputUsd = useUSDPrice({ token: inputCurrency?.address });
   const outputUsd = useUSDPrice({ token: outputCurrency?.address });
   const spotSrcToken = useSpotToken(inputCurrency);
@@ -64,7 +68,6 @@ export function SpotProviderShell({
       minTradeSizeUsd={5}
       callbacks={callbacks}
       displayFeePercent={0}
-      appId={getActiveClientPartnerConfig().id}
     >
       {children}
     </SpotProvider>

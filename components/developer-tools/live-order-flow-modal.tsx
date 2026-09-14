@@ -1,5 +1,6 @@
 "use client";
 
+import { DEMO_SIGNATURE, DEMO_STEP_COPY, type DeveloperExecutionMode } from "./demo-order";
 import { remainingWrapAmount, rewindFlow } from "./flow-navigation";
 import { DownloadIntegrationButton } from "./download-integration-button";
 import { formatAdvancedOrdersSdkFlow } from "./sdk-flow-examples";
@@ -310,21 +311,24 @@ const SUBMIT_PHASE: OrderFlowPhase = {
 
 function LiveOrderFlowModalContent({
   currentPermitData,
+  mode,
   submitDisabled,
   trigger,
   triggerTooltip = "Open order flow",
 }: {
   currentPermitData: LivePermitData;
+  mode: DeveloperExecutionMode;
   submitDisabled?: boolean;
   trigger: ReactElement;
   triggerTooltip?: string;
 }) {
-  const spot = useDeveloperOrder();
+  const isDemo = mode === "demo";
+  const spot = useDeveloperOrder(mode);
   const flowToastId = useId();
   const actionToastId = useId();
   const { address: connectedAccount } = useConnection();
   const { openConnectModal } = useConnectModal();
-  const partner = getActiveSpotPartner() || "unknown";
+  const partner = getActiveSpotPartner() || "external";
   const currentSourceTokenAddress = spot.derivedFormData.srcToken?.address;
   const { setInputAmount } = useActionHandlers();
   const { mutateAsync: getTokenAllowance } = useGetTokenAllowance();
@@ -397,8 +401,8 @@ function LiveOrderFlowModalContent({
     }
     phases.push(SIGN_PHASE, SUBMIT_PHASE);
 
-    return phases;
-  }, [navigation.history, sourceIsNative]);
+    return isDemo ? phases.map((phase) => ({ ...phase, effect: "Simulated" })) : phases;
+  }, [isDemo, navigation.history, sourceIsNative]);
 
   useEffect(() => {
     if (!open || isRunning || step === "success") return;
@@ -460,7 +464,7 @@ function LiveOrderFlowModalContent({
         setCreatedOrder(undefined);
         setShowCreatedOrder(false);
         completedStepsRef.current = { wrappedAmount: BigInt(0) };
-      } else if (step === "success") {
+      } else if (step === "success" && !isDemo) {
         setInputAmount("");
       }
 
@@ -470,6 +474,7 @@ function LiveOrderFlowModalContent({
       currentPermitData,
       currentSourceTokenAddress,
       isRunning,
+      isDemo,
       partner,
       setInputAmount,
       step,
@@ -483,26 +488,73 @@ function LiveOrderFlowModalContent({
     }));
   }, []);
 
+  const submissionPrepared = useMemo(() => {
+    const form = calculatedForm ?? spot.derivedFormData.form;
+    if (!spot.client || !form.canSubmit) return undefined;
+    const prepared = spot.client.prepareOrder({
+      form,
+      inputTokenAddress: permitData.order.permitted.token,
+      outputTokenAddress: permitData.order.witness.output.token,
+      swapperAddress: permitData.order.witness.swapper,
+    });
+    // Share the exact arguments between the inspector and submission.
+    return {
+      ...prepared,
+      order: permitData.order,
+      signingRequest: { ...prepared.signingRequest, typedData: {
+        domain: permitData.domain, types: permitData.types,
+        primaryType: permitData.primaryType, message: permitData.order,
+      } },
+    };
+  }, [calculatedForm, permitData, spot.client, spot.derivedFormData.form]);
+
   const executeCurrentStep = useCallback(async () => {
     if (isRunning || step === "success") return;
 
     setIsRunning(true);
-    toast.loading(STEP_LOADING_MESSAGES[step], {
+    toast.loading(isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step], {
       id: actionToastId,
       position: "bottom-right",
     });
 
     try {
-      if (calculatedForm && savedCalculationContext !== calculationContext) {
+      if (`${permitData.domain.chainId}:${permitData.order.permitted.token}:${permitData.order.witness.output.token}` !== calculationContext || (calculatedForm && savedCalculationContext !== calculationContext)) {
         throw new Error("The chain or token pair changed. Reopen the flow to recalculate this order.");
+      }
+      // Demo stops here: it never reaches wallet mutations or Orders Sink.
+      if (isDemo) {
+        if (!spot.canDemoExecute) throw new Error("Resolve the order inputs and wait for market data before continuing the demo.");
+        if (step === "flow") {
+          setWrapAmount(permitData.order.permitted.amount);
+          advanceToStep("check");
+        } else if (step === "check") {
+          setApprovalRequired(true);
+          advanceToStep(sourceIsNative ? "wrap" : "approve");
+        } else if (step === "wrap") {
+          advanceToStep("approve");
+        } else if (step === "approve") {
+          advanceToStep("sign");
+        } else if (step === "sign") {
+          // Keep the example signature visibly invalid and never sign the payload.
+          advanceToStep("submit");
+        } else if (step === "submit") {
+          advanceToStep("success");
+        }
+        toast.success(step === "submit" ? "Demo complete — no order created" : "Demo step complete", {
+          id: actionToastId,
+          description: "Simulated locally. No wallet request, transaction, or order submission.",
+          position: "bottom-right",
+        });
+        return;
+      }
+      if (!connectedAccount || submitDisabled || !spot.derivedFormData.form.canSubmit) {
+        throw new Error("Connect a funded wallet and resolve the order inputs before running a real order.");
       }
       if (step === "flow") {
         if (!spot.client) throw new Error("Spot client is not ready");
-        const nextPermitData = calculatedForm
-          ? rebuildCalculatedPermit(currentPermitData, calculatedForm, connectedAccount ?? PLACEHOLDER_ACCOUNT, spot.client)
-          : permitData;
+        const nextPermitData = rebuildCalculatedPermit(currentPermitData, calculatedForm ?? spot.derivedFormData.form, connectedAccount, spot.client);
         setPermitData(nextPermitData);
-        if (calculatedForm) setSignatureData(createSignatureData(nextPermitData, partner, currentSourceTokenAddress));
+        setSignatureData(createSignatureData(nextPermitData, partner, currentSourceTokenAddress));
         setWrapAmount(nextPermitData.order.permitted.amount);
         advanceToStep("check");
         toast.success("Order flow started", {
@@ -511,6 +563,10 @@ function LiveOrderFlowModalContent({
           position: "bottom-right",
         });
         return;
+      }
+
+      if (permitData.order.witness.swapper.toLowerCase() !== connectedAccount.toLowerCase()) {
+        throw new Error("The wallet changed. Reopen the flow to prepare an order for this wallet.");
       }
 
       if (step === "check") {
@@ -658,21 +714,8 @@ function LiveOrderFlowModalContent({
         }
 
         if (!spot.client) throw new Error("Spot client is not ready");
-        const prepared = spot.client.prepareOrder({
-          form: calculatedForm ?? spot.derivedFormData.form,
-          inputTokenAddress: permitData.order.permitted.token,
-          outputTokenAddress: permitData.order.witness.output.token,
-          swapperAddress: permitData.order.witness.swapper,
-        });
-        // Preserve the exact developer-edited order that the wallet signed.
-        const order = await spot.client.submitOrder({
-          ...prepared,
-          order: permitData.order,
-          signingRequest: { ...prepared.signingRequest, typedData: {
-            domain: permitData.domain, types: permitData.types,
-            primaryType: permitData.primaryType, message: permitData.order,
-          } },
-        }, orderSignature);
+        if (!submissionPrepared) throw new Error("The prepared order is not ready");
+        const order = await spot.client.submitOrder(submissionPrepared.order, orderSignature);
 
         setCreatedOrder({
           data: JSON.parse(JSON.stringify(order)) as JsonContainer,
@@ -713,6 +756,9 @@ function LiveOrderFlowModalContent({
     actionToastId,
     advanceToStep,
     approvalRequired,
+    isDemo,
+    submitDisabled,
+    submissionPrepared,
     approveToken,
     calculatedForm,
     calculationContext,
@@ -731,6 +777,7 @@ function LiveOrderFlowModalContent({
     signatureData,
     sourceIsNative,
     spot.orderHistoryPanel,
+    spot.canDemoExecute,
     spot.client,
     spot.derivedFormData.form,
     step,
@@ -836,6 +883,15 @@ function LiveOrderFlowModalContent({
       };
     }
 
+    if (isDemo && viewedStep === "success") {
+      return {
+        codeSnippet: { language: "JSON", syntaxLanguage: "json", fileName: "demo-result.json", copyLabel: "Copy demo result", format: (data) => JSON.stringify(data, null, 2) },
+        data: JSON.parse(JSON.stringify({ demo: true, submitted: false, id: "demo-order-not-submitted", status: "simulated", order: permitData.order })) as JsonContainer,
+        explanation: DEMO_STEP_COPY.success,
+        title: "Demo complete — no order created",
+      };
+    }
+
     if (viewedStep === "success" && showCreatedOrder && createdOrder) {
       return {
         codeSnippet: CREATED_ORDER_CODE_SNIPPET,
@@ -850,9 +906,9 @@ function LiveOrderFlowModalContent({
       const signedOrder = JSON.parse(
         JSON.stringify({
           signature:
-            orderSignature ?? "0x<65-byte-eip-712-signature>",
-          order: permitData.order,
-          status: "pending",
+            isDemo ? DEMO_SIGNATURE : orderSignature ?? "0x<65-byte-eip-712-signature>",
+          order: submissionPrepared?.order,
+          demo: isDemo,
         }),
       ) as JsonContainer;
 
@@ -870,6 +926,8 @@ function LiveOrderFlowModalContent({
 
     throw new Error(`Unsupported developer order step: ${viewedStep}`);
   }, [
+    isDemo,
+    submissionPrepared,
     calculationInput,
     calculationDefaults,
     step,
@@ -883,14 +941,15 @@ function LiveOrderFlowModalContent({
     wrapAmount,
   ]);
 
-  const actionLabel =
-    step === "success" && showCreatedOrder
+  const actionLabel = isDemo
+    ? ({ flow: "Start demo", check: "Simulate allowance check", wrap: "Simulate wrap", approve: "Simulate approval", sign: "Simulate signature", submit: "Simulate submission", success: "Close demo" } satisfies Record<DeveloperOrderStep, string>)[step]
+    : step === "success" && showCreatedOrder
       ? "Close"
       : STEP_ACTION_LABELS[step];
   const disabledReason =
     step === "success"
       ? undefined
-      : submitDisabled
+      : (isDemo ? !spot.canDemoExecute : submitDisabled)
         ? "Resolve the current form or quote issue before running this step."
         : undefined;
   const guideSection =
@@ -955,13 +1014,13 @@ function LiveOrderFlowModalContent({
           actualStep={step}
           flowStep="flow"
           flowSummary="Wrap / Approve appear only if needed"
-          flowTitle="Live order flow"
+          flowTitle={isDemo ? "Demo order flow" : "Real order flow"}
           onSelectPhase={handleSelectPhase}
           phases={liveFlowPhases}
           progressLabel="Order creation progress"
           selectablePhaseIndexes={selectablePhaseIndexes}
           successStep="success"
-          successTitle="Order complete"
+          successTitle={isDemo ? "Demo complete · No order created" : "Order complete"}
           viewedStep={viewedStep}
         />
       ),
@@ -975,6 +1034,7 @@ function LiveOrderFlowModalContent({
       },
     );
   }, [
+    isDemo,
     flowToastId,
     handleSelectPhase,
     liveFlowPhases,
@@ -1017,7 +1077,8 @@ function LiveOrderFlowModalContent({
         showCloseButton
         className="h-[min(1040px,98dvh)] max-w-[960px] grid-rows-[minmax(0,1fr)] gap-0 overscroll-contain p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
       >
-        <div className="h-full min-h-0 overflow-hidden">
+        <div className="flex h-full min-h-0 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden">
           <JsonInspectorPanel
             data={presentation.data}
             editable={presentation.editable}
@@ -1025,7 +1086,7 @@ function LiveOrderFlowModalContent({
             codeScrollResetKey={viewedStep}
             codeSnippetState="active"
             description=""
-            explanation={presentation.explanation}
+            explanation={isDemo ? DEMO_STEP_COPY[viewedStep] : presentation.explanation}
             explanationDisplay="tooltip"
             headerBackAction={
               navigation.viewedIndex > 0 && !isRunning
@@ -1059,7 +1120,7 @@ function LiveOrderFlowModalContent({
                 ? dexDerivedSignatureData
                 : undefined
             }
-            title={presentation.title}
+            title={isDemo && viewedStep !== "success" ? `Demo · ${presentation.title}` : presentation.title}
             codeToolbarAction={
               <DownloadIntegrationButton
                 flow="advanced-orders"
@@ -1090,7 +1151,7 @@ function LiveOrderFlowModalContent({
                   >
                     Close
                   </Button>
-                  {!connectedAccount ? (
+                  {!isDemo && !connectedAccount ? (
                     <Button
                       data-submit-button
                       type="button"
@@ -1103,6 +1164,7 @@ function LiveOrderFlowModalContent({
                       type="button"
                       onClick={() => {
                         if (step === "success") {
+                          if (isDemo) { handleOpenChange(false); return; }
                           if (!showCreatedOrder) {
                             setShowCreatedOrder(true);
                             return;
@@ -1130,6 +1192,7 @@ function LiveOrderFlowModalContent({
               </div>
             }
           />
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -1137,10 +1200,12 @@ function LiveOrderFlowModalContent({
 }
 
 export function LiveOrderFlowModal({
+  mode,
   submitDisabled,
   trigger,
   triggerTooltip = "Open order flow",
 }: {
+  mode: DeveloperExecutionMode;
   submitDisabled?: boolean;
   trigger: ReactElement;
   triggerTooltip?: string;
@@ -1170,20 +1235,22 @@ export function LiveOrderFlowModal({
 
     return (
       <Button
+        data-submit-button
         type="button"
-        variant="outline"
+        variant="default"
         size="lg"
         isLoading={configLoading}
         disabled
-        className="h-12 rounded-[14px]"
+        className="h-12 w-full rounded-[14px]"
       >
-        {configLoading ? "Loading config" : "Enter an amount and connect a wallet"}
+        {mode === "demo" ? "Place demo order" : "Place order"}
       </Button>
     );
   }
 
   return (
     <LiveOrderFlowModalContent
+      mode={mode}
       currentPermitData={currentPermitData}
       submitDisabled={submitDisabled}
       trigger={trigger}

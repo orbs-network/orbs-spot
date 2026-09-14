@@ -1,13 +1,13 @@
-const UNKNOWN_PARTNER_ID = "unknown";
+const EXTERNAL_PARTNER_ID = "external";
 const DEX_PARTNER_ID_COMMENT =
-  '// Use your DEX partner ID if Orbs provided one; otherwise use "unknown".';
+  '// Use your DEX partner ID if Orbs provided one; otherwise use "external".';
 const LIQUIDITY_HUB_PARTNER_ID_COMMENT =
-  '// Use the partner name provided by Orbs; otherwise use "unknown".';
+  '// Use the partner name provided by Orbs; otherwise use "external".';
 
 export function getExamplePartnerId(value: unknown): string {
   return typeof value === "string" && value.trim()
     ? value
-    : UNKNOWN_PARTNER_ID;
+    : EXTERNAL_PARTNER_ID;
 }
 
 export function formatPartnerDeclaration(partner: string): string {
@@ -17,7 +17,7 @@ export function formatPartnerDeclaration(partner: string): string {
 export function getLiquidityHubExamplePartnerId(value: unknown): string {
   return typeof value === "string" && value.trim()
     ? value
-    : UNKNOWN_PARTNER_ID;
+    : EXTERNAL_PARTNER_ID;
 }
 
 export function formatLiquidityHubPartnerDeclaration(

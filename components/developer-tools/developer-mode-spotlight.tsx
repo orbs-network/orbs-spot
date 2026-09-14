@@ -24,7 +24,8 @@ export type DeveloperModeSpotlightVariant =
   | "orders-sink";
 
 type SpotlightTarget =
-  | "developer-action"
+  | "demo-action"
+  | "live-action"
   | "developer-guide"
   | "liquidity-hub-quote";
 
@@ -40,7 +41,7 @@ type SpotlightStepConfig = {
 const SPOTLIGHT_STEPS = {
   "orders-sink": [
     {
-      actionLabel: "Next: Submit Order",
+      actionLabel: "Next: Demo",
       description:
         "Open Advanced Order Docs for Orders Sink setup, signing, submission, fetching orders, and cancellation examples.",
       gap: 2,
@@ -49,13 +50,22 @@ const SPOTLIGHT_STEPS = {
       title: "Open Advanced Order Docs",
     },
     {
-      actionLabel: "Got It",
+      actionLabel: "Next: Place order",
       description:
-        "Use this button to inspect and run the complete Orders Sink flow, one step at a time. It stays visible in Dev Mode; enter an amount to enable it.",
+        "Demo simulates the order flow using live data. Enter an amount to enable it. No wallet opens, no funds are used, and no order is created.",
       gap: 8,
       shape: "rounded-rectangle",
-      target: "developer-action",
-      title: "Submit a Developer Order",
+      target: "demo-action",
+      title: "Demo · Simulate an order",
+    },
+    {
+      actionLabel: "Got it",
+      description:
+        "Place order runs the real order flow step by step. Connect a funded wallet and complete the form to enable it. Wallet approvals and signing can create a real order.",
+      gap: 8,
+      shape: "rounded-rectangle",
+      target: "live-action",
+      title: "Place order · Real execution",
     },
   ],
   "liquidity-hub": [
@@ -69,7 +79,7 @@ const SPOTLIGHT_STEPS = {
       title: "Open Liquidity Hub Docs",
     },
     {
-      actionLabel: "Next: Inspect Swap",
+      actionLabel: "Next: Demo",
       description:
         "Use the quote button beside the To token title to inspect the exact Liquidity Hub request and its complete response. You can open it before entering an amount.",
       gap: 6,
@@ -78,13 +88,22 @@ const SPOTLIGHT_STEPS = {
       title: "Inspect the Live Quote",
     },
     {
-      actionLabel: "Got It",
+      actionLabel: "Next: Swap",
       description:
-        "This button becomes available after the Swap form has a valid quote. Use it to inspect wrapping, Permit2 approval, quote freshness, signing, swap execution, and confirmation step by step.",
+        "Demo simulates the swap flow using live data. Enter an amount and wait for a valid quote to enable it. No wallet opens and no funds are used.",
       gap: 8,
       shape: "rounded-rectangle",
-      target: "developer-action",
-      title: "Inspect the Liquidity Hub Flow",
+      target: "demo-action",
+      title: "Demo · Simulate a swap",
+    },
+    {
+      actionLabel: "Got it",
+      description:
+        "Swap runs the real swap flow step by step. Connect a funded wallet and get a valid quote to enable it. Wallet approvals, signing, and submission use real funds.",
+      gap: 8,
+      shape: "rounded-rectangle",
+      target: "live-action",
+      title: "Swap · Real execution",
     },
   ],
 } satisfies Record<
@@ -93,14 +112,14 @@ const SPOTLIGHT_STEPS = {
 >;
 
 const WALKTHROUGH_SEEN_STORAGE_KEYS = {
-  "orders-sink": "developer-mode-walkthrough-v1",
-  "liquidity-hub": "developer-mode-liquidity-hub-walkthrough-v2",
+  "orders-sink": "developer-mode-walkthrough-v2",
+  "liquidity-hub": "developer-mode-liquidity-hub-walkthrough-v3",
 } satisfies Record<DeveloperModeSpotlightVariant, string>;
 
 const SPOTLIGHT_TARGET_SELECTORS = {
   "developer-guide": "[data-developer-guide-link]",
   "liquidity-hub-quote": "[data-developer-liquidity-hub-quote]",
-} satisfies Record<Exclude<SpotlightTarget, "developer-action">, string>;
+} satisfies Record<Exclude<SpotlightTarget, "demo-action" | "live-action">, string>;
 
 const subscribeToClientReady = () => () => {};
 const getClientSnapshot = () => true;
@@ -416,11 +435,15 @@ function DeveloperModeSpotlightContent({
     if (!open) return;
 
     const target =
-      activeStep.target === "developer-action"
+      activeStep.target === "demo-action"
         ? targetRef.current
-        : document.querySelector<HTMLElement>(
-            SPOTLIGHT_TARGET_SELECTORS[activeStep.target],
-          );
+        : activeStep.target === "live-action"
+          ? document.querySelector<HTMLElement>(
+              `[data-dev-flow="${variant}"][data-dev-execution-mode="live"]`,
+            )
+          : document.querySelector<HTMLElement>(
+              SPOTLIGHT_TARGET_SELECTORS[activeStep.target],
+            );
     if (!target) {
       setLayout(null);
       return;
@@ -462,6 +485,7 @@ function DeveloperModeSpotlightContent({
     activeStep.target,
     open,
     targetRef,
+    variant,
   ]);
 
   useSpotlightDialogBehavior({

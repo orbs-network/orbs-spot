@@ -1,5 +1,9 @@
 "use client";
 
+import { DEMO_ACCOUNT, DEMO_SIGNATURE, type DeveloperExecutionMode } from "./demo-order";
+import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
+import { useBalance } from "@/lib/hooks/use-balances";
+import BN from "bignumber.js";
 import { remainingWrapAmount, rewindFlow } from "./flow-navigation";
 import { QuotePriceChangeDialog } from "./quote-price-change-dialog";
 import { DownloadIntegrationButton } from "./download-integration-button";
@@ -96,6 +100,16 @@ type StepPresentation = {
 };
 
 type LiquidityHubFlowPhase = LiveFlowPhase<LiquidityHubFlowStep>;
+
+const DEMO_SWAP_EXPLANATIONS: Record<LiquidityHubFlowStep, string> = {
+  flow: "Live quote, simulated execution. No wallet or gas required. A sample address is used when disconnected. The demo assumes enough tokens and gas; it does not verify execution. Downloaded integration code performs real actions if you run it.",
+  check: "Simulated allowance: zero, so you can explore approval. Your wallet allowance is not read or changed.",
+  wrap: "Simulated wrapping. No native tokens are deposited and no gas is spent.",
+  approve: "Simulated Permit2 approval. No spending permission is granted and no transaction is sent.",
+  sign: "Simulated signing of the live quote. The demo uses example hex bytes; no wallet opens or valid signature is generated.",
+  swap: "The actual quote and demo hex signature are shown below. This call is not executed; no swap is sent to Liquidity Hub and no receipt is requested.",
+  success: "Local demo result. No swap was executed, no funds moved, and no receipt or gas usage was produced.",
+};
 
 const EMPTY_QUOTE_RESPONSE = {} satisfies JsonContainer;
 
@@ -247,12 +261,16 @@ function getPresentation({
 
 export function LiquidityHubDeveloperContent({
   trigger,
+  mode,
 }: {
+  mode: DeveloperExecutionMode;
   trigger: ReactElement;
 }) {
+  const isDemo = mode === "demo";
   const flowToastId = useId();
   const actionToastId = useId();
-  const { address: account, chainId } = useConnection();
+  const { address: account } = useConnection();
+  const chainId = useDataChainId();
   const { openConnectModal } = useConnectModal();
   const { slippage } = useSettings();
   const {
@@ -262,6 +280,8 @@ export function LiquidityHubDeveloperContent({
     parsedInputAmount,
     trade,
   } = useDerivedSwap();
+  const inputBalance = useBalance(inputCurrency).wei;
+  const hasBalance = Boolean(account && BN(inputBalance ?? "0").gte(parsedInputAmount));
   const liquidityHub = useLiquidityHub();
   const { setInputAmount } = useActionHandlers();
   const { mutateAsync: refetchBalances } =
@@ -310,7 +330,7 @@ export function LiquidityHubDeveloperContent({
         inAmount: parsedInputAmount || "0",
         dexMinAmountOut: "-1",
         slippage,
-        account: account ?? "<connected-wallet-address>",
+        account: account ?? DEMO_ACCOUNT,
       },
     };
   }, [
@@ -354,12 +374,13 @@ export function LiquidityHubDeveloperContent({
     () => ({
       ...asRecord(requestData),
       quote: asRecord(quoteData),
+      demo: isDemo,
       execution: {
         signature: signature ?? "<wallet-signature>",
         txHash: txHash ?? "<swap-transaction-hash>",
       },
     }),
-    [quoteData, requestData, signature, txHash],
+    [isDemo, quoteData, requestData, signature, txHash],
   );
   const liveFlowPhases = useMemo(() => {
     const visitedSteps = new Set(navigation.history);
@@ -373,8 +394,8 @@ export function LiquidityHubDeveloperContent({
     }
     phases.push(SIGN_PHASE, SWAP_PHASE);
 
-    return phases;
-  }, [navigation.history, sourceIsNative]);
+    return isDemo ? phases.map((phase) => ({ ...phase, effect: "Simulated" })) : phases;
+  }, [isDemo, navigation.history, sourceIsNative]);
 
   const handleTriggerTooltipOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -402,12 +423,12 @@ export function LiquidityHubDeveloperContent({
         setApprovalRequired(false);
         setSignature(undefined);
         setTxHash(undefined);
-      } else if (step === "success") {
+      } else if (step === "success" && !isDemo) {
         setInputAmount("");
       }
 
       setOpen(nextOpen);
-    }, [inputIsNative, isRunning, liveQuote, setInputAmount, step]);
+    }, [inputIsNative, isDemo, isRunning, liveQuote, setInputAmount, step]);
 
   const advanceToStep = useCallback((nextStep: LiquidityHubFlowStep) => {
     setNavigation((current) => ({
@@ -426,7 +447,7 @@ export function LiquidityHubDeveloperContent({
     if (isRunning || step === "success") return;
 
     setIsRunning(true);
-    toast.loading(STEP_LOADING_MESSAGES[step], {
+    toast.loading(isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step], {
       id: actionToastId,
       position: "bottom-right",
     });
@@ -441,6 +462,33 @@ export function LiquidityHubDeveloperContent({
     });
 
     try {
+      const quote = executionQuote ?? liveQuote;
+      if (!quote || quote.error || !BN(quote.inAmount).gt(0) || !BN(quote.outAmount).gt(0)) {
+        throw new Error("Enter a valid amount and wait for a live quote.");
+      }
+      if (isDemo) {
+        // Never reach allowance mutations, wallet signing, swaps, or receipt polling.
+        if (step === "flow") advanceToStep("check");
+        else if (step === "check") {
+          setApprovalRequired(true);
+          advanceToStep(sourceIsNative ? "wrap" : "approve");
+        } else if (step === "wrap") advanceToStep("approve");
+        else if (step === "approve") advanceToStep("sign");
+        else if (step === "sign") {
+          setExecutionQuote(quote);
+          setSignature(DEMO_SIGNATURE);
+          advanceToStep("swap");
+        } else if (step === "swap") advanceToStep("success");
+        toast.success(step === "swap" ? "Demo complete — no swap executed" : "Demo step complete", {
+          id: actionToastId,
+          description: "Simulated locally. No funds used or transaction sent.",
+          position: "bottom-right",
+        });
+        return;
+      }
+      if (!account) throw new Error("Connect a wallet to execute a real swap.");
+      if (step === "flow" && !hasBalance) throw new Error("Insufficient balance for this swap.");
+      if (quote.user.toLowerCase() !== account.toLowerCase()) throw new Error("The wallet changed. Reopen the flow for a fresh quote.");
       if (step === "flow") {
         advanceToStep("check");
         toast.success("Swap flow started", {
@@ -595,6 +643,9 @@ export function LiquidityHubDeveloperContent({
       setIsRunning(false);
     }
   }, [
+    isDemo,
+    account,
+    hasBalance,
     actionToastId,
     advanceToStep,
     approvalRequired,
@@ -617,16 +668,21 @@ export function LiquidityHubDeveloperContent({
   ]);
 
   const presentation = useMemo(
-    () =>
-      getPresentation({
-        data: integrationData,
-        step: viewedStep,
-      }),
-    [integrationData, viewedStep],
+    () => {
+      if (isDemo && viewedStep === "success") return {
+        title: "Demo complete — no swap executed",
+        explanation: "Local demo result. No transaction was sent, no funds moved, and no receipt or gas usage was produced.",
+        data: { demo: true, submitted: false, status: "simulated", quote: quoteData },
+        codeSnippet: { language: "JSON", syntaxLanguage: "json", fileName: "demo-swap-result.json", format: (data: JsonContainer) => JSON.stringify(data, null, 2) },
+      } satisfies StepPresentation;
+      return getPresentation({ data: integrationData, step: viewedStep });
+    },
+    [isDemo, integrationData, quoteData, viewedStep],
   );
-  const actionLabel = STEP_ACTION_LABELS[step];
+  const actionLabel = isDemo ? ({ flow: "Start demo", check: "Simulate allowance check", wrap: "Simulate wrap", approve: "Simulate approval", sign: "Simulate signature", swap: "Simulate swap", success: "Close demo" })[step] : STEP_ACTION_LABELS[step];
   const disabledReason = useMemo(() => {
     if (step === "success") return undefined;
+    if (!isDemo && step === "flow" && !hasBalance) return "Insufficient balance for a real swap.";
     if (!parsedInputAmount || parsedInputAmount === "0") {
       return "Enter a swap amount before running the live flow.";
     }
@@ -637,7 +693,7 @@ export function LiquidityHubDeveloperContent({
       return "A live Liquidity Hub quote is required.";
     }
     return undefined;
-  }, [executionQuote, isLoadingTrade, liveQuote, parsedInputAmount, step]);
+  }, [isDemo, hasBalance, executionQuote, isLoadingTrade, liveQuote, parsedInputAmount, step]);
   const guideSection =
     viewedStep === "flow" ? "end-to-end-flow" : "execute-swap";
   const selectablePhaseIndexes = useMemo(
@@ -692,13 +748,13 @@ export function LiquidityHubDeveloperContent({
           actualStep={step}
           flowStep="flow"
           flowSummary="Wrap / Approve appear only if needed"
-          flowTitle="Live swap flow"
+          flowTitle={isDemo ? "Demo swap flow" : "Live swap flow"}
           onSelectPhase={handleSelectPhase}
           phases={liveFlowPhases}
           progressLabel="Liquidity Hub swap progress"
           selectablePhaseIndexes={selectablePhaseIndexes}
           successStep="success"
-          successTitle="Swap complete"
+          successTitle={isDemo ? "Demo complete · No swap executed" : "Swap complete"}
           viewedStep={viewedStep}
         />
       ),
@@ -712,6 +768,7 @@ export function LiquidityHubDeveloperContent({
       },
     );
   }, [
+    isDemo,
     flowToastId,
     handleSelectPhase,
     liveFlowPhases,
@@ -746,7 +803,7 @@ export function LiquidityHubDeveloperContent({
           <DialogTrigger asChild>{trigger}</DialogTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          Inspect the complete Liquidity Hub flow
+          {isDemo ? "Live quote, simulated execution — no wallet or funds needed" : "Real swap — wallet and funds required"}
         </TooltipContent>
       </Tooltip>
       <DialogContent
@@ -754,10 +811,11 @@ export function LiquidityHubDeveloperContent({
         mobilePresentation="fullscreen"
         onInteractOutside={(event) => event.preventDefault()}
         showCloseButton
-        className="h-[min(1040px,98dvh)] max-w-[960px] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-0 overscroll-contain p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
+        className="overflow-clip h-[min(1040px,98dvh)] max-w-[960px] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-0 overscroll-contain p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
       >
         <div className="h-full min-h-0 overflow-hidden">
           <JsonInspectorPanel
+            key={viewedStep}
             data={presentation.data}
             editable={viewedStep === "sign" && step === "sign" && !isRunning}
             isValueEditable={(path) => path[0] === "message"}
@@ -766,7 +824,7 @@ export function LiquidityHubDeveloperContent({
             codeScrollResetKey={viewedStep}
             codeSnippetState="active"
             description=""
-            explanation={presentation.explanation}
+            explanation={isDemo ? DEMO_SWAP_EXPLANATIONS[viewedStep] : presentation.explanation}
             explanationDisplay="tooltip"
             getFieldExplanation={getLiquidityHubFieldExplanation}
             getResponseFieldExplanation={getLiquidityHubFieldExplanation}
@@ -778,7 +836,7 @@ export function LiquidityHubDeveloperContent({
                   }
                 : undefined
             }
-            title={presentation.title}
+            title={isDemo && viewedStep !== "success" ? `Demo · ${presentation.title}` : presentation.title}
             codeToolbarAction={
               <DownloadIntegrationButton
                 flow="liquidity-hub"
@@ -802,7 +860,7 @@ export function LiquidityHubDeveloperContent({
                   >
                     Close
                   </Button>
-                  {!account ? (
+                  {!isDemo && !account ? (
                     <Button
                       data-submit-button
                       type="button"

@@ -147,7 +147,7 @@ export function CancelOrderDeveloperButtonContent({
 }) {
   const { address } = useConnection();
   const isLegacyOrder = rawOrder.version === 1;
-  const partner = getActiveSpotPartner() || "unknown";
+  const partner = getActiveSpotPartner() || "external";
   const basePermitDataQuery = useBasePermitData(
     isLegacyOrder ? undefined : rawOrder.chainId,
   );

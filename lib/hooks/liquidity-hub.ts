@@ -1,10 +1,10 @@
 import { createClient } from "@orbs-network/liquidity-hub-sdk";
 import { useMemo } from "react";
-import { useConnection } from "wagmi";
+import { useDataChainId } from "./use-data-chain-id";
 import { getActiveLiquidityHubPartnerId } from "../partners/liquidity-hub";
 
 export const useLiquidityHub = () => {
-  const { chainId } = useConnection();
+  const chainId = useDataChainId();
   return useMemo(() => {
     return createClient({
       chainId: chainId || 1,

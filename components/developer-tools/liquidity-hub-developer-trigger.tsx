@@ -1,14 +1,13 @@
 "use client";
 
-import { Code2Icon, FileJson2Icon, Loader2Icon } from "lucide-react";
+import { FileJson2Icon, Loader2Icon } from "lucide-react";
 import { lazy, Suspense, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import BN from "bignumber.js";
+import { useConnection } from "wagmi";
+import { useBalance } from "@/lib/hooks/use-balances";
+import type { DeveloperExecutionMode } from "./demo-order";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useIsSwapTab } from "@/lib/hooks/use-form-tab";
 import { DeveloperModeSpotlight } from "./developer-mode-spotlight";
@@ -24,86 +23,34 @@ const LiquidityHubQuoteDeveloperContent = lazy(async () => ({
     .LiquidityHubQuoteDeveloperContent,
 }));
 
-function LiquidityHubDeveloperTriggerContent() {
+function LiquidityHubDeveloperTriggerContent({ mode }: { mode: DeveloperExecutionMode }) {
   const targetRef = useRef<HTMLDivElement>(null);
-  const { isLoadingTrade, trade } = useDerivedSwap();
+  const { isLoadingTrade, trade, inputCurrency, parsedInputAmount } = useDerivedSwap();
+  const { address } = useConnection();
+  const balance = useBalance(inputCurrency).wei;
   const quote = trade?.originalQuote as { error?: string } | undefined;
-  const hasQuote = Boolean(quote && !quote.error);
-  const isWaitingForQuote = isLoadingTrade && !hasQuote;
+  const hasQuote = Boolean(quote && !quote.error && BN(parsedInputAmount).gt(0));
+  const label = mode === "demo" ? "Demo" : "Swap";
+  const variant = mode === "demo" ? "demo" : "default";
+  const disabled = !hasQuote || (mode === "live" && (!address || !BN(balance ?? "0").gte(parsedInputAmount)));
   const trigger = (
-    <Button
-      data-developer-trigger
-      data-developer-liquidity-hub
-      type="button"
-      variant="outline"
-      size="icon-lg"
-      className="size-12 rounded-[14px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
-      aria-label="Inspect the complete Liquidity Hub flow"
-    >
-      <Code2Icon aria-hidden="true" className="size-5" />
+    <Button data-submit-button type="button" variant={variant} size="lg"
+      className="h-12 w-full rounded-[14px] px-3 text-sm" disabled={disabled}>
+      {label}
     </Button>
   );
-
   return (
     <>
-      <div ref={targetRef} className="shrink-0" data-dev-submit-target>
+      <div ref={targetRef} className={mode === "demo" ? "w-24 shrink-0" : "min-w-0 flex-1"} data-dev-submit-target data-dev-flow="liquidity-hub" data-dev-execution-mode={mode}>
         {hasQuote ? (
-          <Suspense
-            fallback={
-              <Button
-                data-developer-trigger
-                type="button"
-                variant="outline"
-                size="icon-lg"
-                className="size-12 rounded-[14px] border-primary/35 text-primary"
-                isLoading
-                disabled
-                aria-label="Loading Liquidity Hub developer tools"
-              />
-            }
-          >
-            <LiquidityHubDeveloperContent trigger={trigger} />
+          <Suspense fallback={<Button data-submit-button variant={variant} className="h-12 w-full rounded-[14px] px-3 text-sm" disabled isLoading>{label}</Button>}>
+            <LiquidityHubDeveloperContent mode={mode} trigger={trigger} />
           </Suspense>
         ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                data-developer-trigger
-                data-developer-liquidity-hub
-                type="button"
-                variant="outline"
-                size="icon-lg"
-                aria-busy={isWaitingForQuote}
-                aria-disabled="true"
-                aria-label={
-                  isWaitingForQuote
-                    ? "Waiting for a Liquidity Hub quote"
-                    : "Liquidity Hub developer flow requires a quote"
-                }
-                className="size-12 rounded-[14px] border-primary/35 text-primary opacity-50 !cursor-not-allowed"
-              >
-                {isWaitingForQuote ? (
-                  <Loader2Icon
-                    aria-hidden="true"
-                    className="size-5 motion-safe:animate-spin"
-                  />
-                ) : (
-                  <Code2Icon aria-hidden="true" className="size-5" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {isWaitingForQuote
-                ? "Waiting for the current Liquidity Hub quote"
-                : "Enter an amount and wait for a quote to inspect the live flow"}
-            </TooltipContent>
-          </Tooltip>
+          <Button data-submit-button variant={variant} className="h-12 w-full rounded-[14px] px-3 text-sm" disabled isLoading={isLoadingTrade}>{label}</Button>
         )}
       </div>
-      <DeveloperModeSpotlight
-        targetRef={targetRef}
-        variant="liquidity-hub"
-      />
+      {mode === "demo" && <DeveloperModeSpotlight targetRef={targetRef} variant="liquidity-hub" />}
     </>
   );
 }
@@ -144,12 +91,12 @@ function QuoteDeveloperButton({ loading = false }: { loading?: boolean }) {
   );
 }
 
-export function LiquidityHubDeveloperTrigger() {
+export function LiquidityHubDeveloperTrigger({ mode }: { mode: DeveloperExecutionMode }) {
   const { isDeveloperMode } = useDeveloperMode();
   const isSwapTab = useIsSwapTab();
 
   return isDeveloperMode && isSwapTab ? (
-    <LiquidityHubDeveloperTriggerContent />
+    <LiquidityHubDeveloperTriggerContent mode={mode} />
   ) : null;
 }
 

@@ -502,8 +502,8 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
               </Tooltip>
             </div>
           )}
-          <ThemeToggle />
           {!isDeveloperGuideRoute && <NavWalletControls />}
+          <ThemeToggle />
         </div>
       </div>
     </nav>

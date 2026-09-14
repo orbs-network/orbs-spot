@@ -238,3 +238,39 @@ test('all Liquidity Hub generators and supporting files are TypeScript without R
     }
   }
 });
+
+test('submission snippet passes the displayed prepared order and full signature unchanged', async () => {
+  const prepared = { order: { permitted: { amount: '90071992547409931234' }, nonce: '42' }, signingRequest: { typedData: { message: { nonce: '42' } } } };
+  const signature = '0x' + 'ab'.repeat(65);
+  const snippet = advanced.CREATE_ORDER_CODE_SNIPPET.format({ order: prepared.order, signature });
+  assert.match(snippet, /import type \{ RePermitOrder \} from "@orbs-network\/spot-ui";/);
+  assert.match(snippet, /as RePermitOrder,/);
+  const body = snippet.replace(/^import type .*;\n/gm, '');
+  const compiled = ts.transpileModule(`async function submit() { ${body} }`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  let submitted;
+  await vm.runInNewContext(`${compiled}\nsubmit()`, { client: { submitOrder: async (...args) => { submitted = args; } } });
+  assert.deepEqual(JSON.parse(JSON.stringify(submitted)), [prepared.order, signature]);
+  const demo = advanced.CREATE_ORDER_CODE_SNIPPET.format({ order: prepared.order, signature: load('demo-order').DEMO_SIGNATURE, demo: true });
+  assert.match(demo, /Demo only/);
+  assert.ok(demo.includes(load('demo-order').DEMO_SIGNATURE));
+  assert.match(load('demo-order').DEMO_SIGNATURE, /^0x[0-9a-f]{130}$/);
+});
+
+test('swap submission snippet accepts quote and signature props and returns the confirmed transaction', async () => {
+  const quote = { inAmount: '90071992547409931234', outAmount: '23', eip712: { message: { nonce: '42' } } };
+  const signature = '0x' + 'ab'.repeat(65);
+  const snippet = liquidityHub.LIQUIDITY_HUB_SWAP_AND_CONFIRM_CODE_SNIPPET.format({ quote, execution: { signature } });
+  assert.match(snippet, /client.swap\(\s*quote,/);
+  assert.doesNotMatch(snippet, /"inAmount"|Parameters<typeof client.swap>/);
+  const body = snippet.replace(/^import type .*;\n/gm, '');
+  const code = ts.transpileModule(body, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  let submitted;
+  let confirmed;
+  const receipt = { status: 'success' };
+  const result = await vm.runInNewContext(`${code}\nswapAndConfirm({ quote, signature })`, { quote, signature, client: { swap: async (...args) => { submitted = args; return '0x123'; } }, waitForTransactionConfirmation: async (hash) => { confirmed = hash; return receipt; } });
+  assert.equal(submitted[0], quote);
+  assert.deepEqual(JSON.parse(JSON.stringify(submitted)), [quote, signature]);
+  assert.equal(confirmed, '0x123');
+  assert.equal(result.hash, '0x123');
+  assert.equal(result.receipt, receipt);
+});

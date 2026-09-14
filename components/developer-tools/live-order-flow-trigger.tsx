@@ -1,7 +1,6 @@
 "use client";
 
 import { lazy, Suspense, useRef } from "react";
-import { Code2Icon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +10,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 
+import type { DeveloperExecutionMode } from "./demo-order";
 import { DeveloperModeSpotlight } from "./developer-mode-spotlight";
 import { useDeveloperMode } from "./use-developer-mode";
 
@@ -20,49 +20,57 @@ const LiveOrderFlowModal = lazy(async () => ({
 
 function LiveOrderFlowTriggerContent({
   submitDisabled,
+  mode,
 }: {
   submitDisabled?: boolean;
+  mode: DeveloperExecutionMode;
 }) {
+  const label = mode === "demo" ? "Demo" : "Place order";
+  const variant = mode === "demo" ? "demo" : "default";
   const { inputAmount } = useDerivedSwap();
   const targetRef = useRef<HTMLDivElement>(null);
   const hasInputAmount = Boolean(inputAmount.trim());
 
   const trigger = (
     <Button
-      data-developer-trigger
+      data-submit-button
       data-developer-order-submit
       type="button"
-      variant="outline"
-      size="icon-lg"
-      className="size-12 rounded-[14px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
-      aria-label="Submit developer order"
+      variant={variant}
+      size="lg"
+      className="h-12 w-full rounded-[14px] px-3 text-sm"
+      aria-label={label}
+      disabled={mode === "live" && submitDisabled}
     >
-      <Code2Icon aria-hidden="true" className="size-5" />
+      {label}
     </Button>
   );
 
   return (
     <>
-      <div ref={targetRef} className="shrink-0" data-dev-submit-target>
+      <div ref={targetRef} className={mode === "demo" ? "w-24 shrink-0" : "min-w-0 flex-1"} data-dev-submit-target data-dev-flow="orders-sink" data-dev-execution-mode={mode}>
         {hasInputAmount ? (
           <Suspense
             fallback={
               <Button
-                data-developer-trigger
+                data-submit-button
                 data-developer-order-submit
                 type="button"
-                variant="outline"
-                size="icon-lg"
-                className="size-12 rounded-[14px] border-primary/35 text-primary"
+                variant={variant}
+                size="lg"
+                className="h-12 w-full rounded-[14px] px-3 text-sm"
                 isLoading
                 disabled
                 aria-label="Loading developer order flow"
-              />
+              >
+                {label}
+              </Button>
             }
           >
             <LiveOrderFlowModal
+              mode={mode}
               submitDisabled={submitDisabled}
-              triggerTooltip="Run the order flow and inspect each action"
+              triggerTooltip={mode === "demo" ? "Live data, simulated execution — no wallet or funds needed" : "Real execution — wallet and funds required"}
               trigger={trigger}
             />
           </Suspense>
@@ -70,37 +78,39 @@ function LiveOrderFlowTriggerContent({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
-                data-developer-trigger
+                data-submit-button
                 data-developer-order-submit
                 type="button"
-                variant="outline"
-                size="icon-lg"
-                className="size-12 rounded-[14px] border-primary/35 text-primary opacity-50 !cursor-not-allowed"
+                variant={variant}
+                size="lg"
+                className="h-12 w-full rounded-[14px] px-3 text-sm opacity-50 !cursor-not-allowed"
                 aria-disabled="true"
-                aria-label="Enter an amount to submit a developer order"
+                aria-label={label}
               >
-                <Code2Icon aria-hidden="true" className="size-5" />
+                {label}
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              Enter an amount to run the developer order flow
+              Enter an amount to place an order
             </TooltipContent>
           </Tooltip>
         )}
       </div>
-      <DeveloperModeSpotlight targetRef={targetRef} variant="orders-sink" />
+      {mode === "demo" && <DeveloperModeSpotlight targetRef={targetRef} variant="orders-sink" />}
     </>
   );
 }
 
 export function LiveOrderFlowTrigger({
   submitDisabled,
+  mode,
 }: {
   submitDisabled?: boolean;
+  mode: DeveloperExecutionMode;
 }) {
   const { isDeveloperMode } = useDeveloperMode();
 
   return isDeveloperMode ? (
-    <LiveOrderFlowTriggerContent submitDisabled={submitDisabled} />
+    <LiveOrderFlowTriggerContent mode={mode} submitDisabled={submitDisabled} />
   ) : null;
 }

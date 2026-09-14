@@ -4,6 +4,7 @@ import { useOrderReview } from "./use-order-review";
 import { getExplorerUrl } from "@/lib/utils";
 import { SUPPORTED_CHAINS } from "@/lib/consts";
 
+import { useDeveloperMode } from "@/components/developer-tools/use-developer-mode";
 import { LiveOrderFlowTrigger } from "@/components/developer-tools/live-order-flow-trigger";
 import { SubmitSwapButton } from "@/components/submit-swap-button";
 import { SwapFlowLoader } from "@/components/swap-flow-loader";
@@ -459,6 +460,7 @@ function SubmitOrderPanel({
 }
 
 export function SubmitOrder({ orderModule }: { orderModule: Module }) {
+  const { isDeveloperMode } = useDeveloperMode();
   const t = useTranslations();
   const {
     submitOrder: onSubmit,
@@ -521,6 +523,15 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
     }
   }, [resetCurrentSwap, resetState, setInputAmount, setOpen, status]);
 
+  if (isDeveloperMode) {
+    return (
+      <div className="flex w-full items-center gap-2">
+        <LiveOrderFlowTrigger mode="live" submitDisabled={disabled || loading} />
+        <LiveOrderFlowTrigger mode="demo" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex w-full items-center gap-2">
       <div className="min-w-0 flex-1">
@@ -557,7 +568,6 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
           </DialogContent>
         </Dialog>
       </div>
-      <LiveOrderFlowTrigger submitDisabled={disabled || loading} />
     </div>
   );
 }

@@ -316,7 +316,7 @@ A careful integrator who reads both the page and the resources it links has to g
 
 | Question | Docs page | Skill | Reference app |
 | --- | --- | --- | --- |
-| Partner identifier | `"unknown"`; *"do not invent one from the application name"* | *"Set the `partner` field to the DEX name (lowercase, e.g. `"myDex"`)"* | partner registry |
+| Partner identifier | `"external"`; *"do not invent one from the application name"* | *"Set the `partner` field to the DEX name (lowercase, e.g. `"myDex"`)"* | partner registry |
 | Permit2 approval amount | prose: exact, max "should be explicit" — snippet: `maxUint256` | `maxUint256` | exact |
 | LH signing path | raw `permitData` fields | raw `permitData` fields | ethers `_TypedDataEncoder` normalization |
 | `dexMinAmountOut` with no DEX quote | omit | pass the DEX minimum | `"-1"` |

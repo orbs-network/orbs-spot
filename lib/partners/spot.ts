@@ -11,6 +11,6 @@ export function getActiveSpotPartner() {
     case "ginco":
       return Partners.Ginco;
     default:
-      return Partners.Unknown;
+      return Partners.External;
   }
 }

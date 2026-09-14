@@ -7,6 +7,9 @@ import {
   getWrappedNativeCurrency,
   isNativeAddress,
 } from "../utils";
+import { useDataChainId } from "./use-data-chain-id";
+import { useDeveloperMode } from "@/components/developer-tools/use-developer-mode";
+import { DEMO_ACCOUNT } from "@/components/developer-tools/demo-order";
 import { useConnection } from "wagmi";
 import { useSwapStore } from "./store";
 import { useMemo } from "react";
@@ -33,7 +36,11 @@ const useQuoteLiquidityHub = (
   const liquidityHub = useLiquidityHub();
   const { slippage } = useSettings();
   const pauseQuote = useSwapStore((state) => state.pauseQuote);
-  const { chainId, address: account } = useConnection();
+  const { chainId: walletChainId, address } = useConnection();
+  const dataChainId = useDataChainId();
+  const { isDeveloperMode } = useDeveloperMode();
+  const chainId = walletChainId ?? (isDeveloperMode ? dataChainId : undefined);
+  const account = address ?? (isDeveloperMode ? DEMO_ACCOUNT : undefined);
   const inputCurrencyAddress = inputCurrency?.address ?? "";
   const outputCurrencyAddress = outputCurrency?.address ?? "";
   return useQuery<BestTradeQuote>({

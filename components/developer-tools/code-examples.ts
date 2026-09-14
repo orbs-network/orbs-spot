@@ -1051,7 +1051,7 @@ export const FULL_ORDER_FLOW_CODE_SNIPPET = ADVANCED_ORDERS_SDK_FLOW;
 export const CREATE_ORDER_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "submit-order.ts",
-  format: () => formatAdvancedOrdersSdkStep("submit"),
+  format: (data) => formatAdvancedOrdersSdkStep("submit", data),
   language: "TypeScript",
   syntaxLanguage: "typescript",
 };
@@ -1085,7 +1085,7 @@ export const PERMIT_DATA_CODE_SNIPPET: CodeSnippetOptions = {
 };
 
 export const SIGNATURE_EXAMPLE_DATA = {
-  partner: "unknown",
+  partner: "external",
   message: {
     permitted: {
       token: "0x1111111111111111111111111111111111111111",
@@ -1195,12 +1195,12 @@ export const CREATE_ORDER_EXAMPLE_URL =
 
 export const PERMIT_DATA_REQUEST_DATA = {
   endpoint: "https://order-sink-v2.orbs.network/config",
-  partner: "unknown",
+  partner: "external",
   chain: 137,
 } satisfies JsonContainer;
 
 export const PERMIT_DATA_REQUEST_URL =
-  "https://order-sink-v2.orbs.network/config?partner=unknown&chain=137";
+  "https://order-sink-v2.orbs.network/config?partner=external&chain=137";
 
 export const PERMIT_DATA_RESPONSE = {
   domain: {
@@ -1249,7 +1249,7 @@ export const PERMIT_DATA_RESPONSE = {
       },
     },
   },
-  partner: "unknown",
+  partner: "external",
   primaryType: "RePermitWitnessTransferFrom",
   types: {
     Exchange: [

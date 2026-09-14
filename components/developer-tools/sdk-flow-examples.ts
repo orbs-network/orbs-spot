@@ -63,7 +63,7 @@ const LH_SIGN_CODE = `async function signQuote(quote: Quote, account: Address, r
   return { quote, signature };
 }`;
 
-const LH_SUBMIT_CODE = `async function swapAndConfirm(quote: Quote, signature: Hash) {
+const LH_SUBMIT_CODE = `async function swapAndConfirm({ quote, signature }: { quote: Quote; signature: Hash }) {
   // Submit the exact quote used to create the signature.
   const hash = await client.swap(quote, signature) as Hash;
   const receipt = await waitForTransactionConfirmation(hash);
@@ -147,7 +147,7 @@ const signature = await walletClient.signTypedData({
 });`;
 
 const ADVANCED_SUBMIT_CODE = `// Submit exactly this prepared order with its unchanged signature, once.
-return await client.submitOrder(prepared, signature);`;
+return await client.submitOrder(prepared.order, signature);`;
 
 const ADVANCED_CLIENT_HELPER = `let clientPromise: ReturnType<typeof createClient> | undefined;
 
@@ -170,7 +170,7 @@ import { polygon } from "viem/chains";
 
 // Browser example: use the chain selected in the host wallet.
 const chain = polygon;
-const partner = Partners.Unknown;
+const partner = Partners.External;
 const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
 if (!provider) throw new Error("A browser wallet is required");
 const publicClient = createPublicClient({ chain, transport: http() });
@@ -254,7 +254,7 @@ export async function swapFlow(account: Address, input: SwapInput) {
 
   const { quote, signature } = await signQuote(initialQuote, account, input.refetchQuote);
 
-  return swapAndConfirm(quote, signature);
+  return swapAndConfirm({ quote, signature });
 }
 ${WALLET_HELPERS}
 
@@ -323,6 +323,16 @@ export function formatAdvancedOrdersSdkStep(step: AdvancedOrdersSdkStep, data?: 
   message: ${JSON.stringify(orderMessage, null, 2).split("\n").join("\n  ")},`,
       )
     : ADVANCED_SIGN_CODE;
+  const payload = data && !Array.isArray(data) ? data : undefined;
+  const submitCode = payload?.order && typeof payload.signature === "string"
+    ? `import type { RePermitOrder } from "@orbs-network/spot-ui";
+
+${payload.demo ? "// Demo only: the signature is a placeholder. This call is not executed." : "// Submit the exact prepared order and unchanged wallet signature shown below."}
+return await client.submitOrder(
+  ${JSON.stringify(payload.order, null, 2).split("\n").join("\n  ")} as RePermitOrder,
+  ${JSON.stringify(payload.signature)}
+);`
+    : ADVANCED_SUBMIT_CODE;
   const sections = {
     check: ADVANCED_ALLOWANCE_CODE,
     wrap: ADVANCED_WRAP_CODE,
@@ -339,7 +349,7 @@ ${signCode.split("\n").map((line) => "  " + line).join("\n")}
 }
 
 ${ADVANCED_CLIENT_HELPER}`,
-    submit: ADVANCED_SUBMIT_CODE,
+    submit: submitCode,
   };
   return `// From advanced-orders.ts; uses the same clients and order values.
 ${sections[step]}
@@ -355,6 +365,16 @@ export function formatLiquidityHubSdkStep(step: "check" | "wrap" | "approve" | "
     message: ${JSON.stringify(message, null, 2).split("\n").join("\n    ")},`,
       )
     : LH_SIGN_CODE;
+  const payload = data && !Array.isArray(data) ? data : undefined;
+  const execution = payload?.execution;
+  const signature = execution && typeof execution === "object" && !Array.isArray(execution) ? execution.signature : undefined;
+  if (step === "swap" && payload?.quote && typeof signature === "string") {
+    return `import type { Hash } from "viem";
+import type { Quote } from "@orbs-network/liquidity-hub-sdk";
+
+// ${payload.demo ? "Demo only: this function is not executed." : "Pass the exact signed quote and unchanged wallet signature."}
+${LH_SUBMIT_CODE}`;
+  }
   const sections = {
     check: `${LH_APPROVE_FUNCTION}
 

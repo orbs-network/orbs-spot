@@ -1,4 +1,5 @@
 "use client";
+import { useDeveloperMode } from "./developer-tools/use-developer-mode";
 import { CurrencyCard } from "./currency-card";
 import { useSwapBestTrade } from "@/lib/hooks/use-swap-best-trade";
 import { ToggleCurrencies } from "./toggle-currencies";
@@ -276,6 +277,7 @@ const SwapReviewContent = ({
 };
 
 const SubmitSwap = () => {
+  const { isDeveloperMode } = useDeveloperMode();
   const t = useTranslations();
   const [open, setOpen] = useState(false);
   const {
@@ -329,6 +331,13 @@ const SubmitSwap = () => {
    }
   }, [reset, setOpen, status]);
 
+  if (isDeveloperMode) {
+    return <div className="flex w-full items-center gap-2">
+      <LiquidityHubDeveloperTrigger mode="live" />
+      <LiquidityHubDeveloperTrigger mode="demo" />
+    </div>;
+  }
+
   return (
     <div className="flex w-full items-center gap-2">
       <div className="min-w-0 flex-1">
@@ -351,7 +360,6 @@ const SubmitSwap = () => {
           />
         </Dialog>
       </div>
-      <LiquidityHubDeveloperTrigger />
     </div>
   );
 };
