@@ -14,6 +14,7 @@ const chainIdToLlamaName: Record<number, string> = {
   [chains.sonic.id]: "sonic",
   [chains.monad.id]: "monad",
   [chains.flare.id]: "flare",
+  [chains.katana.id]: "katana",
 };
 
 const chainIdToDexScreenerName: Record<number, string> = {

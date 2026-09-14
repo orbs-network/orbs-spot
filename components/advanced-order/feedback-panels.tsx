@@ -4,14 +4,15 @@ import { InlineMessage } from "@/components/ui/inline-message";
 import { useTranslations } from "@/lib/use-translations";
 import {
   ORBS_TWAP_FAQ_URL,
-  useSpot,
+  useInputErrors,
+  useDisclaimer,
 } from "@orbs-network/spot-react";
 import { AlertTriangleIcon, InfoIcon } from "lucide-react";
 import { formatInputError } from "./utils";
 
 export function InputErrorPanel() {
   const t = useTranslations();
-  const error = useSpot().inputError;
+  const error = useInputErrors();
   const message = formatInputError(error, t);
 
   if (!message) {
@@ -32,7 +33,7 @@ export function InputErrorPanel() {
 
 export function DisclaimerPanel() {
   const t = useTranslations();
-  const disclaimer = useSpot().disclaimerPanel;
+  const disclaimer = useDisclaimer();
 
   if (!disclaimer) {
     return null;

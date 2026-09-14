@@ -22,7 +22,7 @@ import TokensPair from "@/components/tokens-pair";
 import { useConnection } from "wagmi";
 import {
   isUserRejectedError,
-  showTransactionRejectedToast,
+  dismissTransactionRejectedToast,
 } from "../tx-rejection";
 
 const usePrepareQuote = () => {
@@ -234,7 +234,7 @@ const useToasts = () => {
   const onTransactionRejected = useCallback(() => {
     const id = activeToastId.current ?? swapToastId.current;
     dismissPendingToasts();
-    showTransactionRejectedToast({
+    dismissTransactionRejectedToast({
       id,
     });
     activeToastId.current = undefined;
@@ -345,7 +345,7 @@ export const useSwapBestTrade = () => {
       updateStore({ status: SwapStatus.SUCCESS });
     },
     onError: (error) => {
-      if (process.env.NODE_ENV !== "production") {
+      if (process.env.NODE_ENV !== "production" && !isUserRejectedError(error)) {
         console.error(error);
       }
     

@@ -1061,40 +1061,23 @@
   resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.1.1.tgz#aad579e18cb035a8a44973ae67f0f72663ea624f"
   integrity sha512-Kq7EN1i3RFpwrI7N24S39Pqyqn1zWt01OSVrZB527iiokKiOPeY1VtUYkKo4zzWWI2MptI6/R8x1Evmzf0DnDQ==
 
-"@orbs-network/spot-react@^1.1.45":
-  version "1.1.45"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-react/-/spot-react-1.1.45.tgz#8413926f91f21f66bcfa5b05cab5079cc620e5d2"
-  integrity sha512-kUkj4lnH/xq7l7VM7JZSDucF/6nNIRRZoQKRDcvDSAtsrjJOJH+DRetfCz8Na8H8eu8nVq3NbY68VlexrHCdhQ==
+"@orbs-network/spot-react@2.1.4":
+  version "2.1.4"
+  resolved "https://registry.npmjs.org/@orbs-network/spot-react/-/spot-react-2.1.4.tgz#7b09cdf49dd2d64b0afbb0fbdd2e0745b4174cbc"
+  integrity sha512-Rje7IRfaGNCEgcgC8RNocEcWOYtI59ey//sYym5TGAvfMqYclca5gpRl7czjEKAQymUXAzHkOS2Vrsel5S0ZTA==
   dependencies:
-    "@orbs-network/spot-ui" "1.0.27"
+    "@orbs-network/spot-ui" "2.1.4"
+    zustand "^5.0.9"
 
-"@orbs-network/spot-ui@1.0.27":
-  version "1.0.27"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-1.0.27.tgz#f10803011c87e0238e66f03ac96b3f5fdaa15cdf"
-  integrity sha512-WHc1e6HeWGpagB35JF2fLJQLhP7hOVFRafPdv3oEWwNEvv7ssVdI5i/Q1SXom+cW5lMg9mPdHW53qT8vxPtqFQ==
-  dependencies:
-    "@orbs-network/spot" "^2.8.1"
-    "@orbs-network/twap" "^2.7.28"
-
-"@orbs-network/spot-ui@2.1.2":
-  version "2.1.2"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-2.1.2.tgz#380ad51f124c6027477c95d99ae3eae87382c44d"
-  integrity sha512-AxgWETjCa6CQ7dduFOGFeeGpAc+oEh5fhPz3uBouAK1mVPcvnCNKSeV337oFlYqhQ8brXIwI5fNh26M6/l+1vQ==
-
-"@orbs-network/spot@^2.8.1":
-  version "2.8.1"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot/-/spot-2.8.1.tgz#694523da348c4f5bf1ab5aa587024b1065951a11"
-  integrity sha512-EHSXcMMOcPWXxKtF8/w2Qrs7lB2AG4b3vinICjHPga1BFBYft31okYAReWIKAXLKNjun182+q1Dqso+bVqLM1Q==
+"@orbs-network/spot-ui@2.1.4":
+  version "2.1.4"
+  resolved "https://registry.npmjs.org/@orbs-network/spot-ui/-/spot-ui-2.1.4.tgz#b5837bfbddd26e71f25aa3be50106d729309aee4"
+  integrity sha512-xjcMItGpsCfkQl0UZbeuTZ6pQa/NVtAE3WbY69CmnnFgKRdypGJJsMDo2YAyv5vJg9F5v5+09F5x50OVOEoEHw==
 
 "@orbs-network/swap-ui@^0.0.61":
   version "0.0.61"
   resolved "https://registry.yarnpkg.com/@orbs-network/swap-ui/-/swap-ui-0.0.61.tgz#ec82fffbd68274373f965f247e405aa7d17d86b3"
   integrity sha512-GCPAXf69usNQulQbMNGpGW+cgvoeu/R6T8xKiL7pSMMYs6L2sMP8b2YBeHn53lO8/LRaFrFDf28EB7Gh7xzgiQ==
-
-"@orbs-network/twap@^2.7.28":
-  version "2.7.29"
-  resolved "https://registry.yarnpkg.com/@orbs-network/twap/-/twap-2.7.29.tgz#224724d35d834f4b90d2daf629cee9551c200e67"
-  integrity sha512-6Va1LQZc3o5F5a0FyHozRoBJNacX4K4BfjMevlAmmnx5Sgb6YEhTYMYiIpMwzBpcRB4vMlCIEbKtzPLTcxwUsw==
 
 "@paraswap/core@2.4.3":
   version "2.4.3"

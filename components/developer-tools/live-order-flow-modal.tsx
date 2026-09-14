@@ -21,8 +21,7 @@ import { useConnection } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
   isNativeAddress,
-  submitOrder,
-  useSpot,
+  type RePermitData,
 } from "@orbs-network/spot-react";
 
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,7 @@ import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
 import { getActiveSpotPartner } from "@/lib/partners/spot";
 import {
   isUserRejectedError,
-  showTransactionRejectedToast,
+  dismissTransactionRejectedToast,
 } from "@/lib/tx-rejection";
 
 import {
@@ -73,20 +72,11 @@ import {
 import { OrdersSinkGuideLink } from "./orders-sink-guide-link";
 import { DeveloperGuideLink } from "./developer-guide-link";
 import { getSpotDocsHref } from "@/lib/developer-docs";
+import { useDeveloperOrder } from "../advanced-order/use-developer-order";
 import type { CalculatedOrderForm } from "@orbs-network/spot-ui";
 import { calculateEditedOrderForm, getLiveOrderFormInput, rebuildCalculatedPermit, validateOrderFormInput } from "./order-form-calculation";
 
-type LivePermitData = NonNullable<
-  ReturnType<typeof useSpot>["derivedFormData"]["rePermitData"]
->;
-
-// The SDK runtime forwards this value unchanged, but the installed declaration
-// still describes the legacy v/r/s object. Keep that compatibility detail at
-// this boundary while the app and API use the regular EIP-712 hex signature.
-const submitOrderWithEip712Signature = submitOrder as unknown as (
-  order: Parameters<typeof submitOrder>[0],
-  signature: Hex,
-) => ReturnType<typeof submitOrder>;
+type LivePermitData = RePermitData;
 
 type DeveloperOrderStep =
   | "flow"
@@ -327,7 +317,7 @@ function LiveOrderFlowModalContent({
   trigger: ReactElement;
   triggerTooltip?: string;
 }) {
-  const spot = useSpot();
+  const spot = useDeveloperOrder();
   const flowToastId = useId();
   const actionToastId = useId();
   const { address: connectedAccount } = useConnection();
@@ -360,10 +350,10 @@ function LiveOrderFlowModalContent({
   const [savedCalculationContext, setSavedCalculationContext] = useState<string>();
   const [calculationInput, setCalculationInput] = useState<JsonContainer>();
   const [calculatedForm, setCalculatedForm] = useState<CalculatedOrderForm>();
-  const timingPermitData = useMemo(() => calculatedForm
-    ? rebuildCalculatedPermit(currentPermitData, calculatedForm, connectedAccount ?? PLACEHOLDER_ACCOUNT)
+  const timingPermitData = useMemo(() => calculatedForm && spot.client
+    ? rebuildCalculatedPermit(currentPermitData, calculatedForm, connectedAccount ?? PLACEHOLDER_ACCOUNT, spot.client)
     : currentPermitData,
-    [calculatedForm, connectedAccount, currentPermitData],
+    [calculatedForm, connectedAccount, currentPermitData, spot.client],
   );
 
   const [open, setOpen] = useState(false);
@@ -505,8 +495,9 @@ function LiveOrderFlowModalContent({
         throw new Error("The chain or token pair changed. Reopen the flow to recalculate this order.");
       }
       if (step === "flow") {
+        if (!spot.client) throw new Error("Spot client is not ready");
         const nextPermitData = calculatedForm
-          ? rebuildCalculatedPermit(currentPermitData, calculatedForm, connectedAccount ?? PLACEHOLDER_ACCOUNT)
+          ? rebuildCalculatedPermit(currentPermitData, calculatedForm, connectedAccount ?? PLACEHOLDER_ACCOUNT, spot.client)
           : permitData;
         setPermitData(nextPermitData);
         if (calculatedForm) setSignatureData(createSignatureData(nextPermitData, partner, currentSourceTokenAddress));
@@ -597,13 +588,15 @@ function LiveOrderFlowModalContent({
       }
 
       if (step === "sign") {
+        if (!spot.client) throw new Error("Spot client is not ready");
+        const signingTiming = rebuildCalculatedPermit(permitData, calculatedForm ?? spot.derivedFormData.form, connectedAccount ?? PLACEHOLDER_ACCOUNT, spot.client);
         const freshPermitData = refreshPermitTiming(
           permitData,
-          timingPermitData,
+          signingTiming,
         );
         const freshSignatureData = refreshSignatureTiming(
           signatureData,
-          timingPermitData,
+          signingTiming,
         );
         const executionPermitData = applySignatureData(
           freshPermitData,
@@ -662,10 +655,22 @@ function LiveOrderFlowModalContent({
           throw new Error("Sign the order before submitting it");
         }
 
-        const order = await submitOrderWithEip712Signature(
-          permitData.order,
-          orderSignature,
-        );
+        if (!spot.client) throw new Error("Spot client is not ready");
+        const prepared = spot.client.prepareOrder({
+          form: calculatedForm ?? spot.derivedFormData.form,
+          inputTokenAddress: permitData.order.permitted.token,
+          outputTokenAddress: permitData.order.witness.output.token,
+          swapperAddress: permitData.order.witness.swapper,
+        });
+        // Preserve the exact developer-edited order that the wallet signed.
+        const order = await spot.client.submitOrder({
+          ...prepared,
+          order: permitData.order,
+          signingRequest: { ...prepared.signingRequest, typedData: {
+            domain: permitData.domain, types: permitData.types,
+            primaryType: permitData.primaryType, message: permitData.order,
+          } },
+        }, orderSignature);
 
         setCreatedOrder({
           data: JSON.parse(JSON.stringify(order)) as JsonContainer,
@@ -687,7 +692,7 @@ function LiveOrderFlowModalContent({
       }
     } catch (executionError) {
       if (isUserRejectedError(executionError)) {
-        showTransactionRejectedToast({
+        dismissTransactionRejectedToast({
           id: actionToastId,
           position: "bottom-right",
         });
@@ -713,7 +718,6 @@ function LiveOrderFlowModalContent({
     connectedAccount,
     currentSourceTokenAddress,
     partner,
-    timingPermitData,
     currentPermitData,
     createdOrder,
     getTokenAllowance,
@@ -725,6 +729,8 @@ function LiveOrderFlowModalContent({
     signatureData,
     sourceIsNative,
     spot.orderHistoryPanel,
+    spot.client,
+    spot.derivedFormData.form,
     step,
     wrapNativeToken,
   ]);
@@ -749,8 +755,9 @@ function LiveOrderFlowModalContent({
   );
 
   const handleSaveCalculation = useCallback((data: JsonContainer) => {
+    if (!spot.client) throw new Error("Spot client is not ready");
     const form = calculateEditedOrderForm(data);
-    const nextPermitData = rebuildCalculatedPermit(currentPermitData, form, connectedAccount ?? PLACEHOLDER_ACCOUNT);
+    const nextPermitData = rebuildCalculatedPermit(currentPermitData, form, connectedAccount ?? PLACEHOLDER_ACCOUNT, spot.client);
     setCalculationInput(data);
     setCalculatedForm(form);
     setSavedCalculationContext(calculationContext);
@@ -762,7 +769,7 @@ function LiveOrderFlowModalContent({
     setShowCreatedOrder(false);
     setApprovalRequired(false);
     setNavigation({ history: ["flow"], viewedIndex: 0 });
-  }, [calculationContext, connectedAccount, currentPermitData, currentSourceTokenAddress, partner]);
+  }, [calculationContext, connectedAccount, currentPermitData, currentSourceTokenAddress, partner, spot.client]);
 
   const presentation = useMemo<StepPresentation>(() => {
     const tokenAddress = permitData.order.permitted.token;
@@ -773,7 +780,7 @@ function LiveOrderFlowModalContent({
         data: calculationInput ?? calculationDefaults,
         editable: !isRunning && step !== "success",
         explanation:
-          "Edit calculate-order-form.ts and save to rebuild the live RePermit data before checking allowance and signing. Examples target @orbs-network/spot-ui 2.1.2 or later.",
+          "Edit the inline calculation inputs and save to rebuild the live RePermit data before checking allowance and signing. Examples target @orbs-network/spot-ui 2.1.2 or later.",
         title: "Advanced Orders Typescript SDK flow",
       };
     }
@@ -1029,7 +1036,7 @@ function LiveOrderFlowModalContent({
             validate={viewedStep === "flow" ? validateOrderFormInput : undefined}
             isValueEditable={
               viewedStep === "flow"
-                ? (path) => !["module", "inputTokenDecimals", "outputTokenDecimals"].includes(String(path.at(-1)))
+                ? (path) => path[0] === "formParams"
                 : viewedStep === "sign"
                 ? isSignatureValueEditable
                 : viewedStep === "approve"
@@ -1130,7 +1137,7 @@ export function LiveOrderFlowModal({
   trigger: ReactElement;
   triggerTooltip?: string;
 }) {
-  const spot = useSpot();
+  const spot = useDeveloperOrder();
   const currentPermitData = spot.derivedFormData.rePermitData;
   const configError = spot.submitOrderButton.error;
   const configLoading = spot.submitOrderButton.loading;
@@ -1162,7 +1169,7 @@ export function LiveOrderFlowModal({
         disabled
         className="h-12 rounded-[14px]"
       >
-        Loading config
+        {configLoading ? "Loading config" : "Enter an amount and connect a wallet"}
       </Button>
     );
   }

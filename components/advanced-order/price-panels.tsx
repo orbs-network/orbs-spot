@@ -14,7 +14,7 @@ import { useCurrency } from "@/lib/hooks/use-currencies";
 import { useTranslations } from "@/lib/use-translations";
 import { Currency, Field } from "@/lib/types";
 import { cn, formatDecimals } from "@/lib/utils";
-import { Module, type Token, useSpot } from "@orbs-network/spot-react";
+import { Module, type Token, usePriceDisplay, useTriggerPrice, useLimitPrice } from "@orbs-network/spot-react";
 import { ArrowLeftRightIcon } from "lucide-react";
 import { useCallback } from "react";
 
@@ -139,17 +139,16 @@ function PriceResetButton({ onClick }: { onClick: () => void }) {
 
 function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
   const t = useTranslations();
-  const { isInverted } = useSpot().pricePanel;
+  const { isInverted } = usePriceDisplay();
   const {
-    priceUI: price,
+    price: { ui: price, usd },
     onInputChange,
     percentage,
     onPercentageChange,
     onReset,
-    invertedDstToken,
+    displayOutputToken: invertedDstToken,
     isTypedValue,
-    usd,
-  } = useSpot().triggerPricePanel;
+  } = useTriggerPrice();
 
   if (orderModule !== Module.STOP_LOSS && orderModule !== Module.TAKE_PROFIT) {
     return null;
@@ -186,19 +185,18 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
 
 function LimitPricePanel({ orderModule }: { orderModule: Module }) {
   const t = useTranslations();
-  const { isInverted } = useSpot().pricePanel;
+  const { isInverted } = usePriceDisplay();
   const {
     onInputChange,
-    priceUI,
+    price: { ui: priceUI, usd },
     percentage,
     onPercentageChange,
-    isLimitPrice,
-    toggleLimitPrice,
+    isEnabled: isLimitPrice,
+    toggle: toggleLimitPrice,
     onReset,
-    invertedDstToken,
+    displayOutputToken: invertedDstToken,
     isTypedValue,
-    usd,
-  } = useSpot().limitPricePanel;
+  } = useLimitPrice();
 
   return (
     <div className="flex flex-col gap-2">
@@ -235,8 +233,8 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
 }
 
 function PricesHeader() {
-  const { onInvert, isInverted, fromToken, isMarketPrice } =
-    useSpot().pricePanel;
+  const { onInvert, isInverted, displayInputToken: fromToken, isMarketOrder: isMarketPrice } =
+    usePriceDisplay();
   const fromTokenField = isInverted ? Field.OUTPUT : Field.INPUT;
 
   return (

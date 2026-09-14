@@ -7,7 +7,7 @@ import { useToAmountWei } from "@/lib/hooks/common";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import {
   isUserRejectedError,
-  showTransactionRejectedToast,
+  dismissTransactionRejectedToast,
 } from "@/lib/tx-rejection";
 import { useTranslations } from "@/lib/use-translations";
 import { Currency } from "@/lib/types";
@@ -33,7 +33,7 @@ import {
   type OnWrapSuccessCallback,
   type Order,
   type ParsedError,
-  type SignOrderProps,
+  type OrderSigningRequest,
   type Token,
   type WalletInteractions,
 } from "@orbs-network/spot-react";
@@ -129,7 +129,7 @@ export function useWalletInteractions() {
           return hash;
         } catch (error) {
           if (isUserRejectedError(error)) {
-            showTransactionRejectedToast({ id: WRAP_TOAST_ID });
+            dismissTransactionRejectedToast({ id: WRAP_TOAST_ID });
           }
 
           throw error;
@@ -145,7 +145,7 @@ export function useWalletInteractions() {
           return hash;
         } catch (error) {
           if (isUserRejectedError(error)) {
-            showTransactionRejectedToast({ id: APPROVE_TOAST_ID });
+            dismissTransactionRejectedToast({ id: APPROVE_TOAST_ID });
           }
 
           throw error;
@@ -170,28 +170,28 @@ export function useWalletInteractions() {
           return hash;
         } catch (error) {
           if (isUserRejectedError(error)) {
-            showTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
+            dismissTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
           }
 
           throw error;
         }
       },
-      signOrder: async (props: SignOrderProps) => {
+      signOrder: async (props: OrderSigningRequest) => {
         if (!walletClient) {
           throw new Error("Wallet client not found");
         }
 
         try {
           return await signTypedData({
-            domain: props.domain as any,
-            types: props.types as any,
-            primaryType: props.primaryType,
-            message: props.message as any,
-            account: props.account,
+            domain: props.typedData.domain as any,
+            types: props.typedData.types as any,
+            primaryType: props.typedData.primaryType,
+            message: props.typedData.message as any,
+            account: props.signerAddress,
           });
         } catch (error) {
           if (isUserRejectedError(error)) {
-            showTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
+            dismissTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
           }
 
           throw error;
@@ -324,7 +324,7 @@ export function useSpotCallbacks() {
       },
       onSubmitOrderFailed: ({ code, message }: ParsedError) => {
         if (isUserRejectedError({ code, message })) {
-          showTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
+          dismissTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
           return;
         }
 
@@ -337,7 +337,7 @@ export function useSpotCallbacks() {
         );
       },
       onSubmitOrderRejected: () => {
-        showTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
+        dismissTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
       },
       onCancelOrderRequest: () => {
         toast.loading(`${t("cancelOrder")}…`, {
@@ -358,7 +358,7 @@ export function useSpotCallbacks() {
       },
       onCancelOrderFailed: (error: Error) => {
         if (isUserRejectedError(error)) {
-          showTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
+          dismissTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
           return;
         }
 

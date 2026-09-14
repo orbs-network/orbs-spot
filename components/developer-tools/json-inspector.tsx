@@ -94,6 +94,7 @@ export type CodeSnippetFileOptions = {
 };
 
 export type CodeSnippetOptions = {
+  inlineEditRoot?: JsonValuePath;
   showFieldTooltips?: boolean;
   copyLabel?: string;
   fileName?: string;
@@ -479,6 +480,7 @@ type JsonLineAnnotation = {
 const buildCodeLineAnnotations = (
   code: string,
   data: JsonContainer,
+  rootPath: JsonValuePath = [],
 ) => {
   const annotations = new Map<number, JsonLineAnnotation>();
   const contexts: Array<{
@@ -504,7 +506,7 @@ const buildCodeLineAnnotations = (
     }
 
     const path = [
-      ...(contexts.at(-1)?.path ?? []),
+      ...(contexts.at(-1)?.path ?? rootPath),
       key,
     ];
 
@@ -820,8 +822,8 @@ function JsonInspectorModalContent({
       return new Map<number, JsonLineAnnotation>();
     }
 
-    return buildCodeLineAnnotations(formattedCode, data);
-  }, [activeCodeIsInlineEditable, data, formattedCode]);
+    return buildCodeLineAnnotations(formattedCode, data, codeSnippet?.inlineEditRoot);
+  }, [activeCodeIsInlineEditable, data, formattedCode, codeSnippet?.inlineEditRoot]);
   const codeLineExplanations = useMemo(() => {
     const explanations = new Map<
       number,

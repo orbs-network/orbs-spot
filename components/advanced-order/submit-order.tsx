@@ -1,5 +1,9 @@
 "use client";
 
+import { useOrderReview } from "./use-order-review";
+import { getExplorerUrl } from "@/lib/utils";
+import { SUPPORTED_CHAINS } from "@/lib/consts";
+
 import { LiveOrderFlowTrigger } from "@/components/developer-tools/live-order-flow-trigger";
 import { SubmitSwapButton } from "@/components/submit-swap-button";
 import { SwapFlowLoader } from "@/components/swap-flow-loader";
@@ -23,24 +27,36 @@ import {
   isNativeAddress,
   Module,
   Steps,
-  SwapStatus,
-  useExplorerLink,
-  useNetwork,
-  useSpot,
+  ExecutionStatus,
+  ExecutionPhase,
+  useExecution,
+  useSubmitButton,
   type ParsedError,
   type Token,
 } from "@orbs-network/spot-react";
-import { Step, SwapFlow } from "@orbs-network/swap-ui";
+import { Step, SwapFlow, SwapStatus } from "@orbs-network/swap-ui";
 import BN from "bignumber.js";
 import { AlertTriangleIcon, ArrowRightIcon, CheckIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useConnection } from "wagmi";
 import { Field, type Currency } from "@/lib/types";
-import { formatDeadline, formatDuration, getOrderTitle } from "./utils";
+import { formatDuration, getOrderTitle } from "./utils";
+
+function useSubmitOrderExecution() {
+  const execution = useExecution();
+  // Allowance is read during preparation. Keep review visible and let the
+  // submit button's isExecuting loader indicate that work is in progress.
+  const showReview = execution.isRejected || execution.phase === ExecutionPhase.PREPARING;
+  return {
+    ...execution,
+    status: showReview ? undefined : execution.status,
+    error: execution.isRejected ? undefined : execution.error,
+  };
+}
 
 function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
   const t = useTranslations();
-  const order = useSpot().derivedFormData;
+  const order = useOrderReview();
   const srcToken = order.srcToken;
   const dstToken = order.dstToken;
   const minReceived = useFormatNumber({
@@ -75,7 +91,7 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         labelClassName="text-xs leading-5"
         valueClassName="text-xs leading-5"
       >
-        {formatDeadline(order.deadline)}
+        {formatDuration(order.durationMillis)}
       </DetailRow>
       <DetailRow
         label={t("triggerPrice")}
@@ -173,13 +189,13 @@ function TxError({ error }: { error?: ParsedError }) {
 
 function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
   const t = useTranslations();
-  const { step, wrapTxHash, approveTxHash, status } =
-    useSpot().orderExecutionPanel;
-  const network = useNetwork();
-  const wrapExplorerUrl = useExplorerLink(wrapTxHash);
-  const approveExplorerUrl = useExplorerLink(approveTxHash);
+  const { currentStep: step, wrapTxHash, approvalTxHash: approveTxHash, status, chainId } =
+    useSubmitOrderExecution();
+  const network = SUPPORTED_CHAINS.find((chain) => chain.id === chainId);
+  const wrapExplorerUrl = getExplorerUrl(chainId, wrapTxHash);
+  const approveExplorerUrl = getExplorerUrl(chainId, approveTxHash);
   const symbol = isNativeAddress(srcToken?.address ?? "")
-    ? (network?.native?.symbol ?? srcToken?.symbol ?? "")
+    ? (network?.nativeCurrency.symbol ?? srcToken?.symbol ?? "")
     : (srcToken?.symbol ?? "");
 
   return useMemo(() => {
@@ -204,7 +220,7 @@ function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
     return {
       title: t("createOrderAction", { name: orderTitle }),
       footerText:
-        status === SwapStatus.LOADING ? t("proceedInWallet") : undefined,
+        status === ExecutionStatus.LOADING ? t("proceedInWallet") : undefined,
     };
   }, [
     approveExplorerUrl,
@@ -228,7 +244,7 @@ function OrderFlowMain({
 }) {
   const t = useTranslations();
   const [accepted, setAccepted] = useState(true);
-  const { status } = useSpot().orderExecutionPanel;
+  const { status } = useSubmitOrderExecution();
   const isSubmitted = Boolean(status);
 
   return (
@@ -274,7 +290,7 @@ function OrderFlowMain({
 }
 
 function OrderUsd({ kind }: { kind: "src" | "dst" }) {
-  const order = useSpot().derivedFormData;
+  const order = useOrderReview();
   const value = kind === "src" ? order.srcAmountUsd : order.dstAmountUsd;
   const formatted = useFormatNumber({ value, decimalScale: 2 });
   return <p className="text-sm text-muted-foreground">${formatted || "0"}</p>;
@@ -369,9 +385,9 @@ function SubmitOrderPanel({
   onSubmit: () => void;
   isSubmitting?: boolean;
 }) {
-  const { status, stepIndex, totalSteps, parsedError, srcToken, dstToken } =
-    useSpot().orderExecutionPanel;
-  const order = useSpot().derivedFormData;
+  const { status, currentStepIndex: stepIndex, totalSteps, error: parsedError, inputToken: srcToken, outputToken: dstToken } =
+    useSubmitOrderExecution();
+  const order = useOrderReview();
   const srcAmount = useFormatNumber({
     value: order.srcAmountUI,
   });
@@ -395,7 +411,7 @@ function SubmitOrderPanel({
     <SwapFlow
       inAmount={srcAmount}
       outAmount={dstAmount}
-      swapStatus={status}
+      swapStatus={status === ExecutionStatus.LOADING ? SwapStatus.LOADING : status === ExecutionStatus.SUCCESS ? SwapStatus.SUCCESS : status === ExecutionStatus.FAILED ? SwapStatus.FAILED : undefined}
       totalSteps={totalSteps}
       currentStep={currentStep}
       currentStepIndex={stepIndex}
@@ -444,16 +460,17 @@ function SubmitOrderPanel({
 
 export function SubmitOrder({ orderModule }: { orderModule: Module }) {
   const t = useTranslations();
-  const spot = useSpot();
   const {
-    onSubmit,
+    submitOrder: onSubmit,
     status,
-    resetState,
-    resetCurrentSwap,
-    parsedError,
-    confirmButtonLoading,
-  } = spot.orderExecutionPanel;
-  const { disabled, loading } = spot.submitOrderButton;
+    startNewOrder: resetState,
+    returnToOrderForm: resetCurrentSwap,
+    error: parsedError,
+    isExecuting: confirmButtonLoading,
+    isRejected,
+  } = useSubmitOrderExecution();
+  const { disabled, loading } = useSubmitButton();
+  const isFetchingQuote = loading && !confirmButtonLoading;
   const { handleCurrencyChange, setInputAmount } = useActionHandlers();
   const pendingWrappedInputAddress = useOrderSubmitFlowStore(
     (state) => state.pendingWrappedInputAddress,
@@ -464,6 +481,10 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
   const { chainId } = useConnection();
   const [open, setOpen] = useState(false);
   const orderTitle = getOrderTitle(orderModule, t);
+
+  useEffect(() => {
+    if (isRejected) resetCurrentSwap();
+  }, [isRejected, resetCurrentSwap]);
 
   useEffect(() => {
     if (open || !pendingWrappedInputAddress) return;
@@ -485,14 +506,14 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
 
   const onOpen = useCallback(() => {
     setOpen(true);
-    if (status !== SwapStatus.LOADING) {
+    if (status !== ExecutionStatus.LOADING) {
       resetCurrentSwap();
     }
   }, [resetCurrentSwap, setOpen, status]);
 
   const closeReview = useCallback(() => {
     setOpen(false);
-    if (status === SwapStatus.SUCCESS) {
+    if (status === ExecutionStatus.SUCCESS) {
       setInputAmount("");
       window.setTimeout(resetState, 400);
     } else if (status) {
@@ -510,8 +531,8 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
           <SubmitSwapButton
             onClick={onOpen}
             disabled={disabled}
-            isLoading={loading}
-            text={loading ? t("fetchingQuote") : t("placeOrder")}
+            isLoading={isFetchingQuote}
+            text={isFetchingQuote ? t("fetchingQuote") : t("placeOrder")}
             validateSwap={false}
             chainId={chainId}
           />

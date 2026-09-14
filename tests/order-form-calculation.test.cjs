@@ -2,7 +2,7 @@
 const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { resolve } = require("node:path");
-const { test } = require("node:test");
+const { test, before } = require("node:test");
 const ts = require("typescript");
 
 // Exercise the actual SDK and the app's TypeScript adapter with Node's test runner.
@@ -35,11 +35,21 @@ const template = () => ({
   order: {
     permitted: { token: inputToken, amount: "1" }, nonce: "1700000000123", deadline: "1700000060",
     witness: {
+      exchange: { adapter: spender },
       chainid: 137, swapper: account, nonce: "1700000000123", start: "1700000000", deadline: "1700000060",
       input: { token: inputToken, amount: "1", maxAmount: "1" },
       output: { token: outputToken, recipient: account, limit: "0", triggerLower: "0", triggerUpper: "0" },
     },
   },
+});
+
+let client;
+before(async () => {
+  const sdk = require("@orbs-network/spot-ui");
+  const originalFetch = global.fetch;
+  global.fetch = async () => ({ ok: true, json: async () => template() });
+  try { client = await sdk.createClient(sdk.getPartners().find(p => p.chainId === 137).name, 137); }
+  finally { global.fetch = originalFetch; }
 });
 
 test("edited amount and trade count rebuild the live spending and per-trade amounts", () => {
@@ -50,7 +60,7 @@ test("edited amount and trade count rebuild the live spending and per-trade amou
   const form = calculateEditedOrderForm(input);
   const before = template();
   const original = structuredClone(before);
-  const result = rebuildCalculatedPermit(before, form, account);
+  const result = rebuildCalculatedPermit(before, form, account, client);
   assert.equal(result.order.permitted.amount, "2000000000000000000");
   assert.equal(result.order.witness.input.maxAmount, "2000000000000000000");
   assert.equal(result.order.witness.input.amount, "100000000000000000");
@@ -61,7 +71,8 @@ test("edited amount and trade count rebuild the live spending and per-trade amou
   assert.deepEqual(before, original);
 });
 
-test("edited duration, interval, protection and account survive timing refresh", () => {
+test("edited duration, interval, protection and account survive timing refresh", (t) => {
+  t.mock.method(Date, "now", () => 1800000000000);
   const input = defaults();
   input.formParams.userInput.orderDuration.value = 24;
   input.formParams.userInput.tradeInterval.value = 10;
@@ -71,12 +82,12 @@ test("edited duration, interval, protection and account survive timing refresh",
   fresh.order.witness.start = "1700000100";
   fresh.order.nonce = fresh.order.witness.nonce = "1700000100456";
   const newAccount = "0x6666666666666666666666666666666666666666";
-  const result = rebuildCalculatedPermit(fresh, form, newAccount);
+  const result = rebuildCalculatedPermit(fresh, form, newAccount, client);
   assert.equal(result.order.witness.epoch, 600);
   assert.equal(result.order.witness.slippage, 200);
-  assert.equal(result.order.deadline, String(1700000100 + 24 * 3600 + 60));
+  assert.equal(result.order.deadline, String(Number(result.order.witness.start) + 24 * 3600 + 60));
   assert.equal(result.order.witness.deadline, result.order.deadline);
-  assert.equal(result.order.nonce, "1700000100456");
+  assert.ok(BigInt(result.order.nonce) > BigInt(fresh.order.nonce));
   assert.equal(result.order.witness.nonce, result.order.nonce);
   assert.equal(result.order.witness.swapper, newAccount);
   assert.equal(result.order.witness.output.recipient, newAccount);
@@ -101,7 +112,7 @@ test("trigger order edits populate the correct RePermit bound", () => {
     input.formParams.userInput.tradeCount = 1;
     input.formParams.userInput.triggerPriceUi = price;
     const form = calculateEditedOrderForm(input);
-    const result = rebuildCalculatedPermit(template(), form, account);
+    const result = rebuildCalculatedPermit(template(), form, account, client);
     assert.equal(result.order.witness.output[bound], form.values.triggerOutputAmountPerTrade);
     assert.notEqual(result.order.witness.output[bound], "0");
     assert.equal(result.order.witness.epoch, 0);

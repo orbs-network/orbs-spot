@@ -151,20 +151,22 @@ return await client.submitOrder(prepared, signature);`;
 
 const ADVANCED_CLIENT_HELPER = `let clientPromise: ReturnType<typeof createClient> | undefined;
 
-function getClient(chainId: number) {
-  clientPromise ??= createClient(partner, chainId).catch((error) => {
+function getClient() {
+  clientPromise ??= createClient(partner, chain.id).catch((error) => {
     clientPromise = undefined;
     throw error;
   });
   return clientPromise;
 }`;
 
-export function formatAdvancedOrdersSdkFlow(): string {
+export function formatAdvancedOrdersSdkFlow(data: JsonContainer = {}): string {
+  const params = Array.isArray(data) ? {} : data.formParams ?? {};
+  const calculationInput = JSON.stringify(params, null, 2)
+    .replace(/"module": "(TWAP|LIMIT|STOP_LOSS|TAKE_PROFIT)"/, '"module": Module.$1');
   return `// advanced-orders.ts — requires @orbs-network/spot-ui 2.1.2 or later.
-import { calculateOrderForm, createClient, isNativeAddress, Partners } from "@orbs-network/spot-ui";
+import { calculateOrderForm, createClient, isNativeAddress, Module, Partners } from "@orbs-network/spot-ui";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import { polygon } from "viem/chains";
-import { getOrderForm } from "./calculate-order-form";
 
 // Browser example: use the chain selected in the host wallet.
 const chain = polygon;
@@ -181,15 +183,10 @@ export type OrderInput = {
 };
 
 export async function createAdvancedOrderFlow(account: Address, input: OrderInput) {
-  const chainId = walletClient.chain?.id;
-  if (!chainId || await walletClient.getChainId() !== chainId ||
-      await publicClient.getChainId() !== chainId) {
-    throw new Error("Connect the wallet and RPC to the same chain");
-  }
-  const form = calculateOrderForm(getOrderForm().formParams);
+  const form = calculateOrderForm(${calculationInput.split("\n").join("\n  ")});
   if (!form.canSubmit) throw new Error("Resolve the order form errors first");
 
-  const client = await getClient(chainId);
+  const client = await getClient();
   const sourceIsNative = isNativeAddress(input.inputToken);
   const inputToken = sourceIsNative ? input.wrappedNativeToken : input.inputToken;
 
@@ -294,25 +291,13 @@ Swap steps
 `;
 }
 
-export function formatOrderFormCalculation(data: JsonContainer): string {
-  const params = Array.isArray(data) ? {} : data.formParams ?? {};
-  const serialized = JSON.stringify({ formParams: params }, null, 2)
-    .replace(/"module": "(TWAP|LIMIT|STOP_LOSS|TAKE_PROFIT)"/, '"module": Module.$1');
-  return `import { Module } from "@orbs-network/spot-ui";
-
-// Edit these inputs, then save to recalculate the live order's RePermit data.
-export function getOrderForm() {
-  return ${serialized.split("\n").join("\n  ")};
-}
-`;
-}
-
 export const ADVANCED_ORDERS_SDK_FLOW: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "advanced-orders.ts",
   format: formatAdvancedOrdersSdkFlow,
   getFieldExplanation: getOrderFormFieldExplanation,
-  files: [{ name: "calculate-order-form.ts", format: formatOrderFormCalculation, syntaxLanguage: "typescript", inlineEditable: true }],
+  inlineEditable: true,
+  inlineEditRoot: ["formParams"],
   language: "TypeScript",
   syntaxLanguage: "typescript",
   hideStatusLabel: true,
@@ -345,7 +330,7 @@ export function formatAdvancedOrdersSdkStep(step: AdvancedOrdersSdkStep, data?: 
     sign: `import type { CalculatedOrderForm } from "@orbs-network/spot-ui";
 
 export async function signOrder(account: Address, input: OrderInput, form: CalculatedOrderForm) {
-  const client = await getClient(chain.id);
+  const client = await getClient();
   if (!form.canSubmit) throw new Error("Resolve the order form errors first");
   const inputToken = isNativeAddress(input.inputToken) ? input.wrappedNativeToken : input.inputToken;
 

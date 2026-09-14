@@ -1,9 +1,9 @@
-import { calculateOrderForm, Module, type CalculatedOrderForm, type CalculateOrderFormParams, type RePermitData } from "@orbs-network/spot-ui";
-import { buildRePermitOrderData, type useSpot } from "@orbs-network/spot-react";
+import { calculateOrderForm, Module, type CalculatedOrderForm, type CalculateOrderFormParams, type SpotClient, type RePermitData } from "@orbs-network/spot-ui";
+import type { useDeveloperOrder } from "../advanced-order/use-developer-order";
 import BN from "bignumber.js";
 import type { JsonContainer, JsonValidationIssue } from "./json-inspector";
 
-type SpotData = ReturnType<typeof useSpot>;
+type SpotData = ReturnType<typeof useDeveloperOrder>;
 
 export function getLiveOrderFormInput(spot: SpotData): JsonContainer {
   const data = spot.derivedFormData;
@@ -12,18 +12,18 @@ export function getLiveOrderFormInput(spot: SpotData): JsonContainer {
     return value.isFinite() && value.gt(0) ? value.toFixed() : "0";
   };
   const params: CalculateOrderFormParams = {
-    module: Module[spot.module],
+    module: spot.module,
     inputTokenDecimals: data.srcToken?.decimals ?? 18,
     outputTokenDecimals: data.dstToken?.decimals ?? 18,
-    quotedOutputAmountRaw: data.dstAmount || "0",
+    quotedOutputAmountRaw: new BN(data.form.marketPrice.raw || "0").times(data.srcAmountUI || "0").toFixed(0),
     inputTokenUsdPrice: unitPrice(data.srcAmountUsd, data.srcAmountUI),
     outputTokenUsdPrice: unitPrice(data.dstAmountUsd, data.dstAmountUI),
     minTradeSizeUsd: 5,
-    priceProtectionPercent: (data.rePermitData?.order.witness.slippage ?? 300) / 100,
+    priceProtectionPercent: data.form.values.slippageBps / 100,
     displayFeePercent: data.feesPercentage,
     userInput: {
       inputAmountUi: data.srcAmountUI,
-      isMarketOrder: data.isMarketOrder ?? false,
+      isMarketOrder: data.form.values.isMarketOrder,
       tradeCount: data.totalTrades,
       tradeInterval: spot.fillDelayPanel.fillDelay,
       orderDuration: spot.durationPanel.duration,
@@ -73,28 +73,12 @@ export function validateOrderFormInput(data: JsonContainer): JsonValidationIssue
   }
 }
 
-export function rebuildCalculatedPermit(permitData: RePermitData, form: CalculatedOrderForm, account: string): RePermitData {
-  const values = form.values;
-  const currentTimeMillis = Number(permitData.order.witness.start) * 1000;
-  const result = buildRePermitOrderData({
-    permitData,
-    chainId: Number(permitData.domain.chainId),
-    module: form.module,
-    srcTokenAddress: permitData.order.permitted.token,
-    dstTokenAddress: permitData.order.witness.output.token,
+export function rebuildCalculatedPermit(permitData: RePermitData, form: CalculatedOrderForm, account: string, client: SpotClient): RePermitData {
+  const prepared = client.prepareOrder({
+    form,
+    inputTokenAddress: permitData.order.permitted.token,
+    outputTokenAddress: permitData.order.witness.output.token,
     swapperAddress: account,
-    totalSrcAmount: values.inputAmount,
-    srcAmountPerTrade: values.inputAmountPerTrade,
-    minDstAmountPerTrade: values.minOutputAmountPerTrade,
-    triggerAmountPerTrade: values.triggerOutputAmountPerTrade,
-    totalTrades: values.totalTrades,
-    fillDelayMillis: values.fillDelayMillis,
-    slippageBps: values.slippageBps,
-    currentTimeMillis,
-    deadlineMillis: currentTimeMillis + values.duration.unit * values.duration.value + 60_000,
   });
-  // Keep the fresh nonce from the host rather than rounding it to start seconds.
-  result.order.nonce = permitData.order.nonce;
-  result.order.witness.nonce = permitData.order.witness.nonce;
-  return result;
+  return { ...client.rePermitData, order: prepared.order };
 }

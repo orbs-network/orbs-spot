@@ -47,7 +47,7 @@ import { useWrap } from "@/lib/hooks/use-wrap";
 import { getActiveLiquidityHubPartnerId } from "@/lib/partners/liquidity-hub";
 import {
   isUserRejectedError,
-  showTransactionRejectedToast,
+  dismissTransactionRejectedToast,
 } from "@/lib/tx-rejection";
 import { getWrappedNativeCurrency, isNativeAddress } from "@/lib/utils";
 import {
@@ -268,11 +268,6 @@ export function LiquidityHubDeveloperContent({
     useGetTransactionReceiptCallback();
   const { mutateAsync: signQuote } = useSignEip();
   const { mutateAsync: wrap } = useWrap();
-  const { approve, ensureAllowance } = useApproval(
-    permit2Address,
-    inputCurrency?.address,
-    parsedInputAmount,
-  );
   const [open, setOpen] = useState(false);
   const [triggerTooltipOpen, setTriggerTooltipOpen] = useState(false);
   const [navigation, setNavigation] = useState<StepNavigation>({
@@ -280,6 +275,11 @@ export function LiquidityHubDeveloperContent({
     viewedIndex: 0,
   });
   const [executionQuote, setExecutionQuote] = useState<Quote>();
+  const { approve, ensureAllowance } = useApproval(
+    permit2Address,
+    executionQuote?.inToken ?? inputCurrency?.address,
+    executionQuote?.inAmount ?? parsedInputAmount,
+  );
   const [priceChange, setPriceChange] = useState<{ previous: Quote; next: Quote }>();
   const [sourceIsNative, setSourceIsNative] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
@@ -332,8 +332,21 @@ export function LiquidityHubDeveloperContent({
     if (!quote || !message || typeof message !== "object" || Array.isArray(message)) {
       throw new Error("A quote and an EIP-712 message object are required");
     }
-    setExecutionQuote({ ...quote, eip712: { ...quote.eip712, message } });
+    const permitted = asRecord(message).permitted;
+    const amount = asRecord(permitted).amount;
+    const nextAmount = BigInt(String(amount));
+    if (nextAmount <= BigInt(0)) throw new Error("Input amount must be positive");
+    setExecutionQuote({
+      ...quote,
+      inAmount: nextAmount.toString(),
+      eip712: { ...quote.eip712, message },
+    });
     setSignature(undefined);
+    setTxHash(undefined);
+    if (nextAmount > BigInt(quote.inAmount)) {
+      // Recheck Permit2 against the edited amount before signing again.
+      setNavigation((current) => rewindFlow(current, current.history.indexOf("check")));
+    }
   }, [executionQuote, liveQuote]);
   const integrationData = useMemo<JsonContainer>(
     () => ({
@@ -565,7 +578,7 @@ export function LiquidityHubDeveloperContent({
       }
     } catch (executionError) {
       if (isUserRejectedError(executionError)) {
-        showTransactionRejectedToast({
+        dismissTransactionRejectedToast({
           id: actionToastId,
           position: "bottom-right",
         });

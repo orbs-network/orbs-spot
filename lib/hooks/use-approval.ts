@@ -60,8 +60,9 @@ export const useApproval = (
 
   const { mutateAsync: ensureAllowance } = useMutation({
     mutationFn: async () => {
-      return queryClient.ensureQueryData({
+      return queryClient.fetchQuery({
         queryKey: allowanceKey,
+        staleTime: 0,
         queryFn: async () => {
           return hasTokenAllowance({
             tokenAddress: currencyAddress,

@@ -39,7 +39,7 @@ export const useUSDPrice = ({
   const { data: usdPrices, isLoading, isError } = useUSDPrices(
     tokens,
     disabled || !tokenKey
-  );
+  );  
 
   const data = useMemo(() => {
     return BN(usdPrices?.[tokenKey] ?? usdPrices?.[token ?? ""] ?? 0)

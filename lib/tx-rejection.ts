@@ -2,7 +2,6 @@ import { toast, type ExternalToast } from "sonner";
 
 const REJECTION_CODES = new Set([4001, "4001", "ACTION_REJECTED"]);
 const REJECTION_TOAST_ID = "transaction-rejected";
-const REJECTION_TOAST_DURATION = 6_000;
 
 function getRejectionToastId(id?: ExternalToast["id"]) {
   return id === undefined ? REJECTION_TOAST_ID : `${String(id)}-rejected`;
@@ -57,19 +56,8 @@ export function isUserRejectedError(error: unknown): boolean {
   return cause ? isUserRejectedError(cause) : false;
 }
 
-export function showTransactionRejectedToast(options: ExternalToast = {}) {
-  const { id, duration, ...toastOptions } = options;
-
-  if (id !== undefined) {
-    toast.dismiss(id);
-  }
-
-  toast.info("Request cancelled", {
-    id: getRejectionToastId(id),
-    description:
-      "Nothing was submitted and no funds moved. Try again whenever you're ready.",
-    duration: duration ?? REJECTION_TOAST_DURATION,
-    closeButton: true,
-    ...toastOptions,
-  });
+/** Wallet cancellation returns to review without a notification. */
+export function dismissTransactionRejectedToast(options: ExternalToast = {}) {
+  if (options.id !== undefined) toast.dismiss(options.id);
+  toast.dismiss(getRejectionToastId(options.id));
 }

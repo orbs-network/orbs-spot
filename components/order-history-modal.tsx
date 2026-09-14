@@ -34,8 +34,8 @@ import {
   OrderType,
   TimeUnit,
   useCancelOrder,
-  useDerivedHistoryOrder,
-  useSpot,
+  useHistoryOrder,
+  useOrders,
   type Order,
 } from "@orbs-network/spot-react";
 import {
@@ -64,7 +64,7 @@ const ORDER_FILTER_OPTIONS = [
 ] as const;
 
 type DerivedHistoryOrder = NonNullable<
-  ReturnType<typeof useDerivedHistoryOrder>
+  ReturnType<typeof useHistoryOrder>
 >;
 type DerivedHistoryFill = DerivedHistoryOrder["fills"][number];
 type OpenDetailSection = "summary" | "info" | undefined;
@@ -410,21 +410,21 @@ function OrderPairHeader({ order }: { order: DerivedHistoryOrder }) {
   return (
     <div className="mb-6 flex min-w-0 items-center gap-3">
       <CurrencyLogo
-        logoUrl={order.srcToken?.logoUrl}
-        symbol={order.srcToken?.symbol}
+        logoUrl={order.inputToken?.logoUrl}
+        symbol={order.inputToken?.symbol}
         className="size-8 shrink-0"
       />
       <p className="min-w-0 truncate text-sm font-semibold text-foreground">
-        {order.srcToken?.symbol}
+        {order.inputToken?.symbol}
       </p>
       <ArrowRightIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
       <CurrencyLogo
-        logoUrl={order.dstToken?.logoUrl}
-        symbol={order.dstToken?.symbol}
+        logoUrl={order.outputToken?.logoUrl}
+        symbol={order.outputToken?.symbol}
         className="size-8 shrink-0"
       />
       <p className="min-w-0 truncate text-sm font-semibold text-foreground">
-        {order.dstToken?.symbol}
+        {order.outputToken?.symbol}
       </p>
     </div>
   );
@@ -443,11 +443,11 @@ function FillDetailCard({ fill }: { fill: DerivedHistoryFill }) {
       />
       <OrderDetailRow
         label={t("fillAmountOut")}
-        value={formatTokenValue(fill.srcAmount, fill.srcToken?.symbol)}
+        value={formatTokenValue(fill.inputAmount.ui, fill.inputToken?.symbol)}
       />
       <OrderDetailRow
         label={t("fillAmountReceived")}
-        value={formatTokenValue(fill.dstAmount, fill.dstToken?.symbol)}
+        value={formatTokenValue(fill.outputAmount.ui, fill.outputToken?.symbol)}
       />
       <OrderDetailRow
         label={t("fillTransactionHash")}
@@ -549,7 +549,7 @@ function OrderFillsView({
               </div>
             )}
             computeItemKey={(_, fill) =>
-              `${fill.txHash}-${fill.timestamp}-${fill.srcAmount}-${fill.dstAmount}`
+              `${fill.txHash}-${fill.timestamp}-${fill.inputAmount.ui}-${fill.outputAmount.ui}`
             }
           />
         </div>
@@ -572,7 +572,7 @@ function SelectedOrderDetails({
   const t = useTranslations();
   const srcCurrency = useCurrency(rawOrder.srcTokenAddress);
   const dstCurrency = useCurrency(rawOrder.dstTokenAddress);
-  const order = useDerivedHistoryOrder(rawOrder, srcCurrency, dstCurrency);
+  const order = useHistoryOrder(rawOrder, srcCurrency, dstCurrency);
   const [view, setView] = useState<"details" | "fills">("details");
   const [openDetailSection, setOpenDetailSection] =
     useState<OpenDetailSection>("summary");
@@ -617,16 +617,16 @@ function SelectedOrderDetails({
           <OrderDetailRow
             label={t("amountOut")}
             value={formatTokenValue(
-              order.amountInFilledUI,
-              order.srcToken?.symbol,
+              order.inputAmountFilled.ui,
+              order.inputToken?.symbol,
             )}
           />
-          {order.amountOutFilled ? (
+          {order.outputAmountFilled.raw ? (
             <OrderDetailRow
               label={t("amountReceived")}
               value={formatTokenValue(
-                order.amountOutFilledUI,
-                order.dstToken?.symbol,
+                order.outputAmountFilled.ui,
+                order.outputToken?.symbol,
               )}
             />
           ) : null}
@@ -642,9 +642,9 @@ function SelectedOrderDetails({
                   : "averageExecutionPrice",
               )}
               value={formatPriceValue(
-                order.executionPriceUI,
-                order.srcToken?.symbol,
-                order.dstToken?.symbol,
+                order.executionPrice.ui,
+                order.inputToken?.symbol,
+                order.outputToken?.symbol,
               )}
             />
           ) : null}
@@ -673,15 +673,15 @@ function SelectedOrderDetails({
           />
           <OrderDetailRow
             label={t("amountOut")}
-            value={formatTokenValue(order.srcAmountUI, order.srcToken?.symbol)}
+            value={formatTokenValue(order.inputAmount.ui, order.inputToken?.symbol)}
           />
-          {!isZeroValue(order.minDestAmountPerTradeUI) ? (
+          {!isZeroValue(order.minOutputAmountPerTrade.ui) ? (
             <OrderDetailRow
               label={t("minReceivedPerTrade")}
               tooltip={t("minDstAmountTooltip")}
               value={formatTokenValue(
-                order.minDestAmountPerTradeUI,
-                order.dstToken?.symbol,
+                order.minOutputAmountPerTrade.ui,
+                order.outputToken?.symbol,
               )}
             />
           ) : null}
@@ -696,8 +696,8 @@ function SelectedOrderDetails({
                 label={t("individualTradeSize")}
                 tooltip={t("tradeSizeTooltip")}
                 value={formatTokenValue(
-                  order.sizePerTradeUI,
-                  order.srcToken?.symbol,
+                  order.inputAmountPerTrade.ui,
+                  order.inputToken?.symbol,
                 )}
               />
               <OrderDetailRow
@@ -707,25 +707,25 @@ function SelectedOrderDetails({
               />
             </>
           ) : null}
-          {!isZeroValue(order.triggerPriceUI) ? (
+          {!isZeroValue(order.triggerPrice.ui) ? (
             <OrderDetailRow
               label={t("triggerPrice")}
               tooltip={t("triggerPriceTooltip")}
               value={formatPriceValue(
-                order.triggerPriceUI,
-                order.srcToken?.symbol,
-                order.dstToken?.symbol,
+                order.triggerPrice.ui,
+                order.inputToken?.symbol,
+                order.outputToken?.symbol,
               )}
             />
           ) : null}
-          {order.limitPriceUI ? (
+          {order.limitPrice.ui ? (
             <OrderDetailRow
               label={t("limitPrice")}
               tooltip={t("limitPriceTooltip")}
               value={formatPriceValue(
-                order.limitPriceUI,
-                order.srcToken?.symbol,
-                order.dstToken?.symbol,
+                order.limitPrice.ui,
+                order.inputToken?.symbol,
+                order.outputToken?.symbol,
               )}
             />
           ) : null}
@@ -792,7 +792,7 @@ export function OrderHistoryModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const { address } = useConnection();
-  const { orders, isLoading } = useSpot().orderHistoryPanel;
+  const { data: orders, isLoading } = useOrders();
   const [selectedFilter, setSelectedFilter] = useState<OrderFilter>(
     OrderFilter.All,
   );
@@ -809,13 +809,13 @@ export function OrderHistoryModal({
   useEffect(() => clearSelectedOrderTimer, [clearSelectedOrderTimer]);
 
   const filteredOrders = useMemo(
-    () => filterAndSortOrders(orders.all, selectedFilter),
-    [orders.all, selectedFilter],
+    () => filterAndSortOrders(orders?.all ?? [], selectedFilter),
+    [orders?.all, selectedFilter],
   );
   // Store only the stable ID. Resolving against the latest unfiltered order
   // list keeps details in sync after cancellation or any background refetch.
   const selectedOrder = selectedOrderId
-    ? orders.all.find((order) => order.id === selectedOrderId)
+    ? orders?.all.find((order) => order.id === selectedOrderId)
     : undefined;
 
   const loading = isLoading;
@@ -857,7 +857,7 @@ export function OrderHistoryModal({
                 </DialogTitle>
                 <FetchOrdersDeveloperButton
                   isLoading={loading}
-                  orders={orders.all}
+                  orders={orders?.all ?? []}
                 />
               </div>
             </DialogHeader>

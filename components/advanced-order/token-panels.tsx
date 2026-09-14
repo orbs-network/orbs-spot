@@ -12,14 +12,14 @@ import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useTranslations } from "@/lib/use-translations";
 import { Field } from "@/lib/types";
 import { cn, formatDecimals } from "@/lib/utils";
-import { Module, useSpot } from "@orbs-network/spot-react";
+import { Module, useOutputAmount, useTrades, useDuration, useFillDelay } from "@orbs-network/spot-react";
 import { type ReactNode, useCallback, useMemo } from "react";
 import { DURATION_OPTIONS } from "./constants";
 
 export function TokenPanel({ isSource }: { isSource: boolean }) {
   const t = useTranslations();
   const { inputCurrency, outputCurrency, inputAmount } = useDerivedSwap();
-  const { value: dstAmount, isLoading } = useSpot().dstTokenPanel;
+  const { amount: { ui: dstAmount }, isLoading } = useOutputAmount();
   const { handleCurrencyChange, setInputAmount } = useActionHandlers();
 
   const onTokenChange = useCallback(
@@ -127,11 +127,10 @@ function TradesPanel() {
   const {
     totalTrades,
     onChange,
-    amountPerTradeUI,
-    amountPerTradeUsd,
+    inputAmountPerTrade: { ui: amountPerTradeUI, usd: amountPerTradeUsd },
     error,
-    fromToken,
-  } = useSpot().tradesAmountPanel;
+    inputToken: fromToken,
+  } = useTrades();
   const amountPerTrade = useFormatNumber({ value: amountPerTradeUI });
   const amountPerTradeUsdFormatted = useFormatNumber({
     value: amountPerTradeUsd,
@@ -175,8 +174,8 @@ function TradesPanel() {
 
 function TimeInputPanel({ kind }: { kind: "duration" | "fillDelay" }) {
   const t = useTranslations();
-  const durationPanel = useSpot().durationPanel;
-  const fillDelayPanel = useSpot().fillDelayPanel;
+  const durationPanel = useDuration();
+  const fillDelayPanel = useFillDelay();
 
   return (
     <OrderNumericInputPanel
