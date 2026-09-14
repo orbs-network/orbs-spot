@@ -113,6 +113,7 @@ export type CodeSnippetOptions = {
 
 export type JsonInspectorModalProps = {
   codeSnippet?: CodeSnippetOptions;
+  codeToolbarAction?: ReactNode;
   codeScrollResetKey?: string | number;
   codeSnippetState?: "active" | "review";
   copyActionsInHeaders?: boolean;
@@ -691,6 +692,7 @@ function InspectorContent({
 
 function JsonInspectorModalContent({
   codeSnippet,
+  codeToolbarAction,
   codeScrollResetKey,
   codeSnippetState,
   copyActionsInHeaders = true,
@@ -1861,7 +1863,7 @@ function JsonInspectorModalContent({
                       </span>
                     </div>
                   )}
-                  <div className="ml-auto flex shrink-0 items-center gap-1 px-2">
+                  <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1 px-2">
                     {fullscreenError ? (
                       <span
                         role="status"
@@ -1914,6 +1916,7 @@ function JsonInspectorModalContent({
                             : "Populated snippet"}
                         </span>
                       ) : null)}
+                    {codeToolbarAction}
                     {editable && activeCodeIsEditable && (
                       <label
                         className={`flex h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[11px] font-medium transition-colors hover:bg-secondary/60 hover:text-foreground ${

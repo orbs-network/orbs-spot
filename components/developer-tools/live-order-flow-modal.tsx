@@ -1,6 +1,8 @@
 "use client";
 
 import { remainingWrapAmount, rewindFlow } from "./flow-navigation";
+import { DownloadIntegrationButton } from "./download-integration-button";
+import { formatAdvancedOrdersSdkFlow } from "./sdk-flow-examples";
 
 import {
   type ReactElement,
@@ -1058,9 +1060,15 @@ function LiveOrderFlowModalContent({
                 : undefined
             }
             title={presentation.title}
+            codeToolbarAction={
+              <DownloadIntegrationButton
+                flow="advanced-orders"
+                getCode={() => formatAdvancedOrdersSdkFlow(calculationInput ?? calculationDefaults)}
+              />
+            }
             viewModeAction={
-              <div className="flex w-full min-w-0 items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+              <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 sm:basis-0">
                   <DeveloperGuideLink baseHref={getSpotDocsHref("/advanced-orders/direct")}>
                     API only
                   </DeveloperGuideLink>

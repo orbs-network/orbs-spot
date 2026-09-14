@@ -2,6 +2,8 @@
 
 import { remainingWrapAmount, rewindFlow } from "./flow-navigation";
 import { QuotePriceChangeDialog } from "./quote-price-change-dialog";
+import { DownloadIntegrationButton } from "./download-integration-button";
+import { formatLiquidityHubSdkFlow } from "./sdk-flow-examples";
 
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
@@ -777,9 +779,15 @@ export function LiquidityHubDeveloperContent({
                 : undefined
             }
             title={presentation.title}
+            codeToolbarAction={
+              <DownloadIntegrationButton
+                flow="liquidity-hub"
+                getCode={() => formatLiquidityHubSdkFlow(integrationData)}
+              />
+            }
             viewModeAction={
-              <div className="flex w-full min-w-0 items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">
+              <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 sm:basis-0">
                   <DeveloperGuideLink baseHref={getSpotDocsHref("/liquidity-hub/direct")}>
                     Direct API
                   </DeveloperGuideLink>
