@@ -13,6 +13,7 @@ import {
   ChevronDownIcon,
   Code2Icon,
   CopyIcon,
+  GithubIcon,
   LogOutIcon,
   WalletIcon,
   SunIcon,
@@ -503,6 +504,20 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
             </div>
           )}
           {!isDeveloperGuideRoute && <NavWalletControls />}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <a
+                href="https://github.com/orbs-network/orbs-spot"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="View Orbs Spot on GitHub (opens in a new tab)"
+                className={cn(navPillClass, "w-10 shrink-0 justify-center p-0")}
+              >
+                <GithubIcon aria-hidden="true" className="size-4" />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent>View on GitHub</TooltipContent>
+          </Tooltip>
           <ThemeToggle />
         </div>
       </div>
