@@ -1,4 +1,4 @@
-const DEFAULT_SPOT_DOCS_URL = "https://spot-integration-docs.vercel.app";
+const DEFAULT_SPOT_DOCS_URL = "https://spot-docs.orbs.com";
 
 export const SPOT_DOCS_URL = (
   process.env.NEXT_PUBLIC_SPOT_DOCS_URL ?? DEFAULT_SPOT_DOCS_URL
