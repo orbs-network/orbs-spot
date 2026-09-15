@@ -173,10 +173,6 @@ const CANCEL_FIELD_EXPLANATIONS: Record<string, string> = {
 };
 
 const FETCH_ORDERS_RESPONSE_FIELD_EXPLANATIONS: Record<string, string> = {
-  page: "The current one-based response page.",
-  limit: "The maximum number of orders requested for this page.",
-  total: "The total number of matching orders across every page.",
-  totalPages: "The number of pages available for this query.",
   "orders.hash": "The unique hash used to identify this submitted order.",
   "orders.metadata.expectedChunks":
     "The number of order fills expected when the complete order executes.",
@@ -456,17 +452,13 @@ export type FetchOrdersQuery = {
   swapper: Address;
   // Network on which those orders execute.
   chainId: number;
-  // Exchange adapter from the partner's GET /config response.
-  exchange: Address;
+  // Same partner ID used when submitting the orders.
+  partner: string;
 };
 
 // Response body returned by the order-history endpoint.
 export type FetchOrdersResponse = {
   orders: OrderResponse[];
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
 };`;
 }
 
@@ -665,10 +657,6 @@ export function formatLiveCreateOrderCode() {
 export function formatFetchOrdersCode(data: JsonContainer) {
   if (Array.isArray(data)) return JSON.stringify(data, null, 2);
 
-  const endpoint =
-    typeof data.endpoint === "string"
-      ? data.endpoint
-      : "https://order-sink-v2.orbs.network/orders";
   const query =
     data.query &&
     typeof data.query === "object" &&
@@ -684,49 +672,36 @@ export function formatFetchOrdersCode(data: JsonContainer) {
     typeof query.chainId === "number"
       ? query.chainId
       : 1;
-  const { partner } = getPermitConfigExampleParams(data);
+  const partner = getExamplePartnerId(query.partner ?? data.partner);
 
-  return `import type { FetchOrdersResponse, PermitData } from "./order-types";
+  return `import { createClient, Partners, type Order, type SpotClient } from "@orbs-network/spot-ui";
 
-// Keep the Orders Sink origin fixed instead of accepting a user-provided host.
-const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
-${formatPartnerDeclaration(partner)}
+// Use the same enabled partner and connected chain as order submission.
+const partner = Object.values(Partners).find((value) => value === ${JSON.stringify(partner)});
+const chainId = ${JSON.stringify(Number(chainId))};
 
-export const fetchOrders = async () => {
-  // 1. Fetch trusted config for the same partner and chain as the history query.
-  // The exchange adapter identifies which integration's orders to return.
-  const configQuery = new URLSearchParams({
-    partner,
-    chain: ${JSON.stringify(String(chainId))},
+// Reuse one client per partner and chain. Discard failed initialization so it can retry.
+let clientPromise: Promise<SpotClient> | undefined;
+function getClient(): Promise<SpotClient> {
+  if (!partner) throw new Error("Unknown Spot partner");
+  clientPromise ??= createClient(partner, chainId).catch((error: unknown) => {
+    clientPromise = undefined;
+    throw error;
   });
-  const permitDataRequest = await fetch(
-    \`\${ORDERS_SINK_URL}/config?\${configQuery}\`,
-    { headers: { Accept: "application/json" } },
-  );
-  if (!permitDataRequest.ok) {
-    throw new Error(\`Failed to fetch RePermit data (\${permitDataRequest.status})\`);
-  }
-  const permitDataResponse = (await permitDataRequest.json()) as PermitData;
+  return clientPromise;
+}
 
-  // 2. Request orders for one wallet, chain, and configured adapter.
-  // swapper is the wallet that signed/owns the orders, not necessarily a token
-  // recipient used by a custom integration.
-  const search = new URLSearchParams({
-    swapper: ${JSON.stringify(swapper)},
-    chainId: ${JSON.stringify(String(chainId))},
-    exchange: permitDataResponse.order.witness.exchange.adapter,
-  });
-  const response = await fetch(\`${endpoint}?\${search}\`, {
-    method: "GET",
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) {
-    throw new Error(\`Failed to fetch orders (\${response.status})\`);
-  }
-
-  const result = (await response.json()) as FetchOrdersResponse;
-  return result.orders;
-};`;
+export async function fetchOrders(
+  account = ${JSON.stringify(swapper)},
+  signal?: AbortSignal,
+): Promise<Order[]> {
+  const client = await getClient();
+  // This inspector shows v2 RePermit orders only. Omit legacyOrders to include v1.
+  // V2 fetches all history with swapper, chainId, and partner; no exchange or pagination.
+  const orders = await client.getAccountOrders({ account, signal, legacyOrders: false });
+  // Key rendered rows and cached records by order.historyKey, not order.id.
+  return orders;
+}`;
 }
 
 export function formatPermitDataFetchCode(data: JsonContainer) {
@@ -1068,7 +1043,6 @@ export const CREATED_ORDER_CODE_SNIPPET: CodeSnippetOptions = {
 export const FETCH_ORDERS_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "fetch-orders.ts",
-  files: [ORDER_TYPES_FILE],
   format: formatFetchOrdersCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",

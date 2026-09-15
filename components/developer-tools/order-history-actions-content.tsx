@@ -30,19 +30,17 @@ export function FetchOrdersDeveloperButtonContent({
 }) {
   const { address } = useConnection();
   const chainId = useDataChainId();
-  const basePermitDataQuery = useBasePermitData(chainId);
+  const partner = getActiveSpotPartner() || "external";
   const request = useMemo(() => {
     const query = {
       swapper: address ?? "<connected-wallet-address>",
       chainId: chainId ?? 1,
-      exchange:
-        basePermitDataQuery.data?.order.witness.exchange.adapter ??
-        "<active-partner-adapter-address>",
+      partner,
     };
     const searchParams = new URLSearchParams({
       swapper: query.swapper,
       chainId: String(query.chainId),
-      exchange: query.exchange,
+      partner: query.partner,
     });
 
     return {
@@ -53,7 +51,7 @@ export function FetchOrdersDeveloperButtonContent({
       } satisfies JsonContainer,
       url: `${ORDER_SINK_URL}/orders?${searchParams.toString()}`,
     };
-  }, [address, basePermitDataQuery.data, chainId]);
+  }, [address, chainId, partner]);
   const rePermitOrders = useMemo(
     () =>
       orders
@@ -77,23 +75,6 @@ export function FetchOrdersDeveloperButtonContent({
     );
   }
 
-  if (basePermitDataQuery.isError) {
-    return (
-      <Button
-        data-developer-trigger
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => void basePermitDataQuery.refetch()}
-        className="border-destructive/55 text-destructive hover:border-destructive hover:text-destructive"
-        aria-label="Retry Orders Sink configuration"
-      >
-        <RefreshCwIcon aria-hidden="true" className="size-3.5" />
-        Retry config
-      </Button>
-    );
-  }
-
   return (
     <JsonInspectorModal
       data={request.data}
@@ -104,7 +85,7 @@ export function FetchOrdersDeveloperButtonContent({
         headers: { Accept: "application/json" },
       }}
       description=""
-      explanation="The Request tab shows the actual HTTP GET request used by Order history. The Response tab shows the current raw RePermit orders returned for the connected wallet, chain, and active exchange."
+      explanation="The Request tab shows the actual HTTP GET request used by Order history. The Response tab shows the current raw RePermit orders returned for the connected wallet, chain, and partner. The SDK snippet returns normalized v2 orders; the Response tab shows their raw API records."
       requestResponseTabs
       requiresDeveloperMode={false}
       responseData={responseData}
@@ -125,7 +106,7 @@ export function FetchOrdersDeveloperButtonContent({
           type="button"
           variant="outline"
           size="icon-sm"
-          isLoading={isLoading || basePermitDataQuery.isLoading}
+          isLoading={isLoading}
           className="rounded-[10px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
           aria-label="Show how to fetch orders"
         >

@@ -274,3 +274,65 @@ test('swap submission snippet accepts quote and signature props and returns the 
   assert.equal(result.hash, '0x123');
   assert.equal(result.receipt, receipt);
 });
+
+
+test('the generated order-history snippet type-checks against the installed SDK', () => {
+  const file = path.resolve(__dirname, '../order-history.generated.ts');
+  const source = advanced.formatFetchOrdersCode({ query: { chainId: 137, partner: 'external' } });
+  const options = {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    strict: true,
+    skipLibCheck: true,
+    noEmit: true,
+    types: [],
+  };
+  const host = ts.createCompilerHost(options);
+  const getSourceFile = host.getSourceFile.bind(host);
+  host.getSourceFile = (name, languageVersion, ...args) => name === file
+    ? ts.createSourceFile(name, source, languageVersion, true)
+    : getSourceFile(name, languageVersion, ...args);
+  const program = ts.createProgram([file], options, host);
+  const diagnostics = ts.getPreEmitDiagnostics(program);
+  assert.equal(diagnostics.length, 0, ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+    getCurrentDirectory: () => process.cwd(),
+    getCanonicalFileName: (name) => name,
+    getNewLine: () => '\n',
+  }));
+});
+
+test('history snippet retries client initialization, reuses it, and forwards account and cancellation', async () => {
+  const account = '0x1111111111111111111111111111111111111111';
+  const source = advanced.formatFetchOrdersCode({ query: { chainId: 137, partner: 'external', swapper: account } });
+  const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  const exports = {};
+  let attempts = 0;
+  const requests = [];
+  const orders = [{ historyKey: 'v2:137:order' }];
+  vm.runInNewContext(code, {
+    exports,
+    require: (name) => {
+      assert.equal(name, '@orbs-network/spot-ui');
+      return {
+        Partners: { External: 'external' },
+        createClient: async (partner, chainId) => {
+          assert.equal(partner, 'external');
+          assert.equal(chainId, 137);
+          if (++attempts === 1) throw new Error('Configuration unavailable');
+          return { getAccountOrders: async (request) => { requests.push(request); return orders; } };
+        },
+      };
+    },
+  });
+  await assert.rejects(exports.fetchOrders(), /Configuration unavailable/);
+  const signal = new AbortController().signal;
+  assert.equal(await exports.fetchOrders(undefined, signal), orders);
+  await exports.fetchOrders('0x2222222222222222222222222222222222222222', signal);
+  assert.equal(attempts, 2);
+  assert.equal(requests[0].account, account);
+  assert.equal(requests[1].account, '0x2222222222222222222222222222222222222222');
+  assert.equal(requests[0].signal, signal);
+  assert.equal(requests[0].legacyOrders, false);
+  assert.deepEqual(Object.keys(requests[0]).sort(), ['account', 'legacyOrders', 'signal']);
+});
