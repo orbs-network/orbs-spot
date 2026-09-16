@@ -6,7 +6,7 @@ and TanStack Query for reads and async actions. Spot calculation and execution u
 there is no `@orbs-network/spot-react` dependency or Spot provider.
 
 - [Playground](https://spot-app.orbs.com/)
-- [Integration documentation](https://spot-docs.orbs.com/)
+- [Integration documentation](https://docs.orbs.com/)
 - [SDK integration skill](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)
 
 ## Where to start

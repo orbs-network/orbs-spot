@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const spotDocsUrl = (
   process.env.NEXT_PUBLIC_SPOT_DOCS_URL ??
-  "https://spot-docs.orbs.com"
+  "https://docs.orbs.com"
 ).replace(/\/$/, "");
 
 const nextConfig: NextConfig = {
