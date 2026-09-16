@@ -1,7 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { erc20Abi, type TransactionReceipt } from "viem";
 import { useConnection, useWalletClient } from "wagmi";
-import { useGetTransactionReceiptCallback } from "./use-get-transaction-receipt";
+import { useGetTransactionReceipt } from "./use-get-transaction-receipt";
 
 export type ApproveTokenParams = {
   tokenAddress?: string;
@@ -17,8 +17,7 @@ export type TransactionResult = {
 export const useApproveToken = () => {
   const { data: walletClient } = useWalletClient();
   const { address: account } = useConnection();
-  const { mutateAsync: getTransactionReceipt } =
-    useGetTransactionReceiptCallback();
+  const getTransactionReceipt = useGetTransactionReceipt();
 
   return useMutation({
     mutationFn: async ({
@@ -42,6 +41,7 @@ export const useApproveToken = () => {
         chain: walletClient.chain,
       });
 
+      // Keep the mutation pending until confirmation so signing cannot race approval.
       const receipt = await getTransactionReceipt(hash);
       return { hash, receipt };
     },

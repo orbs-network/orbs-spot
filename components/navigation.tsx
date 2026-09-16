@@ -1,5 +1,7 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
+
 import {
   type ComponentProps,
   useEffect,
@@ -280,15 +282,16 @@ const WalletAccountPopover = ({
   const [open, setOpen] = useState(false);
   const disconnect = useDisconnect();
 
-  const copyAddress = async () => {
-    try {
-      await navigator.clipboard.writeText(address);
+  const { mutate: copyAddress } = useMutation({
+    mutationFn: () => navigator.clipboard.writeText(address),
+    networkMode: "always",
+    retry: false,
+    onSuccess: () => {
       toast.success("Address copied");
       setOpen(false);
-    } catch {
-      toast.error("Failed to copy address");
-    }
-  };
+    },
+    onError: () => { toast.error("Failed to copy address"); },
+  });
 
   const disconnectWallet = () => {
     setOpen(false);
@@ -408,7 +411,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
   );
   const developerGuide = isSpotTab
     ? {
-        href: getSpotDocsHref("/advanced-orders/direct"),
+        href: getSpotDocsHref("/advanced-orders/typescript"),
         linkLabel: "Advanced Order Docs",
         tooltip: "Open Advanced Order Docs",
       }

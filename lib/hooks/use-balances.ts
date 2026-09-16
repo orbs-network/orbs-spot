@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { useMemo } from "react";
 import { useFormatNumber, useToAmountUI } from "./common";
@@ -23,12 +23,15 @@ const postBalances = async ({
   chainId,
   address,
   tokens,
+  signal,
 }: {
   chainId?: number;
   address?: string;
   tokens: string[];
+  signal?: AbortSignal;
 }) => {
   const response = await fetch("/api/balances", {
+    signal,
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chainId, address, tokens }),
@@ -50,9 +53,7 @@ const useWatchedBalanceAddresses = () => {
 
   return useMemo(() => {
     const custom =
-      customCurrencies[tokenChainId]?.map(
-        (currency) => currency.address
-      ) ?? [];
+      customCurrencies[tokenChainId]?.map((currency) => currency.address) ?? [];
     const defaultTokens = getDefaultTokensForChain(tokenChainId);
 
     return uniqueTokenAddresses([
@@ -74,52 +75,30 @@ const useBalanceQueryMeta = () => {
 
   const queryKey = useMemo(
     () => ["balances", chainId, address?.toLowerCase(), watchedAddressesKey],
-    [chainId, address, watchedAddressesKey]
+    [chainId, address, watchedAddressesKey],
   );
 
   return useMemo(
     () => ({ address, chainId, queryKey, watchedAddresses }),
-    [address, chainId, queryKey, watchedAddresses]
+    [address, chainId, queryKey, watchedAddresses],
   );
 };
 
+// Balance reads and post-transaction refreshes use this same query. Calling
+// refetch updates every subscribed balance display without a second mutation cache.
 export const useBalances = () => {
-  const { chainId, address, queryKey, watchedAddresses } = useBalanceQueryMeta();
+  const { chainId, address, queryKey, watchedAddresses } =
+    useBalanceQueryMeta();
 
   return useQuery<BalanceResponse>({
     queryKey,
-    queryFn: () => postBalances({ chainId, address, tokens: watchedAddresses }),
+    queryFn: ({ signal }) =>
+      postBalances({ chainId, address, tokens: watchedAddresses, signal }),
     enabled: !!chainId && !!address && watchedAddresses.length > 0,
     refetchInterval: 120_000,
     refetchIntervalInBackground: false,
     staleTime: 60_000,
     gcTime: Infinity,
-  });
-};
-
-export const useRefetchSelectedCurrenciesBalances = () => {
-  const queryClient = useQueryClient();
-  const { chainId, address, queryKey } = useBalanceQueryMeta();
-  const { inputCurrency, outputCurrency } = useSwapParams();
-
-  return useMutation({
-    mutationFn: async () => {
-      const addresses = uniqueTokenAddresses([inputCurrency, outputCurrency]);
-
-      if (!addresses.length) {
-        return {};
-      }
-
-      const newBalances = await postBalances({ chainId, address, tokens: addresses });
-
-      queryClient.setQueryData<BalanceResponse>(
-        queryKey,
-        (prevBalances) => {
-          if (!prevBalances) return newBalances;
-          return { ...prevBalances, ...newBalances };
-        }
-      );
-    },
   });
 };
 
@@ -145,6 +124,6 @@ export const useBalance = (currency?: Currency) => {
       isLoading: isWatched && isLoading,
       refetch,
     }),
-    [balance, formatted, isLoading, isWatched, refetch, ui]
+    [balance, formatted, isLoading, isWatched, refetch, ui],
   );
 };

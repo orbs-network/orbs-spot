@@ -1,6 +1,12 @@
 "use client";
 
-import { DEMO_ACCOUNT, DEMO_SIGNATURE, type DeveloperExecutionMode } from "./demo-order";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+import {
+  DEMO_ACCOUNT,
+  DEMO_SIGNATURE,
+  type DeveloperExecutionMode,
+} from "./demo-order";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { useBalance } from "@/lib/hooks/use-balances";
 import BN from "bignumber.js";
@@ -31,11 +37,7 @@ import { useConnection } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { getSpotDocsHref } from "@/lib/developer-docs";
 import { DeveloperGuideLink } from "./developer-guide-link";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -43,9 +45,9 @@ import {
 } from "@/components/ui/tooltip";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { useApproval } from "@/lib/hooks/use-approval";
-import { useRefetchSelectedCurrenciesBalances } from "@/lib/hooks/use-balances";
+import { useBalances } from "@/lib/hooks/use-balances";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
-import { useGetTransactionReceiptCallback } from "@/lib/hooks/use-get-transaction-receipt";
+import { useGetTransactionReceipt } from "@/lib/hooks/use-get-transaction-receipt";
 import { useLiquidityHub } from "@/lib/hooks/liquidity-hub";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useSignEip } from "@/lib/hooks/use-sign-eip";
@@ -103,12 +105,15 @@ type LiquidityHubFlowPhase = LiveFlowPhase<LiquidityHubFlowStep>;
 
 const DEMO_SWAP_EXPLANATIONS: Record<LiquidityHubFlowStep, string> = {
   flow: "Live quote, simulated execution. No wallet or gas required. A sample address is used when disconnected. The demo assumes enough tokens and gas; it does not verify execution. Downloaded integration code performs real actions if you run it.",
-  check: "Simulated allowance: zero, so you can explore approval. Your wallet allowance is not read or changed.",
+  check:
+    "Simulated allowance: zero, so you can explore approval. Your wallet allowance is not read or changed.",
   wrap: "Simulated wrapping. No native tokens are deposited and no gas is spent.",
-  approve: "Simulated Permit2 approval. No spending permission is granted and no transaction is sent.",
+  approve:
+    "Simulated Permit2 approval. No spending permission is granted and no transaction is sent.",
   sign: "Simulated signing of the live quote. The demo uses example hex bytes; no wallet opens or valid signature is generated.",
   swap: "The actual quote and demo hex signature are shown below. This call is not executed; no swap is sent to Liquidity Hub and no receipt is requested.",
-  success: "Local demo result. No swap was executed, no funds moved, and no receipt or gas usage was produced.",
+  success:
+    "Local demo result. No swap was executed, no funds moved, and no receipt or gas usage was produced.",
 };
 
 const EMPTY_QUOTE_RESPONSE = {} satisfies JsonContainer;
@@ -253,8 +258,7 @@ function getPresentation({
   return {
     codeSnippet: LIQUIDITY_HUB_SWAP_AND_CONFIRM_CODE_SNIPPET,
     data,
-    explanation:
-      "The Liquidity Hub swap transaction was confirmed on-chain.",
+    explanation: "The Liquidity Hub swap transaction was confirmed on-chain.",
     title: "Swap confirmed",
   };
 }
@@ -281,13 +285,14 @@ export function LiquidityHubDeveloperContent({
     trade,
   } = useDerivedSwap();
   const inputBalance = useBalance(inputCurrency).wei;
-  const hasBalance = Boolean(account && BN(inputBalance ?? "0").gte(parsedInputAmount));
+  const hasBalance = Boolean(
+    account && BN(inputBalance ?? "0").gte(parsedInputAmount),
+  );
   const liquidityHub = useLiquidityHub();
+  const queryClient = useQueryClient();
   const { setInputAmount } = useActionHandlers();
-  const { mutateAsync: refetchBalances } =
-    useRefetchSelectedCurrenciesBalances();
-  const { mutateAsync: getTransactionReceipt } =
-    useGetTransactionReceiptCallback();
+  const { refetch: refetchBalances } = useBalances();
+  const getTransactionReceipt = useGetTransactionReceipt();
   const { mutateAsync: signQuote } = useSignEip();
   const { mutateAsync: wrap } = useWrap();
   const [open, setOpen] = useState(false);
@@ -302,10 +307,13 @@ export function LiquidityHubDeveloperContent({
     executionQuote?.inToken ?? inputCurrency?.address,
     executionQuote?.inAmount ?? parsedInputAmount,
   );
-  const [priceChange, setPriceChange] = useState<{ previous: Quote; next: Quote }>();
+  const [priceChange, setPriceChange] = useState<{
+    previous: Quote;
+    next: Quote;
+  }>();
   const [sourceIsNative, setSourceIsNative] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
-  const [isRunning, setIsRunning] = useState(false);
+
   const [signature, setSignature] = useState<string>();
   const [txHash, setTxHash] = useState<`0x${string}`>();
   const suppressTriggerTooltipRef = useRef(false);
@@ -348,28 +356,39 @@ export function LiquidityHubDeveloperContent({
     [executionQuote, liveQuote],
   );
   const quoteData = currentQuote ?? EMPTY_QUOTE_RESPONSE;
-  const handleSaveSigningMessage = useCallback((data: JsonContainer) => {
-    const quote = executionQuote ?? liveQuote;
-    const message = asRecord(data).message;
-    if (!quote || !message || typeof message !== "object" || Array.isArray(message)) {
-      throw new Error("A quote and an EIP-712 message object are required");
-    }
-    const permitted = asRecord(message).permitted;
-    const amount = asRecord(permitted).amount;
-    const nextAmount = BigInt(String(amount));
-    if (nextAmount <= BigInt(0)) throw new Error("Input amount must be positive");
-    setExecutionQuote({
-      ...quote,
-      inAmount: nextAmount.toString(),
-      eip712: { ...quote.eip712, message },
-    });
-    setSignature(undefined);
-    setTxHash(undefined);
-    if (nextAmount > BigInt(quote.inAmount)) {
-      // Recheck Permit2 against the edited amount before signing again.
-      setNavigation((current) => rewindFlow(current, current.history.indexOf("check")));
-    }
-  }, [executionQuote, liveQuote]);
+  const handleSaveSigningMessage = useCallback(
+    (data: JsonContainer) => {
+      const quote = executionQuote ?? liveQuote;
+      const message = asRecord(data).message;
+      if (
+        !quote ||
+        !message ||
+        typeof message !== "object" ||
+        Array.isArray(message)
+      ) {
+        throw new Error("A quote and an EIP-712 message object are required");
+      }
+      const permitted = asRecord(message).permitted;
+      const amount = asRecord(permitted).amount;
+      const nextAmount = BigInt(String(amount));
+      if (nextAmount <= BigInt(0))
+        throw new Error("Input amount must be positive");
+      setExecutionQuote({
+        ...quote,
+        inAmount: nextAmount.toString(),
+        eip712: { ...quote.eip712, message },
+      });
+      setSignature(undefined);
+      setTxHash(undefined);
+      if (nextAmount > BigInt(quote.inAmount)) {
+        // Recheck Permit2 against the edited amount before signing again.
+        setNavigation((current) =>
+          rewindFlow(current, current.history.indexOf("check")),
+        );
+      }
+    },
+    [executionQuote, liveQuote],
+  );
   const integrationData = useMemo<JsonContainer>(
     () => ({
       ...asRecord(requestData),
@@ -394,16 +413,281 @@ export function LiquidityHubDeveloperContent({
     }
     phases.push(SIGN_PHASE, SWAP_PHASE);
 
-    return isDemo ? phases.map((phase) => ({ ...phase, effect: "Simulated" })) : phases;
+    return isDemo
+      ? phases.map((phase) => ({ ...phase, effect: "Simulated" }))
+      : phases;
   }, [isDemo, navigation.history, sourceIsNative]);
 
-  const handleTriggerTooltipOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      if (nextOpen && suppressTriggerTooltipRef.current) return;
-      setTriggerTooltipOpen(nextOpen);
+  const advanceToStep = useCallback((nextStep: LiquidityHubFlowStep) => {
+    setNavigation((current) => ({
+      history: [...current.history, nextStep],
+      viewedIndex: current.history.length,
+    }));
+  }, []);
+
+  const returnToSigning = useCallback(() => {
+    setSignature(undefined);
+    setTxHash(undefined);
+    setNavigation((current) =>
+      rewindFlow(current, current.history.lastIndexOf("sign")),
+    );
+  }, []);
+
+  // Mutation state drives the UI; this synchronous lock also blocks duplicate
+  // clicks before React renders the pending state. Each click runs one step.
+  const executionInFlight = useRef(false);
+  const { mutate: executeCurrentStep, isPending: isRunning } = useMutation({
+    // Demo steps change local state only and remain usable without a connection.
+    networkMode: isDemo ? "always" : "online",
+    retry: false,
+    mutationFn: async () => {
+      if (executionInFlight.current || step === "success") return;
+
+      executionInFlight.current = true;
+      toast.loading(
+        isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step],
+        {
+          id: actionToastId,
+          position: "bottom-right",
+        },
+      );
+
+      // Refresh the quote being executed, which may differ from the live form
+      // after edits. Include all its request inputs in the cache key.
+      const fetchReplacementQuote = (quote: Quote) => queryClient.fetchQuery({
+        queryKey: ["liquidity-hub-execution-quote", getActiveLiquidityHubPartnerId(), chainId, quote.inToken, quote.outToken, quote.inAmount, quote.slippage, quote.user],
+        queryFn: ({ signal }) => liquidityHub.getQuote({
+          fromToken: quote.inToken,
+          toToken: quote.outToken,
+          inAmount: quote.inAmount,
+          dexMinAmountOut: "-1",
+          slippage: quote.slippage,
+          account: quote.user,
+          signal,
+        }),
+        staleTime: 0,
+        retry: false,
+      });
+
+      try {
+        const quote = executionQuote ?? liveQuote;
+        if (
+          !quote ||
+          quote.error ||
+          !BN(quote.inAmount).gt(0) ||
+          !BN(quote.outAmount).gt(0)
+        ) {
+          throw new Error("Enter a valid amount and wait for a live quote.");
+        }
+        if (isDemo) {
+          // Never reach allowance mutations, wallet signing, swaps, or receipt polling.
+          if (step === "flow") advanceToStep("check");
+          else if (step === "check") {
+            setApprovalRequired(true);
+            advanceToStep(sourceIsNative ? "wrap" : "approve");
+          } else if (step === "wrap") advanceToStep("approve");
+          else if (step === "approve") advanceToStep("sign");
+          else if (step === "sign") {
+            setExecutionQuote(quote);
+            setSignature(DEMO_SIGNATURE);
+            advanceToStep("swap");
+          } else if (step === "swap") advanceToStep("success");
+          toast.success(
+            step === "swap"
+              ? "Demo complete — no swap executed"
+              : "Demo step complete",
+            {
+              id: actionToastId,
+              description:
+                "Simulated locally. No funds used or transaction sent.",
+              position: "bottom-right",
+            },
+          );
+          return;
+        }
+        if (!account)
+          throw new Error("Connect a wallet to execute a real swap.");
+        if (step === "flow" && !hasBalance)
+          throw new Error("Insufficient balance for this swap.");
+        if (quote.user.toLowerCase() !== account.toLowerCase())
+          throw new Error(
+            "The wallet changed. Reopen the flow for a fresh quote.",
+          );
+        if (step === "flow") {
+          advanceToStep("check");
+          toast.success("Swap flow started", {
+            id: actionToastId,
+            description:
+              "Next, check the quote input token’s Permit2 allowance.",
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (step === "check") {
+          const hasAllowance = await ensureAllowance();
+          if (!hasAllowance) await approve();
+          setApprovalRequired(false);
+
+          const needsWrap =
+            sourceIsNative &&
+            remainingWrapAmount(
+              BigInt(executionQuote?.inAmount ?? parsedInputAmount),
+              wrappedAmountRef.current,
+            ) > BigInt(0);
+          advanceToStep(needsWrap ? "wrap" : "sign");
+          toast.success("Token ready", {
+            id: actionToastId,
+            description: needsWrap
+              ? "Native input must be wrapped before signing."
+              : "The Permit2 allowance is sufficient.",
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (step === "wrap") {
+          const amount = remainingWrapAmount(
+            BigInt(executionQuote?.inAmount ?? parsedInputAmount),
+            wrappedAmountRef.current,
+          );
+          if (amount > BigInt(0)) {
+            const receipt = await wrap(amount.toString());
+            if (receipt.status !== "success")
+              throw new Error("Native token wrapping reverted");
+            wrappedAmountRef.current += amount;
+          }
+
+          advanceToStep(approvalRequired ? "approve" : "sign");
+          toast.success("Native token wrapped", {
+            id: actionToastId,
+            description: approvalRequired
+              ? "Permit2 approval is still required."
+              : "Next, review and sign the quote.",
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (step === "approve") {
+          if (!(await ensureAllowance())) await approve();
+
+          setApprovalRequired(false);
+          advanceToStep("sign");
+          toast.success("Permit2 approved", {
+            id: actionToastId,
+            description: "Approval confirmed. Next, review and sign the quote.",
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (step === "sign") {
+          let quoteToSign = executionQuote ?? liveQuote;
+          if (!quoteToSign || quoteToSign.error) {
+            throw new Error(
+              quoteToSign?.error || "A Liquidity Hub quote is required",
+            );
+          }
+
+          if (!isFreshQuote(quoteToSign, 60)) {
+            const freshQuote = await fetchReplacementQuote(quoteToSign);
+            if (
+              BigInt(freshQuote.minAmountOut) < BigInt(quoteToSign.minAmountOut)
+            ) {
+              setPriceChange({ previous: quoteToSign, next: freshQuote });
+              toast.dismiss(actionToastId);
+              return;
+            }
+            quoteToSign = freshQuote;
+          }
+
+          setExecutionQuote(quoteToSign);
+          const nextSignature = await signQuote(quoteToSign);
+          setSignature(nextSignature);
+
+          advanceToStep("swap");
+          toast.success("Quote signed", {
+            id: actionToastId,
+            description: "The quote and signature are paired for submission.",
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (step === "swap") {
+          if (!executionQuote || !signature) {
+            throw new Error(
+              "Sign the quote payload before submitting the swap",
+            );
+          }
+
+          // A quote can expire while the wallet is open or before this step is run.
+          // A replacement must be signed again; never reuse its predecessor's signature.
+          if (!txHash && !isFreshQuote(executionQuote, 60)) {
+            const freshQuote = await fetchReplacementQuote(executionQuote);
+            returnToSigning();
+            if (
+              BigInt(freshQuote.minAmountOut) <
+              BigInt(executionQuote.minAmountOut)
+            ) {
+              setPriceChange({ previous: executionQuote, next: freshQuote });
+              toast.dismiss(actionToastId);
+            } else {
+              setExecutionQuote(freshQuote);
+              toast.info(
+                "Quote refreshed. Sign the updated quote to continue.",
+                {
+                  id: actionToastId,
+                  position: "bottom-right",
+                },
+              );
+            }
+            return;
+          }
+
+          const hash =
+            txHash ??
+            ((await liquidityHub.swap(
+              executionQuote,
+              signature,
+            )) as `0x${string}`);
+          if (!txHash) setTxHash(hash);
+
+          await getTransactionReceipt(hash);
+          advanceToStep("success");
+          toast.success("Swap confirmed", {
+            id: actionToastId,
+            description: "The final output and gas details are ready.",
+            position: "bottom-right",
+          });
+          void refetchBalances().catch(() => undefined);
+          return;
+        }
+      } finally {
+        executionInFlight.current = false;
+      }
     },
-    [],
-  );
+    onError: (executionError) => {
+      if (isUserRejectedError(executionError)) {
+        dismissTransactionRejectedToast({
+          id: actionToastId,
+          position: "bottom-right",
+        });
+      } else {
+        toast.error("Liquidity Hub step failed", {
+          id: actionToastId,
+          description: getErrorMessage(executionError),
+          position: "bottom-right",
+        });
+      }
+    },
+  });
+
+  const handleTriggerTooltipOpenChange = useCallback((nextOpen: boolean) => {
+    if (nextOpen && suppressTriggerTooltipRef.current) return;
+    setTriggerTooltipOpen(nextOpen);
+  }, []);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -428,261 +712,46 @@ export function LiquidityHubDeveloperContent({
       }
 
       setOpen(nextOpen);
-    }, [inputIsNative, isDemo, isRunning, liveQuote, setInputAmount, step]);
-
-  const advanceToStep = useCallback((nextStep: LiquidityHubFlowStep) => {
-    setNavigation((current) => ({
-      history: [...current.history, nextStep],
-      viewedIndex: current.history.length,
-    }));
-  }, []);
-
-  const returnToSigning = useCallback(() => {
-    setSignature(undefined);
-    setTxHash(undefined);
-    setNavigation((current) => rewindFlow(current, current.history.lastIndexOf("sign")));
-  }, []);
-
-  const executeCurrentStep = useCallback(async () => {
-    if (isRunning || step === "success") return;
-
-    setIsRunning(true);
-    toast.loading(isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step], {
-      id: actionToastId,
-      position: "bottom-right",
-    });
-
-    const fetchReplacementQuote = (quote: Quote) => liquidityHub.getQuote({
-      fromToken: quote.inToken,
-      toToken: quote.outToken,
-      inAmount: quote.inAmount,
-      dexMinAmountOut: "-1",
-      slippage: quote.slippage,
-      account: quote.user,
-    });
-
-    try {
-      const quote = executionQuote ?? liveQuote;
-      if (!quote || quote.error || !BN(quote.inAmount).gt(0) || !BN(quote.outAmount).gt(0)) {
-        throw new Error("Enter a valid amount and wait for a live quote.");
-      }
-      if (isDemo) {
-        // Never reach allowance mutations, wallet signing, swaps, or receipt polling.
-        if (step === "flow") advanceToStep("check");
-        else if (step === "check") {
-          setApprovalRequired(true);
-          advanceToStep(sourceIsNative ? "wrap" : "approve");
-        } else if (step === "wrap") advanceToStep("approve");
-        else if (step === "approve") advanceToStep("sign");
-        else if (step === "sign") {
-          setExecutionQuote(quote);
-          setSignature(DEMO_SIGNATURE);
-          advanceToStep("swap");
-        } else if (step === "swap") advanceToStep("success");
-        toast.success(step === "swap" ? "Demo complete — no swap executed" : "Demo step complete", {
-          id: actionToastId,
-          description: "Simulated locally. No funds used or transaction sent.",
-          position: "bottom-right",
-        });
-        return;
-      }
-      if (!account) throw new Error("Connect a wallet to execute a real swap.");
-      if (step === "flow" && !hasBalance) throw new Error("Insufficient balance for this swap.");
-      if (quote.user.toLowerCase() !== account.toLowerCase()) throw new Error("The wallet changed. Reopen the flow for a fresh quote.");
-      if (step === "flow") {
-        advanceToStep("check");
-        toast.success("Swap flow started", {
-          id: actionToastId,
-          description: "Next, check the quote input token’s Permit2 allowance.",
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (step === "check") {
-        const hasAllowance = await ensureAllowance();
-        if (!hasAllowance) await approve();
-        setApprovalRequired(false);
-
-        const needsWrap = sourceIsNative && remainingWrapAmount(
-          BigInt(executionQuote?.inAmount ?? parsedInputAmount), wrappedAmountRef.current,
-        ) > BigInt(0);
-        advanceToStep(needsWrap ? "wrap" : "sign");
-        toast.success("Token ready", {
-          id: actionToastId,
-          description: needsWrap
-            ? "Native input must be wrapped before signing."
-            : "The Permit2 allowance is sufficient.",
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (step === "wrap") {
-        const amount = remainingWrapAmount(
-          BigInt(executionQuote?.inAmount ?? parsedInputAmount), wrappedAmountRef.current,
-        );
-        if (amount > BigInt(0)) {
-          const receipt = await wrap(amount.toString());
-          if (receipt.status !== "success") throw new Error("Native token wrapping reverted");
-          wrappedAmountRef.current += amount;
-        }
-
-        advanceToStep(approvalRequired ? "approve" : "sign");
-        toast.success("Native token wrapped", {
-          id: actionToastId,
-          description: approvalRequired
-            ? "Permit2 approval is still required."
-            : "Next, review and sign the quote.",
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (step === "approve") {
-        if (!await ensureAllowance()) await approve();
-
-        setApprovalRequired(false);
-        advanceToStep("sign");
-        toast.success("Permit2 approved", {
-          id: actionToastId,
-          description:
-            "Approval confirmed. Next, review and sign the quote.",
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (step === "sign") {
-        let quoteToSign = executionQuote ?? liveQuote;
-        if (!quoteToSign || quoteToSign.error) {
-          throw new Error(
-            quoteToSign?.error || "A Liquidity Hub quote is required",
-          );
-        }
-
-        if (!isFreshQuote(quoteToSign, 60)) {
-          const freshQuote = await fetchReplacementQuote(quoteToSign);
-          if (BigInt(freshQuote.minAmountOut) < BigInt(quoteToSign.minAmountOut)) {
-            setPriceChange({ previous: quoteToSign, next: freshQuote });
-            toast.dismiss(actionToastId);
-            return;
-          }
-          quoteToSign = freshQuote;
-        }
-
-        setExecutionQuote(quoteToSign);
-        const nextSignature = await signQuote(quoteToSign);
-        setSignature(nextSignature);
-
-        advanceToStep("swap");
-        toast.success("Quote signed", {
-          id: actionToastId,
-          description:
-            "The quote and signature are paired for submission.",
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (step === "swap") {
-        if (!executionQuote || !signature) {
-          throw new Error("Sign the quote payload before submitting the swap");
-        }
-
-        // A quote can expire while the wallet is open or before this step is run.
-        // A replacement must be signed again; never reuse its predecessor's signature.
-        if (!txHash && !isFreshQuote(executionQuote, 60)) {
-          const freshQuote = await fetchReplacementQuote(executionQuote);
-          returnToSigning();
-          if (BigInt(freshQuote.minAmountOut) < BigInt(executionQuote.minAmountOut)) {
-            setPriceChange({ previous: executionQuote, next: freshQuote });
-            toast.dismiss(actionToastId);
-          } else {
-            setExecutionQuote(freshQuote);
-            toast.info("Quote refreshed. Sign the updated quote to continue.", {
-              id: actionToastId,
-              position: "bottom-right",
-            });
-          }
-          return;
-        }
-
-        const hash =
-          txHash ??
-          ((await liquidityHub.swap(
-            executionQuote,
-            signature,
-          )) as `0x${string}`);
-        if (!txHash) setTxHash(hash);
-
-        await getTransactionReceipt(hash);
-        advanceToStep("success");
-        toast.success("Swap confirmed", {
-          id: actionToastId,
-          description: "The final output and gas details are ready.",
-          position: "bottom-right",
-        });
-        void refetchBalances();
-        return;
-      }
-    } catch (executionError) {
-      if (isUserRejectedError(executionError)) {
-        dismissTransactionRejectedToast({
-          id: actionToastId,
-          position: "bottom-right",
-        });
-      } else {
-        toast.error("Liquidity Hub step failed", {
-          id: actionToastId,
-          description: getErrorMessage(executionError),
-          position: "bottom-right",
-        });
-      }
-    } finally {
-      setIsRunning(false);
-    }
-  }, [
-    isDemo,
-    account,
-    hasBalance,
-    actionToastId,
-    advanceToStep,
-    approvalRequired,
-    approve,
-    ensureAllowance,
-    executionQuote,
-    getTransactionReceipt,
-    isRunning,
-    liquidityHub,
-    liveQuote,
-    parsedInputAmount,
-    refetchBalances,
-    returnToSigning,
-    signQuote,
-    signature,
-    sourceIsNative,
-    step,
-    txHash,
-    wrap,
-  ]);
-
-  const presentation = useMemo(
-    () => {
-      if (isDemo && viewedStep === "success") return {
-        title: "Demo complete — no swap executed",
-        explanation: "Local demo result. No transaction was sent, no funds moved, and no receipt or gas usage was produced.",
-        data: { demo: true, submitted: false, status: "simulated", quote: quoteData },
-        codeSnippet: { language: "JSON", syntaxLanguage: "json", fileName: "demo-swap-result.json", format: (data: JsonContainer) => JSON.stringify(data, null, 2) },
-      } satisfies StepPresentation;
-      return getPresentation({ data: integrationData, step: viewedStep });
     },
-    [isDemo, integrationData, quoteData, viewedStep],
+    [inputIsNative, isDemo, isRunning, liveQuote, setInputAmount, step],
   );
-  const actionLabel = isDemo ? ({ flow: "Start demo", check: "Simulate allowance check", wrap: "Simulate wrap", approve: "Simulate approval", sign: "Simulate signature", swap: "Simulate swap", success: "Close demo" })[step] : STEP_ACTION_LABELS[step];
+
+  const presentation = useMemo(() => {
+    if (isDemo && viewedStep === "success")
+      return {
+        title: "Demo complete — no swap executed",
+        explanation:
+          "Local demo result. No transaction was sent, no funds moved, and no receipt or gas usage was produced.",
+        data: {
+          demo: true,
+          submitted: false,
+          status: "simulated",
+          quote: quoteData,
+        },
+        codeSnippet: {
+          language: "JSON",
+          syntaxLanguage: "json",
+          fileName: "demo-swap-result.json",
+          format: (data: JsonContainer) => JSON.stringify(data, null, 2),
+        },
+      } satisfies StepPresentation;
+    return getPresentation({ data: integrationData, step: viewedStep });
+  }, [isDemo, integrationData, quoteData, viewedStep]);
+  const actionLabel = isDemo
+    ? {
+        flow: "Start demo",
+        check: "Simulate allowance check",
+        wrap: "Simulate wrap",
+        approve: "Simulate approval",
+        sign: "Simulate signature",
+        swap: "Simulate swap",
+        success: "Close demo",
+      }[step]
+    : STEP_ACTION_LABELS[step];
   const disabledReason = useMemo(() => {
     if (step === "success") return undefined;
-    if (!isDemo && step === "flow" && !hasBalance) return "Insufficient balance for a real swap.";
+    if (!isDemo && step === "flow" && !hasBalance)
+      return "Insufficient balance for a real swap.";
     if (!parsedInputAmount || parsedInputAmount === "0") {
       return "Enter a swap amount before running the live flow.";
     }
@@ -693,7 +762,15 @@ export function LiquidityHubDeveloperContent({
       return "A live Liquidity Hub quote is required.";
     }
     return undefined;
-  }, [isDemo, hasBalance, executionQuote, isLoadingTrade, liveQuote, parsedInputAmount, step]);
+  }, [
+    isDemo,
+    hasBalance,
+    executionQuote,
+    isLoadingTrade,
+    liveQuote,
+    parsedInputAmount,
+    step,
+  ]);
   const guideSection =
     viewedStep === "flow" ? "end-to-end-flow" : "execute-swap";
   const selectablePhaseIndexes = useMemo(
@@ -704,11 +781,7 @@ export function LiquidityHubDeveloperContent({
             new Set(
               navigation.history
                 .map((historyStep) =>
-                  getLiveFlowPhaseIndex(
-                    historyStep,
-                    liveFlowPhases,
-                    "success",
-                  ),
+                  getLiveFlowPhaseIndex(historyStep, liveFlowPhases, "success"),
                 )
                 .filter(
                   (phaseIndex) =>
@@ -718,23 +791,31 @@ export function LiquidityHubDeveloperContent({
           ),
     [isRunning, liveFlowPhases, navigation.history],
   );
-  const handleReturnToStep = useCallback((targetIndex: number) => {
-    if (isRunning) return;
-    const next = rewindFlow(navigation, targetIndex);
-    if (next === navigation) return;
-    if (next.history.at(-1) !== "swap") {
-      setSignature(undefined);
-      setTxHash(undefined);
-    }
-    setNavigation(next);
-  }, [isRunning, navigation]);
+  const handleReturnToStep = useCallback(
+    (targetIndex: number) => {
+      if (isRunning) return;
+      const next = rewindFlow(navigation, targetIndex);
+      if (next === navigation) return;
+      if (next.history.at(-1) !== "swap") {
+        setSignature(undefined);
+        setTxHash(undefined);
+      }
+      setNavigation(next);
+    },
+    [isRunning, navigation],
+  );
 
-  const handleSelectPhase = useCallback((phaseIndex: number) => {
-    const targetIndex = navigation.history.findLastIndex((historyStep) =>
-      getLiveFlowPhaseIndex(historyStep, liveFlowPhases, "success") === phaseIndex,
-    );
-    handleReturnToStep(targetIndex);
-  }, [handleReturnToStep, liveFlowPhases, navigation.history]);
+  const handleSelectPhase = useCallback(
+    (phaseIndex: number) => {
+      const targetIndex = navigation.history.findLastIndex(
+        (historyStep) =>
+          getLiveFlowPhaseIndex(historyStep, liveFlowPhases, "success") ===
+          phaseIndex,
+      );
+      handleReturnToStep(targetIndex);
+    },
+    [handleReturnToStep, liveFlowPhases, navigation.history],
+  );
 
   useEffect(() => {
     if (!open || viewedStep === "flow") {
@@ -754,7 +835,9 @@ export function LiquidityHubDeveloperContent({
           progressLabel="Liquidity Hub swap progress"
           selectablePhaseIndexes={selectablePhaseIndexes}
           successStep="success"
-          successTitle={isDemo ? "Demo complete · No swap executed" : "Swap complete"}
+          successTitle={
+            isDemo ? "Demo complete · No swap executed" : "Swap complete"
+          }
           viewedStep={viewedStep}
         />
       ),
@@ -803,7 +886,9 @@ export function LiquidityHubDeveloperContent({
           <DialogTrigger asChild>{trigger}</DialogTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          {isDemo ? "Live quote, simulated execution — no wallet or funds needed" : "Real swap — wallet and funds required"}
+          {isDemo
+            ? "Live quote, simulated execution — no wallet or funds needed"
+            : "Real swap — wallet and funds required"}
         </TooltipContent>
       </Tooltip>
       <DialogContent
@@ -819,12 +904,18 @@ export function LiquidityHubDeveloperContent({
             data={presentation.data}
             editable={viewedStep === "sign" && step === "sign" && !isRunning}
             isValueEditable={(path) => path[0] === "message"}
-            onSave={viewedStep === "sign" ? handleSaveSigningMessage : undefined}
+            onSave={
+              viewedStep === "sign" ? handleSaveSigningMessage : undefined
+            }
             codeSnippet={presentation.codeSnippet}
             codeScrollResetKey={viewedStep}
             codeSnippetState="active"
             description=""
-            explanation={isDemo ? DEMO_SWAP_EXPLANATIONS[viewedStep] : presentation.explanation}
+            explanation={
+              isDemo
+                ? DEMO_SWAP_EXPLANATIONS[viewedStep]
+                : presentation.explanation
+            }
             explanationDisplay="tooltip"
             getFieldExplanation={getLiquidityHubFieldExplanation}
             getResponseFieldExplanation={getLiquidityHubFieldExplanation}
@@ -832,11 +923,16 @@ export function LiquidityHubDeveloperContent({
               navigation.viewedIndex > 0 && !isRunning
                 ? {
                     ariaLabel: "View previous Liquidity Hub step",
-                    onClick: () => handleReturnToStep(navigation.viewedIndex - 1),
+                    onClick: () =>
+                      handleReturnToStep(navigation.viewedIndex - 1),
                   }
                 : undefined
             }
-            title={isDemo && viewedStep !== "success" ? `Demo · ${presentation.title}` : presentation.title}
+            title={
+              isDemo && viewedStep !== "success"
+                ? `Demo · ${presentation.title}`
+                : presentation.title
+            }
             codeToolbarAction={
               <DownloadIntegrationButton
                 flow="liquidity-hub"
@@ -846,7 +942,9 @@ export function LiquidityHubDeveloperContent({
             viewModeAction={
               <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 sm:basis-0">
-                  <DeveloperGuideLink baseHref={getSpotDocsHref("/liquidity-hub/direct")}>
+                  <DeveloperGuideLink
+                    baseHref={getSpotDocsHref("/liquidity-hub/direct")}
+                  >
                     Direct API
                   </DeveloperGuideLink>
                   <LiquidityHubGuideLink section={guideSection} />

@@ -9,7 +9,7 @@ const source = readFileSync(resolve(__dirname, '../components/developer-tools/li
 const ast = ts.createSourceFile('flow.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 let handler;
 function visit(node) {
-  if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'executeCurrentStep') handler = node.initializer.arguments[0].getText(ast);
+  if (ts.isVariableDeclaration(node) && node.name.getText(ast).includes('mutate: executeCurrentStep')) handler = node.initializer.arguments[0].properties.find((property) => property.name?.getText(ast) === 'mutationFn').initializer.getText(ast);
   ts.forEachChild(node, visit);
 }
 visit(ast);
@@ -24,9 +24,9 @@ for (const native of [false, true]) {
       let advanced;
       let signature;
       const context = {
-        isRunning: false, step: steps[i], isDemo: true, executionQuote: quote, liveQuote: quote,
+        executionInFlight: { current: false }, step: steps[i], isDemo: true, executionQuote: quote, liveQuote: quote,
         sourceIsNative: native, BN, DEMO_SIGNATURE: '0x' + '11'.repeat(65),
-        setIsRunning() {}, setApprovalRequired() {}, setExecutionQuote() {},
+        setApprovalRequired() {}, setExecutionQuote() {},
         setSignature(value) { signature = value; }, advanceToStep(value) { advanced = value; },
         actionToastId: 'test', toast: { loading() {}, success() {}, error: forbidden },
         liquidityHub: { getQuote: forbidden, swap: forbidden },

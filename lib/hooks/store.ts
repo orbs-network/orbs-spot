@@ -1,3 +1,5 @@
+import type { OrderInput } from "@/lib/spot/form";
+import { ExecutionPhase, type ExecutionSnapshot } from "@/lib/spot/execution";
 import { SwapStatus } from "@orbs-network/swap-ui";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -78,6 +80,8 @@ export const useUserStore = create<UserStore>()(
 );
 
 type SwapStore = {
+  orderDraft: { key: string; input: OrderInput };
+  setOrderInput: (key: string, input: OrderInput) => void;
   inputAmount: string;
   setInputAmount: (inputAmount: string) => void;
   pauseQuote: boolean;
@@ -85,6 +89,16 @@ type SwapStore = {
 };
 
 export const useSwapStore = create<SwapStore>((set) => ({
+  orderDraft: { key: "", input: {} },
+  setOrderInput: (key, input) => set((state) => ({
+    orderDraft: {
+      key,
+      input: {
+        ...(state.orderDraft.key === key ? state.orderDraft.input : {}),
+        ...input,
+      },
+    },
+  })),
   inputAmount: "",
   setInputAmount: (inputAmount: string) => set({ inputAmount }),
   pauseQuote: false,
@@ -102,6 +116,7 @@ export const useFormTabStore = create<FormTabStore>((set) => ({
 }));
 
 type OrderSubmitFlowStore = {
+  execution: ExecutionSnapshot;
   pendingWrappedInputAddress?: string;
   setPendingWrappedInputAddress: (address?: string) => void;
 };
@@ -110,6 +125,7 @@ type OrderSubmitFlowStore = {
 // native-token order. Queue the form update so that changing the input token
 // cannot reset or alter the in-progress order flow.
 export const useOrderSubmitFlowStore = create<OrderSubmitFlowStore>((set) => ({
+  execution: { phase: ExecutionPhase.IDLE },
   pendingWrappedInputAddress: undefined,
   setPendingWrappedInputAddress: (pendingWrappedInputAddress) =>
     set({ pendingWrappedInputAddress }),

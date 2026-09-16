@@ -1,54 +1,23 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import TokensPair from "@/components/tokens-pair";
-import { useRefetchSelectedCurrenciesBalances } from "@/lib/hooks/use-balances";
+import { useBalances } from "@/lib/hooks/use-balances";
 import { useToAmountWei } from "@/lib/hooks/common";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
-import {
-  isUserRejectedError,
-  dismissTransactionRejectedToast,
-} from "@/lib/tx-rejection";
-import { useTranslations } from "@/lib/use-translations";
 import { Currency } from "@/lib/types";
-import {
-  getExplorerUrl,
-  getWrappedNativeCurrency,
-} from "@/lib/utils";
-import { useGetTransactionReceiptCallback } from "@/lib/hooks/use-get-transaction-receipt";
+import { getWrappedNativeCurrency } from "@/lib/utils";
+import { useGetTransactionReceipt } from "@/lib/hooks/use-get-transaction-receipt";
 import { useSignTypedDataPayload } from "@/lib/hooks/use-sign-typed-data";
 import { useApproveToken } from "@/lib/hooks/use-token-approval";
 import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
 import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
-import {
-  isNativeAddress,
-  type ApproveTokenProps,
-  type Callbacks,
-  type CancelOrderProps,
-  type GetAllowanceProps,
-  type OnApproveSuccessCallback,
-  type OnCancelOrderSuccess,
-  type OnWrapSuccessCallback,
-  type Order,
-  type ParsedError,
-  type OrderSigningRequest,
-  type Token,
-  type WalletInteractions,
-} from "@orbs-network/spot-react";
+import { type OrderSigningRequest, type Token } from "@orbs-network/spot-ui";
+import type { SpotWalletPort } from "@/lib/spot/execution";
 import BN from "bignumber.js";
-import { useCallback, useMemo } from "react";
-import { toast } from "sonner";
-import { type Abi, maxUint256 } from "viem";
-import { useConnection, useWalletClient } from "wagmi";
-import {
-  APPROVE_TOAST_ID,
-  CANCEL_ORDER_TOAST_ID,
-  CREATE_ORDER_TOAST_ID,
-  WRAP_TOAST_ID,
-} from "./constants";
-
+import { useMemo } from "react";
+import { type Abi } from "viem";
+import { useWalletClient } from "wagmi";
 export function useSpotToken(currency?: Currency) {
   return useMemo((): Token | undefined => {
     if (!currency) return undefined;
@@ -63,8 +32,14 @@ export function useSpotToken(currency?: Currency) {
 }
 
 export function useSpotMarketReferencePrice() {
-  const { trade, isLoadingTrade, noLiquidity, inputCurrency, outputCurrency, inputAmount } =
-    useDerivedSwap();
+  const {
+    trade,
+    isLoadingTrade,
+    noLiquidity,
+    inputCurrency,
+    outputCurrency,
+    inputAmount,
+  } = useDerivedSwap();
   const inputUsd = useUSDPrice({
     token: inputCurrency?.address,
     amount: inputAmount || "0",
@@ -112,279 +87,90 @@ export function useSpotMarketReferencePrice() {
   );
 }
 
+// Bridge the SDK's Promise-based wallet port to this app's wagmi mutations and queries.
 export function useWalletInteractions() {
   const { data: walletClient } = useWalletClient();
-  const { mutateAsync: waitForTransactionReceipt } =
-    useGetTransactionReceiptCallback();
+  const waitForTransactionReceipt = useGetTransactionReceipt();
+  // The executor must await each step and stop on rejection, so use mutateAsync
+  // here. UI buttons use mutate when they do not need to await a result.
   const { mutateAsync: signTypedData } = useSignTypedDataPayload();
   const { mutateAsync: approveToken } = useApproveToken();
-  const { mutateAsync: getTokenAllowance } = useGetTokenAllowance();
+  const getTokenAllowance = useGetTokenAllowance();
   const { mutateAsync: wrapNativeToken } = useWrapNativeToken();
 
-  return useMemo((): WalletInteractions => {
-    return {
-      wrapNativeToken: async (amount: string) => {
-        try {
-          const { hash } = await wrapNativeToken(amount);
-          return hash;
-        } catch (error) {
-          if (isUserRejectedError(error)) {
-            dismissTransactionRejectedToast({ id: WRAP_TOAST_ID });
-          }
-
-          throw error;
-        }
-      },
-      approveToken: async (props: ApproveTokenProps) => {
-        try {
-          const { hash } = await approveToken({
-            tokenAddress: props.tokenAddress,
-            spenderAddress: props.spenderAddress,
-            amount: maxUint256.toString(),
-          });
-          return hash;
-        } catch (error) {
-          if (isUserRejectedError(error)) {
-            dismissTransactionRejectedToast({ id: APPROVE_TOAST_ID });
-          }
-
-          throw error;
-        }
-      },
-      cancelOrder: async (props: CancelOrderProps) => {
-        if (!walletClient) {
-          throw new Error("Wallet client not found");
-        }
-
-        try {
-          const hash = await walletClient.writeContract({
-            abi: props.abi as Abi,
-            functionName: "cancel",
-            address: props.contractAddress as `0x${string}`,
-            args: props.args as any,
-            chain: walletClient.chain,
-            account: walletClient.account!,
-          } as any);
-
-          await waitForTransactionReceipt(hash);
-          return hash;
-        } catch (error) {
-          if (isUserRejectedError(error)) {
-            dismissTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
-          }
-
-          throw error;
-        }
-      },
-      signOrder: async (props: OrderSigningRequest) => {
-        if (!walletClient) {
-          throw new Error("Wallet client not found");
-        }
-
-        try {
-          return await signTypedData({
-            domain: props.typedData.domain as any,
-            types: props.typedData.types as any,
-            primaryType: props.typedData.primaryType,
-            message: props.typedData.message as any,
-            account: props.signerAddress,
-          });
-        } catch (error) {
-          if (isUserRejectedError(error)) {
-            dismissTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
-          }
-
-          throw error;
-        }
-      },
-      getAllowance: async (props: GetAllowanceProps) => {
-        return getTokenAllowance({
-          tokenAddress: props.tokenAddress,
-          spenderAddress: props.spenderAddress,
-        });
-      },
-    };
-  }, [
-    approveToken,
-    getTokenAllowance,
-    signTypedData,
-    waitForTransactionReceipt,
-    walletClient,
-    wrapNativeToken,
-  ]);
-}
-
-export function useSpotCallbacks() {
-  const t = useTranslations();
-  const { inputCurrency, outputCurrency } = useDerivedSwap();
-  const { chainId } = useConnection();
+  const { refetch: refetchBalances } = useBalances();
   const setPendingWrappedInputAddress = useOrderSubmitFlowStore(
     (state) => state.setPendingWrappedInputAddress,
   );
-  const { mutateAsync: refetchBalances } =
-    useRefetchSelectedCurrenciesBalances();
 
-  const approvalSymbol = useMemo(() => {
-    if (!inputCurrency) return "";
-    if (isNativeAddress(inputCurrency.address)) {
-      return getWrappedNativeCurrency(chainId)?.symbol ?? inputCurrency.symbol;
-    }
-    return inputCurrency.symbol;
-  }, [chainId, inputCurrency]);
-
-  const explorerLink = useCallback(
-    (txHash?: string) => getExplorerUrl(chainId, txHash),
-    [chainId],
+  return useMemo(
+    (): SpotWalletPort => ({
+      // Wallet prompts can remain open while the user changes accounts or networks.
+      // Read the wallet again before each critical step instead of trusting render state.
+      assertContext: async (account, chainId) => {
+        if (!walletClient) throw new Error("Wallet client not found");
+        const [addresses, connectedChain] = await Promise.all([
+          walletClient.getAddresses(),
+          walletClient.getChainId(),
+        ]);
+        if (
+          connectedChain !== chainId ||
+          addresses[0]?.toLowerCase() !== account.toLowerCase()
+        ) {
+          throw new Error(
+            "Wallet account or network changed. Review the order again.",
+          );
+        }
+      },
+      wrapNativeToken: async (amount) => {
+        const { hash } = await wrapNativeToken(amount);
+        // Apply the token change when the review closes, after the confirmed deposit.
+        const wrappedAddress = getWrappedNativeCurrency(
+          walletClient?.chain.id,
+        )?.address;
+        if (wrappedAddress) setPendingWrappedInputAddress(wrappedAddress);
+        void refetchBalances().catch(() => undefined);
+        return hash;
+      },
+      approveToken: async (request) => {
+        const { hash } = await approveToken(request);
+        return hash;
+      },
+      cancelOrder: async (request) => {
+        if (!walletClient) throw new Error("Wallet client not found");
+        const hash = await walletClient.writeContract({
+          abi: request.abi as Abi,
+          functionName: "cancel",
+          address: request.contractAddress as `0x${string}`,
+          args: request.args,
+          chain: walletClient.chain,
+          account: walletClient.account,
+        });
+        await waitForTransactionReceipt(hash);
+        return hash;
+      },
+      // Forward the SDK's typed data unchanged; rebuilding it can invalidate the signature.
+      signOrder: async (request: OrderSigningRequest) => {
+        if (!walletClient) throw new Error("Wallet client not found");
+        return signTypedData({
+          domain: request.typedData.domain,
+          types: request.typedData.types,
+          primaryType: request.typedData.primaryType,
+          message: { ...request.typedData.message },
+          account: request.signerAddress,
+        });
+      },
+      getAllowance: (request) => getTokenAllowance(request),
+    }),
+    [
+      approveToken,
+      getTokenAllowance,
+      signTypedData,
+      waitForTransactionReceipt,
+      walletClient,
+      wrapNativeToken,
+      refetchBalances,
+      setPendingWrappedInputAddress,
+    ],
   );
-
-  const callbacks = useMemo((): Callbacks => {
-    return {
-      onWrapRequest: () => {
-        toast.loading(
-          `${t("wrapAction", { symbol: inputCurrency?.symbol ?? "token" })}…`,
-          {
-            id: WRAP_TOAST_ID,
-            description: t("proceedInWallet"),
-          },
-        );
-      },
-      onWrapSuccess: async ({ txHash }: OnWrapSuccessCallback) => {
-        const wrappedAddress = getWrappedNativeCurrency(chainId)?.address;
-
-        if (wrappedAddress) {
-          // Keep the native token visible while the submit flow is open.
-          // SubmitOrder applies this queued address after its dialog closes.
-          setPendingWrappedInputAddress(wrappedAddress);
-        }
-
-        toast.success(
-          t("wrapAction", { symbol: inputCurrency?.symbol ?? "token" }),
-          {
-            id: WRAP_TOAST_ID,
-            description: explorerLink(txHash) ? (
-              <a href={explorerLink(txHash)} target="_blank" rel="noreferrer">
-                {t("viewOnExplorer")}
-              </a>
-            ) : undefined,
-          },
-        );
-        await refetchBalances();
-      },
-      onApproveRequest: () => {
-        toast.loading(
-          `${t("approveAction", { symbol: approvalSymbol || "token" })}…`,
-          {
-            id: APPROVE_TOAST_ID,
-            description: t("proceedInWallet"),
-          },
-        );
-      },
-      onApproveSuccess: ({ txHash }: OnApproveSuccessCallback) => {
-        toast.success(
-          t("approveAction", { symbol: approvalSymbol || "token" }),
-          {
-            id: APPROVE_TOAST_ID,
-            description: explorerLink(txHash) ? (
-              <a href={explorerLink(txHash)} target="_blank" rel="noreferrer">
-                {t("viewOnExplorer")}
-              </a>
-            ) : undefined,
-          },
-        );
-      },
-      onSignOrderRequest: () => {
-        toast.loading(
-          <TokensPair
-            prefix={t("placeOrder")}
-            srcTokenAddress={inputCurrency?.address}
-            dstTokenAddress={outputCurrency?.address}
-          />,
-          { id: CREATE_ORDER_TOAST_ID, description: t("proceedInWallet") },
-        );
-      },
-      onOrderCreated: (order: Order) => {
-        toast.success(
-          <TokensPair
-            prefix={t("orderPlaced")}
-            srcTokenAddress={order.srcTokenAddress}
-            dstTokenAddress={order.dstTokenAddress}
-          />,
-          { id: CREATE_ORDER_TOAST_ID },
-        );
-      },
-      onOrderFilled: (order: Order) => {
-        toast.success(
-          <TokensPair
-            prefix={t("orderFilled")}
-            srcTokenAddress={order.srcTokenAddress}
-            dstTokenAddress={order.dstTokenAddress}
-          />,
-        );
-        refetchBalances();
-      },
-      onSubmitOrderFailed: ({ code, message }: ParsedError) => {
-        if (isUserRejectedError({ code, message })) {
-          dismissTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
-          return;
-        }
-
-        toast.error(
-          code ? `Transaction failed: ${code}` : "Transaction failed",
-          {
-            id: CREATE_ORDER_TOAST_ID,
-            description: message,
-          },
-        );
-      },
-      onSubmitOrderRejected: () => {
-        dismissTransactionRejectedToast({ id: CREATE_ORDER_TOAST_ID });
-      },
-      onCancelOrderRequest: () => {
-        toast.loading(`${t("cancelOrder")}…`, {
-          id: CANCEL_ORDER_TOAST_ID,
-          description: t("proceedInWallet"),
-        });
-      },
-      onCancelOrderSuccess: ({ txHash }: OnCancelOrderSuccess) => {
-        toast.success(t("Cancelled"), {
-          id: CANCEL_ORDER_TOAST_ID,
-          description: explorerLink(txHash) ? (
-            <a href={explorerLink(txHash)} target="_blank" rel="noreferrer">
-              {t("viewOnExplorer")}
-            </a>
-          ) : undefined,
-        });
-        refetchBalances();
-      },
-      onCancelOrderFailed: (error: Error) => {
-        if (isUserRejectedError(error)) {
-          dismissTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
-          return;
-        }
-
-        toast.error("Cancel failed", {
-          id: CANCEL_ORDER_TOAST_ID,
-          description: error.message,
-        });
-      },
-      onOrdersProgressUpdate: () => {
-        refetchBalances();
-      },
-      onCopy: () => {
-        toast.success("Copied");
-      },
-    };
-  }, [
-    approvalSymbol,
-    chainId,
-    explorerLink,
-    inputCurrency?.address,
-    inputCurrency?.symbol,
-    outputCurrency?.address,
-    refetchBalances,
-    setPendingWrappedInputAddress,
-    t,
-  ]);
-
-  return callbacks;
 }

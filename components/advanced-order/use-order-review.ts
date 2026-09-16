@@ -1,11 +1,18 @@
 "use client";
 
-import { useOrderForm, usePriceDisplay, toAmountUI } from "@orbs-network/spot-react";
+import { useOrderForm, usePriceDisplay } from "./use-order-form";
+
+import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
+import { toAmountUI } from "@orbs-network/spot-ui";
 
 /** Adapt the shared SDK calculation to the existing review labels. */
 export function useOrderReview() {
-  const form = useOrderForm();
-  const { inputToken, outputToken } = usePriceDisplay();
+  const currentForm = useOrderForm();
+  const tokens = usePriceDisplay();
+  const execution = useOrderSubmitFlowStore((state) => state.execution);
+  const form = execution.form ?? currentForm;
+  const inputToken = execution.inputToken ?? tokens.inputToken;
+  const outputToken = execution.outputToken ?? tokens.outputToken;
   return {
     form,
     srcToken: inputToken,

@@ -1,19 +1,25 @@
 "use client";
 
+import { useInputErrors, useDisclaimer } from "./use-order-form";
+
+import { useClient } from "./use-order-client";
 import { InlineMessage } from "@/components/ui/inline-message";
 import { useTranslations } from "@/lib/use-translations";
 import {
   ORBS_TWAP_FAQ_URL,
-  useInputErrors,
-  useDisclaimer,
-} from "@orbs-network/spot-react";
+} from "@orbs-network/spot-ui";
 import { AlertTriangleIcon, InfoIcon } from "lucide-react";
 import { formatInputError } from "./utils";
 
 export function InputErrorPanel() {
   const t = useTranslations();
   const error = useInputErrors();
+  const client = useClient();
   const message = formatInputError(error, t);
+
+  if (client.error) {
+    return <InlineMessage variant="error"><div role="alert">Could not load order configuration. <button type="button" className="underline" onClick={() => void client.refetch()}>Retry</button></div></InlineMessage>;
+  }
 
   if (!message) {
     return null;

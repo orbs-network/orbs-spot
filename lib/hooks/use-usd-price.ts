@@ -15,10 +15,7 @@ export const useUSDPrices = (tokens?: string[], disabled?: boolean) => {
 
   return useQuery({
     queryKey: ["usd-price", normalizedTokens.join(","), chainId],
-    queryFn: async () => {
-      const response = await getUSDPrice(normalizedTokens, chainId!);
-      return response;
-    },
+    queryFn: ({ signal }) => getUSDPrice(normalizedTokens, chainId!, signal),
     enabled: normalizedTokens.length > 0 && !!chainId && !disabled,
     staleTime: Infinity,
   });

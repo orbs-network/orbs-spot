@@ -11,7 +11,7 @@ import { getExplorerUrl, isNativeAddress, makeEllipsisAddress } from "../utils";
 import { useDerivedSwap } from "./use-derived-swap";
 import BN from "bignumber.js";
 import { useLiquidityHub } from "./liquidity-hub";
-import { useGetTransactionReceiptCallback } from "./use-get-transaction-receipt";
+import { useGetTransactionReceipt } from "./use-get-transaction-receipt";
 import { useBestTradeSwapStore, useSwapStore } from "./store";
 import { SwapStatus } from "@orbs-network/swap-ui";
 import { SwapStep } from "../types";
@@ -24,31 +24,6 @@ import {
   isUserRejectedError,
   dismissTransactionRejectedToast,
 } from "../tx-rejection";
-
-const usePrepareQuote = () => {
-  const { trade, refetchTrade } = useDerivedSwap();
-
-  return useMutation({
-    mutationFn: async () => {
-      if (!trade) {
-        throw new Error("Quote not found");
-      }
-      const originalQuote = trade.originalQuote as Quote;
-      
-      if (isFreshQuote(originalQuote, 60)) {
-        return originalQuote;
-      }
-      const freshQuote = (await refetchTrade())?.data?.originalQuote as Quote | undefined;
-      if (!freshQuote) {
-        return originalQuote;
-      }
-      if (BN(freshQuote.minAmountOut).lt(BN(originalQuote.minAmountOut))) {
-        return originalQuote;
-      }
-      return freshQuote;
-    },
-  });
-};
 
 const getTotalSteps = (shouldWrap: boolean, shouldApprove: boolean) => {
   let totalSteps = 1;
@@ -269,7 +244,6 @@ const useToasts = () => {
 };
 
 export const useSwapBestTrade = () => {
-  const { mutateAsync: prepareQuote } = usePrepareQuote();
   const status = useBestTradeSwapStore((state) => state.status);
   const updateStore = useBestTradeSwapStore((state) => state.updateStore);
   const totalSteps = useBestTradeSwapStore((state) => state.totalSteps);
@@ -280,12 +254,11 @@ export const useSwapBestTrade = () => {
   const txHash = useBestTradeSwapStore((state) => state.txHash);
 
   const { mutateAsync: signEip } = useSignEip();
-  const { parsedInputAmount, inputCurrency, outputCurrency } = useDerivedSwap();
+  const { parsedInputAmount, inputCurrency, outputCurrency, trade, refetchTrade } = useDerivedSwap();
   const liquidityHubClient = useLiquidityHub();
   const setPauseQuote = useSwapStore((state) => state.setPauseQuote);
   const { refetch: refetchBalances } = useBalances();
-  const { mutateAsync: getTransactionReceiptCallback } =
-    useGetTransactionReceiptCallback();
+  const getTransactionReceiptCallback = useGetTransactionReceipt();
   const { ensureAllowance, approve } = useApproval(
     permit2Address,
     inputCurrency?.address,
@@ -330,7 +303,14 @@ export const useSwapBestTrade = () => {
       }
 
       updateStore({ currentStep: SwapStep.SWAP });
-      const quote = await prepareQuote();
+      if (!trade) throw new Error("Quote not found");
+      let quote = trade.originalQuote as Quote;
+      if (!isFreshQuote(quote, 60)) {
+        const freshQuote = (await refetchTrade({ throwOnError: true })).data?.originalQuote as Quote | undefined;
+        if (freshQuote && BN(freshQuote.minAmountOut).gte(quote.minAmountOut)) {
+          quote = freshQuote;
+        }
+      }
       toasts.onSwapRequest();
       const signature = await signEip(quote);
       const tx = await liquidityHubClient.swap(quote, signature);

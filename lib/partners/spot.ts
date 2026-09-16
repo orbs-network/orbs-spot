@@ -1,4 +1,4 @@
-import { Partners } from "@orbs-network/spot-react";
+import { Partners } from "@orbs-network/spot-ui";
 
 import { getActiveClientPartnerConfig } from "./client";
 

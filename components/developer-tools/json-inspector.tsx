@@ -1,4 +1,6 @@
 "use client";
+
+import { useMutation } from "@tanstack/react-query";
 import { useTheme } from "@/lib/theme";
 
 import {
@@ -30,11 +32,7 @@ import {
   RotateCcwIcon,
   SaveIcon,
 } from "lucide-react";
-import {
-  Highlight,
-  themes,
-  type Language,
-} from "prism-react-renderer";
+import { Highlight, themes, type Language } from "prism-react-renderer";
 import { allExpanded, JsonView } from "react-json-view-lite";
 import { toast } from "sonner";
 
@@ -126,7 +124,10 @@ export type JsonInspectorModalProps = {
   editable?: boolean;
   explanation?: string;
   explanationDisplay?: "subtitle" | "tooltip";
-  getFieldExplanation?: (path: JsonValuePath, value: JsonValue) => string | undefined;
+  getFieldExplanation?: (
+    path: JsonValuePath,
+    value: JsonValue,
+  ) => string | undefined;
   getResponseFieldExplanation?: (
     path: JsonValuePath,
     value: JsonValue,
@@ -499,17 +500,11 @@ const buildCodeLineAnnotations = (
     const indent = propertyMatch[1].length;
     const key = propertyMatch[2] ?? propertyMatch[3];
     const serializedValue = propertyMatch[4].replace(/,$/, "").trim();
-    while (
-      contexts.length &&
-      contexts[contexts.length - 1].indent >= indent
-    ) {
+    while (contexts.length && contexts[contexts.length - 1].indent >= indent) {
       contexts.pop();
     }
 
-    const path = [
-      ...(contexts.at(-1)?.path ?? rootPath),
-      key,
-    ];
+    const path = [...(contexts.at(-1)?.path ?? rootPath), key];
 
     const value = getValueAtPath(data, path);
     if (value === undefined) return;
@@ -543,10 +538,7 @@ const createFieldInputs = (data: JsonContainer): FieldInputs => {
   const visit = (value: JsonValue, path: JsonValuePath) => {
     if (isJsonContainer(value)) {
       getEntries(value).forEach(([key, childValue]) => {
-        visit(childValue, [
-          ...path,
-          Array.isArray(value) ? Number(key) : key,
-        ]);
+        visit(childValue, [...path, Array.isArray(value) ? Number(key) : key]);
       });
       return;
     }
@@ -606,10 +598,8 @@ export const buildCurlCommand = (
 ) => {
   const method = (options.method ?? "POST").toUpperCase();
   const url =
-    options.url ??
-    (typeof window === "undefined" ? "/" : window.location.href);
-  const includeBody =
-    options.includeBody ?? !["GET", "HEAD"].includes(method);
+    options.url ?? (typeof window === "undefined" ? "/" : window.location.href);
+  const includeBody = options.includeBody ?? !["GET", "HEAD"].includes(method);
   const headers = includeBody
     ? { "Content-Type": "application/json", ...options.headers }
     : options.headers;
@@ -644,11 +634,7 @@ function InspectorRoot({
   if (embedded) return <>{children}</>;
 
   return (
-    <Dialog
-      open={open}
-      defaultOpen={defaultOpen}
-      onOpenChange={onOpenChange}
-    >
+    <Dialog open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
       {children}
     </Dialog>
   );
@@ -741,7 +727,6 @@ function JsonInspectorModalContent({
     createFieldInputs(data),
   );
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [isSaving, setIsSaving] = useState(false);
   const [isCodeFullscreen, setIsCodeFullscreen] = useState(false);
   const [fullscreenError, setFullscreenError] = useState<string>();
   const [previewTab, setPreviewTab] = useState<PreviewTab>("request");
@@ -781,8 +766,7 @@ function JsonInspectorModalContent({
             {
               format: codeSnippet.format,
               formatEdit: codeSnippet.formatEdit,
-              name:
-                codeSnippet.fileName ?? codeSnippet.language ?? "Code",
+              name: codeSnippet.fileName ?? codeSnippet.language ?? "Code",
               syntaxLanguage:
                 codeSnippet.syntaxLanguage ?? ("typescript" as Language),
               showFieldTooltips: codeSnippet.showFieldTooltips,
@@ -793,39 +777,45 @@ function JsonInspectorModalContent({
     [codeSnippet],
   );
   const activeCodeFileIndex =
-    codeFileSelection.codeSnippet === codeSnippet
-      ? codeFileSelection.index
-      : 0;
-  const activeCodeFile =
-    codeFiles[activeCodeFileIndex] ?? codeFiles[0];
+    codeFileSelection.codeSnippet === codeSnippet ? codeFileSelection.index : 0;
+  const activeCodeFile = codeFiles[activeCodeFileIndex] ?? codeFiles[0];
   const formattedCode = useMemo(
-    () => (mode === "edit" && activeCodeFile?.formatEdit
-      ? activeCodeFile.formatEdit(draft)
-      : activeCodeFile?.format(draft)),
+    () =>
+      mode === "edit" && activeCodeFile?.formatEdit
+        ? activeCodeFile.formatEdit(draft)
+        : activeCodeFile?.format(draft),
     [activeCodeFile, draft, mode],
   );
   const isMainCodeFile = activeCodeFileIndex === 0;
-  const activeCodeIsInlineEditable = activeCodeFile?.inlineEditable ?? (isMainCodeFile && Boolean(codeSnippet?.inlineEditable));
+  const activeCodeIsInlineEditable =
+    activeCodeFile?.inlineEditable ??
+    (isMainCodeFile && Boolean(codeSnippet?.inlineEditable));
   const activeCodeIsEditable = isMainCodeFile
-    ? !codeSnippet?.files?.some((file) => file.inlineEditable) || Boolean(codeSnippet?.inlineEditable)
+    ? !codeSnippet?.files?.some((file) => file.inlineEditable) ||
+      Boolean(codeSnippet?.inlineEditable)
     : Boolean(activeCodeFile?.inlineEditable);
   const responseFieldExplanation = isDocumentationDensity
     ? undefined
     : (getResponseFieldExplanation ?? getFieldExplanation);
   const hasResponseContent =
     responseData !== undefined || responseNotice !== undefined;
-  const previewCopyTarget =
-    previewTab === "request" ? "primary" : "response";
+  const previewCopyTarget = previewTab === "request" ? "primary" : "response";
   const inlineCodeFields = useMemo(() => {
-    if (
-      !formattedCode ||
-      !activeCodeIsInlineEditable
-    ) {
+    if (!formattedCode || !activeCodeIsInlineEditable) {
       return new Map<number, JsonLineAnnotation>();
     }
 
-    return buildCodeLineAnnotations(formattedCode, data, codeSnippet?.inlineEditRoot);
-  }, [activeCodeIsInlineEditable, data, formattedCode, codeSnippet?.inlineEditRoot]);
+    return buildCodeLineAnnotations(
+      formattedCode,
+      data,
+      codeSnippet?.inlineEditRoot,
+    );
+  }, [
+    activeCodeIsInlineEditable,
+    data,
+    formattedCode,
+    codeSnippet?.inlineEditRoot,
+  ]);
   const codeLineExplanations = useMemo(() => {
     const explanations = new Map<
       number,
@@ -953,9 +943,7 @@ function JsonInspectorModalContent({
         return;
       }
 
-      const match = line.match(
-        /^(\s*)(?:"([^"]+)"|([A-Za-z_$][\w$]*)):/,
-      );
+      const match = line.match(/^(\s*)(?:"([^"]+)"|([A-Za-z_$][\w$]*)):/);
       if (!match) return;
 
       const indent = match[1].length;
@@ -972,14 +960,13 @@ function JsonInspectorModalContent({
       if (value === undefined) return;
 
       const formattedPath = formatPath(path);
-      const hidesTooltip = activeCodeFile?.hiddenFieldTooltipDescendantKeys?.some(
-        (hiddenKey) => {
+      const hidesTooltip =
+        activeCodeFile?.hiddenFieldTooltipDescendantKeys?.some((hiddenKey) => {
           const hiddenKeyIndex = path.findIndex(
             (segment) => segment === hiddenKey,
           );
           return hiddenKeyIndex >= 0 && hiddenKeyIndex < path.length - 1;
-        },
-      );
+        });
       const tooltip = hidesTooltip
         ? undefined
         : (getFieldExplanation(path, value) ??
@@ -1000,7 +987,6 @@ function JsonInspectorModalContent({
         });
         return;
       }
-
     });
 
     return explanations;
@@ -1094,16 +1080,17 @@ function JsonInspectorModalContent({
       setFieldError(pathKey, result.error);
 
       if (result.error || result.value === undefined) return;
-      setDraft((current) =>
-        updateValueAtPath(current, path, result.value!),
-      );
+      setDraft((current) => updateValueAtPath(current, path, result.value!));
     },
     [setFieldError],
   );
 
-  const updateBooleanField = useCallback((path: JsonValuePath, value: boolean) => {
-    setDraft((current) => updateValueAtPath(current, path, value));
-  }, []);
+  const updateBooleanField = useCallback(
+    (path: JsonValuePath, value: boolean) => {
+      setDraft((current) => updateValueAtPath(current, path, value));
+    },
+    [],
+  );
 
   const getIssueForField = (path: string) =>
     validationIssues.find(
@@ -1116,10 +1103,7 @@ function JsonInspectorModalContent({
   const canEditValue = (path: JsonValuePath, value: JsonPrimitive) =>
     isValueEditable?.(path, value) ?? true;
 
-  const hasEditableValue = (
-    value: JsonValue,
-    path: JsonValuePath,
-  ): boolean => {
+  const hasEditableValue = (value: JsonValue, path: JsonValuePath): boolean => {
     if (!isJsonContainer(value)) return canEditValue(path, value);
 
     return getEntries(value).some(([key, childValue]) =>
@@ -1140,116 +1124,113 @@ function JsonInspectorModalContent({
     setMode("view");
   };
 
-  const handleSave = async () => {
-    if (validationIssues.length) return;
-
-    setIsSaving(true);
-    try {
+  // Saving may be asynchronous. Let the mutation own pending/error state and
+  // leave edit mode only after onSave succeeds, preserving the draft on failure.
+  const { mutate: handleSave, isPending: isSavingDraft } = useMutation({
+    networkMode: "always",
+    retry: false,
+    mutationFn: async () => {
+      if (validationIssues.length)
+        throw new Error("Resolve validation errors before saving.");
       await onSave?.(draft);
+    },
+    onSuccess: () => {
       setMode("view");
       toast.success("Changes saved");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to save JSON.",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to save JSON.");
+    },
+  });
+  const { mutate: handleResetToDefaults, isPending: isResetting } = useMutation(
+    {
+      networkMode: "always",
+      retry: false,
+      mutationFn: () => Promise.resolve(onSave?.(resetData ?? data)),
+      onSuccess: () => {
+        resetDraftToDefaults();
+        toast.success("Changes reset");
+      },
+      onError: (error) => {
+        toast.error(error.message || "Failed to reset changes.");
+      },
+    },
+  );
+  const isSaving = isSavingDraft || isResetting;
 
-  const handleResetToDefaults = async () => {
-    setIsSaving(true);
-    try {
-      const nextDraft = resetData ?? data;
-      await onSave?.(nextDraft);
-      resetDraftToDefaults();
-      toast.success("Changes reset");
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Failed to reset changes.",
-      );
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCopy = async () => {
-    const copyValue =
-      formattedCode ??
-      (copyAs === "json"
-        ? JSON.stringify(draft, null, 2)
-        : buildCurlCommand(draft, curl));
-    const contentName = formattedCode
-      ? "Code snippet"
-      : copyAs === "json"
-        ? "JSON response"
-        : "cURL command";
-
-    try {
-      await navigator.clipboard.writeText(copyValue);
-      setCopiedTarget("primary");
-      toast.success(`${contentName} copied`);
+  // Clipboard work is local: networkMode "always" keeps it working offline.
+  const { mutate: copyContent } = useMutation({
+    networkMode: "always",
+    retry: false,
+    mutationFn: ({
+      value,
+    }: {
+      value: string;
+      label: string;
+      target: "primary" | "response" | "curl";
+    }) => navigator.clipboard.writeText(value),
+    onSuccess: (_, { label, target }) => {
+      setCopiedTarget(target);
+      toast.success(`${label} copied`);
       if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
       copyResetTimer.current = setTimeout(
         () => setCopiedTarget(undefined),
         1600,
       );
-    } catch {
-      toast.error(`Failed to copy ${contentName.toLowerCase()}`);
-    }
+    },
+    onError: (_, { label }) => {
+      toast.error(`Failed to copy ${label.toLowerCase()}`);
+    },
+  });
+  const handleCopy = () =>
+    copyContent({
+      value:
+        formattedCode ??
+        (copyAs === "json"
+          ? JSON.stringify(draft, null, 2)
+          : buildCurlCommand(draft, curl)),
+      label: formattedCode
+        ? "Code snippet"
+        : copyAs === "json"
+          ? "JSON response"
+          : "cURL command",
+      target: "primary",
+    });
+  const handleCopyResponse = () => {
+    if (responseData)
+      copyContent({
+        value: JSON.stringify(responseData, null, 2),
+        label: "JSON response",
+        target: "response",
+      });
   };
+  const handleCopyCurl = () =>
+    copyContent({
+      value: buildCurlCommand(draft, curl),
+      label: "cURL command",
+      target: "curl",
+    });
 
-  const handleCopyResponse = async () => {
-    if (!responseData) return;
-
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(responseData, null, 2));
-      setCopiedTarget("response");
-      toast.success("JSON response copied");
-      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
-      copyResetTimer.current = setTimeout(
-        () => setCopiedTarget(undefined),
-        1600,
-      );
-    } catch {
-      toast.error("Failed to copy JSON response");
-    }
-  };
-
-  const handleCopyCurl = async () => {
-    try {
-      await navigator.clipboard.writeText(buildCurlCommand(draft, curl));
-      setCopiedTarget("curl");
-      toast.success("cURL command copied");
-      if (copyResetTimer.current) clearTimeout(copyResetTimer.current);
-      copyResetTimer.current = setTimeout(
-        () => setCopiedTarget(undefined),
-        1600,
-      );
-    } catch {
-      toast.error("Failed to copy cURL command");
-    }
-  };
-
-  const handleCodeFullscreen = async () => {
-    const codeContainer = codeContainerRef.current;
-    if (!codeContainer) return;
-
-    try {
+  const { mutate: handleCodeFullscreen } = useMutation({
+    networkMode: "always",
+    retry: false,
+    mutationFn: async () => {
+      const codeContainer = codeContainerRef.current;
+      if (!codeContainer) return;
       setFullscreenError(undefined);
       if (document.fullscreenElement === codeContainer) {
         await document.exitFullscreen();
         return;
       }
-
       if (document.fullscreenElement) await document.exitFullscreen();
       await codeContainer.requestFullscreen();
-    } catch {
+    },
+    onError: () => {
       const message = "Full screen is unavailable in this browser.";
       setFullscreenError(message);
       toast.error(message);
-    }
-  };
+    },
+  });
 
   const handleCodeWheel = (event: WheelEvent<HTMLPreElement>) => {
     if (isCodeFullscreen || event.deltaY === 0) return;
@@ -1454,10 +1435,10 @@ function JsonInspectorModalContent({
   };
 
   const isInlineCodeEdit =
-    mode === "edit" &&
-    activeCodeIsInlineEditable && Boolean(formattedCode);
+    mode === "edit" && activeCodeIsInlineEditable && Boolean(formattedCode);
   const keepsCodeVisibleWhileEditing = Boolean(
-    codeSnippet?.inlineEditable || codeSnippet?.files?.some((file) => file.inlineEditable),
+    codeSnippet?.inlineEditable ||
+      codeSnippet?.files?.some((file) => file.inlineEditable),
   );
 
   const renderCodeFileTabs = () => (
@@ -1479,20 +1460,23 @@ function JsonInspectorModalContent({
             aria-controls={`${codeTabsId}-panel`}
             tabIndex={isActive ? 0 : -1}
             onKeyDown={(event) => {
-              const nextIndex = event.key === "ArrowRight"
-                ? (index + 1) % codeFiles.length
-                : event.key === "ArrowLeft"
-                  ? (index - 1 + codeFiles.length) % codeFiles.length
-                  : event.key === "Home"
-                    ? 0
-                    : event.key === "End"
-                      ? codeFiles.length - 1
-                      : undefined;
+              const nextIndex =
+                event.key === "ArrowRight"
+                  ? (index + 1) % codeFiles.length
+                  : event.key === "ArrowLeft"
+                    ? (index - 1 + codeFiles.length) % codeFiles.length
+                    : event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? codeFiles.length - 1
+                        : undefined;
               if (nextIndex === undefined) return;
               event.preventDefault();
               setCodeFileSelection({ codeSnippet, index: nextIndex });
               setCopiedTarget(undefined);
-              document.getElementById(`${codeTabsId}-tab-${nextIndex}`)?.focus();
+              document
+                .getElementById(`${codeTabsId}-tab-${nextIndex}`)
+                ?.focus();
             }}
             onClick={() => {
               setCodeFileSelection({ codeSnippet, index });
@@ -1604,7 +1588,8 @@ function JsonInspectorModalContent({
       embedded={embedded}
       onOpenChange={handleOpenChange}
     >
-      {!embedded && trigger !== null &&
+      {!embedded &&
+        trigger !== null &&
         (triggerTooltip ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -1636,9 +1621,7 @@ function JsonInspectorModalContent({
       >
         <DialogHeader
           className={`border-b border-border/70 pr-14 text-left ${
-            isDocumentationDensity
-              ? "px-4 py-4 sm:px-5"
-              : "px-5 py-5 sm:px-6"
+            isDocumentationDensity ? "px-4 py-4 sm:px-5" : "px-5 py-5 sm:px-6"
           }`}
         >
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1697,9 +1680,7 @@ function JsonInspectorModalContent({
                 <p
                   id={descriptionId}
                   className={`mt-2 max-w-[560px] leading-relaxed text-muted-foreground ${
-                    explanationDisplay === "subtitle"
-                      ? "text-xs"
-                      : "text-sm"
+                    explanationDisplay === "subtitle" ? "text-xs" : "text-sm"
                   }`}
                 >
                   {headerSubtitle}
@@ -1718,38 +1699,38 @@ function JsonInspectorModalContent({
           {mode === "view" || keepsCodeVisibleWhileEditing ? (
             <div
               className={`flex h-full min-h-0 flex-col ${
-                requestResponseTabs && tabsInSectionHeader
-                  ? "gap-0"
-                  : "gap-4"
+                requestResponseTabs && tabsInSectionHeader ? "gap-0" : "gap-4"
               }`}
             >
-              {mode === "edit" && keepsCodeVisibleWhileEditing && validationIssues.length > 0 && (
-                <InlineMessage
-                  variant="error"
-                  icon={
-                    <CircleAlertIcon
-                      aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-destructive"
-                    />
-                  }
-                >
-                  <div>
-                    <p>
-                      Fix {validationIssues.length}{" "}
-                      {validationIssues.length === 1 ? "issue" : "issues"}{" "}
-                      before saving or copying.
-                    </p>
-                    <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
-                      {validationIssues.map((issue, index) => (
-                        <li key={`${issue.path ?? "root"}-${index}`}>
-                          {issue.path ? `${issue.path}: ` : ""}
-                          {issue.message}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </InlineMessage>
-              )}
+              {mode === "edit" &&
+                keepsCodeVisibleWhileEditing &&
+                validationIssues.length > 0 && (
+                  <InlineMessage
+                    variant="error"
+                    icon={
+                      <CircleAlertIcon
+                        aria-hidden="true"
+                        className="mt-0.5 size-4 shrink-0 text-destructive"
+                      />
+                    }
+                  >
+                    <div>
+                      <p>
+                        Fix {validationIssues.length}{" "}
+                        {validationIssues.length === 1 ? "issue" : "issues"}{" "}
+                        before saving or copying.
+                      </p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
+                        {validationIssues.map((issue, index) => (
+                          <li key={`${issue.path ?? "root"}-${index}`}>
+                            {issue.path ? `${issue.path}: ` : ""}
+                            {issue.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </InlineMessage>
+                )}
 
               {requestResponseTabs && formattedCode && hasResponseContent && (
                 <div
@@ -1770,15 +1751,13 @@ function JsonInspectorModalContent({
                     {previewTab === "request" &&
                       isMainCodeFile &&
                       curl?.method && (
-                      <span className="rounded-md border border-primary/25 bg-primary/10 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-primary">
-                        {curl.method}
-                      </span>
-                    )}
+                        <span className="rounded-md border border-primary/25 bg-primary/10 px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-wide text-primary">
+                          {curl.method}
+                        </span>
+                      )}
                   </div>
                   <div className="ml-auto flex shrink-0 items-center gap-1">
-                    {previewTab === "request" &&
-                      isMainCodeFile &&
-                      curl && (
+                    {previewTab === "request" && isMainCodeFile && curl && (
                       <Button
                         type="button"
                         size="sm"
@@ -1789,7 +1768,10 @@ function JsonInspectorModalContent({
                         {copiedTarget === "curl" ? (
                           <CheckIcon aria-hidden="true" className="size-3.5" />
                         ) : (
-                          <ClipboardIcon aria-hidden="true" className="size-3.5" />
+                          <ClipboardIcon
+                            aria-hidden="true"
+                            className="size-3.5"
+                          />
                         )}
                         {copiedTarget === "curl" ? "Copied" : "Copy as cURL"}
                       </Button>
@@ -1813,7 +1795,10 @@ function JsonInspectorModalContent({
                       {copiedTarget === previewCopyTarget ? (
                         <CheckIcon aria-hidden="true" className="size-3.5" />
                       ) : (
-                        <ClipboardIcon aria-hidden="true" className="size-3.5" />
+                        <ClipboardIcon
+                          aria-hidden="true"
+                          className="size-3.5"
+                        />
                       )}
                       {copiedTarget === previewCopyTarget ? "Copied" : "Copy"}
                     </Button>
@@ -1823,363 +1808,384 @@ function JsonInspectorModalContent({
 
               {formattedCode ? (
                 !requestResponseTabs || previewTab === "request" ? (
-              <div
-                ref={codeContainerRef}
-                role={requestResponseTabs ? "tabpanel" : undefined}
-                aria-label={requestResponseTabs ? "Request" : undefined}
-                className={`flex min-h-0 flex-1 flex-col overflow-hidden border border-border/70 bg-background/45 shadow-inner ${
-                  isCodeFullscreen
-                    ? "h-screen w-screen rounded-none border-0 bg-card"
-                    : requestResponseTabs && tabsInSectionHeader
-                      ? "rounded-b-[16px]"
-                      : "rounded-[16px]"
-                } ${
-                  codeSnippetState === "active" && !isCodeFullscreen
-                    ? "border-primary/55 ring-1 ring-primary/15 shadow-xl shadow-primary/10"
-                    : ""
-                }`}
-              >
-                <div
-                  className={`flex min-h-11 flex-wrap items-center justify-between border-b border-border/70 bg-secondary/35 sm:flex-nowrap ${
-                    codeFiles.length > 1 ? "" : "pl-4"
-                  } ${
-                    codeSnippetState === "active"
-                      ? "bg-primary/[0.08]"
-                      : ""
-                  }`}
-                >
-                  {codeFiles.length > 1 ? (
-                    renderCodeFileTabs()
-                  ) : (
-                    <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <Code2Icon
-                        aria-hidden="true"
-                        className="size-4 shrink-0 text-primary"
-                      />
-                      <span className="truncate">
-                        {activeCodeFile?.name ??
-                          codeSnippet?.language ??
-                          "Code"}
-                      </span>
-                    </div>
-                  )}
-                  <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1 px-2">
-                    {fullscreenError ? (
-                      <span
-                        role="status"
-                        className="max-w-44 truncate px-1 text-[10px] font-medium text-destructive"
-                      >
-                        {fullscreenError}
-                      </span>
-                    ) : null}
-                    {codeSnippetState === "review" && (
-                      <span
-                        className="hidden rounded-md border border-border/80 bg-background/45 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:inline-flex"
-                      >
-                        Previous snippet
-                      </span>
-                    )}
-                    {editable && hasChangesFromResetValues && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void handleResetToDefaults()}
-                        isLoading={isSaving}
-                        className="h-10 px-2.5 text-[11px] text-primary hover:text-primary"
-                      >
-                        <RotateCcwIcon aria-hidden="true" className="size-3.5" />
-                        Reset
-                      </Button>
-                    )}
-                    {(!requestResponseTabs || isCodeFullscreen) &&
-                      (copyActionsInHeaders ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => void handleCopy()}
-                          disabled={validationIssues.length > 0}
-                          className="h-10 px-2.5 text-[11px]"
-                        >
-                          {copiedTarget === "primary" ? (
-                            <CheckIcon aria-hidden="true" className="size-3.5" />
-                          ) : (
-                            <ClipboardIcon aria-hidden="true" className="size-3.5" />
-                          )}
-                          {copiedTarget === "primary" ? "Copied" : "Copy"}
-                        </Button>
-                      ) : !codeSnippet?.hideStatusLabel ? (
-                        <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
-                          {isInlineCodeEdit
-                            ? "Editable snippet"
-                            : "Populated snippet"}
-                        </span>
-                      ) : null)}
-                    {codeToolbarAction}
-                    {editable && activeCodeIsEditable && (
-                      <label
-                        className={`flex h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[11px] font-medium transition-colors hover:bg-secondary/60 hover:text-foreground ${
-                          mode === "edit"
-                            ? "text-foreground"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        <span>Edit</span>
-                        <Switch
-                          size="sm"
-                          checked={mode === "edit"}
-                          onCheckedChange={(checked) =>
-                            handleModeChange(checked ? "edit" : "view")
-                          }
-                          aria-label="Edit snippet"
-                        />
-                      </label>
-                    )}
-                    {renderCodeFullscreenButton()}
-                  </div>
-                </div>
-                <Highlight
-                  theme={theme === "dark" ? themes.oneDark : themes.github}
-                  code={formattedCode}
-                  language={activeCodeFile?.syntaxLanguage ?? "typescript"}
-                >
-                  {({
-                    className,
-                    getLineProps,
-                    getTokenProps,
-                    style,
-                    tokens,
-                  }) => (
-                    <pre
-                      ref={codeScrollRef}
-                      id={`${codeTabsId}-panel`}
-                      role={codeFiles.length > 1 ? "tabpanel" : undefined}
-                      aria-labelledby={codeFiles.length > 1 ? `${codeTabsId}-tab-${activeCodeFileIndex}` : undefined}
-                      className={`${className} min-h-0 flex-1 overflow-auto overscroll-x-contain overscroll-y-auto p-4 font-mono ${
-                        isDocumentationDensity
-                          ? "text-[12px] leading-5"
-                          : "text-[13px] leading-6"
-                      } sm:p-5`}
-                      style={{ ...style, background: "transparent" }}
-                      aria-label={`${title} code snippet`}
-                      tabIndex={0}
-                      onWheel={handleCodeWheel}
+                  <div
+                    ref={codeContainerRef}
+                    role={requestResponseTabs ? "tabpanel" : undefined}
+                    aria-label={requestResponseTabs ? "Request" : undefined}
+                    className={`flex min-h-0 flex-1 flex-col overflow-hidden border border-border/70 bg-background/45 shadow-inner ${
+                      isCodeFullscreen
+                        ? "h-screen w-screen rounded-none border-0 bg-card"
+                        : requestResponseTabs && tabsInSectionHeader
+                          ? "rounded-b-[16px]"
+                          : "rounded-[16px]"
+                    } ${
+                      codeSnippetState === "active" && !isCodeFullscreen
+                        ? "border-primary/55 ring-1 ring-primary/15 shadow-xl shadow-primary/10"
+                        : ""
+                    }`}
+                  >
+                    <div
+                      className={`flex min-h-11 flex-wrap items-center justify-between border-b border-border/70 bg-secondary/35 sm:flex-nowrap ${
+                        codeFiles.length > 1 ? "" : "pl-4"
+                      } ${
+                        codeSnippetState === "active" ? "bg-primary/[0.08]" : ""
+                      }`}
                     >
-                      <code className="block w-max min-w-full">
-                        {Children.toArray(tokens.map((line, lineIndex) => {
-                          const lineProps = getLineProps({ line });
-                          const lineExplanation =
-                            codeLineExplanations.get(lineIndex);
-                          const inlineField = isInlineCodeEdit
-                            ? inlineCodeFields.get(lineIndex)
-                            : undefined;
-                          const inlineFieldIsEditable = Boolean(
-                            inlineField &&
-                              canEditValue(
-                                inlineField.path,
-                                inlineField.value,
-                              ),
-                          );
-                          const colonIndex = line.findIndex(
-                            (token) => token.content === ":",
-                          );
-                          const equalsIndex = line.findIndex((token) =>
-                            token.content.includes("="),
-                          );
-                          const fieldSeparatorIndex =
-                            colonIndex >= 0 ? colonIndex : equalsIndex;
-                          const firstContentTokenIndex = line.findIndex(
-                            (token) => token.content.trim().length > 0,
-                          );
-                          const prefixTokenCount =
-                            colonIndex >= 0
-                              ? colonIndex + 1
-                              : Math.max(firstContentTokenIndex, 0);
-                          const pathKey = inlineField
-                            ? formatPath(inlineField.path)
-                            : "";
-                          const fieldIssue = pathKey
-                            ? getIssueForField(pathKey)
-                            : undefined;
-                          const currentValue = inlineField
-                            ? getValueAtPath(draft, inlineField.path)
-                            : undefined;
-                          const inputValue = inlineField
-                            ? (fieldInputs[pathKey] ??
-                              formatFieldInput(
-                                currentValue ?? inlineField.value,
-                              ))
-                            : "";
-                          const hasTrailingComma = line.some(
-                            (token) => token.content === ",",
-                          );
-                          const inlineComment = line
-                            .map((token) => token.content)
-                            .join("")
-                            .match(/\/\/.*$/)?.[0];
-
-                          const renderToken = (
-                            token: (typeof line)[number],
-                            tokenIndex: number,
-                          ) => {
-                            const tokenProps = getTokenProps({ token });
-                            const tokenClassName = token.types.includes(
-                              "comment",
-                            )
-                              ? `${tokenProps.className} !text-foreground/75`
-                              : tokenProps.className;
-                            const isExplainedKey =
-                              fieldSeparatorIndex >= 0 &&
-                              tokenIndex < fieldSeparatorIndex &&
-                              lineExplanation?.key ===
-                                token.content.trim().replace(/^['"]|['"]$/g, "");
-
-                            if (!isExplainedKey) {
-                              return (
-                                <span
-                                  key={`token-${lineIndex}-${tokenIndex}`}
-                                  className={tokenClassName}
-                                  style={tokenProps.style}
-                                >
-                                  {token.content}
-                                </span>
-                              );
-                            }
-
-                            const keyStartIndex = token.content.lastIndexOf(
-                              lineExplanation.key,
-                            );
-
-                            return (
-                              <span
-                                key={`token-${lineIndex}-${tokenIndex}`}
-                                className={tokenClassName}
-                                style={tokenProps.style}
-                              >
-                                {token.content.slice(0, keyStartIndex)}
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className="cursor-help border-0 border-b border-dashed border-current bg-transparent p-0 font-[inherit] text-inherit outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
-                                      aria-label={`Explain ${lineExplanation.path}`}
-                                    >
-                                      {lineExplanation.key}
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    {lineExplanation.tooltip}
-                                  </TooltipContent>
-                                </Tooltip>
-                                {token.content.slice(
-                                  keyStartIndex + lineExplanation.key.length,
-                                )}
-                              </span>
-                            );
-                          };
-
-                          return (
-                            <span
-                              key={`line-${lineIndex}`}
-                              className={`${lineProps.className} flex min-w-full`}
-                              style={lineProps.style}
+                      {codeFiles.length > 1 ? (
+                        renderCodeFileTabs()
+                      ) : (
+                        <div className="flex min-w-0 items-center gap-2 text-xs font-medium text-muted-foreground">
+                          <Code2Icon
+                            aria-hidden="true"
+                            className="size-4 shrink-0 text-primary"
+                          />
+                          <span className="truncate">
+                            {activeCodeFile?.name ??
+                              codeSnippet?.language ??
+                              "Code"}
+                          </span>
+                        </div>
+                      )}
+                      <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-1 px-2">
+                        {fullscreenError ? (
+                          <span
+                            role="status"
+                            className="max-w-44 truncate px-1 text-[10px] font-medium text-destructive"
+                          >
+                            {fullscreenError}
+                          </span>
+                        ) : null}
+                        {codeSnippetState === "review" && (
+                          <span className="hidden rounded-md border border-border/80 bg-background/45 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-muted-foreground sm:inline-flex">
+                            Previous snippet
+                          </span>
+                        )}
+                        {editable && hasChangesFromResetValues && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void handleResetToDefaults()}
+                            isLoading={isSaving}
+                            className="h-10 px-2.5 text-[11px] text-primary hover:text-primary"
+                          >
+                            <RotateCcwIcon
+                              aria-hidden="true"
+                              className="size-3.5"
+                            />
+                            Reset
+                          </Button>
+                        )}
+                        {(!requestResponseTabs || isCodeFullscreen) &&
+                          (copyActionsInHeaders ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => void handleCopy()}
+                              disabled={validationIssues.length > 0}
+                              className="h-10 px-2.5 text-[11px]"
                             >
-                              <span
-                                className="block w-8 shrink-0 select-none pr-4 text-right text-muted-foreground/45"
-                                aria-hidden="true"
-                              >
-                                {lineIndex + 1}
-                              </span>
-                              <span className="block flex-1 whitespace-pre">
-                                {inlineField && inlineFieldIsEditable ? (
-                                  <span data-inline-edit-field={pathKey}>
-                                    {Children.toArray(
-                                      line
-                                        .slice(0, prefixTokenCount)
-                                        .map(renderToken),
-                                    )}
-                                    {colonIndex >= 0 && " "}
-                                    {typeof inlineField.value === "string" && (
-                                      <span style={{ color: "#98c379" }}>
-                                        &quot;
-                                      </span>
-                                    )}
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Input
-                                          name={`json-inline-${pathKey}`}
-                                          autoComplete="off"
-                                          type={
-                                            typeof inlineField.value ===
-                                            "number"
-                                              ? "number"
-                                              : "text"
-                                          }
-                                          step={
-                                            typeof inlineField.value ===
-                                            "number"
-                                              ? "any"
-                                              : undefined
-                                          }
-                                          value={inputValue}
-                                          onChange={(event) =>
-                                            updateFieldInput(
-                                              inlineField.path,
-                                              event.target.value,
-                                              inlineField.value,
-                                            )
-                                          }
-                                          aria-label={`Edit ${pathKey}`}
-                                          aria-invalid={Boolean(fieldIssue)}
-                                          className="mx-1 mb-1 inline-block h-7 min-w-44 rounded-md border-primary/35 bg-background/80 px-2 py-0 align-middle font-mono text-[11px] text-foreground shadow-sm [appearance:textfield] focus-visible:border-primary md:text-[11px] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
-                                          style={{
-                                            width: `${Math.min(
-                                              Math.max(
-                                                inputValue.length + 3,
-                                                24,
-                                              ),
-                                              72,
-                                            )}ch`,
-                                          }}
-                                          spellCheck={false}
-                                        />
-                                      </TooltipTrigger>
-                                      {fieldIssue && (
-                                        <TooltipContent>
-                                          {fieldIssue.message}
-                                        </TooltipContent>
-                                      )}
-                                    </Tooltip>
-                                    {typeof inlineField.value === "string" && (
-                                      <span style={{ color: "#98c379" }}>
-                                        &quot;
-                                      </span>
-                                    )}
-                                    {hasTrailingComma && (
-                                      <span style={{ color: "#abb2bf" }}>,</span>
-                                    )}
-                                    {inlineComment && (
-                                      <span className="!text-foreground/75">
-                                        {` ${inlineComment}`}
-                                      </span>
-                                    )}
-                                  </span>
-                                ) : (
-                                  Children.toArray(line.map(renderToken))
-                                )}
-                              </span>
+                              {copiedTarget === "primary" ? (
+                                <CheckIcon
+                                  aria-hidden="true"
+                                  className="size-3.5"
+                                />
+                              ) : (
+                                <ClipboardIcon
+                                  aria-hidden="true"
+                                  className="size-3.5"
+                                />
+                              )}
+                              {copiedTarget === "primary" ? "Copied" : "Copy"}
+                            </Button>
+                          ) : !codeSnippet?.hideStatusLabel ? (
+                            <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
+                              {isInlineCodeEdit
+                                ? "Editable snippet"
+                                : "Populated snippet"}
                             </span>
-                          );
-                        }))}
-                      </code>
-                    </pre>
-                  )}
-                </Highlight>
-                {isCodeFullscreen &&
-                  showsFooterActions &&
-                  renderFooterActions()}
-              </div>
+                          ) : null)}
+                        {codeToolbarAction}
+                        {editable && activeCodeIsEditable && (
+                          <label
+                            className={`flex h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[11px] font-medium transition-colors hover:bg-secondary/60 hover:text-foreground ${
+                              mode === "edit"
+                                ? "text-foreground"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            <span>Edit</span>
+                            <Switch
+                              size="sm"
+                              checked={mode === "edit"}
+                              onCheckedChange={(checked) =>
+                                handleModeChange(checked ? "edit" : "view")
+                              }
+                              aria-label="Edit snippet"
+                            />
+                          </label>
+                        )}
+                        {renderCodeFullscreenButton()}
+                      </div>
+                    </div>
+                    <Highlight
+                      theme={theme === "dark" ? themes.oneDark : themes.github}
+                      code={formattedCode}
+                      language={activeCodeFile?.syntaxLanguage ?? "typescript"}
+                    >
+                      {({
+                        className,
+                        getLineProps,
+                        getTokenProps,
+                        style,
+                        tokens,
+                      }) => (
+                        <pre
+                          ref={codeScrollRef}
+                          id={`${codeTabsId}-panel`}
+                          role={codeFiles.length > 1 ? "tabpanel" : undefined}
+                          aria-labelledby={
+                            codeFiles.length > 1
+                              ? `${codeTabsId}-tab-${activeCodeFileIndex}`
+                              : undefined
+                          }
+                          className={`${className} min-h-0 flex-1 overflow-auto overscroll-x-contain overscroll-y-auto p-4 font-mono ${
+                            isDocumentationDensity
+                              ? "text-[12px] leading-5"
+                              : "text-[13px] leading-6"
+                          } sm:p-5`}
+                          style={{ ...style, background: "transparent" }}
+                          aria-label={`${title} code snippet`}
+                          tabIndex={0}
+                          onWheel={handleCodeWheel}
+                        >
+                          <code className="block w-max min-w-full">
+                            {Children.toArray(
+                              tokens.map((line, lineIndex) => {
+                                const lineProps = getLineProps({ line });
+                                const lineExplanation =
+                                  codeLineExplanations.get(lineIndex);
+                                const inlineField = isInlineCodeEdit
+                                  ? inlineCodeFields.get(lineIndex)
+                                  : undefined;
+                                const inlineFieldIsEditable = Boolean(
+                                  inlineField &&
+                                    canEditValue(
+                                      inlineField.path,
+                                      inlineField.value,
+                                    ),
+                                );
+                                const colonIndex = line.findIndex(
+                                  (token) => token.content === ":",
+                                );
+                                const equalsIndex = line.findIndex((token) =>
+                                  token.content.includes("="),
+                                );
+                                const fieldSeparatorIndex =
+                                  colonIndex >= 0 ? colonIndex : equalsIndex;
+                                const firstContentTokenIndex = line.findIndex(
+                                  (token) => token.content.trim().length > 0,
+                                );
+                                const prefixTokenCount =
+                                  colonIndex >= 0
+                                    ? colonIndex + 1
+                                    : Math.max(firstContentTokenIndex, 0);
+                                const pathKey = inlineField
+                                  ? formatPath(inlineField.path)
+                                  : "";
+                                const fieldIssue = pathKey
+                                  ? getIssueForField(pathKey)
+                                  : undefined;
+                                const currentValue = inlineField
+                                  ? getValueAtPath(draft, inlineField.path)
+                                  : undefined;
+                                const inputValue = inlineField
+                                  ? (fieldInputs[pathKey] ??
+                                    formatFieldInput(
+                                      currentValue ?? inlineField.value,
+                                    ))
+                                  : "";
+                                const hasTrailingComma = line.some(
+                                  (token) => token.content === ",",
+                                );
+                                const inlineComment = line
+                                  .map((token) => token.content)
+                                  .join("")
+                                  .match(/\/\/.*$/)?.[0];
+
+                                const renderToken = (
+                                  token: (typeof line)[number],
+                                  tokenIndex: number,
+                                ) => {
+                                  const tokenProps = getTokenProps({ token });
+                                  const tokenClassName = token.types.includes(
+                                    "comment",
+                                  )
+                                    ? `${tokenProps.className} !text-foreground/75`
+                                    : tokenProps.className;
+                                  const isExplainedKey =
+                                    fieldSeparatorIndex >= 0 &&
+                                    tokenIndex < fieldSeparatorIndex &&
+                                    lineExplanation?.key ===
+                                      token.content
+                                        .trim()
+                                        .replace(/^['"]|['"]$/g, "");
+
+                                  if (!isExplainedKey) {
+                                    return (
+                                      <span
+                                        key={`token-${lineIndex}-${tokenIndex}`}
+                                        className={tokenClassName}
+                                        style={tokenProps.style}
+                                      >
+                                        {token.content}
+                                      </span>
+                                    );
+                                  }
+
+                                  const keyStartIndex =
+                                    token.content.lastIndexOf(
+                                      lineExplanation.key,
+                                    );
+
+                                  return (
+                                    <span
+                                      key={`token-${lineIndex}-${tokenIndex}`}
+                                      className={tokenClassName}
+                                      style={tokenProps.style}
+                                    >
+                                      {token.content.slice(0, keyStartIndex)}
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <button
+                                            type="button"
+                                            className="cursor-help border-0 border-b border-dashed border-current bg-transparent p-0 font-[inherit] text-inherit outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+                                            aria-label={`Explain ${lineExplanation.path}`}
+                                          >
+                                            {lineExplanation.key}
+                                          </button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {lineExplanation.tooltip}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                      {token.content.slice(
+                                        keyStartIndex +
+                                          lineExplanation.key.length,
+                                      )}
+                                    </span>
+                                  );
+                                };
+
+                                return (
+                                  <span
+                                    key={`line-${lineIndex}`}
+                                    className={`${lineProps.className} flex min-w-full`}
+                                    style={lineProps.style}
+                                  >
+                                    <span
+                                      className="block w-8 shrink-0 select-none pr-4 text-right text-muted-foreground/45"
+                                      aria-hidden="true"
+                                    >
+                                      {lineIndex + 1}
+                                    </span>
+                                    <span className="block flex-1 whitespace-pre">
+                                      {inlineField && inlineFieldIsEditable ? (
+                                        <span data-inline-edit-field={pathKey}>
+                                          {Children.toArray(
+                                            line
+                                              .slice(0, prefixTokenCount)
+                                              .map(renderToken),
+                                          )}
+                                          {colonIndex >= 0 && " "}
+                                          {typeof inlineField.value ===
+                                            "string" && (
+                                            <span style={{ color: "#98c379" }}>
+                                              &quot;
+                                            </span>
+                                          )}
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <Input
+                                                name={`json-inline-${pathKey}`}
+                                                autoComplete="off"
+                                                type={
+                                                  typeof inlineField.value ===
+                                                  "number"
+                                                    ? "number"
+                                                    : "text"
+                                                }
+                                                step={
+                                                  typeof inlineField.value ===
+                                                  "number"
+                                                    ? "any"
+                                                    : undefined
+                                                }
+                                                value={inputValue}
+                                                onChange={(event) =>
+                                                  updateFieldInput(
+                                                    inlineField.path,
+                                                    event.target.value,
+                                                    inlineField.value,
+                                                  )
+                                                }
+                                                aria-label={`Edit ${pathKey}`}
+                                                aria-invalid={Boolean(
+                                                  fieldIssue,
+                                                )}
+                                                className="mx-1 mb-1 inline-block h-7 min-w-44 rounded-md border-primary/35 bg-background/80 px-2 py-0 align-middle font-mono text-[11px] text-foreground shadow-sm [appearance:textfield] focus-visible:border-primary md:text-[11px] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
+                                                style={{
+                                                  width: `${Math.min(
+                                                    Math.max(
+                                                      inputValue.length + 3,
+                                                      24,
+                                                    ),
+                                                    72,
+                                                  )}ch`,
+                                                }}
+                                                spellCheck={false}
+                                              />
+                                            </TooltipTrigger>
+                                            {fieldIssue && (
+                                              <TooltipContent>
+                                                {fieldIssue.message}
+                                              </TooltipContent>
+                                            )}
+                                          </Tooltip>
+                                          {typeof inlineField.value ===
+                                            "string" && (
+                                            <span style={{ color: "#98c379" }}>
+                                              &quot;
+                                            </span>
+                                          )}
+                                          {hasTrailingComma && (
+                                            <span style={{ color: "#abb2bf" }}>
+                                              ,
+                                            </span>
+                                          )}
+                                          {inlineComment && (
+                                            <span className="!text-foreground/75">
+                                              {` ${inlineComment}`}
+                                            </span>
+                                          )}
+                                        </span>
+                                      ) : (
+                                        Children.toArray(line.map(renderToken))
+                                      )}
+                                    </span>
+                                  </span>
+                                );
+                              }),
+                            )}
+                          </code>
+                        </pre>
+                      )}
+                    </Highlight>
+                    {isCodeFullscreen &&
+                      showsFooterActions &&
+                      renderFooterActions()}
+                  </div>
                 ) : null
               ) : (
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-border/70 bg-background/35 shadow-inner">
@@ -2203,7 +2209,10 @@ function JsonInspectorModalContent({
                         {copiedTarget === "primary" ? (
                           <CheckIcon aria-hidden="true" className="size-3.5" />
                         ) : (
-                          <ClipboardIcon aria-hidden="true" className="size-3.5" />
+                          <ClipboardIcon
+                            aria-hidden="true"
+                            className="size-3.5"
+                          />
                         )}
                         {copiedTarget === "primary" ? "Copied" : "Copy"}
                       </Button>
@@ -2232,76 +2241,82 @@ function JsonInspectorModalContent({
               {formattedCode &&
                 hasResponseContent &&
                 (!requestResponseTabs || previewTab === "response") && (
-                <div
-                  role={requestResponseTabs ? "tabpanel" : undefined}
-                  aria-label={requestResponseTabs ? "Response" : undefined}
-                  className={
-                    requestResponseTabs && tabsInSectionHeader
-                      ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[16px] border border-border/70 bg-background/35 shadow-inner"
-                      : "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-border/70 bg-background/35 shadow-inner"
-                  }
-                >
-                  {!requestResponseTabs && (
-                    <div className="flex items-center justify-between border-b border-border/70 bg-secondary/35 px-4 py-3">
-                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                      <BracesIcon
-                        aria-hidden="true"
-                        className="size-4 text-primary"
-                      />
-                      {responseLabel}
+                  <div
+                    role={requestResponseTabs ? "tabpanel" : undefined}
+                    aria-label={requestResponseTabs ? "Response" : undefined}
+                    className={
+                      requestResponseTabs && tabsInSectionHeader
+                        ? "flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-[16px] border border-border/70 bg-background/35 shadow-inner"
+                        : "flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border border-border/70 bg-background/35 shadow-inner"
+                    }
+                  >
+                    {!requestResponseTabs && (
+                      <div className="flex items-center justify-between border-b border-border/70 bg-secondary/35 px-4 py-3">
+                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                          <BracesIcon
+                            aria-hidden="true"
+                            className="size-4 text-primary"
+                          />
+                          {responseLabel}
+                        </div>
+                        {copyActionsInHeaders && responseData ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => void handleCopyResponse()}
+                            className="h-10 px-2.5 text-[11px]"
+                          >
+                            {copiedTarget === "response" ? (
+                              <CheckIcon
+                                aria-hidden="true"
+                                className="size-3.5"
+                              />
+                            ) : (
+                              <ClipboardIcon
+                                aria-hidden="true"
+                                className="size-3.5"
+                              />
+                            )}
+                            {copiedTarget === "response" ? "Copied" : "Copy"}
+                          </Button>
+                        ) : !copyActionsInHeaders ? (
+                          <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
+                            Response
+                          </span>
+                        ) : null}
+                      </div>
+                    )}
+                    <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
+                      {responseNotice ? (
+                        <InlineMessage className="mb-4 text-sm text-muted-foreground">
+                          {responseNotice}
+                        </InlineMessage>
+                      ) : null}
+                      {responseData && responseFieldExplanation ? (
+                        <ExplainedJsonView
+                          data={responseData}
+                          getFieldExplanation={responseFieldExplanation}
+                          initiallyCollapsed={responseInitiallyCollapsed}
+                          ariaLabel={`${title} response JSON tree`}
+                        />
+                      ) : responseData ? (
+                        <JsonView
+                          data={responseData}
+                          style={jsonViewStyles}
+                          shouldExpandNode={
+                            responseInitiallyCollapsed
+                              ? () => false
+                              : allExpanded
+                          }
+                          clickToExpandNode
+                          compactTopLevel
+                          aria-label={`${title} response JSON tree`}
+                        />
+                      ) : null}
                     </div>
-                    {copyActionsInHeaders && responseData ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void handleCopyResponse()}
-                        className="h-10 px-2.5 text-[11px]"
-                      >
-                        {copiedTarget === "response" ? (
-                          <CheckIcon aria-hidden="true" className="size-3.5" />
-                        ) : (
-                          <ClipboardIcon aria-hidden="true" className="size-3.5" />
-                        )}
-                        {copiedTarget === "response" ? "Copied" : "Copy"}
-                      </Button>
-                    ) : !copyActionsInHeaders ? (
-                      <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground/70">
-                        Response
-                      </span>
-                    ) : null}
                   </div>
-                  )}
-                  <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">
-                    {responseNotice ? (
-                      <InlineMessage className="mb-4 text-sm text-muted-foreground">
-                        {responseNotice}
-                      </InlineMessage>
-                    ) : null}
-                    {responseData && responseFieldExplanation ? (
-                      <ExplainedJsonView
-                        data={responseData}
-                        getFieldExplanation={responseFieldExplanation}
-                        initiallyCollapsed={responseInitiallyCollapsed}
-                        ariaLabel={`${title} response JSON tree`}
-                      />
-                    ) : responseData ? (
-                      <JsonView
-                        data={responseData}
-                        style={jsonViewStyles}
-                        shouldExpandNode={
-                          responseInitiallyCollapsed
-                            ? () => false
-                            : allExpanded
-                        }
-                        clickToExpandNode
-                        compactTopLevel
-                        aria-label={`${title} response JSON tree`}
-                      />
-                    ) : null}
-                  </div>
-                </div>
-              )}
+                )}
             </div>
           ) : (
             <div className="h-full space-y-4 overflow-y-auto">
@@ -2338,9 +2353,7 @@ function JsonInspectorModalContent({
           )}
         </div>
 
-        {!isCodeFullscreen &&
-          showsFooterActions &&
-          renderFooterActions()}
+        {!isCodeFullscreen && showsFooterActions && renderFooterActions()}
       </InspectorContent>
     </InspectorRoot>
   );

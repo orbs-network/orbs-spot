@@ -2,14 +2,13 @@ import { useMutation } from "@tanstack/react-query";
 import { useConnection, useWalletClient } from "wagmi";
 import { getWrappedNativeCurrency } from "../utils";
 import wethAbi from "../abi/wethAbi.json";
-import { useGetTransactionReceiptCallback } from "./use-get-transaction-receipt";
+import { useGetTransactionReceipt } from "./use-get-transaction-receipt";
 import type { TransactionResult } from "./use-token-approval";
 
 export const useWrapNativeToken = () => {
   const { data: walletClient } = useWalletClient();
   const { address: account, chainId } = useConnection();
-  const { mutateAsync: getTransactionReceiptCallback } =
-    useGetTransactionReceiptCallback();
+  const getTransactionReceiptCallback = useGetTransactionReceipt();
 
   const address = getWrappedNativeCurrency(chainId)?.address ?? "";
   return useMutation({
@@ -20,6 +19,7 @@ export const useWrapNativeToken = () => {
       if (!address) {
         throw new Error("Wrapped native currency address not found");
       }
+      // deposit receives native currency in base units and mints the wrapped ERC-20.
       const hash = await walletClient.writeContract({
         abi: wethAbi,
         functionName: "deposit",
@@ -28,6 +28,7 @@ export const useWrapNativeToken = () => {
         value: BigInt(amount),
         chain: walletClient.chain,
       });
+      // The wrapped balance is usable only after the deposit succeeds on chain.
       const receipt = await getTransactionReceiptCallback(hash);
       return { hash, receipt };
     },

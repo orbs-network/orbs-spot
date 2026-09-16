@@ -37,7 +37,7 @@ const modalSource = readFileSync(resolve(__dirname, '../components/developer-too
 const ast = ts.createSourceFile('flow.tsx', modalSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 let handler;
 function visit(node) {
-  if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'executeCurrentStep') handler = node.initializer.arguments[0].getText(ast);
+  if (ts.isVariableDeclaration(node) && node.name.getText(ast).includes('mutate: executeCurrentStep')) handler = node.initializer.arguments[0].properties.find((property) => property.name?.getText(ast) === 'mutationFn').initializer.getText(ast);
   ts.forEachChild(node, visit);
 }
 visit(ast);
@@ -51,10 +51,10 @@ for (const native of [false, true]) {
     for (let i = 0; i < steps.length - 1; i++) {
       let advanced;
       const context = {
-        isRunning: false, step: steps[i], isDemo: true, calculatedForm: undefined,
+        executionInFlight: { current: false }, step: steps[i], isDemo: true, calculatedForm: undefined,
         calculationContext: '56:input:output', permitData: permit, sourceIsNative: native,
         connectedAccount: helpers.DEMO_ACCOUNT, submitDisabled: true,
-        setIsRunning() {}, setWrapAmount() {}, setApprovalRequired() {},
+        setWrapAmount() {}, setApprovalRequired() {},
         advanceToStep(value) { advanced = value; },
         actionToastId: 'test', toast: { loading() {}, success() {}, error: forbidden },
         spot: { canDemoExecute: true, client: { submitOrder: forbidden }, orderHistoryPanel: { refetchOrders: forbidden } },

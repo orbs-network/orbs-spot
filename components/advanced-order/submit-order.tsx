@@ -27,14 +27,10 @@ import {
   DISCLAIMER_URL,
   isNativeAddress,
   Module,
-  Steps,
-  ExecutionStatus,
-  ExecutionPhase,
-  useExecution,
-  useSubmitButton,
-  type ParsedError,
   type Token,
-} from "@orbs-network/spot-react";
+} from "@orbs-network/spot-ui";
+import { Steps, ExecutionStatus, ExecutionPhase, type ParsedError } from "@/lib/spot/execution";
+import { useExecution, useSubmitButton } from "./use-order-execution";
 import { Step, SwapFlow, SwapStatus } from "@orbs-network/swap-ui";
 import BN from "bignumber.js";
 import { AlertTriangleIcon, ArrowRightIcon, CheckIcon } from "lucide-react";

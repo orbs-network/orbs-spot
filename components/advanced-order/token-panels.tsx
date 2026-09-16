@@ -1,5 +1,7 @@
 "use client";
 
+import { useOutputAmount, useTrades, useDuration, useFillDelay } from "./use-order-form";
+
 import { CurrencyCard } from "@/components/currency-card";
 import { FormLabel } from "@/components/ui/form-label";
 import { FormNumberField } from "@/components/ui/form-number-field";
@@ -12,7 +14,7 @@ import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useTranslations } from "@/lib/use-translations";
 import { Field } from "@/lib/types";
 import { cn, formatDecimals } from "@/lib/utils";
-import { Module, useOutputAmount, useTrades, useDuration, useFillDelay } from "@orbs-network/spot-react";
+import { Module } from "@orbs-network/spot-ui";
 import { type ReactNode, useCallback, useMemo } from "react";
 import { DURATION_OPTIONS } from "./constants";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { lazy, Suspense } from "react";
-import type { Order } from "@orbs-network/spot-react";
+import type { Order } from "@orbs-network/spot-ui";
 import { useConnection } from "wagmi";
 
 import { useDeveloperMode } from "./use-developer-mode";
@@ -42,7 +42,7 @@ export function CancelOrderDeveloperButton({
   rawOrder,
 }: {
   isCancelling: boolean;
-  onCancel: () => Promise<unknown>;
+  onCancel: () => void;
   rawOrder: Order;
 }) {
   const { isDeveloperMode } = useDeveloperMode();

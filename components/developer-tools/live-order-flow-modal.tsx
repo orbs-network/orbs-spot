@@ -1,6 +1,12 @@
 "use client";
 
-import { DEMO_SIGNATURE, DEMO_STEP_COPY, type DeveloperExecutionMode } from "./demo-order";
+import { useMutation } from "@tanstack/react-query";
+
+import {
+  DEMO_SIGNATURE,
+  DEMO_STEP_COPY,
+  type DeveloperExecutionMode,
+} from "./demo-order";
 import { remainingWrapAmount, rewindFlow } from "./flow-navigation";
 import { DownloadIntegrationButton } from "./download-integration-button";
 import { formatAdvancedOrdersSdkFlow } from "./sdk-flow-examples";
@@ -14,32 +20,22 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  CheckIcon,
-  RefreshCwIcon,
-} from "lucide-react";
+import { CheckIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
 import { maxUint256, type Hex } from "viem";
 import { useConnection } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import {
-  isNativeAddress,
-  type RePermitData,
-} from "@orbs-network/spot-react";
+import { isNativeAddress, type RePermitData } from "@orbs-network/spot-ui";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
-import { useRefetchSelectedCurrenciesBalances } from "@/lib/hooks/use-balances";
+import { useBalances } from "@/lib/hooks/use-balances";
 import { useSignTypedDataPayload } from "@/lib/hooks/use-sign-typed-data";
 import { useApproveToken } from "@/lib/hooks/use-token-approval";
 import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
@@ -77,7 +73,12 @@ import { DeveloperGuideLink } from "./developer-guide-link";
 import { getSpotDocsHref } from "@/lib/developer-docs";
 import { useDeveloperOrder } from "../advanced-order/use-developer-order";
 import type { CalculatedOrderForm } from "@orbs-network/spot-ui";
-import { calculateEditedOrderForm, getLiveOrderFormInput, rebuildCalculatedPermit, validateOrderFormInput } from "./order-form-calculation";
+import {
+  calculateEditedOrderForm,
+  getLiveOrderFormInput,
+  rebuildCalculatedPermit,
+  validateOrderFormInput,
+} from "./order-form-calculation";
 
 type LivePermitData = RePermitData;
 
@@ -112,9 +113,7 @@ type CreatedOrderSummary = {
 const PLACEHOLDER_ACCOUNT = "0x5555555555555555555555555555555555555555";
 
 const asRecord = (value: JsonValue | undefined) =>
-  value && typeof value === "object" && !Array.isArray(value)
-    ? value
-    : {};
+  value && typeof value === "object" && !Array.isArray(value) ? value : {};
 
 const clonePermitData = (permitData: LivePermitData) =>
   JSON.parse(JSON.stringify(permitData)) as LivePermitData;
@@ -127,10 +126,8 @@ function refreshPermitTiming(
 
   nextPermitData.order.nonce = freshPermitData.order.nonce;
   nextPermitData.order.deadline = freshPermitData.order.deadline;
-  nextPermitData.order.witness.nonce =
-    freshPermitData.order.witness.nonce;
-  nextPermitData.order.witness.start =
-    freshPermitData.order.witness.start;
+  nextPermitData.order.witness.nonce = freshPermitData.order.witness.nonce;
+  nextPermitData.order.witness.start = freshPermitData.order.witness.start;
   nextPermitData.order.witness.deadline =
     freshPermitData.order.witness.deadline;
 
@@ -198,8 +195,7 @@ function createSignatureData(
       swapper: account,
       output: {
         ...permitData.order.witness.output,
-        recipient:
-          permitData.order.witness.output.recipient || account,
+        recipient: permitData.order.witness.output.recipient || account,
       },
     },
   };
@@ -228,8 +224,7 @@ function applySignatureData(
   const input = asRecord(witness.input);
   const output = asRecord(witness.output);
   const chainId =
-    typeof witness.chainid === "number" ||
-    typeof witness.chainid === "string"
+    typeof witness.chainid === "number" || typeof witness.chainid === "string"
       ? witness.chainid
       : permitData.order.witness.chainid;
   const tokenAddress =
@@ -241,8 +236,7 @@ function applySignatureData(
       ? input.token
       : permitData.order.witness.input.token;
   const requiredAmount =
-    typeof permitted.amount === "string" ||
-    typeof permitted.amount === "number"
+    typeof permitted.amount === "string" || typeof permitted.amount === "number"
       ? permitted.amount
       : permitData.order.permitted.amount;
 
@@ -331,12 +325,11 @@ function LiveOrderFlowModalContent({
   const partner = getActiveSpotPartner() || "external";
   const currentSourceTokenAddress = spot.derivedFormData.srcToken?.address;
   const { setInputAmount } = useActionHandlers();
-  const { mutateAsync: getTokenAllowance } = useGetTokenAllowance();
+  const getTokenAllowance = useGetTokenAllowance();
   const { mutateAsync: wrapNativeToken } = useWrapNativeToken();
   const { mutateAsync: approveToken } = useApproveToken();
   const { mutateAsync: signTypedData } = useSignTypedDataPayload();
-  const { mutateAsync: refetchBalances } =
-    useRefetchSelectedCurrenciesBalances();
+  const { refetch: refetchBalances } = useBalances();
   const dexDerivedSignatureData = useMemo(
     () =>
       createSignatureData(
@@ -353,12 +346,20 @@ function LiveOrderFlowModalContent({
     [calculationDefaultsJson],
   );
   const calculationContext = `${currentPermitData.domain.chainId}:${currentPermitData.order.permitted.token}:${currentPermitData.order.witness.output.token}`;
-  const [savedCalculationContext, setSavedCalculationContext] = useState<string>();
+  const [savedCalculationContext, setSavedCalculationContext] =
+    useState<string>();
   const [calculationInput, setCalculationInput] = useState<JsonContainer>();
   const [calculatedForm, setCalculatedForm] = useState<CalculatedOrderForm>();
-  const timingPermitData = useMemo(() => calculatedForm && spot.client
-    ? rebuildCalculatedPermit(currentPermitData, calculatedForm, connectedAccount ?? PLACEHOLDER_ACCOUNT, spot.client)
-    : currentPermitData,
+  const timingPermitData = useMemo(
+    () =>
+      calculatedForm && spot.client
+        ? rebuildCalculatedPermit(
+            currentPermitData,
+            calculatedForm,
+            connectedAccount ?? PLACEHOLDER_ACCOUNT,
+            spot.client,
+          )
+        : currentPermitData,
     [calculatedForm, connectedAccount, currentPermitData, spot.client],
   );
 
@@ -372,16 +373,12 @@ function LiveOrderFlowModalContent({
     clonePermitData(currentPermitData),
   );
   const [signatureData, setSignatureData] = useState<JsonContainer>(() =>
-    createSignatureData(
-      currentPermitData,
-      partner,
-      currentSourceTokenAddress,
-    ),
+    createSignatureData(currentPermitData, partner, currentSourceTokenAddress),
   );
   const [sourceIsNative, setSourceIsNative] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
   const [wrapAmount, setWrapAmount] = useState("0");
-  const [isRunning, setIsRunning] = useState(false);
+
   const [orderSignature, setOrderSignature] = useState<Hex>();
   const [createdOrder, setCreatedOrder] = useState<CreatedOrderSummary>();
   const [showCreatedOrder, setShowCreatedOrder] = useState(false);
@@ -401,8 +398,352 @@ function LiveOrderFlowModalContent({
     }
     phases.push(SIGN_PHASE, SUBMIT_PHASE);
 
-    return isDemo ? phases.map((phase) => ({ ...phase, effect: "Simulated" })) : phases;
+    return isDemo
+      ? phases.map((phase) => ({ ...phase, effect: "Simulated" }))
+      : phases;
   }, [isDemo, navigation.history, sourceIsNative]);
+
+  const advanceToStep = useCallback((nextStep: DeveloperOrderStep) => {
+    setNavigation((current) => ({
+      history: [...current.history, nextStep],
+      viewedIndex: current.history.length,
+    }));
+  }, []);
+
+  const submissionPrepared = useMemo(() => {
+    const form = calculatedForm ?? spot.derivedFormData.form;
+    if (!spot.client || !form.canSubmit) return undefined;
+    const prepared = spot.client.prepareOrder({
+      form,
+      inputTokenAddress: permitData.order.permitted.token,
+      outputTokenAddress: permitData.order.witness.output.token,
+      swapperAddress: permitData.order.witness.swapper,
+    });
+    // Share the exact arguments between the inspector and submission.
+    return {
+      ...prepared,
+      order: permitData.order,
+      signingRequest: {
+        ...prepared.signingRequest,
+        typedData: {
+          domain: permitData.domain,
+          types: permitData.types,
+          primaryType: permitData.primaryType,
+          message: permitData.order,
+        },
+      },
+    };
+  }, [calculatedForm, permitData, spot.client, spot.derivedFormData.form]);
+
+  // Mutation state drives the UI; this synchronous lock also blocks duplicate
+  // clicks before React renders the pending state. Each click runs one step.
+  const executionInFlight = useRef(false);
+  const { mutate: executeCurrentStep, isPending: isRunning } = useMutation({
+    // Demo steps change local state only and remain usable without a connection.
+    networkMode: isDemo ? "always" : "online",
+    retry: false,
+    mutationFn: async () => {
+      if (executionInFlight.current || step === "success") return;
+
+      executionInFlight.current = true;
+      toast.loading(
+        isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step],
+        {
+          id: actionToastId,
+          position: "bottom-right",
+        },
+      );
+
+      try {
+        if (
+          `${permitData.domain.chainId}:${permitData.order.permitted.token}:${permitData.order.witness.output.token}` !==
+            calculationContext ||
+          (calculatedForm && savedCalculationContext !== calculationContext)
+        ) {
+          throw new Error(
+            "The chain or token pair changed. Reopen the flow to recalculate this order.",
+          );
+        }
+        // Demo stops here: it never reaches wallet mutations or Orders Sink.
+        if (isDemo) {
+          if (!spot.canDemoExecute)
+            throw new Error(
+              "Resolve the order inputs and wait for market data before continuing the demo.",
+            );
+          if (step === "flow") {
+            setWrapAmount(permitData.order.permitted.amount);
+            advanceToStep("check");
+          } else if (step === "check") {
+            setApprovalRequired(true);
+            advanceToStep(sourceIsNative ? "wrap" : "approve");
+          } else if (step === "wrap") {
+            advanceToStep("approve");
+          } else if (step === "approve") {
+            advanceToStep("sign");
+          } else if (step === "sign") {
+            // Keep the example signature visibly invalid and never sign the payload.
+            advanceToStep("submit");
+          } else if (step === "submit") {
+            advanceToStep("success");
+          }
+          toast.success(
+            step === "submit"
+              ? "Demo complete — no order created"
+              : "Demo step complete",
+            {
+              id: actionToastId,
+              description:
+                "Simulated locally. No wallet request, transaction, or order submission.",
+              position: "bottom-right",
+            },
+          );
+          return;
+        }
+        if (
+          !connectedAccount ||
+          submitDisabled ||
+          !spot.derivedFormData.form.canSubmit
+        ) {
+          throw new Error(
+            "Connect a funded wallet and resolve the order inputs before running a real order.",
+          );
+        }
+        if (step === "flow") {
+          if (!spot.client) throw new Error("Spot client is not ready");
+          const nextPermitData = rebuildCalculatedPermit(
+            currentPermitData,
+            calculatedForm ?? spot.derivedFormData.form,
+            connectedAccount,
+            spot.client,
+          );
+          setPermitData(nextPermitData);
+          setSignatureData(
+            createSignatureData(
+              nextPermitData,
+              partner,
+              currentSourceTokenAddress,
+            ),
+          );
+          setWrapAmount(nextPermitData.order.permitted.amount);
+          advanceToStep("check");
+          toast.success("Order flow started", {
+            id: actionToastId,
+            description: "Next, check the current token allowance.",
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (
+          permitData.order.witness.swapper.toLowerCase() !==
+          connectedAccount.toLowerCase()
+        ) {
+          throw new Error(
+            "The wallet changed. Reopen the flow to prepare an order for this wallet.",
+          );
+        }
+
+        if (step === "check") {
+          const amount = permitData.order.permitted.amount;
+          const tokenAddress = permitData.order.permitted.token;
+          const allowance = await getTokenAllowance({
+            tokenAddress,
+            spenderAddress: permitData.domain.verifyingContract,
+          });
+          const nextApprovalRequired = BigInt(allowance) < BigInt(amount);
+          const amountToWrap = remainingWrapAmount(
+            BigInt(amount),
+            completedStepsRef.current.wrappedAmount,
+          );
+
+          setApprovalRequired(nextApprovalRequired);
+
+          if (sourceIsNative && amountToWrap > BigInt(0)) {
+            setWrapAmount(amountToWrap.toString());
+            advanceToStep("wrap");
+            toast.success("Allowance checked", {
+              id: actionToastId,
+              description: "Native input must be wrapped before signing.",
+              position: "bottom-right",
+            });
+            return;
+          }
+
+          const allowanceOutcome = nextApprovalRequired
+            ? "Allowance is insufficient. Token approval is required."
+            : "The existing allowance is sufficient; approval is skipped.";
+          advanceToStep(nextApprovalRequired ? "approve" : "sign");
+          toast.success("Allowance checked", {
+            id: actionToastId,
+            description: allowanceOutcome,
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (step === "wrap") {
+          const amount = remainingWrapAmount(
+            BigInt(permitData.order.permitted.amount),
+            completedStepsRef.current.wrappedAmount,
+          );
+          if (amount > BigInt(0)) {
+            const { receipt } = await wrapNativeToken(amount.toString());
+            if (receipt.status !== "success")
+              throw new Error("Native token wrapping reverted");
+            completedStepsRef.current.wrappedAmount += amount;
+          }
+          advanceToStep(approvalRequired ? "approve" : "sign");
+          toast.success("Native token wrapped", {
+            id: actionToastId,
+            description: approvalRequired
+              ? "Token approval is still required."
+              : "The order is ready to sign.",
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (step === "approve") {
+          const allowance = await getTokenAllowance({
+            tokenAddress: permitData.order.permitted.token,
+            spenderAddress: permitData.domain.verifyingContract,
+          });
+          if (BigInt(allowance) < BigInt(permitData.order.permitted.amount)) {
+            await approveToken({
+              amount: maxUint256.toString(),
+              spenderAddress: permitData.domain.verifyingContract,
+              tokenAddress: permitData.order.permitted.token,
+            });
+          }
+          setApprovalRequired(false);
+          advanceToStep("sign");
+          toast.success("Token approved", {
+            id: actionToastId,
+            description: "The approval transaction was confirmed on-chain.",
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (step === "sign") {
+          if (!spot.client) throw new Error("Spot client is not ready");
+          const signingTiming = rebuildCalculatedPermit(
+            permitData,
+            calculatedForm ?? spot.derivedFormData.form,
+            connectedAccount ?? PLACEHOLDER_ACCOUNT,
+            spot.client,
+          );
+          const freshPermitData = refreshPermitTiming(
+            permitData,
+            signingTiming,
+          );
+          const freshSignatureData = refreshSignatureTiming(
+            signatureData,
+            signingTiming,
+          );
+          const executionPermitData = applySignatureData(
+            freshPermitData,
+            freshSignatureData,
+          );
+          if (
+            executionPermitData.order.permitted.amount !==
+            permitData.order.permitted.amount
+          ) {
+            setPermitData(executionPermitData);
+            setSignatureData(freshSignatureData);
+            setOrderSignature(undefined);
+            advanceToStep("check");
+            toast.success("Order inputs refreshed", {
+              id: actionToastId,
+              description:
+                "The amount changed, so allowance must be checked again before signing.",
+              position: "bottom-right",
+            });
+            return;
+          }
+
+          setPermitData(executionPermitData);
+          setSignatureData(freshSignatureData);
+
+          const signature = await signTypedData({
+            account: executionPermitData.order.witness.swapper,
+            domain: executionPermitData.domain,
+            message: executionPermitData.order as unknown as Record<
+              string,
+              unknown
+            >,
+            primaryType: executionPermitData.primaryType,
+            types: executionPermitData.types,
+          });
+
+          // Preserve the complete 65-byte EIP-712 signature returned by the wallet.
+          setOrderSignature(signature);
+          advanceToStep("submit");
+          toast.success("Order signed", {
+            id: actionToastId,
+            description: "Review the signed payload before submitting it.",
+            position: "bottom-right",
+          });
+          return;
+        }
+
+        if (step === "submit") {
+          if (createdOrder) {
+            setShowCreatedOrder(true);
+            advanceToStep("success");
+            return;
+          }
+
+          if (!orderSignature) {
+            throw new Error("Sign the order before submitting it");
+          }
+
+          if (!spot.client) throw new Error("Spot client is not ready");
+          if (!submissionPrepared)
+            throw new Error("The prepared order is not ready");
+          const order = await spot.client.submitOrder(
+            submissionPrepared.order,
+            orderSignature,
+          );
+
+          setCreatedOrder({
+            data: JSON.parse(JSON.stringify(order)) as JsonContainer,
+            id: String(order.id),
+            status: "Pending",
+          });
+          setShowCreatedOrder(false);
+          advanceToStep("success");
+          toast.success("Order submitted", {
+            id: actionToastId,
+            description: `Order ${order.id} was created successfully.`,
+            position: "bottom-right",
+          });
+          void Promise.allSettled([
+            spot.orderHistoryPanel.refetchOrders(),
+            refetchBalances(),
+          ]);
+          return;
+        }
+      } finally {
+        executionInFlight.current = false;
+      }
+    },
+    onError: (executionError) => {
+      if (isUserRejectedError(executionError)) {
+        dismissTransactionRejectedToast({
+          id: actionToastId,
+          position: "bottom-right",
+        });
+      } else {
+        const errorMessage = getErrorMessage(executionError);
+        toast.error("Order step failed", {
+          id: actionToastId,
+          description: errorMessage,
+          position: "bottom-right",
+        });
+      }
+    },
+  });
 
   useEffect(() => {
     if (!open || isRunning || step === "success") return;
@@ -419,14 +760,11 @@ function LiveOrderFlowModalContent({
     return () => window.clearTimeout(refreshTimer);
   }, [timingPermitData, isRunning, open, step]);
 
-  const handleTriggerTooltipOpenChange = useCallback(
-    (nextOpen: boolean) => {
-      if (nextOpen && suppressTriggerTooltipRef.current) return;
+  const handleTriggerTooltipOpenChange = useCallback((nextOpen: boolean) => {
+    if (nextOpen && suppressTriggerTooltipRef.current) return;
 
-      setTriggerTooltipOpen(nextOpen);
-    },
-    [],
-  );
+    setTriggerTooltipOpen(nextOpen);
+  }, []);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -451,9 +789,7 @@ function LiveOrderFlowModalContent({
             currentSourceTokenAddress,
           ),
         );
-        setSourceIsNative(
-          isNativeAddress(currentSourceTokenAddress ?? ""),
-        );
+        setSourceIsNative(isNativeAddress(currentSourceTokenAddress ?? ""));
         setNavigation({
           history: ["flow"],
           viewedIndex: 0,
@@ -481,308 +817,7 @@ function LiveOrderFlowModalContent({
     ],
   );
 
-  const advanceToStep = useCallback((nextStep: DeveloperOrderStep) => {
-    setNavigation((current) => ({
-      history: [...current.history, nextStep],
-      viewedIndex: current.history.length,
-    }));
-  }, []);
 
-  const submissionPrepared = useMemo(() => {
-    const form = calculatedForm ?? spot.derivedFormData.form;
-    if (!spot.client || !form.canSubmit) return undefined;
-    const prepared = spot.client.prepareOrder({
-      form,
-      inputTokenAddress: permitData.order.permitted.token,
-      outputTokenAddress: permitData.order.witness.output.token,
-      swapperAddress: permitData.order.witness.swapper,
-    });
-    // Share the exact arguments between the inspector and submission.
-    return {
-      ...prepared,
-      order: permitData.order,
-      signingRequest: { ...prepared.signingRequest, typedData: {
-        domain: permitData.domain, types: permitData.types,
-        primaryType: permitData.primaryType, message: permitData.order,
-      } },
-    };
-  }, [calculatedForm, permitData, spot.client, spot.derivedFormData.form]);
-
-  const executeCurrentStep = useCallback(async () => {
-    if (isRunning || step === "success") return;
-
-    setIsRunning(true);
-    toast.loading(isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step], {
-      id: actionToastId,
-      position: "bottom-right",
-    });
-
-    try {
-      if (`${permitData.domain.chainId}:${permitData.order.permitted.token}:${permitData.order.witness.output.token}` !== calculationContext || (calculatedForm && savedCalculationContext !== calculationContext)) {
-        throw new Error("The chain or token pair changed. Reopen the flow to recalculate this order.");
-      }
-      // Demo stops here: it never reaches wallet mutations or Orders Sink.
-      if (isDemo) {
-        if (!spot.canDemoExecute) throw new Error("Resolve the order inputs and wait for market data before continuing the demo.");
-        if (step === "flow") {
-          setWrapAmount(permitData.order.permitted.amount);
-          advanceToStep("check");
-        } else if (step === "check") {
-          setApprovalRequired(true);
-          advanceToStep(sourceIsNative ? "wrap" : "approve");
-        } else if (step === "wrap") {
-          advanceToStep("approve");
-        } else if (step === "approve") {
-          advanceToStep("sign");
-        } else if (step === "sign") {
-          // Keep the example signature visibly invalid and never sign the payload.
-          advanceToStep("submit");
-        } else if (step === "submit") {
-          advanceToStep("success");
-        }
-        toast.success(step === "submit" ? "Demo complete — no order created" : "Demo step complete", {
-          id: actionToastId,
-          description: "Simulated locally. No wallet request, transaction, or order submission.",
-          position: "bottom-right",
-        });
-        return;
-      }
-      if (!connectedAccount || submitDisabled || !spot.derivedFormData.form.canSubmit) {
-        throw new Error("Connect a funded wallet and resolve the order inputs before running a real order.");
-      }
-      if (step === "flow") {
-        if (!spot.client) throw new Error("Spot client is not ready");
-        const nextPermitData = rebuildCalculatedPermit(currentPermitData, calculatedForm ?? spot.derivedFormData.form, connectedAccount, spot.client);
-        setPermitData(nextPermitData);
-        setSignatureData(createSignatureData(nextPermitData, partner, currentSourceTokenAddress));
-        setWrapAmount(nextPermitData.order.permitted.amount);
-        advanceToStep("check");
-        toast.success("Order flow started", {
-          id: actionToastId,
-          description: "Next, check the current token allowance.",
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (permitData.order.witness.swapper.toLowerCase() !== connectedAccount.toLowerCase()) {
-        throw new Error("The wallet changed. Reopen the flow to prepare an order for this wallet.");
-      }
-
-      if (step === "check") {
-        const amount = permitData.order.permitted.amount;
-        const tokenAddress = permitData.order.permitted.token;
-        const allowance = await getTokenAllowance({
-          tokenAddress,
-          spenderAddress: permitData.domain.verifyingContract,
-        });
-        const nextApprovalRequired =
-          BigInt(allowance) < BigInt(amount);
-        const amountToWrap = remainingWrapAmount(BigInt(amount), completedStepsRef.current.wrappedAmount);
-
-        setApprovalRequired(nextApprovalRequired);
-
-        if (sourceIsNative && amountToWrap > BigInt(0)) {
-          setWrapAmount(amountToWrap.toString());
-          advanceToStep("wrap");
-          toast.success("Allowance checked", {
-            id: actionToastId,
-            description: "Native input must be wrapped before signing.",
-            position: "bottom-right",
-          });
-          return;
-        }
-
-        const allowanceOutcome = nextApprovalRequired
-          ? "Allowance is insufficient. Token approval is required."
-          : "The existing allowance is sufficient; approval is skipped.";
-        advanceToStep(nextApprovalRequired ? "approve" : "sign");
-        toast.success("Allowance checked", {
-          id: actionToastId,
-          description: allowanceOutcome,
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (step === "wrap") {
-        const amount = remainingWrapAmount(BigInt(permitData.order.permitted.amount), completedStepsRef.current.wrappedAmount);
-        if (amount > BigInt(0)) {
-          const { receipt } = await wrapNativeToken(amount.toString());
-          if (receipt.status !== "success") throw new Error("Native token wrapping reverted");
-          completedStepsRef.current.wrappedAmount += amount;
-        }
-        advanceToStep(approvalRequired ? "approve" : "sign");
-        toast.success("Native token wrapped", {
-          id: actionToastId,
-          description: approvalRequired
-            ? "Token approval is still required."
-            : "The order is ready to sign.",
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (step === "approve") {
-        const allowance = await getTokenAllowance({
-          tokenAddress: permitData.order.permitted.token,
-          spenderAddress: permitData.domain.verifyingContract,
-        });
-        if (BigInt(allowance) < BigInt(permitData.order.permitted.amount)) {
-          await approveToken({
-            amount: maxUint256.toString(),
-            spenderAddress: permitData.domain.verifyingContract,
-            tokenAddress: permitData.order.permitted.token,
-          });
-        }
-        setApprovalRequired(false);
-        advanceToStep("sign");
-        toast.success("Token approved", {
-          id: actionToastId,
-          description: "The approval transaction was confirmed on-chain.",
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (step === "sign") {
-        if (!spot.client) throw new Error("Spot client is not ready");
-        const signingTiming = rebuildCalculatedPermit(permitData, calculatedForm ?? spot.derivedFormData.form, connectedAccount ?? PLACEHOLDER_ACCOUNT, spot.client);
-        const freshPermitData = refreshPermitTiming(
-          permitData,
-          signingTiming,
-        );
-        const freshSignatureData = refreshSignatureTiming(
-          signatureData,
-          signingTiming,
-        );
-        const executionPermitData = applySignatureData(
-          freshPermitData,
-          freshSignatureData,
-        );
-        if (
-          executionPermitData.order.permitted.amount !==
-          permitData.order.permitted.amount
-        ) {
-          setPermitData(executionPermitData);
-          setSignatureData(freshSignatureData);
-          setOrderSignature(undefined);
-          advanceToStep("check");
-          toast.success("Order inputs refreshed", {
-            id: actionToastId,
-            description:
-              "The amount changed, so allowance must be checked again before signing.",
-            position: "bottom-right",
-          });
-          return;
-        }
-
-        setPermitData(executionPermitData);
-        setSignatureData(freshSignatureData);
-
-        const signature = await signTypedData({
-          account: executionPermitData.order.witness.swapper,
-          domain: executionPermitData.domain,
-          message: executionPermitData.order as unknown as Record<
-            string,
-            unknown
-          >,
-          primaryType: executionPermitData.primaryType,
-          types: executionPermitData.types,
-        });
-
-        // Preserve the complete 65-byte EIP-712 signature returned by the wallet.
-        setOrderSignature(signature);
-        advanceToStep("submit");
-        toast.success("Order signed", {
-          id: actionToastId,
-          description: "Review the signed payload before submitting it.",
-          position: "bottom-right",
-        });
-        return;
-      }
-
-      if (step === "submit") {
-        if (createdOrder) {
-          setShowCreatedOrder(true);
-          advanceToStep("success");
-          return;
-        }
-
-        if (!orderSignature) {
-          throw new Error("Sign the order before submitting it");
-        }
-
-        if (!spot.client) throw new Error("Spot client is not ready");
-        if (!submissionPrepared) throw new Error("The prepared order is not ready");
-        const order = await spot.client.submitOrder(submissionPrepared.order, orderSignature);
-
-        setCreatedOrder({
-          data: JSON.parse(JSON.stringify(order)) as JsonContainer,
-          id: String(order.id),
-          status: "Pending",
-        });
-        setShowCreatedOrder(false);
-        advanceToStep("success");
-        toast.success("Order submitted", {
-          id: actionToastId,
-          description: `Order ${order.id} was created successfully.`,
-          position: "bottom-right",
-        });
-        void Promise.allSettled([
-          spot.orderHistoryPanel.refetchOrders(),
-          refetchBalances(),
-        ]);
-        return;
-      }
-    } catch (executionError) {
-      if (isUserRejectedError(executionError)) {
-        dismissTransactionRejectedToast({
-          id: actionToastId,
-          position: "bottom-right",
-        });
-      } else {
-        const errorMessage = getErrorMessage(executionError);
-        toast.error("Order step failed", {
-          id: actionToastId,
-          description: errorMessage,
-          position: "bottom-right",
-        });
-      }
-    } finally {
-      setIsRunning(false);
-    }
-  }, [
-    actionToastId,
-    advanceToStep,
-    approvalRequired,
-    isDemo,
-    submitDisabled,
-    submissionPrepared,
-    approveToken,
-    calculatedForm,
-    calculationContext,
-    savedCalculationContext,
-    connectedAccount,
-    currentSourceTokenAddress,
-    partner,
-    currentPermitData,
-    createdOrder,
-    getTokenAllowance,
-    isRunning,
-    orderSignature,
-    permitData,
-    refetchBalances,
-    signTypedData,
-    signatureData,
-    sourceIsNative,
-    spot.orderHistoryPanel,
-    spot.canDemoExecute,
-    spot.client,
-    spot.derivedFormData.form,
-    step,
-    wrapNativeToken,
-  ]);
 
   const handleSaveSignSnippet = useCallback(
     (nextSignatureData: JsonContainer) => {
@@ -803,22 +838,39 @@ function LiveOrderFlowModalContent({
     [timingPermitData, permitData],
   );
 
-  const handleSaveCalculation = useCallback((data: JsonContainer) => {
-    if (!spot.client) throw new Error("Spot client is not ready");
-    const form = calculateEditedOrderForm(data);
-    const nextPermitData = rebuildCalculatedPermit(currentPermitData, form, connectedAccount ?? PLACEHOLDER_ACCOUNT, spot.client);
-    setCalculationInput(data);
-    setCalculatedForm(form);
-    setSavedCalculationContext(calculationContext);
-    setPermitData(nextPermitData);
-    setSignatureData(createSignatureData(nextPermitData, partner, currentSourceTokenAddress));
-    setWrapAmount(nextPermitData.order.permitted.amount);
-    setOrderSignature(undefined);
-    setCreatedOrder(undefined);
-    setShowCreatedOrder(false);
-    setApprovalRequired(false);
-    setNavigation({ history: ["flow"], viewedIndex: 0 });
-  }, [calculationContext, connectedAccount, currentPermitData, currentSourceTokenAddress, partner, spot.client]);
+  const handleSaveCalculation = useCallback(
+    (data: JsonContainer) => {
+      if (!spot.client) throw new Error("Spot client is not ready");
+      const form = calculateEditedOrderForm(data);
+      const nextPermitData = rebuildCalculatedPermit(
+        currentPermitData,
+        form,
+        connectedAccount ?? PLACEHOLDER_ACCOUNT,
+        spot.client,
+      );
+      setCalculationInput(data);
+      setCalculatedForm(form);
+      setSavedCalculationContext(calculationContext);
+      setPermitData(nextPermitData);
+      setSignatureData(
+        createSignatureData(nextPermitData, partner, currentSourceTokenAddress),
+      );
+      setWrapAmount(nextPermitData.order.permitted.amount);
+      setOrderSignature(undefined);
+      setCreatedOrder(undefined);
+      setShowCreatedOrder(false);
+      setApprovalRequired(false);
+      setNavigation({ history: ["flow"], viewedIndex: 0 });
+    },
+    [
+      calculationContext,
+      connectedAccount,
+      currentPermitData,
+      currentSourceTokenAddress,
+      partner,
+      spot.client,
+    ],
+  );
 
   const presentation = useMemo<StepPresentation>(() => {
     const tokenAddress = permitData.order.permitted.token;
@@ -875,8 +927,7 @@ function LiveOrderFlowModalContent({
       return {
         codeSnippet: SIGNATURE_EXAMPLE_CODE_SNIPPET,
         data: signatureData,
-        editable:
-          !isRunning,
+        editable: !isRunning,
         explanation:
           "Prepare the calculated order with client.prepareOrder, then sign its typed data directly with walletClient.signTypedData. Edit the message object directly in the signing snippet to update the live order.",
         title: "Sign order",
@@ -885,8 +936,22 @@ function LiveOrderFlowModalContent({
 
     if (isDemo && viewedStep === "success") {
       return {
-        codeSnippet: { language: "JSON", syntaxLanguage: "json", fileName: "demo-result.json", copyLabel: "Copy demo result", format: (data) => JSON.stringify(data, null, 2) },
-        data: JSON.parse(JSON.stringify({ demo: true, submitted: false, id: "demo-order-not-submitted", status: "simulated", order: permitData.order })) as JsonContainer,
+        codeSnippet: {
+          language: "JSON",
+          syntaxLanguage: "json",
+          fileName: "demo-result.json",
+          copyLabel: "Copy demo result",
+          format: (data) => JSON.stringify(data, null, 2),
+        },
+        data: JSON.parse(
+          JSON.stringify({
+            demo: true,
+            submitted: false,
+            id: "demo-order-not-submitted",
+            status: "simulated",
+            order: permitData.order,
+          }),
+        ) as JsonContainer,
         explanation: DEMO_STEP_COPY.success,
         title: "Demo complete — no order created",
       };
@@ -905,8 +970,9 @@ function LiveOrderFlowModalContent({
     if (viewedStep === "submit" || viewedStep === "success") {
       const signedOrder = JSON.parse(
         JSON.stringify({
-          signature:
-            isDemo ? DEMO_SIGNATURE : orderSignature ?? "0x<65-byte-eip-712-signature>",
+          signature: isDemo
+            ? DEMO_SIGNATURE
+            : (orderSignature ?? "0x<65-byte-eip-712-signature>"),
           order: submissionPrepared?.order,
           demo: isDemo,
         }),
@@ -942,7 +1008,17 @@ function LiveOrderFlowModalContent({
   ]);
 
   const actionLabel = isDemo
-    ? ({ flow: "Start demo", check: "Simulate allowance check", wrap: "Simulate wrap", approve: "Simulate approval", sign: "Simulate signature", submit: "Simulate submission", success: "Close demo" } satisfies Record<DeveloperOrderStep, string>)[step]
+    ? (
+        {
+          flow: "Start demo",
+          check: "Simulate allowance check",
+          wrap: "Simulate wrap",
+          approve: "Simulate approval",
+          sign: "Simulate signature",
+          submit: "Simulate submission",
+          success: "Close demo",
+        } satisfies Record<DeveloperOrderStep, string>
+      )[step]
     : step === "success" && showCreatedOrder
       ? "Close"
       : STEP_ACTION_LABELS[step];
@@ -952,14 +1028,7 @@ function LiveOrderFlowModalContent({
       : (isDemo ? !spot.canDemoExecute : submitDisabled)
         ? "Resolve the current form or quote issue before running this step."
         : undefined;
-  const guideSection =
-    viewedStep === "check" || viewedStep === "approve"
-      ? "allowance"
-      : viewedStep === "sign"
-        ? "sign"
-        : viewedStep === "submit" || viewedStep === "success"
-          ? "submit"
-          : "end-to-end";
+  const guideSection = "prepare-and-submit-an-order";
   const selectablePhaseIndexes = useMemo(
     () =>
       isRunning
@@ -968,39 +1037,42 @@ function LiveOrderFlowModalContent({
             new Set(
               navigation.history
                 .map((historyStep) =>
-                  getLiveFlowPhaseIndex(
-                    historyStep,
-                    liveFlowPhases,
-                    "success",
-                  ),
+                  getLiveFlowPhaseIndex(historyStep, liveFlowPhases, "success"),
                 )
                 .filter(
                   (phaseIndex) =>
-                    phaseIndex >= 0 &&
-                    phaseIndex < liveFlowPhases.length,
+                    phaseIndex >= 0 && phaseIndex < liveFlowPhases.length,
                 ),
             ),
           ),
     [isRunning, liveFlowPhases, navigation.history],
   );
-  const handleReturnToStep = useCallback((targetIndex: number) => {
-    if (isRunning) return;
-    const next = rewindFlow(navigation, targetIndex);
-    if (next === navigation) return;
-    if (next.history.at(-1) !== "submit") {
-      setOrderSignature(undefined);
-      setCreatedOrder(undefined);
-    }
-    setShowCreatedOrder(false);
-    setNavigation(next);
-  }, [isRunning, navigation]);
+  const handleReturnToStep = useCallback(
+    (targetIndex: number) => {
+      if (isRunning) return;
+      const next = rewindFlow(navigation, targetIndex);
+      if (next === navigation) return;
+      if (next.history.at(-1) !== "submit") {
+        setOrderSignature(undefined);
+        setCreatedOrder(undefined);
+      }
+      setShowCreatedOrder(false);
+      setNavigation(next);
+    },
+    [isRunning, navigation],
+  );
 
-  const handleSelectPhase = useCallback((phaseIndex: number) => {
-    const targetIndex = navigation.history.findLastIndex((historyStep) =>
-      getLiveFlowPhaseIndex(historyStep, liveFlowPhases, "success") === phaseIndex,
-    );
-    handleReturnToStep(targetIndex);
-  }, [handleReturnToStep, liveFlowPhases, navigation.history]);
+  const handleSelectPhase = useCallback(
+    (phaseIndex: number) => {
+      const targetIndex = navigation.history.findLastIndex(
+        (historyStep) =>
+          getLiveFlowPhaseIndex(historyStep, liveFlowPhases, "success") ===
+          phaseIndex,
+      );
+      handleReturnToStep(targetIndex);
+    },
+    [handleReturnToStep, liveFlowPhases, navigation.history],
+  );
 
   useEffect(() => {
     if (!open || viewedStep === "flow") {
@@ -1020,7 +1092,9 @@ function LiveOrderFlowModalContent({
           progressLabel="Order creation progress"
           selectablePhaseIndexes={selectablePhaseIndexes}
           successStep="success"
-          successTitle={isDemo ? "Demo complete · No order created" : "Order complete"}
+          successTitle={
+            isDemo ? "Demo complete · No order created" : "Order complete"
+          }
           viewedStep={viewedStep}
         />
       ),
@@ -1079,119 +1153,143 @@ function LiveOrderFlowModalContent({
       >
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
           <div className="min-h-0 flex-1 overflow-hidden">
-          <JsonInspectorPanel
-            data={presentation.data}
-            editable={presentation.editable}
-            codeSnippet={presentation.codeSnippet}
-            codeScrollResetKey={viewedStep}
-            codeSnippetState="active"
-            description=""
-            explanation={isDemo ? DEMO_STEP_COPY[viewedStep] : presentation.explanation}
-            explanationDisplay="tooltip"
-            headerBackAction={
-              navigation.viewedIndex > 0 && !isRunning
-                ? {
-                    ariaLabel: "View previous order step",
-                    onClick: () => handleReturnToStep(navigation.viewedIndex - 1),
-                  }
-                : undefined
-            }
-            validate={viewedStep === "flow" ? validateOrderFormInput : undefined}
-            isValueEditable={
-              viewedStep === "flow"
-                ? (path) => path[0] === "formParams"
-                : viewedStep === "sign"
-                ? isSignatureValueEditable
-                : viewedStep === "approve"
-                  ? isApprovalValueEditable
+            <JsonInspectorPanel
+              data={presentation.data}
+              editable={presentation.editable}
+              codeSnippet={presentation.codeSnippet}
+              codeScrollResetKey={viewedStep}
+              codeSnippetState="active"
+              description=""
+              explanation={
+                isDemo ? DEMO_STEP_COPY[viewedStep] : presentation.explanation
+              }
+              explanationDisplay="tooltip"
+              headerBackAction={
+                navigation.viewedIndex > 0 && !isRunning
+                  ? {
+                      ariaLabel: "View previous order step",
+                      onClick: () =>
+                        handleReturnToStep(navigation.viewedIndex - 1),
+                    }
                   : undefined
-            }
-            onSave={
-              viewedStep === "flow"
-                ? handleSaveCalculation
-                : step === "sign"
-                ? handleSaveSignSnippet
-                : undefined
-            }
-            resetData={
-              viewedStep === "flow"
-                ? calculationDefaults
-                : viewedStep === "sign"
-                ? dexDerivedSignatureData
-                : undefined
-            }
-            title={isDemo && viewedStep !== "success" ? `Demo · ${presentation.title}` : presentation.title}
-            codeToolbarAction={
-              <DownloadIntegrationButton
-                flow="advanced-orders"
-                getCode={() => formatAdvancedOrdersSdkFlow(calculationInput ?? calculationDefaults)}
-              />
-            }
-            viewModeAction={
-              <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 sm:basis-0">
-                  <DeveloperGuideLink baseHref={getSpotDocsHref("/advanced-orders/direct")}>
-                    API only
-                  </DeveloperGuideLink>
-                  <DeveloperGuideLink baseHref={getSpotDocsHref("/advanced-orders/react")}>
-                    React SDK
-                  </DeveloperGuideLink>
-                  {viewedStep === "flow" ? (
-                    <DeveloperGuideLink baseHref={getSpotDocsHref("/advanced-orders/typescript")} />
-                  ) : (
-                    <OrdersSinkGuideLink section={guideSection} />
-                  )}
-                </div>
-                <div className="ml-auto flex shrink-0 items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isRunning}
-                    onClick={() => handleOpenChange(false)}
-                  >
-                    Close
-                  </Button>
-                  {!isDemo && !connectedAccount ? (
-                    <Button
-                      data-submit-button
-                      type="button"
-                      onClick={() => openConnectModal?.()}
+              }
+              validate={
+                viewedStep === "flow" ? validateOrderFormInput : undefined
+              }
+              isValueEditable={
+                viewedStep === "flow"
+                  ? (path) => path[0] === "formParams"
+                  : viewedStep === "sign"
+                    ? isSignatureValueEditable
+                    : viewedStep === "approve"
+                      ? isApprovalValueEditable
+                      : undefined
+              }
+              onSave={
+                viewedStep === "flow"
+                  ? handleSaveCalculation
+                  : step === "sign"
+                    ? handleSaveSignSnippet
+                    : undefined
+              }
+              resetData={
+                viewedStep === "flow"
+                  ? calculationDefaults
+                  : viewedStep === "sign"
+                    ? dexDerivedSignatureData
+                    : undefined
+              }
+              title={
+                isDemo && viewedStep !== "success"
+                  ? `Demo · ${presentation.title}`
+                  : presentation.title
+              }
+              codeToolbarAction={
+                <DownloadIntegrationButton
+                  flow="advanced-orders"
+                  getCode={() =>
+                    formatAdvancedOrdersSdkFlow(
+                      calculationInput ?? calculationDefaults,
+                    )
+                  }
+                />
+              }
+              viewModeAction={
+                <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
+                  <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 sm:basis-0">
+                    <DeveloperGuideLink
+                      baseHref={getSpotDocsHref("/advanced-orders/direct")}
                     >
-                      Connect Wallet
-                    </Button>
-                  ) : (
+                      API only
+                    </DeveloperGuideLink>
+                    <DeveloperGuideLink
+                      baseHref={getSpotDocsHref("/advanced-orders/react")}
+                    >
+                      React SDK
+                    </DeveloperGuideLink>
+                    {viewedStep === "flow" ? (
+                      <DeveloperGuideLink
+                        baseHref={getSpotDocsHref(
+                          "/advanced-orders/typescript",
+                        )}
+                      />
+                    ) : (
+                      <OrdersSinkGuideLink section={guideSection} />
+                    )}
+                  </div>
+                  <div className="ml-auto flex shrink-0 items-center gap-2">
                     <Button
                       type="button"
-                      onClick={() => {
-                        if (step === "success") {
-                          if (isDemo) { handleOpenChange(false); return; }
-                          if (!showCreatedOrder) {
-                            setShowCreatedOrder(true);
+                      variant="outline"
+                      disabled={isRunning}
+                      onClick={() => handleOpenChange(false)}
+                    >
+                      Close
+                    </Button>
+                    {!isDemo && !connectedAccount ? (
+                      <Button
+                        data-submit-button
+                        type="button"
+                        onClick={() => openConnectModal?.()}
+                      >
+                        Connect Wallet
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (step === "success") {
+                            if (isDemo) {
+                              handleOpenChange(false);
+                              return;
+                            }
+                            if (!showCreatedOrder) {
+                              setShowCreatedOrder(true);
+                              return;
+                            }
+
+                            handleOpenChange(false);
                             return;
                           }
 
-                          handleOpenChange(false);
-                          return;
+                          void executeCurrentStep();
+                        }}
+                        disabled={
+                          step !== "success" &&
+                          (Boolean(disabledReason) || isRunning)
                         }
-
-                        void executeCurrentStep();
-                      }}
-                      disabled={
-                        step !== "success" &&
-                        (Boolean(disabledReason) || isRunning)
-                      }
-                      isLoading={isRunning}
-                    >
-                      {step === "success" && (
-                        <CheckIcon aria-hidden="true" className="size-4" />
-                      )}
-                      {actionLabel}
-                    </Button>
-                  )}
+                        isLoading={isRunning}
+                      >
+                        {step === "success" && (
+                          <CheckIcon aria-hidden="true" className="size-4" />
+                        )}
+                        {actionLabel}
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            }
-          />
+              }
+            />
           </div>
         </div>
       </DialogContent>

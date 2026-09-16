@@ -1,6 +1,6 @@
 import { FormTab } from "@/lib/types";
 import type { useTranslations } from "@/lib/use-translations";
-import { Module, TimeUnit } from "@orbs-network/spot-react";
+import { Module, TimeUnit } from "@orbs-network/spot-ui";
 import { MODULE_META } from "./constants";
 
 export type Translate = ReturnType<typeof useTranslations>;

@@ -1,4 +1,4 @@
-import { Module, TimeUnit } from "@orbs-network/spot-react";
+import { Module, TimeUnit } from "@orbs-network/spot-ui";
 
 export const DURATION_OPTIONS = [
   { text: "Minutes", value: TimeUnit.Minutes },

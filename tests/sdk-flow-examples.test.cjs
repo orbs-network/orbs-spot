@@ -336,3 +336,30 @@ test('history snippet retries client initialization, reuses it, and forwards acc
   assert.equal(requests[0].legacyOrders, false);
   assert.deepEqual(Object.keys(requests[0]).sort(), ['account', 'legacyOrders', 'signal']);
 });
+
+
+test('the generated cancellation snippet type-checks against the installed SDK', () => {
+  const file = path.resolve(__dirname, '../cancel-order.generated.ts');
+  const source = advanced.formatCancelOrderCode();
+  const options = {
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    strict: true,
+    skipLibCheck: true,
+    noEmit: true,
+    types: [],
+  };
+  const host = ts.createCompilerHost(options);
+  const getSourceFile = host.getSourceFile.bind(host);
+  host.getSourceFile = (name, languageVersion, ...args) => name === file
+    ? ts.createSourceFile(name, source, languageVersion, true)
+    : getSourceFile(name, languageVersion, ...args);
+  const program = ts.createProgram([file], options, host);
+  const diagnostics = ts.getPreEmitDiagnostics(program);
+  assert.equal(diagnostics.length, 0, ts.formatDiagnosticsWithColorAndContext(diagnostics, {
+    getCurrentDirectory: () => process.cwd(),
+    getCanonicalFileName: (name) => name,
+    getNewLine: () => '\n',
+  }));
+});

@@ -1,5 +1,7 @@
 "use client";
 
+import { useMutation } from "@tanstack/react-query";
+
 import {
   CancelOrderDeveloperButton,
   FetchOrdersDeveloperButton,
@@ -33,11 +35,8 @@ import {
   OrderStatus,
   OrderType,
   TimeUnit,
-  useCancelOrder,
-  useHistoryOrder,
-  useOrders,
   type Order,
-} from "@orbs-network/spot-react";
+} from "@orbs-network/spot-ui";
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
@@ -52,6 +51,8 @@ import { useConnection } from "wagmi";
 import { useTranslations } from "@/lib/use-translations";
 import BN from "bignumber.js";
 import { toast } from "sonner";
+
+import { useCancelOrder, useHistoryOrder, useOrders, useHistoryNotifications } from "./advanced-order/use-order-client";
 
 const ORDER_HISTORY_CLOSE_RESET_DELAY = 180;
 
@@ -189,6 +190,8 @@ function formatTokenValue(
   symbol?: string,
   decimalScale = 4,
 ) {
+  // Missing decimals produce an empty UI amount; distinguish unknown from a real zero.
+  if (!amount) return "-";
   return `${formatDisplayNumber(amount, decimalScale)} ${symbol ?? ""}`.trim();
 }
 
@@ -262,7 +265,7 @@ function OrderListItem({
   return (
     <button
       type="button"
-      onClick={() => onSelect(order.id)}
+      onClick={() => onSelect(order.historyKey)}
       className="mb-1.5 flex w-full cursor-pointer flex-col gap-2 rounded-[13px] border border-border/50 bg-secondary/30 px-3 py-2 text-left transition-colors hover:border-primary/14 hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
     >
       <div className="flex items-start justify-between gap-3">
@@ -311,16 +314,13 @@ function OrderDetailRow({
 }
 
 function OrderIdRow({ id }: { id?: string }) {
-  const copyOrderId = useCallback(async () => {
-    if (!id) return;
-
-    try {
-      await navigator.clipboard.writeText(id);
-      toast.success("Order ID copied", { id: "order-id-copied" });
-    } catch {
-      toast.error("Failed to copy order ID", { id: "order-id-copied" });
-    }
-  }, [id]);
+  const { mutate: copyOrderId } = useMutation({
+    mutationFn: () => id ? navigator.clipboard.writeText(id) : Promise.resolve(),
+    networkMode: "always",
+    retry: false,
+    onSuccess: () => { if (id) toast.success("Order ID copied", { id: "order-id-copied" }); },
+    onError: () => { toast.error("Failed to copy order ID", { id: "order-id-copied" }); },
+  });
 
   return (
     <div className="flex items-start justify-between gap-4 text-sm">
@@ -792,7 +792,8 @@ export function OrderHistoryModal({
   onOpenChange: (open: boolean) => void;
 }) {
   const { address } = useConnection();
-  const { data: orders, isLoading } = useOrders();
+  const { data: orders, isLoading, error, refetch } = useOrders();
+  useHistoryNotifications();
   const [selectedFilter, setSelectedFilter] = useState<OrderFilter>(
     OrderFilter.All,
   );
@@ -815,7 +816,7 @@ export function OrderHistoryModal({
   // Store only the stable ID. Resolving against the latest unfiltered order
   // list keeps details in sync after cancellation or any background refetch.
   const selectedOrder = selectedOrderId
-    ? orders?.all.find((order) => order.id === selectedOrderId)
+    ? orders?.all.find((order) => order.historyKey === selectedOrderId)
     : undefined;
 
   const loading = isLoading;
@@ -844,7 +845,7 @@ export function OrderHistoryModal({
       >
         {selectedOrder ? (
           <SelectedOrderDetails
-            key={`${selectedOrder.id}-${selectedOrder.createdAt}`}
+            key={selectedOrder.historyKey}
             rawOrder={selectedOrder}
             onBack={() => setSelectedOrderId(undefined)}
           />
@@ -875,7 +876,12 @@ export function OrderHistoryModal({
                 />
               </div>
 
-              {loading && !filteredOrders.length ? (
+              {error ? (
+                <div role="alert" className="flex flex-col items-center gap-3 py-8 text-sm">
+                  <p>Could not load order history: {error.message}</p>
+                  <button type="button" className="text-primary underline" onClick={() => void refetch()}>Retry history</button>
+                </div>
+              ) : loading && !filteredOrders.length ? (
                 <div className="flex min-h-[240px] items-center justify-center">
                   <Spinner className="size-10" />
                 </div>
@@ -884,6 +890,7 @@ export function OrderHistoryModal({
                   <Virtuoso
                     style={{ height: "100%" }}
                     data={filteredOrders}
+                    computeItemKey={(_, order) => order.historyKey}
                     itemContent={(_, order) => (
                       <OrderListItem
                         order={order}

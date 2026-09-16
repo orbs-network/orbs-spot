@@ -10,7 +10,7 @@ export function OrdersSinkGuideLink({
 }) {
   return (
     <DeveloperGuideLink
-      baseHref={getSpotDocsHref("/advanced-orders/direct")}
+      baseHref={getSpotDocsHref("/advanced-orders/typescript")}
       className={className}
       section={section}
     />

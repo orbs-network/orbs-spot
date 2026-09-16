@@ -1,5 +1,7 @@
 "use client";
 
+import { usePriceDisplay, useTriggerPrice, useLimitPrice } from "./use-order-form";
+
 import { CurrencySelector } from "@/components/currency-selector";
 import { Button } from "@/components/ui/button";
 import { FormLabel } from "@/components/ui/form-label";
@@ -14,7 +16,7 @@ import { useCurrency } from "@/lib/hooks/use-currencies";
 import { useTranslations } from "@/lib/use-translations";
 import { Currency, Field } from "@/lib/types";
 import { cn, formatDecimals } from "@/lib/utils";
-import { Module, type Token, usePriceDisplay, useTriggerPrice, useLimitPrice } from "@orbs-network/spot-react";
+import { Module, type Token } from "@orbs-network/spot-ui";
 import { ArrowLeftRightIcon } from "lucide-react";
 import { useCallback } from "react";
 

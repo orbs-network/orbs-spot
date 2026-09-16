@@ -1,3 +1,5 @@
+> Historical integration review. This predates the TypeScript SDK migration; see README.md for the current implementation.
+
 # Spot Integration Docs — Review
 
 **Scope:** the developer docs changes on this branch — `features/developer-docs/**`, `app/developers/**`, `components/developer-tools/**`.

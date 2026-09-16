@@ -2,12 +2,12 @@
 
 import { useMemo } from "react";
 import { Code2Icon, RefreshCwIcon } from "lucide-react";
-import type { Order } from "@orbs-network/spot-react";
+import type { Order } from "@orbs-network/spot-ui";
 import { useConnection } from "wagmi";
 
 import { Button } from "@/components/ui/button";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
-import { useBasePermitData } from "@/lib/hooks/use-base-permit-data";
+import { useClient } from "../advanced-order/use-order-client";
 import { getActiveSpotPartner } from "@/lib/partners/spot";
 
 import {
@@ -19,7 +19,6 @@ import { JsonInspectorModal, type JsonContainer } from "./json-inspector";
 import { OrdersSinkGuideLink } from "./orders-sink-guide-link";
 
 const ORDER_SINK_URL = "https://order-sink-v2.orbs.network";
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export function FetchOrdersDeveloperButtonContent({
   isLoading,
@@ -123,39 +122,32 @@ export function CancelOrderDeveloperButtonContent({
   rawOrder,
 }: {
   isCancelling: boolean;
-  onCancel: () => Promise<unknown>;
+  onCancel: () => void;
   rawOrder: Order;
 }) {
   const { address } = useConnection();
-  const isLegacyOrder = rawOrder.version === 1;
-  const partner = getActiveSpotPartner() || "external";
-  const basePermitDataQuery = useBasePermitData(
-    isLegacyOrder ? undefined : rawOrder.chainId,
-  );
+  const client = useClient();
   const data = useMemo<JsonContainer>(() => {
+    const request = client.data?.getCancelOrderRequest(rawOrder);
     return {
-      partner,
-      abi: isLegacyOrder
-        ? "function cancel(uint64 id)"
-        : "function cancel(bytes32[] digests)",
+      partner: client.data?.partner ?? getActiveSpotPartner(),
+      abi: JSON.parse(JSON.stringify(request?.abi ?? [])) as JsonContainer,
       functionName: "cancel",
-      address: isLegacyOrder
-        ? rawOrder.twapAddress ?? ZERO_ADDRESS
-        : basePermitDataQuery.data?.domain.verifyingContract ?? ZERO_ADDRESS,
-      args: isLegacyOrder ? [rawOrder.id] : [[rawOrder.repermitDigest]],
+      address: request?.contractAddress ?? "",
+      args: request?.args ?? [],
       chain: rawOrder.chainId,
       account: address ?? rawOrder.maker,
     };
-  }, [address, basePermitDataQuery.data, isLegacyOrder, partner, rawOrder]);
+  }, [address, client.data, rawOrder]);
 
-  if (!isLegacyOrder && basePermitDataQuery.isError) {
+  if (client.isError) {
     return (
       <Button
         data-developer-trigger
         type="button"
         variant="outline"
         size="lg"
-        onClick={() => void basePermitDataQuery.refetch()}
+        onClick={() => void client.refetch()}
         className="h-12 rounded-[14px] border-destructive/55 text-destructive hover:border-destructive hover:text-destructive"
         aria-label="Retry Orders Sink configuration"
       >
@@ -170,7 +162,7 @@ export function CancelOrderDeveloperButtonContent({
       data={data}
       codeSnippet={CANCEL_CODE_SNIPPET}
       description=""
-      explanation="This is the populated Wagmi contract call used to cancel the selected order."
+      explanation="The SDK selects the cancellation contract, ABI and arguments for this order. The TypeScript example sends the request, waits for confirmation and refreshes history."
       explanationDisplay="tooltip"
       getFieldExplanation={getCancelFieldExplanation}
       requiresDeveloperMode={false}
@@ -182,7 +174,7 @@ export function CancelOrderDeveloperButtonContent({
           type="button"
           variant="outline"
           size="icon-lg"
-          isLoading={!isLegacyOrder && basePermitDataQuery.isLoading}
+          isLoading={client.isLoading}
           className="size-12 rounded-[14px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
           aria-label="Open cancel order code"
         >

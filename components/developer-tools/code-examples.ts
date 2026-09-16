@@ -11,9 +11,6 @@ import {
   getExamplePartnerId,
 } from "./developer-partner";
 
-const CANCEL_ABI_PLACEHOLDER = "__CANCEL_ABI__";
-const CANCEL_ADDRESS_PLACEHOLDER = "__CANCEL_ADDRESS__";
-const CANCEL_CHAIN_PLACEHOLDER = "__CANCEL_CHAIN__";
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 
 function serializeTypeScriptValue(
@@ -462,128 +459,6 @@ export type FetchOrdersResponse = {
 };`;
 }
 
-function getPermitConfigExampleParams(data: JsonContainer) {
-  const root = Array.isArray(data) ? {} : data;
-  const domain =
-    root.domain && typeof root.domain === "object" && !Array.isArray(root.domain)
-      ? root.domain
-      : {};
-  const partner = getExamplePartnerId(root.partner);
-  const query =
-    root.query && typeof root.query === "object" && !Array.isArray(root.query)
-      ? root.query
-      : {};
-  const chain =
-    typeof domain.chainId === "number" || typeof domain.chainId === "string"
-      ? domain.chainId
-      : typeof root.chainId === "number" || typeof root.chainId === "string"
-        ? root.chainId
-        : typeof root.chain === "number" || typeof root.chain === "string"
-          ? root.chain
-          : typeof query.chainId === "number" ||
-              typeof query.chainId === "string"
-            ? query.chainId
-            : 137;
-  return { chain, partner };
-}
-
-export function formatBuildOrderFromDerivedValuesCode(data: JsonContainer) {
-  const root = Array.isArray(data) ? {} : data;
-  const partner = getExamplePartnerId(root.partner);
-
-  return `import { useCallback } from "react";
-import { useConnection, useWalletClient } from "wagmi";
-
-import { useDerivedData } from "./use-derived-data";
-import { useWtokenAddress } from "./use-wtoken-address";
-import type { PermitData, PermitOrder } from "./order-types";
-
-const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
-${formatPartnerDeclaration(partner)}
-
-export function useBuildOrderFromDerivedValues() {
-  const account = useConnection().address!;
-  const chainId = useWalletClient().data!.chain.id;
-  const orderInput = useDerivedData();
-  const wTokenAddress = useWtokenAddress();
-
-  return useCallback(async () => {
-    const permitData = await fetchDefaultPermitData(partner, chainId);
-    const currentTimeMillis = Date.now();
-    const nonce = currentTimeMillis.toString();
-    const start = Math.floor(currentTimeMillis / 1_000).toString();
-    const deadline = Math.round(orderInput.deadlineMillis / 1_000).toString();
-    const epoch = orderInput.totalTrades <= 1
-      ? 0
-      : Math.round(orderInput.fillDelayMillis / 1_000);
-    const inputTokenAddress = orderInput.sourceIsNative
-      ? wTokenAddress
-      : orderInput.inputToken.address;
-    const order = {
-      permitted: {
-        token: inputTokenAddress,
-        amount: orderInput.totalInputAmount,
-      },
-      spender: permitData.order.spender,
-      nonce,
-      deadline,
-      witness: {
-        reactor: permitData.order.witness.reactor,
-        executor: permitData.order.witness.executor,
-        exchange: {
-          adapter: permitData.order.witness.exchange.adapter,
-          ref: permitData.order.witness.exchange.ref,
-          share: permitData.order.witness.exchange.share,
-          data: permitData.order.witness.exchange.data,
-        },
-        swapper: account,
-        nonce,
-        start,
-        deadline,
-        chainid: chainId,
-        exclusivity: permitData.order.witness.exclusivity,
-        epoch,
-        slippage: orderInput.slippageBps,
-        freshness: orderInput.freshnessSeconds ?? 60,
-        input: {
-          token: inputTokenAddress,
-          amount: orderInput.srcAmountPerFill,
-          maxAmount: orderInput.totalInputAmount,
-        },
-        output: {
-          token: orderInput.dstToken,
-          limit: orderInput.dstMinAmountPerFill,
-          triggerLower: orderInput.triggerLower,
-          triggerUpper: orderInput.triggerUpper,
-          recipient: account,
-        },
-      },
-    } satisfies PermitOrder;
-
-    return { order, permitData };
-  }, [account, chainId, orderInput, wTokenAddress]);
-}
-
-export async function fetchDefaultPermitData(
-  partnerId: string,
-  chainId: number,
-): Promise<PermitData> {
-  const query = new URLSearchParams({
-    partner: partnerId,
-    chain: String(chainId),
-  });
-  const response = await fetch(ORDERS_SINK_URL + "/config?" + query, {
-    headers: { Accept: "application/json" },
-  });
-  if (!response.ok) {
-    throw new Error("Failed to fetch default permit data (" + response.status + ")");
-  }
-
-  return (await response.json()) as PermitData;
-}
-}`;
-}
-
 export function formatSignOrderExampleCode() {
   return formatAdvancedOrdersSdkStep("sign");
 }
@@ -775,161 +650,51 @@ function assertPermitData(permitData: PermitData, activeChainId: number): void {
 export const permitDataRequest = fetchRePermitData(partner, chainId);`;
 }
 
-export function formatCancelOrderCode(data: JsonContainer) {
-  if (Array.isArray(data)) return JSON.stringify(data, null, 2);
+export function formatCancelOrderCode() {
+  return `import type { Order, SpotClient } from "@orbs-network/spot-ui";
+import type { Abi, Address, PublicClient, WalletClient } from "viem";
 
-  const abi = typeof data.abi === "string" ? data.abi : "";
-  const isLegacyOrder = abi.includes("uint64");
-  const chainId = typeof data.chain === "number" ? data.chain : 0;
-  const partner = getExamplePartnerId(data.partner);
-  const writeContractArgs = {
-    abi: CANCEL_ABI_PLACEHOLDER,
-    functionName: data.functionName,
-    address: isLegacyOrder ? data.address : CANCEL_ADDRESS_PLACEHOLDER,
-    args: data.args,
-    chain: CANCEL_CHAIN_PLACEHOLDER,
-    account: data.account,
-  };
-  const fieldSourceComments: Record<string, string> = {
-    abi: "Cancellation ABI selected from order.version.",
-    functionName: 'Fixed contract method: "cancel".',
-    address: isLegacyOrder
-      ? "Legacy contract address from order.twapAddress."
-      : "RePermit contract address from permitDataResponse.domain.verifyingContract.",
-    args: isLegacyOrder
-      ? "Legacy order ID from order.id."
-      : "RePermit digest from order.metadata.repermitDigest.",
-    chain: "Active wallet chain, which must match order.chainId.",
-    account:
-      "Connected account from useConnection().address, falling back to order.maker.",
-  };
-  const serializedArgs = JSON.stringify(writeContractArgs, null, 2)
-    .replace(JSON.stringify(CANCEL_ABI_PLACEHOLDER), "cancelAbi")
-    .replace(
-      JSON.stringify(CANCEL_ADDRESS_PLACEHOLDER),
-      "permitDataResponse.domain.verifyingContract",
-    )
-    .replace(JSON.stringify(CANCEL_CHAIN_PLACEHOLDER), "walletClient.chain")
-    .replace(/^(\s*)"([A-Za-z_$][\w$]*)":/gm, "$1$2:")
-    .replace(
-      /^  (abi|functionName|address|args|chain|account):/gm,
-      (_match, field: string) =>
-        `  // ${fieldSourceComments[field]}\n  ${field}:`,
-    )
-    .replace(/\n/g, "\n    ");
-  const configImport = isLegacyOrder
-    ? ""
-    : 'import type { PermitData } from "./order-types";\n';
-  const configConstant = isLegacyOrder
-    ? ""
-    : `
+const pending = new Set<string>();
 
-// Keep the config origin fixed: it supplies the trusted RePermit contract.
-const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
-${formatPartnerDeclaration(partner)}`;
-  const fetchPermitData = isLegacyOrder
-    ? ""
-    : `
-
-    // 1. Fetch the base permit data for this order's partner and chain.
-    // The cancellation contract must come from this trusted configuration.
-    const permitDataRequest = await fetch(
-      \`\${ORDERS_SINK_URL}/config?partner=\${partner}&chain=${chainId}\`,
-      {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      },
-    );
-    if (!permitDataRequest.ok) {
-      throw new Error(\`Failed to fetch RePermit data (\${permitDataRequest.status})\`);
-    }
-    const permitDataResponse = (await permitDataRequest.json()) as PermitData;`;
-  const submitStep = isLegacyOrder
-    ? ""
-    : "    // 2. Submit the selected order digest to RePermit.\n";
-
-  return `${configImport}import { useCallback } from "react";
-import { parseAbi } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
-
-// Use the connected wallet and the cancellation ABI shown by the current order.
-// The connected wallet should be on chain ${chainId} before submitting.
-const cancelAbi = parseAbi([${JSON.stringify(abi)}]);${configConstant}
-
-export function useCancelSelectedOrder() {
-  const publicClient = usePublicClient()!;
-  const walletClient = useWalletClient().data!;
-
-  return useCallback(async () => {${fetchPermitData}
-
-${submitStep}    const hash = await walletClient.writeContract(${serializedArgs});
-
-    // Wait for confirmation, then refresh order history to show its new status.
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    if (receipt.status !== "success") throw new Error("Order cancellation reverted");
-    return hash;
-  }, [publicClient, walletClient]);
-}`;
-}
-
-export function formatCancelOrderExampleCode(data: JsonContainer) {
-  const { partner } = getPermitConfigExampleParams(data);
-
-  return `import { useCallback } from "react";
-import type { OrderResponse, PermitData } from "./order-types";
-import { parseAbi } from "viem";
-import { useConnection, usePublicClient, useWalletClient } from "wagmi";
-
-const ORDERS_SINK_URL = "https://order-sink-v2.orbs.network";
-${formatPartnerDeclaration(partner)}
-// RePermit accepts one or more order digests, hence the bytes32[] argument.
-const cancelAbi = parseAbi(["function cancel(bytes32[] digests)"]);
-
-export function useCancelOrderExample(
-  refetchOrders: () => Promise<unknown>,
+// Pass the initialized client used for submission and an order from getAccountOrders().
+export async function cancelOrder(
+  client: SpotClient,
+  order: Order,
+  walletClient: WalletClient,
+  publicClient: PublicClient,
+  refreshOrders: () => Promise<unknown>,
 ) {
-  // The host renders this flow only after the account and clients are ready.
-  const account = useConnection().address!;
-  const publicClient = usePublicClient()!;
-  const walletClient = useWalletClient().data!;
-
-  // Pass the complete selected history item to access its RePermit digest.
-  return useCallback(async (order: OrderResponse) => {
-    // 1. Resolve the trusted RePermit contract for the wallet's active chain.
-    // Never accept this contract address from editable UI input.
-    const permitDataResponse = await fetchRePermitData(walletClient.chain.id);
-
-    // 2. Call cancel with an array containing the selected order's digest.
+  const [accounts, chainId, publicChainId] = await Promise.all([
+    walletClient.getAddresses(), walletClient.getChainId(), publicClient.getChainId(),
+  ]);
+  const account = accounts[0];
+  if (!account || account.toLowerCase() !== order.maker.toLowerCase() ||
+      chainId !== client.chainId || order.chainId !== chainId || publicChainId !== chainId) {
+    throw new Error("Connect the order's wallet and network before cancelling");
+  }
+  if (pending.has(order.historyKey)) throw new Error("Cancellation is already pending");
+  pending.add(order.historyKey);
+  try {
+    const request = client.getCancelOrderRequest(order);
     const hash = await walletClient.writeContract({
-      address: permitDataResponse.domain.verifyingContract,
-      abi: cancelAbi,
+      address: request.contractAddress as Address,
+      abi: request.abi as Abi,
       functionName: "cancel",
-      args: [[order.metadata.repermitDigest]],
+      args: request.args,
       account,
       chain: walletClient.chain,
     });
-
-    // 3. Wait for confirmation, then refresh the service-owned order status.
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     if (receipt.status !== "success") throw new Error("Order cancellation reverted");
-    await refetchOrders();
+    await refreshOrders();
     return hash;
-  }, [account, publicClient, refetchOrders, walletClient]);
-}
-
-async function fetchRePermitData(chainId: number): Promise<PermitData> {
-  const query = new URLSearchParams({ partner, chain: String(chainId) });
-  const response = await fetch(
-    \`\${ORDERS_SINK_URL}/config?\${query}\`,
-    { headers: { Accept: "application/json" } },
-  );
-  if (!response.ok) {
-    throw new Error(\`Failed to fetch RePermit data (\${response.status})\`);
+  } finally {
+    pending.delete(order.historyKey);
   }
-
-  return (await response.json()) as PermitData;
 }`;
 }
+
+export const formatCancelOrderExampleCode = formatCancelOrderCode;
 
 export function formatApproveTokenCode() {
   return formatAdvancedOrdersSdkStep("approve");
@@ -963,7 +728,6 @@ export const SIGNATURE_EXAMPLE_CODE_SNIPPET: CodeSnippetOptions = {
 export const CANCEL_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "cancel-order.ts",
-  files: [ORDER_TYPES_FILE],
   format: formatCancelOrderCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",
@@ -972,7 +736,6 @@ export const CANCEL_CODE_SNIPPET: CodeSnippetOptions = {
 export const CANCEL_EXAMPLE_CODE_SNIPPET: CodeSnippetOptions = {
   copyLabel: "Copy code",
   fileName: "cancel-order.ts",
-  files: [ORDER_TYPES_FILE],
   format: formatCancelOrderExampleCode,
   language: "TypeScript",
   syntaxLanguage: "typescript",

@@ -2,7 +2,8 @@
 
 import { useMemo } from "react";
 import { useConnection } from "wagmi";
-import { useClient, useOrders, useSubmitButton } from "@orbs-network/spot-react";
+import { useClient, useOrders } from "./use-order-client";
+import { useSubmitButton } from "./use-order-execution";
 import { getWrappedNativeCurrency, isNativeAddress } from "@/lib/utils";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { getDemoOrderForm, DEMO_ACCOUNT, type DeveloperExecutionMode } from "../developer-tools/demo-order";

@@ -15,7 +15,9 @@ export function TradingForm() {
       <div className={isSwapTab ? "block" : "hidden"}>
         <SwapBestTradeForm />
       </div>
-      <AdvancedOrderForm hidden={isSwapTab} />
+      {/* Mount calculation and query hooks only while an advanced tab is visible.
+          Its draft lives in the store, so unmounting does not discard edits. */}
+      {!isSwapTab && <AdvancedOrderForm />}
     </FormContainer>
   );
 }

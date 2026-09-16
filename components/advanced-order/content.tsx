@@ -1,22 +1,20 @@
 "use client";
 
+import { memo } from "react";
 import { FormActionPanel } from "@/components/form-action-panel";
 import { OrderHistoryModal } from "@/components/order-history-modal";
 import { SettingsModal } from "@/components/settings-modal";
 import { ToggleCurrencies } from "@/components/toggle-currencies";
 import { useFormTabStore } from "@/lib/hooks/store";
-import { cn } from "@/lib/utils";
-import { Module } from "@orbs-network/spot-react";
+import { Module } from "@orbs-network/spot-ui";
 import { DisclaimerPanel, InputErrorPanel } from "./feedback-panels";
 import { ModuleInputs, TokenPanel } from "./token-panels";
 import { PricesPanel } from "./price-panels";
 import { SubmitOrder } from "./submit-order";
 
-export function AdvancedOrderContent({
-  hidden,
+export const AdvancedOrderContent = memo(function AdvancedOrderContent({
   orderModule,
 }: {
-  hidden?: boolean;
   orderModule: Module;
 }) {
   const orderHistoryOpen = useFormTabStore((state) => state.orderHistoryOpen);
@@ -26,10 +24,7 @@ export function AdvancedOrderContent({
 
   return (
     <>
-      <div
-        aria-hidden={hidden}
-        className={cn("flex flex-col gap-3", hidden && "hidden")}
-      >
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
           <TokenPanel isSource />
           <ToggleCurrencies />
@@ -50,5 +45,4 @@ export function AdvancedOrderContent({
       />
     </>
   );
-}
-
+});

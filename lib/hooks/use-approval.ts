@@ -1,93 +1,56 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useConnection, usePublicClient } from "wagmi";
-import { useMemo } from "react";
+import { useMutation } from "@tanstack/react-query";
+import BN from "bignumber.js";
+import { useCallback } from "react";
 import { useParseNativeCurrencyAddress } from "./common";
 import { useApproveToken } from "./use-token-approval";
-import { useHasTokenAllowance } from "./use-token-allowance";
+import { useGetTokenAllowance, useTokenAllowance } from "./use-token-allowance";
 
 export const useApproval = (
   spender: string,
   _currencyAddress?: string,
-  amount?: string
+  amount?: string,
 ) => {
   const currencyAddress = useParseNativeCurrencyAddress(_currencyAddress);
-  const { address: account } = useConnection();
-  const publicClient = usePublicClient();
   const { mutateAsync: approveToken } = useApproveToken();
-  const { mutateAsync: hasTokenAllowance } = useHasTokenAllowance();
-  const queryClient = useQueryClient();
-  const allowanceKey = useMemo(
-    () => ["allowance", account, spender, currencyAddress, amount],
-    [account, spender, currencyAddress, amount]
-  );
+  // Subscribe for display, but reread immediately before execution: a cached
+  // allowance may have been spent or changed by another transaction.
+  const allowance = useTokenAllowance({
+    tokenAddress: currencyAddress,
+    spenderAddress: spender,
+  });
+  const getTokenAllowance = useGetTokenAllowance();
+  const ensureAllowance = useCallback(() => {
+    // Fail before querying RPC when there is no amount to check.
+    if (!amount)
+      return Promise.reject(new Error("Missing required allowance amount"));
+    return getTokenAllowance({
+      tokenAddress: currencyAddress,
+      spenderAddress: spender,
+    }).then((data) => BN(data ?? "0").gte(amount));
+  }, [getTokenAllowance, currencyAddress, spender, amount]);
 
-  const { data: hasAllowance, isLoading: isLoadingHasAllowance } = useQuery({
-    queryKey: allowanceKey,
-    queryFn: async () => {
-      return hasTokenAllowance({
+  const { mutateAsync: approve, isPending: isPendingApproval } = useMutation({
+    mutationFn: async () => {
+      const { receipt } = await approveToken({
         tokenAddress: currencyAddress,
         spenderAddress: spender,
         amount,
       });
+      // Check the actual allowance after confirmation, rather than assuming the write took effect.
+      if (!(await ensureAllowance())) throw new Error("Approval failed");
+      return receipt;
     },
-    enabled:
-      !!publicClient && !!account && !!spender && !!currencyAddress && !!amount,
+    retry: false,
   });
 
-  const { mutateAsync: approveCallback, isPending: isPendingApproval } =
-    useMutation({
-      mutationFn: async () => {
-        const { receipt } = await approveToken({
-          tokenAddress: currencyAddress,
-          spenderAddress: spender,
-          amount,
-        });
-
-        const hasAllowance = await hasTokenAllowance({
-          tokenAddress: currencyAddress,
-          spenderAddress: spender,
-          amount,
-        });
-
-        if (!hasAllowance) {
-          throw new Error("Approval failed");
-        }
-
-        queryClient.setQueryData(allowanceKey, true);
-        return receipt;
-      },
-    });
-
-  const { mutateAsync: ensureAllowance } = useMutation({
-    mutationFn: async () => {
-      return queryClient.fetchQuery({
-        queryKey: allowanceKey,
-        staleTime: 0,
-        queryFn: async () => {
-          return hasTokenAllowance({
-            tokenAddress: currencyAddress,
-            spenderAddress: spender,
-            amount,
-          });
-        },
-      });
-    },
-  });
-
-  return useMemo(
-    () => ({
-      hasAllowance,
-      isLoadingHasAllowance,
-      approve: approveCallback,
-      isPendingApproval,
-      ensureAllowance,
-    }),
-    [
-      approveCallback,
-      ensureAllowance,
-      hasAllowance,
-      isLoadingHasAllowance,
-      isPendingApproval,
-    ]
-  );
+  return {
+    hasAllowance:
+      allowance.data === undefined || !amount
+        ? undefined
+        : BN(allowance.data).gte(amount),
+    isLoadingHasAllowance: allowance.isLoading,
+    approve,
+    isPendingApproval,
+    ensureAllowance,
+  };
 };
