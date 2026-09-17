@@ -26,20 +26,28 @@ const SubmitButtonBase = ({
   chainId,
   disabled,
 }: SubmitButtonBaseProps) => {
-  const { address, chainId: currentChainId } = useConnection();
+  const {
+    address,
+    chainId: currentChainId,
+    isConnecting,
+    isReconnecting,
+  } = useConnection();
   const { openConnectModal } = useConnectModal();
   const switchChain = useSwitchChain();
+  const isWalletLoading = isConnecting || isReconnecting;
 
-  if (!address) {
+  if (!address || isWalletLoading) {
     return (
       <Button
         data-submit-button
-        className="h-12 w-full rounded-[14px] text-base"
+        className="h-12 w-full rounded-[14px] text-base motion-reduce:[&_svg]:animate-none"
+        isLoading={isWalletLoading}
+        aria-busy={isWalletLoading}
         onClick={() => {
           openConnectModal?.();
         }}
       >
-        Connect Wallet
+        {isWalletLoading ? "Connecting…" : "Connect Wallet"}
       </Button>
     );
   }

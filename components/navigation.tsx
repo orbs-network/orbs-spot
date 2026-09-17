@@ -21,7 +21,7 @@ import {
   SunIcon,
   MoonIcon,
 } from "lucide-react";
-import { useDisconnect, useSwitchChain } from "wagmi";
+import { useConnection, useDisconnect, useSwitchChain } from "wagmi";
 import { toast } from "sonner";
 import {
   preserveDeveloperModeInHref,
@@ -39,6 +39,7 @@ import type { PartnerBrand } from "@/lib/partners/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Switch } from "./ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { Spinner } from "./ui/spinner";
 
 const navPillClass =
   "inline-flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-[var(--nav-pill-hover-background)] focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:outline-none";
@@ -337,6 +338,8 @@ const WalletAccountPopover = ({
 };
 
 const NavWalletControls = () => {
+  const { isConnecting, isReconnecting } = useConnection();
+
   return (
     <ConnectButton.Custom>
       {({
@@ -354,12 +357,18 @@ const NavWalletControls = () => {
           (!authenticationStatus ||
             authenticationStatus === "authenticated");
 
-        if (!ready) {
+        if (!ready || isConnecting || isReconnecting) {
           return (
-            <div
-              aria-hidden="true"
-              className="h-10 w-[112px] rounded-full bg-secondary/80 opacity-0"
-            />
+            <NavPillButton
+              data-primary-nav-pill
+              disabled
+              aria-busy="true"
+              aria-label="Connecting wallet"
+              className="w-10 justify-center sm:w-auto sm:min-w-[139px] sm:px-4"
+            >
+              <Spinner aria-hidden="true" className="motion-reduce:animate-none" />
+              <span className="hidden sm:inline">Connecting…</span>
+            </NavPillButton>
           );
         }
 

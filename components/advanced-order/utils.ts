@@ -1,4 +1,5 @@
 import { FormTab } from "@/lib/types";
+import { formatDateTime } from "@/lib/date";
 import type { useTranslations } from "@/lib/use-translations";
 import { Module, TimeUnit } from "@orbs-network/spot-ui";
 import { MODULE_META } from "./constants";
@@ -55,10 +56,5 @@ export function formatDuration(ms?: number) {
 
 export function formatDeadline(deadline?: number) {
   if (!deadline) return "";
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(deadline));
+  return formatDateTime(deadline);
 }

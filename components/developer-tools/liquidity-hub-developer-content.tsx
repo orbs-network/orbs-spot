@@ -273,7 +273,8 @@ export function LiquidityHubDeveloperContent({
   const isDemo = mode === "demo";
   const flowToastId = useId();
   const actionToastId = useId();
-  const { address: account } = useConnection();
+  const { address: account, isConnecting, isReconnecting } = useConnection();
+  const isWalletLoading = isConnecting || isReconnecting;
   const chainId = useDataChainId();
   const { openConnectModal } = useConnectModal();
   const { slippage } = useSettings();
@@ -958,13 +959,16 @@ export function LiquidityHubDeveloperContent({
                   >
                     Close
                   </Button>
-                  {!isDemo && !account ? (
+                  {!isDemo && (!account || isWalletLoading) ? (
                     <Button
                       data-submit-button
                       type="button"
+                      className="motion-reduce:[&_svg]:animate-none"
+                      isLoading={isWalletLoading}
+                      aria-busy={isWalletLoading}
                       onClick={() => openConnectModal?.()}
                     >
-                      Connect Wallet
+                      {isWalletLoading ? "Connecting…" : "Connect Wallet"}
                     </Button>
                   ) : (
                     <Button

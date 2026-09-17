@@ -49,6 +49,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { useConnection } from "wagmi";
 import { useTranslations } from "@/lib/use-translations";
+import { formatDateTime } from "@/lib/date";
 import BN from "bignumber.js";
 import { toast } from "sonner";
 
@@ -126,26 +127,14 @@ function formatOrderDate(timestamp?: number) {
   const normalizedTimestamp = normalizeTimestamp(timestamp);
   if (!normalizedTimestamp) return "";
 
-  return new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(normalizedTimestamp));
+  return formatDateTime(normalizedTimestamp);
 }
 
 function formatDetailDate(timestamp?: number) {
   const normalizedTimestamp = normalizeTimestamp(timestamp);
   if (!normalizedTimestamp) return "-";
 
-  return new Intl.DateTimeFormat(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(normalizedTimestamp));
+  return formatDateTime(normalizedTimestamp);
 }
 
 function formatDurationUnit(value: number, unit: string) {
