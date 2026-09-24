@@ -7,8 +7,10 @@ const { test } = require('node:test');
 const ts = require('typescript');
 
 function load(name) {
-  if (name.startsWith('@')) return require(name);
-  const file = path.resolve(__dirname, '../components/developer-tools', name + '.ts');
+  if (name.startsWith('@') && !name.startsWith('@/')) return require(name);
+  const file = name.startsWith('@/')
+    ? path.resolve(__dirname, '..', name.slice(2) + '.ts')
+    : path.resolve(__dirname, '../components/developer-tools', name + '.ts');
   const source = fs.readFileSync(file, 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const exports = {};

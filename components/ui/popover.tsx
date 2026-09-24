@@ -18,9 +18,11 @@ const ResponsivePopoverContext = React.createContext({ isDrawer: false });
 
 function Popover({
   children,
+  responsive = true,
   ...props
-}: React.ComponentProps<typeof PopoverPrimitive.Root>) {
-  const isDrawer = useIsMobile();
+}: React.ComponentProps<typeof PopoverPrimitive.Root> & { responsive?: boolean }) {
+  const isMobile = useIsMobile();
+  const isDrawer = responsive && isMobile;
 
   return (
     <ResponsivePopoverContext.Provider value={{ isDrawer }}>

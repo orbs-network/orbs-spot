@@ -29,28 +29,30 @@ export function FetchOrdersDeveloperButtonContent({
 }) {
   const { address } = useConnection();
   const chainId = useDataChainId();
-  const partner = getActiveSpotPartner() || "external";
+  const client = useClient();
+  const exchange = getActiveSpotPartner() || "external";
   const request = useMemo(() => {
     const query = {
       swapper: address ?? "<connected-wallet-address>",
       chainId: chainId ?? 1,
-      partner,
+      exchange,
     };
     const searchParams = new URLSearchParams({
       swapper: query.swapper,
       chainId: String(query.chainId),
-      partner: query.partner,
+      exchange: query.exchange,
     });
 
     return {
       data: {
         method: "GET",
         endpoint: `${ORDER_SINK_URL}/orders`,
+        partner: client.data?.partner ?? getActiveSpotPartner(),
         query,
       } satisfies JsonContainer,
       url: `${ORDER_SINK_URL}/orders?${searchParams.toString()}`,
     };
-  }, [address, chainId, partner]);
+  }, [address, chainId, exchange, client.data?.partner]);
   const rePermitOrders = useMemo(
     () =>
       orders
@@ -84,7 +86,7 @@ export function FetchOrdersDeveloperButtonContent({
         headers: { Accept: "application/json" },
       }}
       description=""
-      explanation="The Request tab shows the actual HTTP GET request used by Order history. The Response tab shows the current raw RePermit orders returned for the connected wallet, chain, and partner. The SDK snippet returns normalized v2 orders; the Response tab shows their raw API records."
+      explanation="The Request tab shows the actual HTTP GET request used by Order history. The Response tab shows the current raw RePermit orders returned for the connected wallet, chain, and exchange. The partner identifies the SDK configuration only. The SDK snippet returns normalized v2 orders; the Response tab shows their raw API records."
       requestResponseTabs
       requiresDeveloperMode={false}
       responseData={responseData}

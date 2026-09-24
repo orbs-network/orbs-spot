@@ -1,5 +1,8 @@
 "use client";
 
+import { getWrappedNativeCurrency } from "@/lib/utils";
+import { InspectOrderLink } from "@/features/eip712-inspector/inspect-order-link";
+
 import { useMutation } from "@tanstack/react-query";
 
 import {
@@ -746,7 +749,7 @@ function LiveOrderFlowModalContent({
   });
 
   useEffect(() => {
-    if (!open || isRunning || step === "success") return;
+    if (!open || isRunning || orderSignature || step === "success") return;
 
     const refreshTimer = window.setTimeout(() => {
       setPermitData((current) =>
@@ -758,7 +761,7 @@ function LiveOrderFlowModalContent({
     }, 0);
 
     return () => window.clearTimeout(refreshTimer);
-  }, [timingPermitData, isRunning, open, step]);
+  }, [timingPermitData, isRunning, open, orderSignature, step]);
 
   const handleTriggerTooltipOpenChange = useCallback((nextOpen: boolean) => {
     if (nextOpen && suppressTriggerTooltipRef.current) return;
@@ -1217,6 +1220,50 @@ function LiveOrderFlowModalContent({
               viewModeAction={
                 <div className="flex w-full min-w-0 flex-wrap items-center justify-between gap-3">
                   <div className="flex min-w-0 flex-1 basis-full flex-wrap items-center gap-2 sm:basis-0">
+                    {(viewedStep === "sign" ||
+                      viewedStep === "submit" ||
+                      viewedStep === "success") && (
+                      <InspectOrderLink
+                        getDraft={() => {
+                          const signed = !isDemo && Boolean(orderSignature);
+                          const unsigned = asRecord(signatureData);
+                          const payload = signed
+                            ? {
+                                domain: permitData.domain,
+                                types: permitData.types,
+                                primaryType: permitData.primaryType,
+                                message: permitData.order,
+                              }
+                            : {
+                                domain: unsigned.domain,
+                                types: unsigned.types,
+                                primaryType: unsigned.primaryType,
+                                message: unsigned.message,
+                              };
+                          const expected = createSignatureData(
+                            timingPermitData,
+                            partner,
+                            currentSourceTokenAddress,
+                          );
+                          const tokens = [
+                            isNativeAddress(spot.derivedFormData.srcToken?.address ?? "")
+                              ? getWrappedNativeCurrency(Number(permitData.domain.chainId))
+                              : spot.derivedFormData.srcToken,
+                            spot.derivedFormData.dstToken,
+                          ]
+                            .filter((token) => token !== undefined)
+                            .map((token) => ({
+                              address: token.address,
+                              symbol: token.symbol,
+                              decimals: token.decimals,
+                            }));
+                          return {
+                            typedData: payload,
+                            context: { expected, tokens, demo: isDemo },
+                          };
+                        }}
+                      />
+                    )}
                     <DeveloperGuideLink
                       baseHref={getSpotDocsHref("/advanced-orders/direct")}
                     >

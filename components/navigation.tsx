@@ -16,6 +16,9 @@ import {
   Code2Icon,
   CopyIcon,
   GithubIcon,
+  EllipsisIcon,
+  ArrowUpRightIcon,
+  ScanLineIcon,
   LogOutIcon,
   WalletIcon,
   SunIcon,
@@ -409,6 +412,50 @@ const NavWalletControls = () => {
   );
 };
 
+function MoreNavigation({ isDeveloperMode }: { isDeveloperMode: boolean }) {
+  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const itemClass = "flex min-h-11 items-center gap-3 rounded-[11px] px-3 py-2 text-sm font-semibold transition-colors hover:bg-secondary/55 focus-visible:bg-secondary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45";
+
+  return (
+    <Popover open={open} onOpenChange={setOpen} responsive={false}>
+      <PopoverTrigger asChild>
+        <NavPillButton aria-label="More" className="w-10 justify-center p-0 sm:w-auto sm:px-3">
+          <EllipsisIcon aria-hidden="true" className="size-4 sm:hidden" />
+          <span className="hidden sm:inline">More</span>
+          <ChevronDownIcon
+            aria-hidden="true"
+            className={cn("hidden size-4 text-muted-foreground transition-transform motion-reduce:transition-none sm:block", open && "rotate-180")}
+          />
+        </NavPillButton>
+      </PopoverTrigger>
+      <PopoverContent align="end" aria-label="More navigation" className="w-60 max-w-[calc(100vw-2rem)] p-2 motion-reduce:animate-none">
+        <Link
+          href={preserveDeveloperModeInHref("/developers/eip712", isDeveloperMode)}
+          aria-current={pathname === "/developers/eip712" ? "page" : undefined}
+          onClick={() => setOpen(false)}
+          className={cn(itemClass, pathname === "/developers/eip712" && "text-primary")}
+        >
+          <ScanLineIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
+          Order preview
+        </Link>
+        <a
+          href="https://github.com/orbs-network/orbs-spot"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="View Orbs Spot on GitHub (opens in a new tab)"
+          onClick={() => setOpen(false)}
+          className={itemClass}
+        >
+          <GithubIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+          GitHub
+          <ArrowUpRightIcon aria-hidden="true" className="ml-auto size-3.5 text-muted-foreground" />
+        </a>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function Navigation({ brand }: { brand: PartnerBrand }) {
   const { isDeveloperMode, setIsDeveloperMode } = useDeveloperMode();
   const { selectedTab } = useSelectedFormTab();
@@ -458,7 +505,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
             </span>
           )}
         </Link>
-        <div className="ml-auto flex w-auto shrink-0 items-center justify-end gap-2">
+        <div className="ml-auto flex w-auto shrink-0 items-center justify-end gap-1.5 sm:gap-2">
           {isDeveloperMode && !isDeveloperGuideRoute && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -491,7 +538,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
             </Tooltip>
           )}
           {!isDeveloperGuideRoute && (
-            <div className="flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3">
+            <div className="flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-2 sm:px-3">
               <label
                 htmlFor="navbar-developer-mode"
                 className="hidden cursor-pointer whitespace-nowrap text-xs font-semibold text-foreground sm:block"
@@ -516,20 +563,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
             </div>
           )}
           {!isDeveloperGuideRoute && <NavWalletControls />}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <a
-                href="https://github.com/orbs-network/orbs-spot"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="View Orbs Spot on GitHub (opens in a new tab)"
-                className={cn(navPillClass, "w-10 shrink-0 justify-center p-0")}
-              >
-                <GithubIcon aria-hidden="true" className="size-4" />
-              </a>
-            </TooltipTrigger>
-            <TooltipContent>View on GitHub</TooltipContent>
-          </Tooltip>
+          <MoreNavigation isDeveloperMode={isDeveloperMode} />
           <ThemeToggle />
         </div>
       </div>
