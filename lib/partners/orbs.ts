@@ -5,7 +5,7 @@ import type { PartnerConfig } from "./types";
 // here because the trading UI uses it for inset panels, rather than accent buttons.
 export const orbsPartner: PartnerConfig = {
   id: "orbs",
-  features: { customConnectModal: true },
+  features: { customConnectModal: false },
   brand: {
     name: "Orbs",
     navWordmark: "Orbs",

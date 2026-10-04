@@ -11,6 +11,7 @@ import {
   rabbyWallet,
   rainbowWallet,
   safeWallet,
+  walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import { useMemo } from "react";
 import { http, type Chain } from "viem";
@@ -127,10 +128,11 @@ export const useWagmiConfig = ({ partnerBrand }: WagmiConfigOptions) => {
           groupName: "Recommended",
           wallets: [
             metaMaskWallet,
-            ...(customConnectModal ? [phantomWallet, rabbyWallet] : []),
+            rabbyWallet,
+            ...(customConnectModal ? [phantomWallet] : []),
             coinbaseWallet,
             rainbowWallet,
-            walletConnectModalWallet,
+            customConnectModal ? walletConnectModalWallet : walletConnectWallet,
           ],
         },
         {

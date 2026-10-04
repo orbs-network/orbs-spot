@@ -96,11 +96,9 @@ Supported values:
 
 Run `yarn dev:orbs` for the Orbs frontend, or set `NEXT_PARTNER=orbs` when building.
 
-Orbs enables the custom wallet chooser with `features.customConnectModal` in
-`lib/partners/orbs.ts`. Set `NEXT_PUBLIC_ORBS_CONNECT_MODAL=false` before starting
-or building to restore the standard RainbowKit picker. This flag has no effect
-on other partners. The chooser uses the configured wallet connectors; email,
-passkey, and social account sign-in are not configured.
+Orbs uses the standard RainbowKit wallet picker. The custom chooser is disabled
+by `features.customConnectModal` in `lib/partners/orbs.ts`. The picker uses the
+configured wallet connectors; email, passkey, and social account sign-in are not configured.
 Orbs includes light and dark themes based on the Orbs website. The frontend uses the
 existing `playground` Liquidity Hub integration and external Spot partner.
 Developer mode, docs links, GitHub links, and developer pages are available only

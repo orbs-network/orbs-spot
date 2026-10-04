@@ -7,7 +7,11 @@ import dynamic from "next/dynamic";
 import { getActiveClientPartnerConfig } from "@/lib/partners/client";
 import { hasOrbsConnectModal } from "@/lib/partners/features";
 
-const OrbsConnectModal = dynamic(() => import("./orbs-connect-modal").then((module) => module.OrbsConnectModal));
+const OrbsConnectModal = dynamic(
+  () => import("./orbs-connect-modal").then((module) => module.OrbsConnectModal),
+  // Load the closed modal without showing the app's full-page fallback.
+  { loading: () => null },
+);
 const WalletConnectionContext = createContext<{ openConnectModal?: () => void }>({});
 const enabled = hasOrbsConnectModal(getActiveClientPartnerConfig());
 
@@ -29,9 +33,9 @@ export function WalletConnectionProvider({ children }: { children: ReactNode }) 
   return (
     <WalletConnectionContext.Provider value={context}>
       {children}
-      {enabled && open && (
+      {enabled && (
         <OrbsConnectModal
-          open={!standard.connectModalOpen && !isConnected}
+          open={open && !standard.connectModalOpen && !isConnected}
           onOpenChange={setOpen}
           onMoreWallets={() => standard.openConnectModal?.()}
           onCloseAutoFocus={(event) => {

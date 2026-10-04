@@ -839,7 +839,7 @@ html[data-partner="orbs"] [data-orbs-connect] {
 html[data-partner="orbs"] [data-connect-brand] { display: flex; align-items: center; gap: 10px; font-size: 20px; letter-spacing: 0.12em; text-transform: uppercase; }
 html[data-partner="orbs"] [data-connect-intro] [data-slot="dialog-title"],
 html[data-partner="orbs"] [data-connect-welcome] {
-  font-size: 40px;
+  font-size: 28px;
   font-weight: 400;
   line-height: 1.15;
   letter-spacing: -0.035em;
@@ -870,7 +870,7 @@ html[data-partner="orbs"] [data-wallet-badge] { padding: 4px 6px; background: va
 @media (max-width: 639px) {
   html[data-partner="orbs"] [data-orbs-connect] { padding: 24px 20px; gap: 24px; }
   html[data-partner="orbs"] [data-connect-intro] [data-slot="dialog-title"],
-  html[data-partner="orbs"] [data-connect-welcome] { font-size: 32px; }
+  html[data-partner="orbs"] [data-connect-welcome] { font-size: 24px; }
   html[data-partner="orbs"] [data-wallet-option] { padding: 12px; gap: 10px; min-height: 56px; font-size: 11px; }
 }
 

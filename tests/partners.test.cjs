@@ -22,7 +22,7 @@ function loadTs(filename, mocks = {}) {
 const { PARTNERS, getPartnerConfig, hasDeveloperTools } = loadTs("lib/partners/config.ts");
 const { getThemeStyles, getPartnerThemeCss } = loadTs("lib/partners/themes.ts");
 
-test("WalletConnect wallet links and QR modal isolate their Core storage namespaces", (t) => {
+test("WalletConnect uses RainbowKit's native QR flow unless the custom picker is enabled", (t) => {
   const previousProjectId = process.env.NEXT_PUBLIC_PROJECT_ID;
   process.env.NEXT_PUBLIC_PROJECT_ID = "test-project";
   t.after(() => {
@@ -30,7 +30,9 @@ test("WalletConnect wallet links and QR modal isolate their Core storage namespa
     else process.env.NEXT_PUBLIC_PROJECT_ID = previousProjectId;
   });
   let connectorParameters;
-  const walletNames = ["coinbaseWallet", "metaMaskWallet", "phantomWallet", "rabbyWallet", "rainbowWallet", "safeWallet"];
+  let customConnectModal = true;
+  const walletNames = ["coinbaseWallet", "metaMaskWallet", "phantomWallet", "rabbyWallet", "rainbowWallet", "safeWallet", "walletConnectWallet"];
+  const walletFactories = Object.fromEntries(walletNames.map(name => [name, () => ({ id: name })]));
   const { useWagmiConfig } = loadTs("lib/wagmi-config.ts", {
     react: { useMemo: callback => callback() },
     "@rainbow-me/rainbowkit": {
@@ -40,10 +42,10 @@ test("WalletConnect wallet links and QR modal isolate their Core storage namespa
         return details => details;
       },
     },
-    "@rainbow-me/rainbowkit/wallets": Object.fromEntries(walletNames.map(name => [name, () => ({ id: name })])),
+    "@rainbow-me/rainbowkit/wallets": walletFactories,
     "./consts": { SUPPORTED_CHAINS: [{ id: 56 }] },
     "./partners/client": { getActiveClientPartnerConfig: () => getPartnerConfig("orbs") },
-    "./partners/features": { hasOrbsConnectModal: () => true },
+    "./partners/features": { hasOrbsConnectModal: () => customConnectModal },
   });
   const config = useWagmiConfig({ partnerBrand: getPartnerConfig("orbs").brand });
   const parameters = config.walletConnectParameters;
@@ -60,6 +62,13 @@ test("WalletConnect wallet links and QR modal isolate their Core storage namespa
 
   modalFactory({ projectId: config.projectId, walletConnectParameters: parameters });
   assert.equal(connectorParameters.walletConnectParameters.customStoragePrefix, firstPrefix, "the QR namespace must stay stable across renders and reloads");
+
+  customConnectModal = false;
+  const nativeConfig = useWagmiConfig({ partnerBrand: getPartnerConfig("orbs").brand });
+  assert.ok(nativeConfig.wallets[0].wallets.includes(walletFactories.rabbyWallet));
+  assert.equal(nativeConfig.wallets[0].wallets.at(-1), walletFactories.walletConnectWallet,
+    "the standard picker must use RainbowKit's embedded QR code instead of opening a second modal");
+  assert.equal(nativeConfig.walletConnectParameters.customStoragePrefix, parameters.customStoragePrefix);
 });
 
 test("Orbs resolves independently from the default playground", () => {
@@ -114,7 +123,8 @@ test("Orbs explicit dark theme reaches CSS and wallet tokens without changing it
 const { hasOrbsConnectModal } = loadTs("lib/partners/features.ts");
 test("the custom wallet picker is enabled only by the Orbs feature flag", () => {
   const orbs = getPartnerConfig("orbs");
-  assert.equal(hasOrbsConnectModal(orbs, "true"), true);
+  assert.equal(hasOrbsConnectModal(orbs, "true"), false);
+  assert.equal(hasOrbsConnectModal({ ...orbs, features: { customConnectModal: true } }, "true"), true);
   assert.equal(hasOrbsConnectModal(orbs, "false"), false);
   assert.equal(hasOrbsConnectModal({ ...orbs, features: { customConnectModal: false } }, "true"), false);
   assert.equal(hasOrbsConnectModal({ ...orbs, features: undefined }, "true"), false);

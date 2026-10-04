@@ -12,7 +12,6 @@ import { QueryProvider } from "./query-provider";
 import { useWagmiConfig } from "./wagmi-config";
 import { WalletReturnReconnect } from "@/features/wallet-connection/return-reconnect";
 import { WalletConnectionProvider } from "@/features/wallet-connection/provider";
-import { getOrbsWalletColors } from "@/features/wallet-connection/orbs-theme";
 import { IS_ORBS } from "./partners/client";
 
 const AppProvider = dynamic(
@@ -68,6 +67,8 @@ export function Providers({
   const [queryClient] = useState(createQueryClient);
   const { theme } = useTheme();
   const walletTheme = useMemo(() => {
+    if (IS_ORBS) return (theme === "dark" ? darkTheme : lightTheme)();
+
     const themeStyles = getThemeStyles(partnerStyles, theme);
     const walletTheme = (theme === "dark" ? darkTheme : lightTheme)({
       accentColor: themeStyles.colors.primary,
@@ -83,13 +84,6 @@ export function Providers({
       walletTheme.colors.modalText = themeStyles.colors.foreground;
       walletTheme.colors.modalTextSecondary = themeStyles.colors.mutedForeground;
     }
-    if (IS_ORBS) {
-      walletTheme.colors = getOrbsWalletColors(themeStyles);
-      walletTheme.shadows = {
-        connectButton: "none", dialog: "none", profileDetailsAction: "none",
-        selectedOption: "none", selectedWallet: "none", walletLogo: "none",
-      };
-    }
     return walletTheme;
   }, [partnerStyles, theme]);
   useEffect(() => {
@@ -104,7 +98,7 @@ export function Providers({
             <WalletReturnReconnect />
             <RainbowKitProvider
               theme={walletTheme}
-              modalSize={partnerStyles.radius === "0rem" ? "compact" : "wide"}
+              modalSize={IS_ORBS || partnerStyles.radius !== "0rem" ? "wide" : "compact"}
             >
               <WalletConnectionProvider>
                 <AppProvider>
