@@ -427,16 +427,16 @@ export function getFirstAndLastLetter(symbol?: string): string {
 
 
 export const toAmountWei = (value?: string, decimals?: number) => {
-  if (!decimals || !value) return "0";
+  if (decimals === undefined || !Number.isInteger(decimals) || decimals < 0 || decimals > 255 || !value) return "0";
+  if (!/^\d+(?:\.\d*)?$/.test(value)) return "0";
   return parseUnits(value, decimals).toString();
 };
 
 export const toAmountUI = (value?: string, decimals?: number) => {
  try {
-  if (!decimals || !value) return "0";
+  if (decimals === undefined || !Number.isInteger(decimals) || decimals < 0 || decimals > 255 || !value) return "0";
   return formatUnits(BigInt(value), decimals);
- // eslint-disable-next-line @typescript-eslint/no-unused-vars
- } catch (error) {
+ } catch {
   return "0";
  }
 };

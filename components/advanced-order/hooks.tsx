@@ -128,7 +128,7 @@ export function useWalletInteractions() {
         const wrappedAddress = getWrappedNativeCurrency(
           walletClient?.chain.id,
         )?.address;
-        if (wrappedAddress) setPendingWrappedInputAddress(wrappedAddress);
+        if (wrappedAddress && walletClient) setPendingWrappedInputAddress(wrappedAddress, { chainId: walletClient.chain.id, account: walletClient.account.address });
         void refetchBalances().catch(() => undefined);
         return hash;
       },

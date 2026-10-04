@@ -4,7 +4,7 @@ const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { test } = require('node:test');
 const ts = require('typescript');
-const code = ts.transpileModule(readFileSync(resolve(__dirname, '../components/developer-tools/flow-navigation.ts'), 'utf8'), {
+const code = ts.transpileModule(readFileSync(resolve(__dirname, '../features/developer-tools/flow-navigation.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 const helpers = {};

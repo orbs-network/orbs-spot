@@ -89,6 +89,7 @@ const PopularTokens = ({
         <DialogClose key={c.address} asChild>
           <button
             type="button"
+            data-popular-token
             className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-border/60 bg-secondary p-3 transition-colors hover:border-primary/25 hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
             onClick={() => onCurrencyChange(c)}
             aria-label={`Select ${formatTokenName(c.name) || formatTokenSymbol(c.symbol)}`}
@@ -118,7 +119,7 @@ const SearchInput = ({
   value: string;
 }) => {
   return (
-    <div className="p-3">
+    <div className="px-3 pt-1 pb-3">
       <Input
         type="text"
         aria-label="Search tokens"
@@ -203,7 +204,7 @@ const CurrencySelectorContent = ({
       presentation="center"
       className="!flex max-h-[88dvh] flex-col gap-2 overflow-hidden p-0 sm:!max-w-[440px]"
     >
-      <DialogHeader className="p-3 pt-5 pb-2">
+      <DialogHeader className="p-3 pt-5 pb-0">
         <DialogTitle>Select a token</DialogTitle>
       </DialogHeader>
       <SearchInput onChange={setSearch} value={search} />
@@ -392,6 +393,7 @@ const CurrencyItem = memo(function CurrencyItem({
     <DialogClose asChild>
       <button
         type="button"
+        data-token-option
         className="group mx-3 mb-2 flex w-[calc(100%-1.5rem)] cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 text-left transition-colors hover:border-primary/14 hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 data-[highlighted]:bg-primary/6"
         onClick={() => onCurrencyChange(currency)}
       >

@@ -17,6 +17,7 @@ function load(file, dependencies) {
   }).outputText;
   vm.runInNewContext(code, { exports, require: (id) => {
     if (Object.hasOwn(dependencies, id)) return dependencies[id];
+    if (id === '@/lib/spot/queries') return load('lib/spot/queries.ts', {});
     if (id.startsWith('.') || id.startsWith('@/')) throw new Error(`Unmocked dependency: ${id}`);
     return require(id);
   } });
@@ -44,20 +45,29 @@ test('missing approval amount rejects before an execution allowance read', async
 });
 
 function historyFixture() {
-  const state = { orders: [], address: '0xaaaa', open: false, refetches: 0, notifications: [], queries: [] };
+  const state = { orders: [], address: '0xaaaa', chainId: 56, open: false, refetches: 0, notifications: [], queries: [], invalidated: [], cancellationWatches: [], mutation: undefined };
   const previous = { current: undefined };
   const hooks = load('components/advanced-order/use-order-client.ts', {
     react: { useMemo: (fn) => fn(), useRef: () => previous, useEffect: (fn) => fn() },
     '@tanstack/react-query': { useQuery: (options) => {
       state.queries.push(options);
       return { data: options.queryKey[0] === 'spot-orders' ? state.orders : {} };
-    } },
+    },
+      useQueryClient: () => ({ invalidateQueries: async ({ queryKey }) => { state.invalidated.push(Array.from(queryKey)); } }),
+      useMutation: options => { state.mutation = options; return {}; },
+    },
     wagmi: { useConnection: () => ({ address: state.address }) },
     sonner: { toast: { success: (message) => state.notifications.push(message) } },
-    '@/lib/hooks/use-data-chain-id': { useDataChainId: () => 56 },
+    '@/lib/hooks/use-data-chain-id': { useDataChainId: () => state.chainId },
+    '@/lib/consts': { SPOT_CHAINS: [{ id: 56 }, { id: 4663 }] },
     '@/lib/hooks/store': { useFormTabStore: (selector) => selector({ orderHistoryOpen: state.open }) },
     '@/lib/partners/spot': { getActiveSpotPartner: () => 'partner' },
-    '@/lib/spot/cancellation': {}, '@/lib/spot/history': {}, '@/lib/tx-rejection': {}, './constants': {}, './hooks': {},
+    '@/lib/spot/cancel-status': { watchCancelledOrder: (_, scope) => {
+      state.cancellationWatches.push(scope);
+      return { finished: state.refreshFinished ?? Promise.resolve() };
+    } },
+    '@/lib/spot/use-order-cancelling': { useOrderCancelling: () => false },
+    '@/lib/spot/cancellation': {}, '@/lib/spot/history': {}, '@/lib/tx-rejection': {}, './constants': {}, './hooks': { useWalletInteractions: () => ({}) },
     '@/lib/hooks/use-balances': { useBalances: () => ({ refetch: async () => { state.refetches++; } }) },
   });
   return { state, ...hooks };
@@ -66,18 +76,18 @@ function historyFixture() {
 test('one history update refreshes balances once even when multiple orders fill', () => {
   const f = historyFixture();
   f.state.orders = ['first', 'second'].map((historyKey) => ({ historyKey, status: sdk.OrderStatus.Open, srcAmountFilled: '0' }));
-  f.useHistoryNotifications();
+  f.useHistoryNotifications(f.state.orders);
   assert.equal(f.state.refetches, 0);
   f.state.orders = f.state.orders.map((order) => ({ ...order, status: sdk.OrderStatus.Completed, srcAmountFilled: '100' }));
-  f.useHistoryNotifications();
+  f.useHistoryNotifications(f.state.orders);
   assert.equal(f.state.refetches, 1);
   assert.equal(f.state.notifications.length, 2);
-  f.useHistoryNotifications();
+  f.useHistoryNotifications(f.state.orders);
   assert.equal(f.state.refetches, 1);
   assert.equal(f.state.notifications.length, 2);
   f.state.address = '0xbbbb';
   f.state.orders = f.state.orders.map((order) => ({ ...order, srcAmountFilled: '200' }));
-  f.useHistoryNotifications();
+  f.useHistoryNotifications(f.state.orders);
   assert.equal(f.state.refetches, 1);
 });
 
@@ -92,6 +102,50 @@ test('history cache keys match the request scope and polling stays limited to th
   query = f.state.queries.at(-1);
   assert.equal(query.refetchInterval, 10_000);
   assert.equal(query.refetchIntervalInBackground, false);
+});
+
+test('all-network history disables redundant single-network reads', () => {
+  const f = historyFixture();
+  f.useOrders(false);
+  assert.ok(f.state.queries.every(query => query.enabled === false));
+});
+
+test('confirmed cancellation watches the original order scope even after the wallet changes', async () => {
+  const f = historyFixture();
+  f.useCancelOrder({ chainId: 8453 });
+  f.state.address = '0xBBBB';
+  f.state.chainId = 56;
+  const result = { chainId: 8453, partner: 'partner', account: '0xABCD', historyKey: '2:8453:order' };
+  await f.state.mutation.onSuccess(result);
+  assert.deepEqual(f.state.cancellationWatches, [result]);
+  assert.deepEqual(f.state.invalidated, [
+    ['balances', 8453, '0xabcd'],
+  ]);
+});
+
+test('cancellation loading waits for the status refresh to finish', async () => {
+  const f = historyFixture();
+  let finish = () => {};
+  f.state.refreshFinished = new Promise(resolve => { finish = resolve; });
+  f.useCancelOrder({ chainId: 56, historyKey: '2:56:target' });
+  assert.deepEqual(Array.from(f.state.mutation.mutationKey), ['spot-cancellation', 'partner', 56, '0xaaaa', '2:56:target']);
+  let settled = false;
+  const success = f.state.mutation.onSuccess({ chainId: 56, partner: 'partner', account: '0xaaaa', historyKey: '2:56:target' }).then(() => { settled = true; });
+  await Promise.resolve();
+  assert.equal(settled, false);
+  finish();
+  await success;
+  assert.equal(settled, true);
+});
+
+test('swap-only networks do not initialize an unsupported advanced-order client', () => {
+  const f = historyFixture();
+  for (const [chainId, enabled] of [[56, true], [4663, true], [1101, false], [250, false], [81457, false]]) {
+    f.state.chainId = chainId;
+    f.useClient();
+    assert.equal(f.state.queries.at(-1).enabled, enabled);
+    assert.equal(f.state.queries.at(-1).queryKey[2], chainId);
+  }
 });
 
 function executionFixture() {
@@ -158,26 +212,44 @@ test('the shared execution state disables every submit button while an order is 
 test('Swap does not mount the advanced form or its subscriptions', () => {
   let selectedTab = 'swap';
   let mounts = 0;
+  let historyMounts = 0;
+  let historyOpen = false;
+  let partnerId = 'playground';
   const { TradingForm } = load('components/trading-form.tsx', {
     '@/components/advanced-order-form': { AdvancedOrderForm: () => { mounts++; return null; } },
     '@/components/best-trade-form': { SwapBestTradeForm: () => null },
     '@/components/form-container': { FormContainer: ({ children }) => children },
+    '@/components/order-history-modal': { OrderHistoryModal: () => { historyMounts++; return null; } },
+    '@/components/trading-sidebar': { TradingSidebar: () => null },
+    '@/lib/hooks/store': { useFormTabStore: (select) => select({ orderHistoryOpen: historyOpen, setOrderHistoryOpen: () => {} }) },
+    '@/lib/partners/client': { get IS_ORBS() { return partnerId === 'orbs'; } },
     '@/lib/hooks/use-form-tab': { useSelectedFormTab: () => ({ selectedTab: { value: selectedTab } }) },
     '@/lib/types': { FormTab: { SWAP: 'swap' } },
   });
   renderToStaticMarkup(react.createElement(TradingForm));
   assert.equal(mounts, 0);
+  assert.equal(historyMounts, 0);
+  historyOpen = true;
+  renderToStaticMarkup(react.createElement(TradingForm));
+  assert.equal(mounts, 0);
+  assert.equal(historyMounts, 1);
+  historyOpen = false;
   selectedTab = 'twap';
   renderToStaticMarkup(react.createElement(TradingForm));
   assert.equal(mounts, 1);
+  assert.equal(historyMounts, 2);
+  partnerId = 'orbs';
+  historyOpen = true;
+  renderToStaticMarkup(react.createElement(TradingForm));
+  assert.equal(historyMounts, 2, 'Orbs history is a page and must never mount the modal');
 });
 
 
 test('history shows an unknown amount as a placeholder while preserving actual zero', () => {
-  const source = fs.readFileSync(path.resolve(__dirname, '../components/order-history-modal.tsx'), 'utf8');
+  const source = fs.readFileSync(path.resolve(__dirname, '../features/order-history/format.ts'), 'utf8');
   const ast = ts.createSourceFile('history.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const formatter = ast.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === 'formatTokenValue');
-  const compiled = ts.transpileModule(formatter.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  const compiled = ts.transpileModule(formatter.getText(ast).replace(/^export /, ""), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   const format = new Function('formatDisplayNumber', `${compiled}; return formatTokenValue;`)((value) => value);
   assert.equal(format('', 'USDC'), '-');
   assert.equal(format(undefined, 'USDC'), '-');

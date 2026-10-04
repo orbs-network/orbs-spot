@@ -20,6 +20,7 @@ export function InlineMessage({
 }) {
   return (
     <div
+      data-inline-message={variant}
       className={cn(
         "flex gap-2 rounded-[14px] border p-3",
         messageVariants[variant],

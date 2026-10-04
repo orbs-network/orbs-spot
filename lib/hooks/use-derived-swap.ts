@@ -22,6 +22,7 @@ export const useDerivedSwap = () => {
 
   const {
     data: trade,
+    error: quoteError,
     isLoading: isLoadingTrade,
     refetch: refetchTrade,
     usesLiquidityHubQuote,
@@ -38,13 +39,13 @@ export const useDerivedSwap = () => {
       Boolean(inputCurrency && outputCurrency) &&
       !isLoadingTrade &&
       BN(parsedInputAmount ?? "0").gt(0) &&
-      BN(trade?.outAmount ?? "0").isZero(),
+      trade !== undefined && BN(trade.outAmount).isZero(),
     [
       inputCurrency,
       isLoadingTrade,
       outputCurrency,
       parsedInputAmount,
-      trade?.outAmount,
+      trade,
       usesLiquidityHubQuote,
     ]
   );
@@ -58,6 +59,7 @@ export const useDerivedSwap = () => {
       trade,
       isLoadingTrade,
       noLiquidity,
+      quoteError,
       refetchTrade,
       outputAmount,
       usesLiquidityHubQuote,
@@ -67,6 +69,7 @@ export const useDerivedSwap = () => {
       inputCurrency,
       isLoadingTrade,
       noLiquidity,
+      quoteError,
       outputAmount,
       outputCurrency,
       parsedInputAmount,

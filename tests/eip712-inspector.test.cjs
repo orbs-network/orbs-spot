@@ -107,7 +107,7 @@ test("validates arrays recursively and enforces fixed lengths and bytes size", (
 function order() {
   // Reuse the documented order schema; no network/wallet access is needed.
   const source = readFileSync(
-    resolve(__dirname, "../components/developer-tools/code-examples.ts"),
+    resolve(__dirname, "../features/developer-tools/snippets/code-examples.ts"),
     "utf8",
   );
   const start = source.indexOf("export const PERMIT_DATA_RESPONSE =");

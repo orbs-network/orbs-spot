@@ -13,6 +13,7 @@ import { TokenSelectorTrigger } from "@/components/ui/token-selector-trigger";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { useFormatNumber } from "@/lib/hooks/common";
 import { useCurrency } from "@/lib/hooks/use-currencies";
+import { useCurrenciesQuery } from "@/lib/hooks/use-currencies-query";
 import { useTranslations } from "@/lib/use-translations";
 import { Currency, Field } from "@/lib/types";
 import { cn, formatDecimals } from "@/lib/utils";
@@ -34,6 +35,7 @@ export function PriceTokenSelector({
   token?: Token;
 }) {
   const currency = useCurrency(token?.address);
+  const { isLoading: tokensLoading } = useCurrenciesQuery();
   const { handleCurrencyChange } = useActionHandlers();
   const onCurrencyChange = useCallback(
     (currency: Currency) => handleCurrencyChange(currency.address, field),
@@ -47,6 +49,7 @@ export function PriceTokenSelector({
         <TokenSelectorTrigger
           aria-label="Select price token"
           currency={currency}
+          isLoading={tokensLoading}
           symbol={token?.symbol}
           logoUrl={token?.logoUrl || currency?.logoUrl}
           className={cn(
@@ -85,8 +88,9 @@ function SpotPriceInput({
   const usdFormatted = useFormatNumber({ value: usd, decimalScale: 2 });
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_90px] gap-2">
+    <div data-spot-price-input className="grid grid-cols-[minmax(0,1fr)_90px] gap-2">
       <FormNumberField
+        data-spot-price-value
         className="flex min-w-0 items-center gap-3 rounded-[12px] border border-border/80 bg-transparent px-3 py-2 text-foreground transition-colors focus-within:border-primary"
       >
         <PriceTokenSelector

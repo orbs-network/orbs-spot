@@ -1,3 +1,4 @@
+import { validPercent } from "../percent-settings";
 import type { OrderInput } from "@/lib/spot/form";
 import { ExecutionPhase, type ExecutionSnapshot } from "@/lib/spot/execution";
 import { SwapStatus } from "@orbs-network/swap-ui";
@@ -47,9 +48,9 @@ export const useUserStore = create<UserStore>()(
           },
         })),
       setSlippage: (slippage: number, mode = "custom") =>
-        set({ slippage, slippageMode: mode }),
+        set((state) => validPercent(slippage) ? { slippage, slippageMode: mode } : state),
       setPriceProtection: (priceProtection: number, mode = "custom") =>
-        set({ priceProtection, priceProtectionMode: mode }),
+        set((state) => validPercent(priceProtection) ? { priceProtection, priceProtectionMode: mode } : state),
     }),
     {
       name: "swap-store",
@@ -118,7 +119,8 @@ export const useFormTabStore = create<FormTabStore>((set) => ({
 type OrderSubmitFlowStore = {
   execution: ExecutionSnapshot;
   pendingWrappedInputAddress?: string;
-  setPendingWrappedInputAddress: (address?: string) => void;
+  pendingWrappedContext?: { chainId: number; account: string };
+  setPendingWrappedInputAddress: (address?: string, context?: { chainId: number; account: string }) => void;
 };
 
 // Wrapping finishes while the submit dialog is still rendering the original
@@ -127,11 +129,12 @@ type OrderSubmitFlowStore = {
 export const useOrderSubmitFlowStore = create<OrderSubmitFlowStore>((set) => ({
   execution: { phase: ExecutionPhase.IDLE },
   pendingWrappedInputAddress: undefined,
-  setPendingWrappedInputAddress: (pendingWrappedInputAddress) =>
-    set({ pendingWrappedInputAddress }),
+  setPendingWrappedInputAddress: (pendingWrappedInputAddress, pendingWrappedContext) =>
+    set({ pendingWrappedInputAddress, pendingWrappedContext }),
 }));
 
 type BestTradeSwapStore = {
+  review?: { inputCurrency: Currency; outputCurrency: Currency; inputAmount: string; outputAmount: string; chainId: number };
   status?: SwapStatus;
   totalSteps?: number;
   currentStep?: SwapStep;
@@ -151,5 +154,6 @@ export const useBestTradeSwapStore = create<BestTradeSwapStore>((set) => ({
       currentStep: undefined,
       currentStepIndex: undefined,
       txHash: undefined,
+      review: undefined,
     }),
 }));

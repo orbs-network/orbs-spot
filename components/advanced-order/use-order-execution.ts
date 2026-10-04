@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { CREATE_ORDER_TOAST_ID } from "./constants";
 import { useConnection } from "wagmi";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { invalidateOrderQueries } from "@/lib/spot/queries";
 import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
 import { getWrappedNativeCurrency } from "@/lib/utils";
 import {
@@ -113,19 +114,7 @@ export function useExecution() {
       toast.success("Order placed", { id: CREATE_ORDER_TOAST_ID });
       // A refresh failure must not turn an accepted order into a failed submission.
       // Use the submitted wallet scope, even if the user has since switched accounts.
-      void Promise.allSettled([
-        queryClient.invalidateQueries({
-          queryKey: ["balances", result.chainId, result.account.toLowerCase()],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: [
-            "spot-orders",
-            result.partner,
-            result.chainId,
-            result.account.toLowerCase(),
-          ],
-        }),
-      ]);
+      void invalidateOrderQueries(queryClient, result);
     },
   });
   return {

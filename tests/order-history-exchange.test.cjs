@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 
 for (const build of ['CommonJS', 'ES module']) {
-  test(`${build} history always filters both endpoints by configured exchange`, async (t) => {
+  test(`${build} history uses only v2 and preserves account, chain, exchange and cancellation scope`, async (t) => {
     const sdk = build === 'CommonJS'
       ? require('@orbs-network/spot-ui')
       : await import('@orbs-network/spot-ui');
@@ -16,8 +16,10 @@ for (const build of ['CommonJS', 'ES module']) {
       [sdk.Partners.External, 137, '0x2222222222222222222222222222222222222222'],
     ]) {
       const requests = [];
+      let failV2 = false;
       global.fetch = async (input, options) => {
         const url = new URL(input);
+        if (url.hostname === 'bi.orbs.network') return { ok: true };
         if (url.pathname === '/config') {
           assert.equal(url.searchParams.get('partner'), partner);
           assert.equal(url.searchParams.get('chain'), String(chainId));
@@ -32,14 +34,17 @@ for (const build of ['CommonJS', 'ES module']) {
         });
         assert.equal(options.signal, signal);
         requests.push(url.hostname);
-        // A failed primary endpoint must still allow the fallback to return history.
-        return url.hostname === 'order-sink-v2.orbs.network'
+        assert.equal(url.hostname, 'order-sink-v2.orbs.network');
+        return failV2
           ? { ok: false, status: 503 }
           : { ok: true, json: async () => ({ orders: [] }) };
       };
       const client = await sdk.createClient(partner, chainId);
-      assert.deepEqual(await client.getAccountOrders({ account, signal, legacyOrders: false }), []);
-      assert.deepEqual(requests.sort(), ['order-sink-v2.orbs.network', 'order-sink.orbs.network']);
+      assert.deepEqual(await client.getAccountOrders({ account, signal, legacyOrders: false, getv1orders: false }), []);
+      assert.deepEqual(requests, ['order-sink-v2.orbs.network']);
+      failV2 = true;
+      await assert.rejects(client.getAccountOrders({ account, signal, legacyOrders: false, getv1orders: false }), /503/);
+      assert.deepEqual(requests, ['order-sink-v2.orbs.network', 'order-sink-v2.orbs.network']);
     }
   });
 }

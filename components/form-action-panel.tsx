@@ -11,6 +11,7 @@ export function FormActionPanel({
 }) {
   return (
     <FormPanel
+      data-form-action-panel
       variant="muted"
       className={cn(
         "flex w-full flex-col gap-3",

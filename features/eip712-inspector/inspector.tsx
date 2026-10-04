@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeftIcon, BracesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { preserveDeveloperModeInHref, useDeveloperMode } from "@/components/developer-tools/use-developer-mode";
+import { preserveDeveloperModeInHref, useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 import {
   Dialog,
   DialogContent,
@@ -109,7 +109,7 @@ export function Eip712Inspector() {
     setBusy(true);
     try {
       const { PERMIT_DATA_RESPONSE } =
-        await import("@/components/developer-tools/code-examples");
+        await import("@/features/developer-tools/snippets/code-examples");
       if (current !== revision.current) return;
       const example = structuredClone(PERMIT_DATA_RESPONSE);
       const now = Math.floor(Date.now() / 1000);

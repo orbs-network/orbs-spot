@@ -78,6 +78,9 @@ export default function RootLayout({
   return (
     <html lang="en" data-partner={partner.id} className={getDefaultTheme(partner.styles)} suppressHydrationWarning>
       <head>
+        {partner.id === "orbs" && (
+          <link rel="preload" href="/fonts/orbs-montserrat-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        )}
         <style dangerouslySetInnerHTML={{ __html: getPartnerThemeCss(partner.styles) }} />
         <script dangerouslySetInnerHTML={{ __html: `try{const t=localStorage.getItem("orbs-color-theme");if(t==="light"||t==="dark")document.documentElement.className=t;}catch{}` }} />
       </head>

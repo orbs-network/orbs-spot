@@ -10,10 +10,7 @@ on:
         default: default
         options:
           - default
-          - crymbo
-          - efficient-frontier
-          - ginco
-          - ht-digital
+          - orbs
           - all
 
 permissions:
@@ -30,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        frontend_project: ${{ fromJSON(inputs.frontend_project == 'all' && '["default","crymbo","efficient-frontier","ginco","ht-digital"]' || format('["{0}"]', inputs.frontend_project)) }}
+        frontend_project: ${{ fromJSON(inputs.frontend_project == 'all' && '["default","orbs"]' || format('["{0}"]', inputs.frontend_project)) }}
     steps:
       - uses: actions/checkout@v4
 
@@ -48,14 +45,14 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Validate
+        run: yarn lint && yarn typecheck && yarn test
+
       - name: Resolve deploy target
         env:
           FRONTEND_PROJECT: ${{ matrix.frontend_project }}
-          VERCEL_PROJECT_ID_DEFAULT: ${{ secrets.VERCEL_PROJECT_ID_DEFAULT || secrets.VERCEL_PROJECT_ID }}
-          VERCEL_PROJECT_ID_CRYMBO: ${{ secrets.VERCEL_PROJECT_ID_CRYMBO }}
-          VERCEL_PROJECT_ID_EFFICIENT_FRONTIER: ${{ secrets.VERCEL_PROJECT_ID_EFFICIENT_FRONTIER }}
-          VERCEL_PROJECT_ID_GINCO: ${{ secrets.VERCEL_PROJECT_ID_GINCO }}
-          VERCEL_PROJECT_ID_HT_DIGITAL: ${{ secrets.VERCEL_PROJECT_ID_HT_DIGITAL }}
+          VERCEL_PROJECT_ID_DEFAULT: ${{ vars.VERCEL_PROJECT_ID_DEFAULT }}
+          VERCEL_PROJECT_ID_ORBS: ${{ vars.VERCEL_PROJECT_ID_ORBS }}
         run: |
           set -euo pipefail
 
@@ -64,21 +61,9 @@ jobs:
               next_partner="default"
               project_id="$VERCEL_PROJECT_ID_DEFAULT"
               ;;
-            crymbo)
-              next_partner="crymbo"
-              project_id="$VERCEL_PROJECT_ID_CRYMBO"
-              ;;
-            efficient-frontier)
-              next_partner="efficient-frontier"
-              project_id="$VERCEL_PROJECT_ID_EFFICIENT_FRONTIER"
-              ;;
-            ginco)
-              next_partner="ginco"
-              project_id="$VERCEL_PROJECT_ID_GINCO"
-              ;;
-            ht-digital)
-              next_partner="ht-digital"
-              project_id="$VERCEL_PROJECT_ID_HT_DIGITAL"
+            orbs)
+              next_partner="orbs"
+              project_id="$VERCEL_PROJECT_ID_ORBS"
               ;;
             *)
               echo "Unknown frontend project: $FRONTEND_PROJECT" >&2
@@ -87,7 +72,7 @@ jobs:
           esac
 
           if [ -z "$project_id" ]; then
-            echo "Missing Vercel project id secret for frontend project: $FRONTEND_PROJECT" >&2
+            echo "Missing Vercel project id variable for frontend project: $FRONTEND_PROJECT" >&2
             exit 1
           fi
 

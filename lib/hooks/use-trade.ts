@@ -8,8 +8,8 @@ import {
   isNativeAddress,
 } from "../utils";
 import { useDataChainId } from "./use-data-chain-id";
-import { useDeveloperMode } from "@/components/developer-tools/use-developer-mode";
-import { DEMO_ACCOUNT } from "@/components/developer-tools/demo-order";
+import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
+import { DEVELOPER_PREVIEW_ACCOUNT } from "./use-developer-mode";
 import { useConnection } from "wagmi";
 import { useSwapStore } from "./store";
 import { useMemo } from "react";
@@ -40,7 +40,7 @@ const useQuoteLiquidityHub = (
   const dataChainId = useDataChainId();
   const { isDeveloperMode } = useDeveloperMode();
   const chainId = walletChainId ?? (isDeveloperMode ? dataChainId : undefined);
-  const account = address ?? (isDeveloperMode ? DEMO_ACCOUNT : undefined);
+  const account = address ?? (isDeveloperMode ? DEVELOPER_PREVIEW_ACCOUNT : undefined);
   const inputCurrencyAddress = inputCurrency?.address ?? "";
   const outputCurrencyAddress = outputCurrency?.address ?? "";
   return useQuery<BestTradeQuote>({
@@ -54,6 +54,9 @@ const useQuoteLiquidityHub = (
       slippage,
     ],
     queryFn: async ({ signal }) => {
+      if (!chainId || !account || !inputCurrency || !outputCurrency || !BN(parsedInputAmount).gt(0)) {
+        throw new Error("Connect a wallet and enter an amount before requesting a quote");
+      }
       const quote = await liquidityHub.getQuote({
         fromToken: isNativeAddress(inputCurrencyAddress)
           ? getWrappedNativeCurrency(chainId!)?.address ?? ""
@@ -79,6 +82,9 @@ const useQuoteLiquidityHub = (
         originalQuote: quote,
       };
     },
+    // Several controls observe this query. Reuse the quote between polling ticks
+    // instead of refetching whenever another consumer mounts.
+    staleTime: 10_000,
     refetchInterval: (it) => {
       if (stopQuoteLiquidityHub(it.state.error?.message)) {
         return false;
@@ -93,6 +99,8 @@ const useQuoteLiquidityHub = (
     },
     enabled:
       enabled &&
+      !pauseQuote &&
+      !!account &&
       !!inputCurrencyAddress &&
       !!outputCurrencyAddress &&
       BN(parsedInputAmount).gt(0) &&
@@ -115,6 +123,7 @@ export const useTrade = (
 
   return useMemo(
     () => ({
+      error: isSwapTab ? liquidityHubQuote.error : null,
       isLoading: isSwapTab ? liquidityHubQuote.isLoading : false,
       refetch: liquidityHubQuote.refetch,
       data: isSwapTab ? liquidityHubQuote.data : undefined,
@@ -123,6 +132,7 @@ export const useTrade = (
     [
       isSwapTab,
       liquidityHubQuote.data,
+      liquidityHubQuote.error,
       liquidityHubQuote.isLoading,
       liquidityHubQuote.refetch,
     ]

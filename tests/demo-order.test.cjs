@@ -5,7 +5,7 @@ const { resolve } = require('node:path');
 const { test } = require('node:test');
 const ts = require('typescript');
 const sdk = require('@orbs-network/spot-ui');
-const code = ts.transpileModule(readFileSync(resolve(__dirname, '../components/developer-tools/demo-order.ts'), 'utf8'), {
+const code = ts.transpileModule(readFileSync(resolve(__dirname, '../features/developer-tools/demo-order.ts'), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText;
 const helpers = {};
@@ -33,7 +33,7 @@ test('demo never makes missing market data ready', () => {
 });
 
 // Exercise the actual event handler with wallet/network functions that must not run.
-const modalSource = readFileSync(resolve(__dirname, '../components/developer-tools/live-order-flow-modal.tsx'), 'utf8');
+const modalSource = readFileSync(resolve(__dirname, '../features/developer-tools/live-order-flow-modal.tsx'), 'utf8');
 const ast = ts.createSourceFile('flow.tsx', modalSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 let handler;
 function visit(node) {

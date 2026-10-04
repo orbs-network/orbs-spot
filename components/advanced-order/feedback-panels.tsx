@@ -10,6 +10,7 @@ import {
 } from "@orbs-network/spot-ui";
 import { AlertTriangleIcon, InfoIcon } from "lucide-react";
 import { formatInputError } from "./utils";
+import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 
 export function InputErrorPanel() {
   const t = useTranslations();
@@ -40,6 +41,7 @@ export function InputErrorPanel() {
 export function DisclaimerPanel() {
   const t = useTranslations();
   const disclaimer = useDisclaimer();
+  const { isDeveloperToolsAvailable } = useDeveloperMode();
 
   if (!disclaimer) {
     return null;
@@ -53,14 +55,14 @@ export function DisclaimerPanel() {
     >
       <p className="flex-1 text-[14px] text-muted-foreground">
         {t(disclaimer)}{" "}
-        <a
+        {isDeveloperToolsAvailable && <a
           href={ORBS_TWAP_FAQ_URL}
           target="_blank"
           rel="noopener noreferrer"
           className="font-semibold text-primary"
         >
           Learn more
-        </a>
+        </a>}
       </p>
     </InlineMessage>
   );

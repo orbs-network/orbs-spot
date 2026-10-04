@@ -1,4 +1,12 @@
 export type PartnerStyles = {
+  themeOverrides?: Partial<
+    Record<
+      "light" | "dark",
+      Partial<Omit<PartnerStyles, "themeOverrides" | "colors">> & {
+        colors?: Partial<PartnerStyles["colors"]>;
+      }
+    >
+  >;
   radius: string;
   fontFamily: string;
   selectedTabBackground?: string;
@@ -57,6 +65,7 @@ export type PartnerStyles = {
 
 export type PartnerBrand = {
   name: string;
+  navWordmark?: string;
   logoSrc?: string;
   navLogoClassName?: string;
   iconSrc?: string;
@@ -72,6 +81,9 @@ export type PartnerBrand = {
 
 export type PartnerConfig = {
   id: string;
+  features?: {
+    customConnectModal?: boolean;
+  };
   brand: PartnerBrand;
   styles: PartnerStyles;
 };

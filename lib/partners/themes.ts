@@ -8,6 +8,10 @@ export function getDefaultTheme(styles: PartnerStyles): "light" | "dark" {
 }
 
 export function getThemeStyles(styles: PartnerStyles, theme: "light" | "dark"): PartnerStyles {
+  const override = styles.themeOverrides?.[theme];
+  if (override) {
+    return { ...styles, ...override, colors: { ...styles.colors, ...override.colors } };
+  }
   if (theme === getDefaultTheme(styles)) return styles;
   const light = theme === "light";
   const foreground = light ? "#20212a" : "#fafafa";

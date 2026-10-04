@@ -67,7 +67,6 @@ export const getBalances = async (
 
     return result;
   } catch (error) {
-    console.error("Error fetching balances:", error);
     throw error;
   }
 };

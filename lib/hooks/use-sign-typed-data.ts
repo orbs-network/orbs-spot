@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useMutation } from "@tanstack/react-query";
 import { useSignTypedData } from "wagmi";
 
@@ -15,7 +14,7 @@ export const useSignTypedDataPayload = () => {
 
   return useMutation({
     mutationFn: async (payload: SignTypedDataPayload) => {
-      return signTypedDataAsync(payload as any);
+      return signTypedDataAsync(payload as Parameters<typeof signTypedDataAsync>[0]);
     },
   });
 };

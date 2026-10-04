@@ -1,8 +1,6 @@
 import type { Currency } from "@/lib/types";
 import { Skeleton } from "./skeleton";
-import BN from "bignumber.js";
 import { useBalance } from "@/lib/hooks/use-balances";
-import { formatDecimals } from "@/lib/utils";
 
 export const Balance = ({
     currency,
@@ -29,7 +27,7 @@ export const Balance = ({
         aria-label={`Use full ${currency?.symbol ?? "token"} balance`}
         disabled={isLoading}
         className="flex min-w-0 cursor-pointer items-center justify-end gap-2 rounded-md text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 disabled:cursor-wait"
-        onClick={() => onAmountChange(formatDecimals(BN(ui).toString(), 8))}
+        onClick={() => onAmountChange(ui || "")}
       >
         {isLoading ? (
           <Skeleton className="h-4 w-[40px]" />

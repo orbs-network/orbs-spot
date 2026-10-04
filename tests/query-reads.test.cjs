@@ -89,3 +89,35 @@ test('reverted receipts reject without automatic retries', async () => {
   assert.equal(calls, 1);
   cache.clear();
 });
+
+test('pending receipts poll in the browser until confirmation without caching pending state', async () => {
+  let calls = 0;
+  const { transactionReceiptQueryOptions } = load('use-get-transaction-receipt', {
+    setTimeout: (fn) => setTimeout(fn, 0), clearTimeout,
+    fetch: async () => ++calls === 1
+      ? { status: 202, ok: true, json: async () => ({ status: 'pending' }) }
+      : { status: 200, ok: true, json: async () => ({ status: 'success' }) },
+  });
+  const cache = createCache();
+  const receipt = await cache.fetchQuery(transactionReceiptQueryOptions(56, '0xhash'));
+  assert.equal(receipt.status, 'success');
+  assert.equal(calls, 2);
+  cache.clear();
+});
+
+test('receipt cancellation between a pending response and retry does not leave a timer', async () => {
+  const controller = new AbortController();
+  let timers = 0;
+  const { transactionReceiptQueryOptions } = load('use-get-transaction-receipt', {
+    setTimeout: () => { timers++; }, clearTimeout,
+    fetch: async () => {
+      controller.abort();
+      return { status: 202 };
+    },
+  });
+  await assert.rejects(
+    transactionReceiptQueryOptions(56, '0xhash').queryFn({ signal: controller.signal }),
+    { name: 'AbortError' },
+  );
+  assert.equal(timers, 0);
+});

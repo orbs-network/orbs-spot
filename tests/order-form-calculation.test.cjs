@@ -6,7 +6,7 @@ const { test, before } = require("node:test");
 const ts = require("typescript");
 
 // Exercise the actual SDK and the app's TypeScript adapter with Node's test runner.
-const source = readFileSync(resolve(__dirname, "../components/developer-tools/order-form-calculation.ts"), "utf8");
+const source = readFileSync(resolve(__dirname, "../features/developer-tools/order-form-calculation.ts"), "utf8");
 const compiled = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
 }).outputText;
@@ -48,7 +48,7 @@ before(async () => {
   const sdk = require("@orbs-network/spot-ui");
   const originalFetch = global.fetch;
   global.fetch = async () => ({ ok: true, json: async () => template() });
-  try { client = await sdk.createClient(sdk.getPartners().find(p => p.chainId === 137).name, 137); }
+  try { client = await sdk.createClient(sdk.Partners.External, 137); }
   finally { global.fetch = originalFetch; }
 });
 

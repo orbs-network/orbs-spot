@@ -5,11 +5,11 @@ import { NumericInput } from "./ui/numeric-input";
 import { useBalance } from "@/lib/hooks/use-balances";
 import { type ReactNode, useCallback } from "react";
 import BN from "bignumber.js";
-import { formatDecimals } from "@/lib/utils";
 import { USD } from "./ui/usd";
 import { Balance } from "./ui/balance";
 import { TokenSelectorTrigger } from "./ui/token-selector-trigger";
 import { FormPanel } from "./ui/form-panel";
+import { useCurrenciesQuery } from "@/lib/hooks/use-currencies-query";
 
 type Props = {
   currency?: Currency;
@@ -52,19 +52,19 @@ const PercentageButtons = ({
   const { ui: balance } = useBalance(currency);
   const onPercentageClick = useCallback(
     (percentage: number) => {
-      if (BN(balance).decimalPlaces(7).lte(0)) {
+      if (!BN(balance).isFinite() || BN(balance).lte(0)) {
         onAmountChange("");
         return;
       }
       onAmountChange(
-        formatDecimals(BN(balance).times(percentage).toString(), 8),
+        BN(balance).times(percentage).decimalPlaces(currency?.decimals ?? 18, BN.ROUND_DOWN).toFixed(),
       );
     },
-    [balance, onAmountChange],
+    [balance, currency?.decimals, onAmountChange],
   );
 
   return (
-    <div className="absolute right-4 top-4 flex flex-wrap items-center justify-end gap-1">
+    <div data-percentage-controls className="absolute right-4 top-4 flex flex-wrap items-center justify-end gap-1">
       {PERCENTAGE_BUTTONS.map((button) => (
         <button
           type="button"
@@ -92,19 +92,19 @@ export function CurrencyCard({
   isLoading = false,
   statusText,
 }: Props) {
+  const { isLoading: tokensLoading } = useCurrenciesQuery();
+
   return (
-    <FormPanel className="group relative flex min-w-0 flex-col gap-2 bg-secondary/55 transition-colors hover:border-primary/35">
-      {!disabled && onAmountChange && (
-        <PercentageButtons
-          onAmountChange={onAmountChange}
-          currency={currency}
-        />
-      )}
-      <div className="flex items-center gap-2">
-        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-        {titleAction}
+    <FormPanel data-currency-card className="group relative flex min-w-0 flex-col gap-2 bg-secondary/55 transition-colors hover:border-primary/35">
+      <div data-currency-card-header className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-muted-foreground">{title}</p>
+          {titleAction}
+        </div>
+        {!disabled && onAmountChange && <PercentageButtons onAmountChange={onAmountChange} currency={currency} />}
       </div>
       <div
+        data-currency-amount-row
         className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${
           disabled ? "" : "mt-2 sm:mt-3"
         }`}
@@ -113,6 +113,7 @@ export function CurrencyCard({
           aria-label={`${title ?? (disabled ? "To" : "From")} amount`}
           name={disabled ? "destination-amount" : "source-amount"}
           disabled={disabled}
+          decimalScale={currency?.decimals ?? 18}
           value={amount}
           onChange={onAmountChange ?? (() => {})}
           isLoading={isLoading}
@@ -126,6 +127,7 @@ export function CurrencyCard({
             <TokenSelectorTrigger
               aria-label={`Select ${title ?? (disabled ? "destination" : "source")} token`}
               currency={currency}
+              isLoading={tokensLoading}
               showChevron
               className="gap-1 border border-border/80 bg-card px-2 py-1.5 hover:border-primary/25 hover:bg-secondary/45"
               logoClassName="mr-1 size-7"
@@ -134,7 +136,7 @@ export function CurrencyCard({
           }
         />
       </div>
-      <div className="flex min-w-0 items-center justify-between gap-2">
+      <div data-currency-value-row className="flex min-w-0 items-center justify-between gap-2">
         {statusText ? (
           <p className="truncate text-sm font-medium text-muted-foreground">
             {statusText}

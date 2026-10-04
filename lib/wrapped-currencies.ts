@@ -1,7 +1,9 @@
+import { ADDITIONAL_CHAIN_TOKENS } from "./additional-chain-tokens";
 import { monad } from "viem/chains";
 import type { Currency } from "./types";
 
 export const wCurrencies: Record<number, Currency> = {
+  ...Object.fromEntries(Object.entries(ADDITIONAL_CHAIN_TOKENS).map(([id, tokens]) => [id, tokens[0]])),
   1: {
     symbol: "WETH",
     address: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
@@ -116,7 +118,7 @@ export const wCurrencies: Record<number, Currency> = {
   },
   5000: {
     symbol: "WMNT",
-    address: "0x78c1b0C915C4FAA5FfA6CaA1F0219DA63d7f4cb8",
+    address: "0x78c1b0c915c4faa5ffa6caa1f0219da63d7f4cb8",
     decimals: 18,
     logoUrl: "https://s2.coinmarketcap.com/static/img/coins/128x128/27614.png",
     name: "Wrapped Mantle",

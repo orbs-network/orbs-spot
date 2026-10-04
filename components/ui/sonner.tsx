@@ -54,6 +54,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--toast-description-color": "var(--muted-foreground)",
           "--border-radius": "18px",
           zIndex: TOAST_Z_INDEX,
+          // Modal dialogs disable body pointer events; toasts remain interactive.
+          pointerEvents: "auto",
         } as CSSProperties
       }
       toastOptions={{

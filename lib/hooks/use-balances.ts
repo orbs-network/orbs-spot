@@ -98,7 +98,7 @@ export const useBalances = () => {
     refetchInterval: 120_000,
     refetchIntervalInBackground: false,
     staleTime: 60_000,
-    gcTime: Infinity,
+    gcTime: 5 * 60_000,
   });
 };
 

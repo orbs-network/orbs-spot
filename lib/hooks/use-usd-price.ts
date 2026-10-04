@@ -9,7 +9,7 @@ import { useDataChainId } from "./use-data-chain-id";
 export const useUSDPrices = (tokens?: string[], disabled?: boolean) => {
   const chainId = useDataChainId();
   const normalizedTokens = useMemo(
-    () => uniqueTokenAddresses(tokens ?? []).slice(0, MAX_USD_PRICE_TOKENS),
+    () => uniqueTokenAddresses(tokens ?? []).sort().slice(0, MAX_USD_PRICE_TOKENS),
     [tokens]
   );
 
@@ -17,7 +17,9 @@ export const useUSDPrices = (tokens?: string[], disabled?: boolean) => {
     queryKey: ["usd-price", normalizedTokens.join(","), chainId],
     queryFn: ({ signal }) => getUSDPrice(normalizedTokens, chainId!, signal),
     enabled: normalizedTokens.length > 0 && !!chainId && !disabled,
-    staleTime: Infinity,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 };
 
@@ -39,9 +41,10 @@ export const useUSDPrice = ({
   );  
 
   const data = useMemo(() => {
-    return BN(usdPrices?.[tokenKey] ?? usdPrices?.[token ?? ""] ?? 0)
+    const price = usdPrices?.[tokenKey] ?? usdPrices?.[token ?? ""];
+    if (price === undefined || !Number.isFinite(price) || price <= 0) return undefined;
+    return BN(price)
       .multipliedBy(amount ?? 0)
-      .decimalPlaces(6)
       .toNumber();
   }, [usdPrices, token, tokenKey, amount]);
 

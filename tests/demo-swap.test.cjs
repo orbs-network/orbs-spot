@@ -5,7 +5,7 @@ const { resolve } = require('node:path');
 const { test } = require('node:test');
 const ts = require('typescript');
 const BN = require('bignumber.js');
-const source = readFileSync(resolve(__dirname, '../components/developer-tools/liquidity-hub-developer-content.tsx'), 'utf8');
+const source = readFileSync(resolve(__dirname, '../features/developer-tools/liquidity-hub-developer-content.tsx'), 'utf8');
 const ast = ts.createSourceFile('flow.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 let handler;
 function visit(node) {

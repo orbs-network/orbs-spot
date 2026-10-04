@@ -20,7 +20,9 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@developer-tools": ["./features/developer-tools/entry.tsx"],
+      "@developer-inspector": ["./features/eip712-inspector/inspector.tsx"]
     }
   },
   "include": [

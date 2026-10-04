@@ -3,11 +3,13 @@ import { crymboPartner } from "./crymbo";
 import { efficientFrontierPartner } from "./efficient-frontier";
 import { gincoPartner } from "./ginco";
 import { htDigitalPartner } from "./ht-digital";
+import { orbsPartner } from "./orbs";
 import type { PartnerConfig } from "./types";
 
 export type { PartnerConfig, PartnerStyles } from "./types";
 
 export const DEFAULT_PARTNER = "default";
+export const ORBS_PARTNER = "orbs";
 export const CRYMBO_PARTNER = "crymbo";
 export const EFFICIENT_FRONTIER_PARTNER = "efficient-frontier";
 export const GINCO_PARTNER = "ginco";
@@ -15,6 +17,7 @@ export const HT_DIGITAL_PARTNER = "ht-digital";
 
 export const PARTNERS = {
   [DEFAULT_PARTNER]: defaultPartner,
+  [ORBS_PARTNER]: orbsPartner,
   [CRYMBO_PARTNER]: crymboPartner,
   [EFFICIENT_FRONTIER_PARTNER]: efficientFrontierPartner,
   [GINCO_PARTNER]: gincoPartner,
@@ -58,4 +61,9 @@ export function normalizePartnerId(value?: string) {
 export function getPartnerConfig(partnerId?: string): PartnerConfig {
   const resolvedPartnerId = normalizePartnerId(partnerId) ?? DEFAULT_PARTNER;
   return PARTNERS[resolvedPartnerId];
+}
+
+export function hasDeveloperTools(partner: PartnerConfig): boolean {
+  // The default frontend uses the backend partner id "playground".
+  return partner.id === defaultPartner.id;
 }

@@ -21,7 +21,7 @@ there is no `@orbs-network/spot-react` dependency or Spot provider.
 | Cached SDK client, history polling, cancellation | [`components/advanced-order/use-order-client.ts`](components/advanced-order/use-order-client.ts) |
 | Host wallet adapter | [`components/advanced-order/hooks.tsx`](components/advanced-order/hooks.tsx) |
 | Execution state → existing UI | [`components/advanced-order/use-order-execution.ts`](components/advanced-order/use-order-execution.ts) |
-| Copyable standalone TypeScript flows | [`components/developer-tools/sdk-flow-examples.ts`](components/developer-tools/sdk-flow-examples.ts) |
+| Copyable standalone TypeScript flows | [`features/developer-tools/snippets/sdk-flow-examples.ts`](features/developer-tools/snippets/sdk-flow-examples.ts) |
 
 The files in `lib/spot` do not import React, wagmi, or a UI store. Reuse these with your own wallet
 adapter, or follow the SDK calls directly. The app hooks demonstrate how this host connects those calls
@@ -92,6 +92,25 @@ Supported values:
 - `efficient-frontier`
 - `ginco`
 - `ht-digital`
+- `orbs`
+
+Run `yarn dev:orbs` for the Orbs frontend, or set `NEXT_PARTNER=orbs` when building.
+
+Orbs enables the custom wallet chooser with `features.customConnectModal` in
+`lib/partners/orbs.ts`. Set `NEXT_PUBLIC_ORBS_CONNECT_MODAL=false` before starting
+or building to restore the standard RainbowKit picker. This flag has no effect
+on other partners. The chooser uses the configured wallet connectors; email,
+passkey, and social account sign-in are not configured.
+Orbs includes light and dark themes based on the Orbs website. The frontend uses the
+existing `playground` Liquidity Hub integration and external Spot partner.
+Developer mode, docs links, GitHub links, and developer pages are available only
+on `default`; `devMode=true` has no effect on other partners.
+
+Chain selectors use the [Swap](https://docs.orbs.com/liquidity-hub/shared#supported-chains)
+and [Advanced Orders](https://docs.orbs.com/advanced-orders/shared#supported-chains)
+network lists, excluding Fantom and Polygon zkEVM: 8 swap networks and 23 order
+networks. Wallet configuration covers their 24-network union. Order creation requires
+a valid partner/chain configuration returned by the Spot SDK.
 
 ## Build
 
@@ -114,16 +133,34 @@ domain allowlist check.
 ## Deploy
 
 The manual GitHub Actions workflow `.github/workflows/frontend-deploy.yml`
-deploys `default`, `crymbo`, `efficient-frontier`, `ginco`, `ht-digital`, or `all` to Vercel.
+deploys `default` or `orbs` to Vercel. Select `all` to deploy both.
 
 Required repository/environment secrets:
 
 - `VERCEL_TOKEN`
 - `VERCEL_ORG_ID`
-- `VERCEL_PROJECT_ID_DEFAULT` or fallback `VERCEL_PROJECT_ID`
-- `VERCEL_PROJECT_ID_CRYMBO`
-- `VERCEL_PROJECT_ID_EFFICIENT_FRONTIER`
-- `VERCEL_PROJECT_ID_GINCO`
-- `VERCEL_PROJECT_ID_HT_DIGITAL`
 - `NEXT_PUBLIC_PROJECT_ID`
 - `RPC_URL`
+
+Required repository/environment variables for the default and Orbs deployments:
+
+- `VERCEL_PROJECT_ID_DEFAULT` (read as `vars.VERCEL_PROJECT_ID_DEFAULT`)
+- `VERCEL_PROJECT_ID_ORBS` (read as `vars.VERCEL_PROJECT_ID_ORBS`)
+
+## Production and developer boundaries
+
+Trading components live in `components/advanced-order`, `features/swap`, and `features/order-history`. Wallet UI lives in `features/wallet-connection`. Execution logic is isolated from React in `lib/spot` and `lib/swap`; server request validation lives in `lib/server`.
+
+Developer inspectors and simulations live in `features/developer-tools`, with copyable example generators in its `snippets` directory. Import their UI only through `@developer-tools`. Next.js resolves that entry (and `@developer-inspector`) to an empty module for every non-default partner, so developer implementations are excluded from partner builds. ESLint enforces the production import boundary. The default frontend keeps the developer tools available.
+
+Before release, run `yarn lint`, `yarn typecheck`, `yarn test`, and the target partner build. CI runs those checks for pull requests. Wallet execution tests use simulated ports; they do not submit live transactions. Production hosting should enforce request rate limits for the public RPC endpoints and provide `RPC_URL` and `NEXT_PUBLIC_PROJECT_ID` through its environment configuration.
+
+Dependency security overrides in `package.json` keep Axios, viem's WebSocket client, Protobuf, browser mapping data, and MetaMask's UUID utility on patched releases. Remove these overrides when upstream dependency ranges include the fixes. MetaMask uses the compatible UUID v4 API; its override retains CommonJS support.
+
+The October 1, 2026 production dependency audit reports no known vulnerabilities. WalletConnect is on 2.25.0, within wagmi’s supported range; its dependency chain removes the vulnerable legacy URL decoder. Re-run `yarn audit --groups dependencies` before release.
+
+## Spot SDK history endpoints
+
+Spot SDK 2.1.18 provides `getv1orders: false` to restrict order-sink history reads to `https://order-sink-v2.orbs.network`. Both history views and the developer example pass this option, replacing the local patch required by 2.1.17.
+
+Account, chain, and exchange filters are preserved. Submission and legacy subgraph behavior are unchanged; `legacyOrders` controls subgraph reads separately, and the developer example disables those too. Orders available only from the old order-sink host are excluded. The endpoint regression tests cover both ESM and CommonJS builds, including a v2 failure without a fallback request.

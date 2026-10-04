@@ -66,10 +66,8 @@ export function NumericInput({
       placeholder={placeholder || "0"}
       max={maxValue}
       isAllowed={(values) => {
-        const { floatValue = 0 } = values;
-        return maxValue
-          ? floatValue <= parseFloat(maxValue.toString())
-          : BN(floatValue).isLessThanOrEqualTo(maxUint256.toString());
+        const numericValue = BN(values.value || "0");
+        return numericValue.isFinite() && numericValue.lte(maxValue ?? maxUint256.toString());
       }}
       prefix={prefix ? `${prefix} ` : ""}
       suffix={suffix ? `${suffix} ` : ""}

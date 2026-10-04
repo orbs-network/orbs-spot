@@ -8,7 +8,7 @@ export const USD = ({
     address?: string;
     amount: string;
   }) => {
-    const { formatted: usdPrice, isLoading } = useUSDPrice({
+    const { formatted: usdPrice, data, isLoading } = useUSDPrice({
       token: address,
       amount: amount,
     });
@@ -18,7 +18,7 @@ export const USD = ({
         {isLoading ? (
           <Skeleton className="h-4 w-[40px]" />
         ) : (
-          <p className="truncate text-sm text-muted-foreground">${usdPrice || "0"}</p>
+          <p className="truncate text-sm text-muted-foreground">{data === undefined && amount && amount !== "0" ? "—" : `$${usdPrice || "0"}`}</p>
         )}
       </div>
     );

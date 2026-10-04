@@ -18,7 +18,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { SUPPORTED_CHAINS } from "@/lib/consts";
-import { SIGNATURE_FIELD_EXPLANATIONS } from "@/lib/eip712-field-explanations";
+import { SIGNATURE_FIELD_EXPLANATIONS } from "@/features/developer-tools/eip712-field-explanations";
 import { record, type Check, type Inspection, type TokenInfo } from "./inspect";
 import { duration, orderValues } from "./order-values";
 import { useOrderTokens } from "./use-order-tokens";

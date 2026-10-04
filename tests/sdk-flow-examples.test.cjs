@@ -10,7 +10,7 @@ function load(name) {
   if (name.startsWith('@') && !name.startsWith('@/')) return require(name);
   const file = name.startsWith('@/')
     ? path.resolve(__dirname, '..', name.slice(2) + '.ts')
-    : path.resolve(__dirname, '../components/developer-tools', name + '.ts');
+    : path.resolve(__dirname, '../features/developer-tools/snippets', name + '.ts');
   const source = fs.readFileSync(file, 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
   const exports = {};
@@ -252,10 +252,10 @@ test('submission snippet passes the displayed prepared order and full signature 
   let submitted;
   await vm.runInNewContext(`${compiled}\nsubmit()`, { client: { submitOrder: async (...args) => { submitted = args; } } });
   assert.deepEqual(JSON.parse(JSON.stringify(submitted)), [prepared.order, signature]);
-  const demo = advanced.CREATE_ORDER_CODE_SNIPPET.format({ order: prepared.order, signature: load('demo-order').DEMO_SIGNATURE, demo: true });
+  const demo = advanced.CREATE_ORDER_CODE_SNIPPET.format({ order: prepared.order, signature: load('@/features/developer-tools/demo-order').DEMO_SIGNATURE, demo: true });
   assert.match(demo, /Demo only/);
-  assert.ok(demo.includes(load('demo-order').DEMO_SIGNATURE));
-  assert.match(load('demo-order').DEMO_SIGNATURE, /^0x[0-9a-f]{130}$/);
+  assert.ok(demo.includes(load('@/features/developer-tools/demo-order').DEMO_SIGNATURE));
+  assert.match(load('@/features/developer-tools/demo-order').DEMO_SIGNATURE, /^0x[0-9a-f]{130}$/);
 });
 
 test('swap submission snippet accepts quote and signature props and returns the confirmed transaction', async () => {
@@ -336,7 +336,8 @@ test('history snippet retries client initialization, reuses it, and forwards acc
   assert.equal(requests[1].account, '0x2222222222222222222222222222222222222222');
   assert.equal(requests[0].signal, signal);
   assert.equal(requests[0].legacyOrders, false);
-  assert.deepEqual(Object.keys(requests[0]).sort(), ['account', 'legacyOrders', 'signal']);
+  assert.equal(requests[0].getv1orders, false);
+  assert.deepEqual(Object.keys(requests[0]).sort(), ['account', 'getv1orders', 'legacyOrders', 'signal']);
 });
 
 

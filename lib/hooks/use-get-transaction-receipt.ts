@@ -14,21 +14,29 @@ export function transactionReceiptQueryOptions(
       const params = new URLSearchParams({ chainId: String(chainId), hash });
       // The host endpoint waits for two confirmations. A transaction hash alone
       // only means the wallet broadcast it; the receipt determines success.
-      const result = await fetch(
-        `/api/transaction-receipt?${params.toString()}`,
-        { signal },
-      );
-      if (!result.ok) {
-        const data = await result.json().catch(() => undefined);
-        throw new Error(data?.error ?? "Failed to get transaction receipt");
+      const deadline = Date.now() + 180_000;
+      while (Date.now() < deadline) {
+        signal.throwIfAborted();
+        const result = await fetch(`/api/transaction-receipt?${params.toString()}`, { signal });
+        if (result.status === 202) {
+          await new Promise<void>((resolve, reject) => {
+            signal.throwIfAborted();
+            const abort = () => { clearTimeout(timer); reject(signal.reason); };
+            const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, 2_000);
+            signal.addEventListener("abort", abort, { once: true });
+          });
+          continue;
+        }
+        if (!result.ok) {
+          const data = await result.json().catch(() => undefined);
+          throw new Error(data?.error ?? "Failed to get transaction receipt");
+        }
+        const receipt = (await result.json()) as TransactionReceipt;
+        if (receipt.status === "reverted") throw new Error("Transaction failed");
+        if (receipt.status !== "success") throw new Error("Invalid transaction receipt");
+        return receipt;
       }
-      const receipt = (await result.json()) as TransactionReceipt;
-      if (receipt.status === "reverted") {
-        throw new Error(
-          receipt.logs?.[0]?.data?.toString() ?? "Transaction failed",
-        );
-      }
-      return receipt;
+      throw new Error("Transaction is still pending. Check the explorer before retrying.");
     },
     // Reuse a successful confirmation when another step asks about the same hash.
     // Reverted/failed reads throw above and never become successful cached data.

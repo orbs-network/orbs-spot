@@ -3,8 +3,10 @@ import {
   avalanche,
   base,
   berachain,
+  blast,
   bsc,
   flare,
+  ink,
   katana,
   linea,
   mainnet,
@@ -12,15 +14,18 @@ import {
   monad,
   optimism,
   polygon,
+  plasma,
+  rootstock,
   sei,
   sonic,
   unichain,
   xLayer,
 } from "viem/chains";
-import { defineChain, type Chain } from "viem";
+import { defineChain } from "viem";
+import { ADDITIONAL_CHAIN_TOKENS } from "./additional-chain-tokens";
 import { FormTab } from "./types";
 
-export const hyperEvmChain: Chain = defineChain({
+export const hyperEvmChain = defineChain({
   id: 999,
   name: "HyperEVM",
   network: "hyperevm",
@@ -48,7 +53,7 @@ export const hyperEvmChain: Chain = defineChain({
   },
 });
 
-export const megaethChain: Chain = defineChain({
+export const megaethChain = defineChain({
   id: 4326,
   name: "MegaETH",
   network: "megaeth",
@@ -77,37 +82,34 @@ export const megaethChain: Chain = defineChain({
   },
 });
 
+// https://docs.robinhood.com/chain/connecting/
+export const robinhoodChain = defineChain({
+  id: 4663,
+  name: "Robinhood Chain",
+  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
+  blockExplorers: { default: { name: "Robinhood Explorer", url: "https://robinhoodchain.blockscout.com" } },
+  contracts: {
+    // Runtime bytecode verified against the standard Multicall3 deployment.
+    multicall3: { address: "0xca11bde05977b3631167028862be2a173976ca11" },
+  },
+});
+
+// https://docs.orbs.com/liquidity-hub/shared#supported-chains
 export const MAIN_CHAINS = [
-  mainnet,
-  arbitrum,
-  bsc,
-  linea,
-  base,
-  sonic,
-  polygon,
-  monad,
-  flare,
+  mainnet, arbitrum, bsc, linea, base, sonic, polygon, blast,
 ] as const;
 
+// https://docs.orbs.com/advanced-orders/shared#supported-chains
+// Each chain has a validated external-partner configuration in Order Sink v2.
 export const SPOT_CHAINS = [
-  bsc,
-  linea,
-  sei,
-  base,
-  sonic,
-  polygon,
-  berachain,
-  flare,
-  avalanche,
-  monad,
-  arbitrum,
-  mainnet,
-  katana,
-  optimism,
-  mantle,
+  bsc, linea, sei, base, sonic, polygon, berachain, flare, avalanche, monad,
+  arbitrum, mainnet, katana, optimism, mantle, hyperEvmChain, unichain, xLayer,
+  megaethChain, rootstock, robinhoodChain, plasma, ink,
 ] as const;
 
-export const SUPPORTED_CHAINS = SPOT_CHAINS;
+// Wallets and public clients must include swap-only chains as well as Spot.
+export const SUPPORTED_CHAINS = [...SPOT_CHAINS, blast] as const;
 
 export type SupportedChainId = (typeof SUPPORTED_CHAINS)[number]["id"];
 
@@ -119,6 +121,7 @@ type DefaultTokenPair = {
 export const DEFAULT_CHAIN_ID = bsc.id;
 
 export const DEFAULT_TOKENS = {
+  ...Object.fromEntries(Object.entries(ADDITIONAL_CHAIN_TOKENS).map(([id, tokens]) => [id, { input: tokens[0].address, output: tokens[1].address }])),
   [bsc.id]: {
     input: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
     output: "0x55d398326f99059ff775485246999027b3197955",
@@ -198,6 +201,7 @@ export const DEFAULT_TOKENS = {
 } satisfies Record<number, DefaultTokenPair>;
 
 export const BASE_TOKENS = {
+  ...Object.fromEntries(Object.entries(ADDITIONAL_CHAIN_TOKENS).map(([id, tokens]) => [id, tokens.map((token) => token.address)])),
   [bsc.id]: [
     "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
     "0x55d398326f99059fF775485246999027B3197955",
@@ -327,6 +331,7 @@ export const BASE_TOKENS = {
 } satisfies Record<number, string[]>;
 
 export const POPULAR_TOKENS = {
+  ...Object.fromEntries(Object.entries(ADDITIONAL_CHAIN_TOKENS).map(([id, tokens]) => [id, tokens.map((token) => token.address)])),
   [bsc.id]: [
     ...BASE_TOKENS[bsc.id],
     "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
@@ -352,6 +357,11 @@ export const POPULAR_TOKENS = {
 } satisfies Record<number, string[]>;
 
 export const NATIVE_TOKENS_LOGO_URLS = {
+  30: "https://icons.llamao.fi/icons/chains/rsz_rootstock",
+  4663: "https://icons.llamao.fi/icons/chains/rsz_robinhood",
+  9745: "https://icons.llamao.fi/icons/chains/rsz_plasma",
+  57073: "https://icons.llamao.fi/icons/chains/rsz_ink",
+  81457: "https://icons.llamao.fi/icons/chains/rsz_blast",
   [bsc.id]: "https://s2.coinmarketcap.com/static/img/coins/128x128/1839.png",
   [polygon.id]:
     "https://s2.coinmarketcap.com/static/img/coins/128x128/3890.png",
@@ -380,7 +390,12 @@ export const NATIVE_TOKENS_LOGO_URLS = {
 } satisfies Record<number, string>;
 
 export const CHAIN_LOGO_URLS = {
-  [bsc.id]: "https://icons.llamao.fi/icons/chains/rsz_bsc",
+  30: "https://icons.llamao.fi/icons/chains/rsz_rootstock",
+  4663: "https://icons.llamao.fi/icons/chains/rsz_robinhood",
+  9745: "https://icons.llamao.fi/icons/chains/rsz_plasma",
+  57073: "https://icons.llamao.fi/icons/chains/rsz_ink",
+  81457: "https://icons.llamao.fi/icons/chains/rsz_blast",
+  [bsc.id]: "/networks/bsc.svg",
   [polygon.id]: "https://icons.llamao.fi/icons/chains/rsz_polygon",
   [base.id]: "https://icons.llamao.fi/icons/chains/rsz_base",
   [mainnet.id]: "https://icons.llamao.fi/icons/chains/rsz_ethereum",
@@ -404,6 +419,8 @@ export const CHAIN_LOGO_URLS = {
 export const DEFAULT_SLIPPAGE = 0.5;
 
 export const DEFAULT_PRICE_PROTECTION = 3;
+
+export const PERPS_URL = "https://perps.orbs.network/";
 
 export const FORM_TABS = [
   {

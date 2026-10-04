@@ -1,3 +1,4 @@
+import { resolvePercent } from "../percent-settings";
 import { DEFAULT_PRICE_PROTECTION, DEFAULT_SLIPPAGE } from "../consts";
 import { useUserStore } from "./store";
 import { useMemo } from "react";
@@ -9,8 +10,8 @@ export const useSettings = () => {
   const priceProtection = useUserStore((state) => state.priceProtection);
   const priceProtectionMode = useUserStore((state) => state.priceProtectionMode);
   const setPriceProtection = useUserStore((state) => state.setPriceProtection);
-  const resolvedSlippage = slippage ?? DEFAULT_SLIPPAGE;
-  const resolvedPriceProtection = priceProtection ?? DEFAULT_PRICE_PROTECTION;
+  const resolvedSlippage = resolvePercent(slippage, DEFAULT_SLIPPAGE);
+  const resolvedPriceProtection = resolvePercent(priceProtection, DEFAULT_PRICE_PROTECTION);
   const resolvedSlippageMode =
     slippageMode ?? (resolvedSlippage === DEFAULT_SLIPPAGE ? "auto" : "custom");
   const resolvedPriceProtectionMode =

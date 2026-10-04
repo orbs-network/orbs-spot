@@ -46,3 +46,30 @@ for (const useFallback of [false, true]) {
     assert.equal(requests.length, useFallback ? 2 : 1);
   });
 }
+
+for (const cancelFallback of [false, true]) {
+  test(`navigation cancellation during ${cancelFallback ? 'fallback' : 'primary'} pricing is propagated without logging`, async () => {
+    const exports = {};
+    const controller = new AbortController();
+    const cancellation = new Error('Navigation cancelled');
+    let requests = 0;
+    const errors = [];
+    vm.runInNewContext(compiled, {
+      exports,
+      console: { error: (...args) => errors.push(args) },
+      require: (name) => name === './utils' ? {
+        isNativeAddress: () => false,
+        getWrappedNativeCurrency: () => ({ address: eth }),
+      } : require(name),
+      fetch: async () => {
+        requests++;
+        if (cancelFallback && requests === 1) return { ok: true, json: async () => ({ coins: {} }) };
+        controller.abort(cancellation);
+        throw cancellation;
+      },
+    });
+    await assert.rejects(exports.getUSDPrice([eth], 747474, controller.signal), (error) => error === cancellation);
+    assert.equal(requests, cancelFallback ? 2 : 1);
+    assert.deepEqual(errors, []);
+  });
+}

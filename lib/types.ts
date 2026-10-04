@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+import type { Quote } from "@orbs-network/liquidity-hub-sdk";
 
 
 export type Currency = {
@@ -46,6 +46,6 @@ export enum FormTab {
     outToken: string;
     inAmount: string;
     gas: string;
-    originalQuote: any;
+    originalQuote: Quote;
   }
   

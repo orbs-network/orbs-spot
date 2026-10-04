@@ -1,3 +1,4 @@
+import { MAX_PERCENT_SETTING } from "@/lib/percent-settings";
 import { useState } from "react";
 import {
   Dialog,
@@ -7,7 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
-import { PencilIcon, XIcon } from "lucide-react";
+import { PencilIcon, SlidersHorizontalIcon, XIcon } from "lucide-react";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { NumericInput } from "./ui/numeric-input";
 import { DEFAULT_PRICE_PROTECTION, DEFAULT_SLIPPAGE } from "@/lib/consts";
@@ -117,7 +118,8 @@ const PercentSettings = ({
           <NumericInput
             aria-label="Custom percentage"
             name="custom-percentage"
-            value={value ? value.toString() : ""}
+            value={value.toString()}
+            maxValue={MAX_PERCENT_SETTING}
             onChange={(nextValue) => onChange(Number(nextValue), "custom")}
             className="text-center text-[16px] font-semibold"
             placeholder={formatPlaceholder(defaultValue)}
@@ -162,12 +164,12 @@ const SpotSettings = () => {
   );
 };
 
-type SettingsTriggerVariant = "card" | "action";
+type SettingsTriggerVariant = "card" | "action" | "icon";
 
 const SettingsInlineTrigger = ({
   variant = "card",
 }: {
-  variant?: SettingsTriggerVariant;
+  variant?: Exclude<SettingsTriggerVariant, "icon">;
 }) => {
   const isSpotTab = useIsSpotTab();
   const { slippage, slippageMode, priceProtection, priceProtectionMode } =
@@ -183,6 +185,7 @@ const SettingsInlineTrigger = ({
 
   return (
     <div
+      data-settings-row
       className={cn(
         "flex w-full items-center justify-between gap-3 text-left",
         isActionVariant
@@ -232,7 +235,19 @@ export const SettingsModal = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <div className={className}>
-        <SettingsInlineTrigger variant={triggerVariant} />
+        {triggerVariant === "icon" ? (
+          <DialogTrigger asChild>
+            <button
+              type="button"
+              data-settings-trigger
+              aria-label={`Open ${isSpotTab ? "Price Protection" : "Slippage Tolerance"} settings`}
+              title={isSpotTab ? "Price protection settings" : "Slippage settings"}
+              className="flex size-10 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              <SlidersHorizontalIcon aria-hidden="true" className="size-5" strokeWidth={1.5} />
+            </button>
+          </DialogTrigger>
+        ) : <SettingsInlineTrigger variant={triggerVariant} />}
       </div>
       <DialogContent
         presentation="center"

@@ -2,6 +2,8 @@ import axios from "axios";
 import { getAddress, isAddress, zeroAddress } from "viem";
 import * as chains from "viem/chains";
 
+import { ADDITIONAL_CHAIN_TOKENS } from "./additional-chain-tokens";
+import { wCurrencies } from "./wrapped-currencies";
 import { SUPPORTED_CHAINS } from "./consts";
 import type { Currency } from "./types";
 import {
@@ -31,6 +33,10 @@ const coinGeckoChainNames: Readonly<Partial<Record<number, string>>> = {
   [chains.unichain.id]: "unichain",
   [chains.xLayer.id]: "x-layer",
   [chains.megaeth.id]: "megaeth",
+  [chains.blast.id]: "blast",
+  [chains.rootstock.id]: "rootstock",
+  [chains.plasma.id]: "plasma",
+  [chains.ink.id]: "ink",
 };
 
 type CoinGeckoToken = {
@@ -54,11 +60,12 @@ function isValidCoinGeckoToken(
   token: CoinGeckoToken,
 ): token is ValidCoinGeckoToken {
   return (
+    token !== null && typeof token === "object" &&
     typeof token.address === "string" &&
     isAddress(token.address) &&
     typeof token.symbol === "string" &&
     typeof token.name === "string" &&
-    typeof token.decimals === "number"
+    typeof token.decimals === "number" && Number.isInteger(token.decimals) && token.decimals >= 0 && token.decimals <= 255
   );
 }
 
@@ -80,26 +87,29 @@ export async function getCurrencies(
       }
     : undefined;
 
+  const seedTokens = ADDITIONAL_CHAIN_TOKENS[chainId]
+    ?? (wCurrencies[chainId] ? [wCurrencies[chainId]] : []);
   if (!name) {
-    return nativeToken ? [nativeToken] : [];
+    return nativeToken ? [nativeToken, ...seedTokens] : [...seedTokens];
   }
 
   const response = await axios.get<{ tokens?: CoinGeckoToken[] }>(
     `https://tokens.coingecko.com/${name}/all.json`,
-    { signal },
+    { signal, timeout: 15_000 },
   );
   const responseTokens = Array.isArray(response.data.tokens)
     ? response.data.tokens
     : [];
-  const tokens = dedupeCurrenciesByAddress(
-    responseTokens.filter(isValidCoinGeckoToken).map((token) => ({
+  const tokens = dedupeCurrenciesByAddress([
+    ...seedTokens,
+    ...responseTokens.filter(isValidCoinGeckoToken).map((token) => ({
       address: getAddress(token.address),
       symbol: token.symbol,
       decimals: token.decimals,
       logoUrl: "",
       name: token.name,
     })),
-  );
+  ]);
   const tokensWithoutNativeSymbol = tokens.filter(
     (token) => !eqCompare(token.symbol, nativeCurrency?.symbol ?? ""),
   );

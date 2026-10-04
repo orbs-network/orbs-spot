@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Eip712Inspector } from "@/features/eip712-inspector/inspector";
+import { Eip712Inspector } from "@developer-inspector";
 
 export const metadata: Metadata = { title: "Order preview | Orbs Spot" };
 

@@ -1,27 +1,15 @@
+import { TransactionReceiptNotFoundError } from "viem";
 import { getPublicClient } from "./get-public-client";
 
+/** One bounded read. The browser polls pending confirmations, not a server worker. */
 export const getTxReceipt = async (chainId: number, hash: `0x${string}`) => {
-  const publicClient = getPublicClient(chainId);
-  const maxRetries = 10;
-  let attempt = 0;
-  let delay = 1000;
-
-  while (attempt < maxRetries) {
-    try {
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash,
-        confirmations: 2,
-        retryDelay: delay,
-      });
-      return receipt;
-    } catch (error) {
-      attempt++;
-      if (attempt >= maxRetries) {
-        throw new Error(`Failed after ${maxRetries} attempts: ${error}`);
-      }
-      await new Promise((resolve) => setTimeout(resolve, delay));
-      delay *= 2; // Exponential backoff
-    }
+  const client = getPublicClient(chainId);
+  try {
+    const receipt = await client.getTransactionReceipt({ hash });
+    const blockNumber = await client.getBlockNumber({ cacheTime: 0 });
+    return blockNumber >= receipt.blockNumber + BigInt(1) ? receipt : undefined;
+  } catch (error) {
+    if (error instanceof TransactionReceiptNotFoundError) return undefined;
+    throw error;
   }
-  throw new Error(`Failed after ${maxRetries} attempts`);
 };

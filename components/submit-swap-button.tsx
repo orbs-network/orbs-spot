@@ -1,6 +1,6 @@
 import { useConnection, useSwitchChain } from "wagmi";
 import { Button } from "./ui/button";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
+import { useWalletConnectModal } from "@/features/wallet-connection/provider";
 import { getChainName } from "@/lib/utils";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useBalance } from "@/lib/hooks/use-balances";
@@ -32,7 +32,7 @@ const SubmitButtonBase = ({
     isConnecting,
     isReconnecting,
   } = useConnection();
-  const { openConnectModal } = useConnectModal();
+  const { openConnectModal } = useWalletConnectModal();
   const switchChain = useSwitchChain();
   const isWalletLoading = isConnecting || isReconnecting;
 
@@ -72,6 +72,7 @@ const SubmitButtonBase = ({
       className="h-12 w-full rounded-[14px] text-base"
       onClick={onClick}
       isLoading={isLoading}
+      aria-busy={isLoading}
       disabled={disabled || isLoading}
     >
       {text}
@@ -93,6 +94,8 @@ const ValidatedSubmitSwapButton = ({
     parsedInputAmount,
     isLoadingTrade,
     noLiquidity,
+    quoteError,
+    trade,
   } = useDerivedSwap();
   const inputTokenBalance = useBalance(inputCurrency).wei;
 
@@ -101,7 +104,7 @@ const ValidatedSubmitSwapButton = ({
   const insufficientBalance = useMemo(() => {
     return BN(inputTokenBalance ?? "0").lt(parsedInputAmount ?? "0");
   }, [inputTokenBalance, parsedInputAmount]);
-  const enterAmount = BN(parsedInputAmount ?? "0").eq(0) 
+  const enterAmount = !BN(parsedInputAmount).isFinite() || BN(parsedInputAmount).lte(0)
 
   const _disabled =
     disabled ||
@@ -109,6 +112,9 @@ const ValidatedSubmitSwapButton = ({
     !outputCurrency ||
     isLoading ||
     insufficientBalance ||
+    isLoadingTrade ||
+    !!quoteError ||
+    !trade ||
     enterAmount ||
     noLiquidity;
 
@@ -122,6 +128,7 @@ const ValidatedSubmitSwapButton = ({
     if (insufficientBalance) {
       return t("insufficientFunds");
     }
+    if (quoteError) return "Quote unavailable";
     if(noLiquidity) {
       return t("noLiquidity");
     }
@@ -133,6 +140,7 @@ const ValidatedSubmitSwapButton = ({
     t,
     isLoadingTrade,
     noLiquidity,
+    quoteError,
   ]);
 
   return (

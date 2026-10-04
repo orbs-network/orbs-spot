@@ -8,3 +8,6 @@ export function getActiveClientPartnerConfig() {
 
   return getPartnerConfig(partnerId);
 }
+
+// The partner is fixed for the lifetime of the page.
+export const IS_ORBS = getActiveClientPartnerConfig().id === "orbs";

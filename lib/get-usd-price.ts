@@ -1,5 +1,4 @@
 import * as chains from "viem/chains";
-import BN from "bignumber.js";
 import { getAddress, isAddress, zeroAddress } from "viem";
 import { USDPrices } from "./types";
 import { getWrappedNativeCurrency, isNativeAddress } from "./utils";
@@ -15,10 +14,26 @@ const chainIdToLlamaName: Record<number, string> = {
   [chains.monad.id]: "monad",
   [chains.flare.id]: "flare",
   [chains.katana.id]: "katana",
+  [chains.avalanche.id]: "avax",
+  [chains.optimism.id]: "optimism",
+  [chains.mantle.id]: "mantle",
+  [chains.sei.id]: "sei",
+  [chains.berachain.id]: "berachain",
+  [chains.hyperEvm.id]: "hyperliquid",
+  [chains.unichain.id]: "unichain",
+  [chains.xLayer.id]: "xlayer",
+  [chains.megaeth.id]: "megaeth",
+  [chains.blast.id]: "blast",
+  [chains.rootstock.id]: "rsk",
+  [chains.plasma.id]: "plasma",
+  [chains.ink.id]: "ink",
+  4663: "robinhood",
 };
 
 const chainIdToDexScreenerName: Record<number, string> = {
   ...chainIdToLlamaName,
+  [chains.avalanche.id]: "avalanche",
+  [chains.rootstock.id]: "rootstock",
   [chains.mainnet.id]: "ethereum",
 };
 
@@ -63,9 +78,6 @@ function normalizeToken(token: string, chainId: number): string | null {
   return getAddress(token).toLowerCase();
 }
 
-function roundPrice(price: number): number {
-  return BN(price).decimalPlaces(6).toNumber();
-}
 
 function getDexScreenerTokenPrice(pair: DexScreenerPair, token: string) {
   const base = pair.baseToken?.address?.toLowerCase();
@@ -106,11 +118,12 @@ async function fetchLlamaPrices(
           const coinId = `${chainName}:${address}`;
           const price = data.coins?.[coinId]?.price;
 
-          if (typeof price === "number" && price > 0) {
-            prices[address] = roundPrice(price);
+          if (typeof price === "number" && Number.isFinite(price) && price > 0) {
+            prices[address] = price;
           }
         }
       } catch (e) {
+        if (signal?.aborted) throw e;
         console.error("Llama price batch failed:", e);
       }
     }),
@@ -159,11 +172,12 @@ async function fetchDexScreenerFallbackPrices(
             ? getDexScreenerTokenPrice(bestPair, token)
             : 0;
 
-          if (price > 0) {
-            prices[token] = roundPrice(price);
+          if (Number.isFinite(price) && price > 0) {
+            prices[token] = price;
           }
         }
       } catch (e) {
+        if (signal?.aborted) throw e;
         console.error("DexScreener fallback batch failed:", e);
       }
     }),
@@ -242,6 +256,7 @@ export async function getUSDPrice(
 
     return prices;
   } catch (error) {
+    if (signal?.aborted) throw error;
     console.error("Error fetching USD prices:", error);
     return {};
   }

@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  createClient,
   getTwapConfig,
   OrderStatus,
   type Order,
@@ -11,11 +10,14 @@ import {
   useQuery,
   useMutation,
   useQueryClient,
-  replaceEqualDeep,
 } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef } from "react";
 import { useConnection } from "wagmi";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
+import { shareOrders, spotClientQueryOptions, spotKeys } from "@/lib/spot/queries";
+import { watchCancelledOrder } from "@/lib/spot/cancel-status";
+import { useOrderCancelling } from "@/lib/spot/use-order-cancelling";
+import { SPOT_CHAINS } from "@/lib/consts";
 import { useFormTabStore } from "@/lib/hooks/store";
 import { getActiveSpotPartner } from "@/lib/partners/spot";
 import { cancelOrder as cancelSdkOrder } from "@/lib/spot/cancellation";
@@ -29,54 +31,41 @@ import {
 import { CANCEL_ORDER_TOAST_ID } from "./constants";
 import { useWalletInteractions } from "./hooks";
 
-export function useClient() {
-  const chainId = useDataChainId();
+export function useClient(requestedChainId?: number, enabled = true) {
+  const connectedChainId = useDataChainId();
+  const chainId = requestedChainId ?? connectedChainId;
   const partner = getActiveSpotPartner();
   // The host cache owns one client per partner/chain; failed initialization can retry.
   return useQuery({
-    queryKey: ["spot-client", partner, chainId],
-    queryFn: () => createClient(partner, chainId),
-    staleTime: Infinity,
-    retry: false,
-    // This cached value is an SDK client with methods, not a JSON response.
-    structuralSharing: false,
+    ...spotClientQueryOptions(partner, chainId),
+    enabled: enabled && SPOT_CHAINS.some((chain) => chain.id === chainId),
   });
 }
 
 const EMPTY_ORDERS: Order[] = [];
-export function useOrders() {
+export function useOrders(enabled = true) {
   const { address } = useConnection();
   const chainId = useDataChainId();
   const partner = getActiveSpotPartner();
-  const client = useClient();
+  const client = useClient(undefined, enabled);
   const open = useFormTabStore((state) => state.orderHistoryOpen);
   // Every request-defining value belongs in the key so wallets, chains and
   // partners cannot reuse each other's history. signal lets Query cancel the read.
   const query = useQuery({
-    queryKey: ["spot-orders", partner, chainId, address?.toLowerCase()],
+    queryKey: spotKeys.orders(partner, chainId, address),
     queryFn: ({ signal }) => {
       if (!client.data || !address)
         throw new Error("Connect a wallet to load order history");
-      return client.data.getAccountOrders({ account: address, signal });
+      return client.data.getAccountOrders({ account: address, signal, getv1orders: false });
     },
-    enabled: Boolean(client.data && address),
+    enabled: enabled && Boolean(client.data && address),
     // Deliberately poll only while history is open. Fill notifications follow
     // these reads (and explicit refreshes), rather than a background watcher.
     refetchInterval: open ? 10_000 : false,
     refetchIntervalInBackground: false,
     staleTime: 5_000,
     // Preserve unchanged row objects by protocol identity, even if polling reorders them.
-    structuralSharing: (previous, next) => {
-      const byKey = new Map(
-        ((previous as Order[] | undefined) ?? []).map((order) => [
-          order.historyKey,
-          order,
-        ]),
-      );
-      return (next as Order[]).map((order) =>
-        replaceEqualDeep(byKey.get(order.historyKey), order),
-      );
-    },
+    structuralSharing: shareOrders,
   });
   const orders = query.data ?? EMPTY_ORDERS;
   const data = useMemo(() => ({ all: orders }), [orders]);
@@ -90,8 +79,7 @@ export function useOrders() {
 }
 
 /** One observer on the existing form, independent of form-input subscriptions. */
-export function useHistoryNotifications() {
-  const { data } = useOrders();
+export function useHistoryNotifications(orders: Order[]) {
   const { refetch: refetchBalances } = useBalances();
   const { address } = useConnection();
   const chainId = useDataChainId();
@@ -106,7 +94,7 @@ export function useHistoryNotifications() {
         previous.current.orders.map((order) => [order.historyKey, order]),
       );
       let fillsChanged = false;
-      for (const order of data.all) {
+      for (const order of orders) {
         const old = byKey.get(order.historyKey);
         if (!old) continue;
         if (
@@ -121,17 +109,19 @@ export function useHistoryNotifications() {
       // One poll can update several orders; refresh the shared balance query once.
       if (fillsChanged) void refetchBalances().catch(() => undefined);
     }
-    previous.current = { key, orders: data.all };
-  }, [data.all, refetchBalances, key]);
+    previous.current = { key, orders };
+  }, [orders, refetchBalances, key]);
 }
 
 export function useCancelOrder(order?: Order) {
-  const client = useClient();
+  const client = useClient(order?.chainId);
   const wallet = useWalletInteractions();
   const { address } = useConnection();
   const queryClient = useQueryClient();
+  const isOrderCancelling = useOrderCancelling(order);
   // Cancellation is a wallet write: start it only from an explicit user action.
   const mutation = useMutation({
+    mutationKey: spotKeys.cancellation(getActiveSpotPartner(), order?.chainId, address, order?.historyKey),
     mutationFn: async () => {
       if (!order || !client.data || !address)
         throw new Error("Connect the order's wallet and network to cancel");
@@ -141,29 +131,20 @@ export function useCancelOrder(order?: Order) {
         partner: client.data.partner,
         chainId: client.data.chainId,
         account: address,
+        historyKey: order.historyKey,
       };
     },
     retry: false,
     onMutate: () => {
       toast.loading("Cancel order…", { id: CANCEL_ORDER_TOAST_ID });
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       toast.success("Order cancelled", { id: CANCEL_ORDER_TOAST_ID });
-      // The write is already confirmed. Refresh the original wallet's caches
-      // without treating a refresh failure as a failed cancellation.
-      void Promise.allSettled([
-        queryClient.invalidateQueries({
-          queryKey: ["balances", result.chainId, result.account.toLowerCase()],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: [
-            "spot-orders",
-            result.partner,
-            result.chainId,
-            result.account.toLowerCase(),
-          ],
-        }),
-      ]);
+      const refresh = watchCancelledOrder(queryClient, result);
+      void queryClient.invalidateQueries({
+        queryKey: ["balances", result.chainId, result.account.toLowerCase()],
+      }).catch(() => { /* A balance refresh cannot undo a confirmed cancellation. */ });
+      await refresh.finished;
     },
     onError: (error) => {
       if (isUserRejectedError(error)) {
@@ -178,7 +159,7 @@ export function useCancelOrder(order?: Order) {
   });
   return {
     cancelOrder: mutation.mutate,
-    isLoading: mutation.isPending,
+    isLoading: mutation.isPending || isOrderCancelling,
     isSuccess: mutation.isSuccess,
   };
 }

@@ -164,3 +164,36 @@ test('cancellation forwards the SDK request and waits for the confirmed wallet w
     await assert.rejects(cancelOrder(f.input.client, f.input.wallet, { ...order, chainId: 1 }, account), /does not match/);
   }
 });
+
+test('cross-network cancellation cannot prepare or send a write until the wallet confirms the order chain', async () => {
+  const { cancelOrder } = load('cancellation');
+  for (const version of [1, 2]) {
+    const f = fixture();
+    const order = { version, historyKey: `v${version}:137:1`, maker: account, chainId: 137 };
+    let walletChain = 56;
+    let prepared = 0;
+    let writes = 0;
+    f.input.wallet.assertContext = async (expectedAccount, expectedChain) => {
+      assert.equal(expectedAccount, account);
+      assert.equal(expectedChain, order.chainId);
+      if (walletChain !== expectedChain) throw new Error('Wallet network changed');
+    };
+    f.input.client.getCancelOrderRequest = () => { prepared++; return {}; };
+    f.input.wallet.cancelOrder = async () => { writes++; return '0xconfirmed'; };
+
+    // A rejected or unfinished network switch leaves the wallet on its old chain.
+    await assert.rejects(cancelOrder(f.input.client, f.input.wallet, order, account), /Wallet network changed/);
+    assert.equal(prepared, 0);
+    assert.equal(writes, 0);
+
+    walletChain = order.chainId;
+    assert.equal(await cancelOrder(f.input.client, f.input.wallet, order, account), '0xconfirmed');
+    assert.equal(writes, 1);
+
+    // Switching away again must not reuse a previously successful context check.
+    walletChain = 56;
+    await assert.rejects(cancelOrder(f.input.client, f.input.wallet, order, account), /Wallet network changed/);
+    assert.equal(prepared, 1);
+    assert.equal(writes, 1);
+  }
+});

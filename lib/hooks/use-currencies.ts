@@ -8,10 +8,11 @@ import type { Currency } from "../types";
 import { useCurrenciesQuery } from "./use-currencies-query";
 import { useDataChainId } from "./use-data-chain-id";
 
-const useExternalCurrency = (address?: `0x${string}`) => {
-  const chainId = useDataChainId();
+const useExternalCurrency = (address?: `0x${string}`, requestedChainId?: number) => {
+  const connectedChainId = useDataChainId();
+  const chainId = requestedChainId ?? connectedChainId;
   const enabled = Boolean(address && chainId);
-  const { data: externalCurrency } = useReadContracts({
+  const { data: externalCurrency, isPending } = useReadContracts({
     allowFailure: false,
     contracts: [
       {
@@ -35,10 +36,12 @@ const useExternalCurrency = (address?: `0x${string}`) => {
     ],
     query: {
       enabled,
+      staleTime: 24 * 60 * 60_000,
+      gcTime: 30 * 60_000,
     },
   });
 
-  return useMemo((): Currency | undefined => {
+  const currency = useMemo((): Currency | undefined => {
     if (!address || !externalCurrency) return undefined;
     return {
       decimals: externalCurrency[0] ?? 0,
@@ -49,6 +52,7 @@ const useExternalCurrency = (address?: `0x${string}`) => {
       imported: true,
     };
   }, [externalCurrency, address]);
+  return { currency, isLoading: enabled && isPending };
 };
 
 const useAllCurrencies = () => {
@@ -103,25 +107,28 @@ export const useCurrencies = (query?: string) => {
   const allowExternal =
     query && !isLoading && !internalCurrencies?.length && isAddress(query);
 
-  const externalCurrency = useExternalCurrency(
+  const { currency: externalCurrency, isLoading: isLoadingExternal } = useExternalCurrency(
     allowExternal ? query : undefined
   );
 
-  const result = externalCurrency ? [externalCurrency] : internalCurrencies;
+  const result = useMemo(
+    () => externalCurrency ? [externalCurrency] : internalCurrencies,
+    [externalCurrency, internalCurrencies],
+  );
 
   return {
     balances,
     currencies: result,
     isError,
-    isLoading,
+    isLoading: isLoading || isLoadingExternal,
     refetch,
     usdPrices,
   };
 };
 
-export const useCurrency = (address?: string) => {
+export const useCurrencyMetadata = (address?: string, chainId?: number) => {
   const tokenKey = getTokenKey(address);
-  const { data: currencies, isLoading } = useCurrenciesQuery();
+  const { data: currencies, isLoading } = useCurrenciesQuery(chainId);
 
   const internalCurrency = useMemo(() => {
     return currencies?.find((currency) => getTokenKey(currency.address) === tokenKey);
@@ -135,8 +142,12 @@ export const useCurrency = (address?: string) => {
     isAddress(address);
 
   const externalCurrency = useExternalCurrency(
-    allowExternal ? address : undefined
+    allowExternal ? address : undefined, chainId
   );
 
-  return internalCurrency ?? externalCurrency;
+  const currency = internalCurrency ?? externalCurrency.currency;
+  return { currency, isLoading: !currency && (isLoading || externalCurrency.isLoading) };
 };
+
+export const useCurrency = (address?: string, chainId?: number) =>
+  useCurrencyMetadata(address, chainId).currency;

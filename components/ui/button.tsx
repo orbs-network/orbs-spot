@@ -62,6 +62,7 @@ function Button({
       {...props}
       type={asChild ? undefined : props.type ?? "button"}
       data-slot="button"
+      data-variant={variant ?? "default"}
       className={cn(buttonVariants({ variant, size, className }), "cursor-pointer")}
       disabled={isLoading || props.disabled}
     >

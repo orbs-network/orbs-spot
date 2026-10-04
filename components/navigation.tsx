@@ -1,70 +1,23 @@
 "use client";
-
-import { useMutation } from "@tanstack/react-query";
-
-import {
-  type ComponentProps,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
+import { type ComponentProps, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import {
-  ChevronDownIcon,
-  Code2Icon,
-  CopyIcon,
-  GithubIcon,
-  EllipsisIcon,
-  ArrowUpRightIcon,
-  ScanLineIcon,
-  LogOutIcon,
-  WalletIcon,
-  SunIcon,
-  MoonIcon,
-} from "lucide-react";
-import { useConnection, useDisconnect, useSwitchChain } from "wagmi";
-import { toast } from "sonner";
-import {
-  preserveDeveloperModeInHref,
-  useDeveloperMode,
-} from "@/components/developer-tools/use-developer-mode";
+import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon, SunIcon, MoonIcon } from "lucide-react";
+import { useConnection, useDisconnect } from "wagmi";
+import { preserveDeveloperModeInHref, useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 import { cn, makeEllipsisAddress } from "@/lib/utils";
-import { CHAIN_LOGO_URLS, MAIN_CHAINS, SPOT_CHAINS, SPOT_TABS } from "@/lib/consts";
-import {
-  preserveFormTabInHref,
-  useSelectedFormTab,
-} from "@/lib/hooks/use-form-tab";
-import { getSpotDocsHref } from "@/lib/developer-docs";
+import { DeveloperNavigation, DeveloperMoreNavigation } from "@developer-tools";
+import { NavPillButton } from "./ui/nav-pill";
 import { useTheme } from "@/lib/theme";
 import type { PartnerBrand } from "@/lib/partners/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Switch } from "./ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { Spinner } from "./ui/spinner";
-
-const navPillClass =
-  "inline-flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-3 text-sm font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-[var(--nav-pill-hover-background)] focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:outline-none";
-
-function NavPillButton({
-  children,
-  className,
-  ref,
-  ...props
-}: ComponentProps<"button">) {
-  return (
-    <button
-      data-nav-pill
-      ref={ref}
-      type="button"
-      className={cn(navPillClass, className)}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-}
+import { useWalletConnectModal } from "@/features/wallet-connection/provider";
+import { IS_ORBS } from "@/lib/partners/client";
+import { MobileTradingMenu } from "./mobile-trading-menu";
 
 function PopoverMenuButton({
   children,
@@ -79,6 +32,7 @@ function PopoverMenuButton({
   return (
     <button
       type="button"
+      data-wallet-action={tone}
       className={cn(
         "flex w-full items-center gap-3 rounded-[11px] px-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none",
         size === "large" ? "h-12" : "h-11",
@@ -93,179 +47,6 @@ function PopoverMenuButton({
     </button>
   );
 }
-
-const CHAIN_LABELS: ReadonlyMap<number, string> = new Map(
-  [...MAIN_CHAINS, ...SPOT_CHAINS].map((chain) => [chain.id, chain.name]),
-);
-
-const formatChainSelectorLabel = (label: string) =>
-  label.replace(/\bchain\b/gi, "").replace(/\s{2,}/g, " ").trim() || label;
-
-const getChainLabel = (chainId?: number, fallback?: string) => {
-  const label = chainId ? (CHAIN_LABELS.get(chainId) ?? fallback) : fallback;
-  return formatChainSelectorLabel(label ?? "Network");
-};
-
-const getChainIconUrl = (chainId?: number) => {
-  if (!chainId) return undefined;
-  return CHAIN_LOGO_URLS[chainId as keyof typeof CHAIN_LOGO_URLS];
-};
-
-const UNSUPPORTED_CHAIN_TOAST_ID = "unsupported-chain";
-
-const ChainIcon = ({
-  className,
-  iconUrl,
-  iconBackground,
-  name,
-}: {
-  className?: string;
-  iconUrl?: string;
-  iconBackground?: string;
-  name?: string;
-}) => {
-  return (
-    <span
-      aria-hidden="true"
-      className={cn(
-        "flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/10 text-[8px] font-bold",
-        className,
-      )}
-      style={{ background: iconBackground ?? "var(--secondary)" }}
-    >
-      {iconUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={iconUrl}
-          alt=""
-          width={28}
-          height={28}
-          className="size-full"
-        />
-      ) : (
-        name?.slice(0, 1) ?? "N"
-      )}
-    </span>
-  );
-};
-
-const ChainSelectorPopover = ({
-  currentChainId,
-  currentChainName,
-  currentChainIconUrl,
-  currentChainIconBackground,
-  isUnsupported,
-}: {
-  currentChainId?: number;
-  currentChainName?: string;
-  currentChainIconUrl?: string;
-  currentChainIconBackground?: string;
-  isUnsupported?: boolean;
-}) => {
-  const [open, setOpen] = useState(false);
-  const switchChain = useSwitchChain();
-  const { selectedTab } = useSelectedFormTab();
-  const isSpotTab = SPOT_TABS.includes(
-    selectedTab.value as (typeof SPOT_TABS)[number],
-  );
-  const availableChains = isSpotTab ? SPOT_CHAINS : MAIN_CHAINS;
-  const chainOptions = useMemo(
-    () =>
-      availableChains.map((supportedChain) => ({
-        id: supportedChain.id,
-        label: getChainLabel(supportedChain.id, supportedChain.name),
-        iconUrl: getChainIconUrl(supportedChain.id),
-      })),
-    [availableChains],
-  );
-  const isUnavailableForTab = !availableChains.some(
-    (chain) => chain.id === currentChainId,
-  );
-  const isWrongNetwork = isUnsupported || isUnavailableForTab;
-  const currentLabel = isWrongNetwork
-    ? "Wrong network"
-    : getChainLabel(currentChainId, currentChainName);
-
-  useEffect(() => {
-    if (!isWrongNetwork || !currentChainId) {
-      toast.dismiss(UNSUPPORTED_CHAIN_TOAST_ID);
-      return;
-    }
-
-    toast.warning(
-      `This chain is not supported by ${selectedTab.fullLabel}`,
-      {
-        id: UNSUPPORTED_CHAIN_TOAST_ID,
-        description: "Switch to a supported network to continue.",
-      },
-    );
-  }, [currentChainId, isWrongNetwork, selectedTab.fullLabel]);
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <NavPillButton
-          aria-label={`Select network, current network is ${currentLabel}`}
-          className={cn(
-            "pr-2.5",
-            isWrongNetwork && "border-destructive/60 text-destructive",
-          )}
-        >
-          <ChainIcon
-            iconUrl={getChainIconUrl(currentChainId) ?? currentChainIconUrl}
-            iconBackground={currentChainIconBackground}
-            name={currentLabel}
-          />
-          <span className="hidden max-w-[132px] truncate sm:inline">
-            {currentLabel}
-          </span>
-          <ChevronDownIcon
-            aria-hidden="true"
-            className={cn(
-              "size-4 shrink-0 text-muted-foreground transition-transform duration-200",
-              open && "rotate-180",
-            )}
-          />
-        </NavPillButton>
-      </PopoverTrigger>
-      <PopoverContent
-        align="end"
-        drawerTitle="Select chain"
-        mobilePresentation="fullscreen"
-        className="w-[224px] overflow-hidden rounded-[14px] border-primary/35 bg-popover/98 p-2"
-      >
-        <div className="flex max-h-[min(520px,calc(85dvh-48px))] flex-col gap-0 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch] max-sm:min-h-0 max-sm:flex-1 max-sm:max-h-none">
-          {chainOptions.map((option) => {
-            const selected = currentChainId === option.id && !isWrongNetwork;
-            return (
-              <PopoverMenuButton
-                key={option.id}
-                size="large"
-                onClick={() => {
-                  setOpen(false);
-                  if (!selected) {
-                    switchChain.mutate({ chainId: option.id });
-                  }
-                }}
-                className={cn(
-                  "gap-3 rounded-[16px] text-[14px] py-3",
-                  selected && "text-primary",
-                )}
-              >
-                <ChainIcon
-                  iconUrl={option.iconUrl}
-                  name={option.label}
-                  className="size-7 text-[9px]"
-                />
-                <span className="whitespace-nowrap">{option.label}</span>
-              </PopoverMenuButton>
-            );
-          })}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-};
 
 const WalletAvatar = ({ label }: { label?: string }) => {
   return (
@@ -286,15 +67,10 @@ const WalletAccountPopover = ({
   const [open, setOpen] = useState(false);
   const disconnect = useDisconnect();
 
-  const { mutate: copyAddress } = useMutation({
-    mutationFn: () => navigator.clipboard.writeText(address),
-    networkMode: "always",
-    retry: false,
-    onSuccess: () => {
-      toast.success("Address copied");
-      setOpen(false);
-    },
-    onError: () => { toast.error("Failed to copy address"); },
+  const { mutate: copyAddress } = useCopyToClipboard({
+    successMessage: "Address copied",
+    errorMessage: "Failed to copy address",
+    onSuccess: () => setOpen(false),
   });
 
   const disconnectWallet = () => {
@@ -308,6 +84,7 @@ const WalletAccountPopover = ({
         <NavPillButton
           className="max-w-[138px] pr-2.5"
           aria-label={`Open wallet menu for ${displayName}`}
+          data-wallet-account-trigger
         >
           <WalletAvatar label={displayName} />
           <span className="min-w-0 truncate">{displayName}</span>
@@ -326,7 +103,7 @@ const WalletAccountPopover = ({
         className="w-[176px] rounded-[14px] border-primary/60 bg-popover/98 p-2"
       >
         <div className="flex flex-col gap-1">
-          <PopoverMenuButton onClick={() => void copyAddress()}>
+          <PopoverMenuButton onClick={() => void copyAddress(address)}>
             <CopyIcon aria-hidden="true" className="size-4 text-muted-foreground" />
             <span>Copy address</span>
           </PopoverMenuButton>
@@ -342,6 +119,7 @@ const WalletAccountPopover = ({
 
 const NavWalletControls = () => {
   const { isConnecting, isReconnecting } = useConnection();
+  const { openConnectModal } = useWalletConnectModal();
 
   return (
     <ConnectButton.Custom>
@@ -350,7 +128,6 @@ const NavWalletControls = () => {
         chain,
         mounted,
         authenticationStatus,
-        openConnectModal,
       }) => {
         const ready = mounted && authenticationStatus !== "loading";
         const connected =
@@ -383,21 +160,15 @@ const NavWalletControls = () => {
               onClick={openConnectModal}
               className="w-10 justify-center bg-primary p-0 text-primary-foreground hover:bg-primary/74 sm:w-auto sm:px-4"
             >
-              <WalletIcon aria-hidden="true" className="size-4 sm:hidden" />
-              <span className="hidden sm:inline">Connect Wallet</span>
+              <WalletIcon data-connect-wallet-icon aria-hidden="true" className="size-4 sm:hidden" />
+              <span data-connect-wallet-label className="hidden sm:inline">Connect Wallet</span>
+              {IS_ORBS && <span data-mobile-connect-label className="hidden">Connect</span>}
             </NavPillButton>
           );
         }
 
         return (
           <div className="flex items-center gap-2">
-            <ChainSelectorPopover
-              currentChainId={chain.id}
-              currentChainName={chain.name}
-              currentChainIconUrl={chain.iconUrl}
-              currentChainIconBackground={chain.iconBackground}
-              isUnsupported={chain.unsupported}
-            />
             <WalletAccountPopover
               address={account.address}
               displayName={makeEllipsisAddress(account.address, {
@@ -412,75 +183,16 @@ const NavWalletControls = () => {
   );
 };
 
-function MoreNavigation({ isDeveloperMode }: { isDeveloperMode: boolean }) {
-  const [open, setOpen] = useState(false);
-  const pathname = usePathname();
-  const itemClass = "flex min-h-11 items-center gap-3 rounded-[11px] px-3 py-2 text-sm font-semibold transition-colors hover:bg-secondary/55 focus-visible:bg-secondary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45";
-
-  return (
-    <Popover open={open} onOpenChange={setOpen} responsive={false}>
-      <PopoverTrigger asChild>
-        <NavPillButton aria-label="More" className="w-10 justify-center p-0 sm:w-auto sm:px-3">
-          <EllipsisIcon aria-hidden="true" className="size-4 sm:hidden" />
-          <span className="hidden sm:inline">More</span>
-          <ChevronDownIcon
-            aria-hidden="true"
-            className={cn("hidden size-4 text-muted-foreground transition-transform motion-reduce:transition-none sm:block", open && "rotate-180")}
-          />
-        </NavPillButton>
-      </PopoverTrigger>
-      <PopoverContent align="end" aria-label="More navigation" className="w-60 max-w-[calc(100vw-2rem)] p-2 motion-reduce:animate-none">
-        <Link
-          href={preserveDeveloperModeInHref("/developers/eip712", isDeveloperMode)}
-          aria-current={pathname === "/developers/eip712" ? "page" : undefined}
-          onClick={() => setOpen(false)}
-          className={cn(itemClass, pathname === "/developers/eip712" && "text-primary")}
-        >
-          <ScanLineIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
-          Order preview
-        </Link>
-        <a
-          href="https://github.com/orbs-network/orbs-spot"
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="View Orbs Spot on GitHub (opens in a new tab)"
-          onClick={() => setOpen(false)}
-          className={itemClass}
-        >
-          <GithubIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-          GitHub
-          <ArrowUpRightIcon aria-hidden="true" className="ml-auto size-3.5 text-muted-foreground" />
-        </a>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 export function Navigation({ brand }: { brand: PartnerBrand }) {
-  const { isDeveloperMode, setIsDeveloperMode } = useDeveloperMode();
-  const { selectedTab } = useSelectedFormTab();
+  const { isDeveloperMode } = useDeveloperMode();
   const pathname = usePathname();
-  const isDeveloperGuideRoute =
-    pathname === "/developers" || pathname.startsWith("/developers/");
-  const isSpotTab = SPOT_TABS.includes(
-    selectedTab.value as (typeof SPOT_TABS)[number],
-  );
-  const developerGuide = isSpotTab
-    ? {
-        href: getSpotDocsHref("/advanced-orders/typescript"),
-        linkLabel: "Advanced Order Docs",
-        tooltip: "Open Advanced Order Docs",
-      }
-    : {
-        href: getSpotDocsHref("/liquidity-hub"),
-        linkLabel: "Liquidity Hub Docs",
-        tooltip: "Open Liquidity Hub integration guide",
-      };
+  const isDeveloperGuideRoute = pathname === "/developers" || pathname.startsWith("/developers/");
 
   return (
     <nav className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
       <div className="flex w-full flex-nowrap items-center gap-2 sm:gap-3">
         <Link
+          data-nav-brand
           href={preserveDeveloperModeInHref("/", isDeveloperMode)}
           className="flex min-h-8 min-w-0 shrink items-center gap-2.5 no-underline"
           aria-label={`${brand.name} trading`}
@@ -504,67 +216,18 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
               {brand.name}
             </span>
           )}
+          {brand.navWordmark && (
+            <span data-nav-wordmark className="text-xl font-normal uppercase tracking-[0.12em] text-foreground">
+              {brand.navWordmark}
+            </span>
+          )}
         </Link>
         <div className="ml-auto flex w-auto shrink-0 items-center justify-end gap-1.5 sm:gap-2">
-          {isDeveloperMode && !isDeveloperGuideRoute && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link
-                  data-nav-pill
-                  data-developer-trigger
-                  data-developer-guide-link
-                  href={preserveDeveloperModeInHref(
-                    preserveFormTabInHref(
-                      developerGuide.href,
-                      selectedTab.value,
-                    ),
-                    isDeveloperMode,
-                  )}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={developerGuide.tooltip}
-                  className={cn(
-                    navPillClass,
-                    "w-10 justify-center p-0 sm:w-auto sm:px-3",
-                  )}
-                >
-                  <Code2Icon aria-hidden="true" className="size-4" />
-                  <span className="hidden sm:inline">
-                    {developerGuide.linkLabel}
-                  </span>
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent>{developerGuide.tooltip}</TooltipContent>
-            </Tooltip>
-          )}
-          {!isDeveloperGuideRoute && (
-            <div className="flex h-10 items-center gap-2 rounded-full border border-border/70 bg-[var(--nav-pill-background)] px-2 sm:px-3">
-              <label
-                htmlFor="navbar-developer-mode"
-                className="hidden cursor-pointer whitespace-nowrap text-xs font-semibold text-foreground sm:block"
-              >
-                Dev mode
-              </label>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="inline-flex">
-                    <Switch
-                      id="navbar-developer-mode"
-                      checked={isDeveloperMode}
-                      onCheckedChange={setIsDeveloperMode}
-                      aria-label="Developer mode"
-                    />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Show developer code and request controls
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          )}
+          <DeveloperNavigation />
           {!isDeveloperGuideRoute && <NavWalletControls />}
-          <MoreNavigation isDeveloperMode={isDeveloperMode} />
-          <ThemeToggle />
+          <DeveloperMoreNavigation isDeveloperMode={isDeveloperMode} />
+          <div className={IS_ORBS ? "hidden lg:block" : undefined}><ThemeToggle /></div>
+          {IS_ORBS && <MobileTradingMenu><ThemeToggle /></MobileTradingMenu>}
         </div>
       </div>
     </nav>

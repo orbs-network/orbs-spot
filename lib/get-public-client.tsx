@@ -11,6 +11,6 @@ export function getPublicClient(chainId: number) {
 
   return createPublicClient({
     chain,
-    transport: http(getRpcUrl(chainId)),
+    transport: http(getRpcUrl(chainId), { timeout: 10_000, retryCount: 0 }),
   });
 }

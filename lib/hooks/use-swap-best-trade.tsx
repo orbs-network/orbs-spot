@@ -1,250 +1,28 @@
-import {
-  isFreshQuote,
-  permit2Address,
-  Quote,
-} from "@orbs-network/liquidity-hub-sdk";
-import { useMutation } from "@tanstack/react-query";
+import { permit2Address } from "@orbs-network/liquidity-hub-sdk";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSignEip } from "./use-sign-eip";
 import { useApproval } from "./use-approval";
 import { useWrap } from "./use-wrap";
-import { getExplorerUrl, isNativeAddress, makeEllipsisAddress } from "../utils";
+import { getWrappedNativeCurrency, isNativeAddress } from "../utils";
 import { useDerivedSwap } from "./use-derived-swap";
-import BN from "bignumber.js";
+import { createSwapExecutor } from "@/lib/swap/execution";
+import { useSwapToasts } from "@/lib/swap/use-swap-toasts";
 import { useLiquidityHub } from "./liquidity-hub";
 import { useGetTransactionReceipt } from "./use-get-transaction-receipt";
 import { useBestTradeSwapStore, useSwapStore } from "./store";
 import { SwapStatus } from "@orbs-network/swap-ui";
 import { SwapStep } from "../types";
-import { toast } from "sonner";
-import { useBalances } from "./use-balances";
-import { useCallback, useMemo, useRef } from "react";
-import TokensPair from "@/components/tokens-pair";
-import { useConnection } from "wagmi";
-import {
-  isUserRejectedError,
-  dismissTransactionRejectedToast,
-} from "../tx-rejection";
+import { useCallback, useMemo } from "react";
+import { useConnection, useWalletClient } from "wagmi";
+import { isUserRejectedError } from "../tx-rejection";
 
-const getTotalSteps = (shouldWrap: boolean, shouldApprove: boolean) => {
-  let totalSteps = 1;
-  if (shouldWrap) {
-    totalSteps++;
-  }
-  if (shouldApprove) {
-    totalSteps++;
-  }
-  return totalSteps;
-};
-
-type ToastId = string | number;
-
-const getReadableSwapError = (error: unknown) => {
-  if (!(error instanceof Error)) {
-    return "Something went wrong while preparing the transaction.";
-  }
-
-  const message = error.message.toLowerCase();
-
-  if (message.includes("quote")) {
-    return "The quote expired or could not be refreshed. Try again with a fresh quote.";
-  }
-  if (message.includes("allowance") || message.includes("approval")) {
-    return "Token approval did not complete. Please try approving again.";
-  }
-  if (message.includes("insufficient")) {
-    return "The wallet does not have enough balance for this swap.";
-  }
-  if (message.includes("network") || message.includes("fetch")) {
-    return "Network request failed. Check your connection and try again.";
-  }
-
-  return "The transaction could not be completed. Please try again.";
-};
-
-const useToasts = () => {
-  const wrapToastId = useRef<ToastId | undefined>(undefined);
-  const approveToastId = useRef<ToastId | undefined>(undefined);
-  const swapToastId = useRef<ToastId | undefined>(undefined);
-  const activeToastId = useRef<ToastId | undefined>(undefined);
-  const { inputCurrency, outputCurrency } = useDerivedSwap();
-  const { chainId } = useConnection();
-
-  const dismissPendingToasts = useCallback(() => {
-    for (const id of [
-      wrapToastId.current,
-      approveToastId.current,
-      swapToastId.current,
-    ]) {
-      if (id) toast.dismiss(id);
-    }
-    wrapToastId.current = undefined;
-    approveToastId.current = undefined;
-    swapToastId.current = undefined;
-    activeToastId.current = undefined;
-  }, []);
-
-  const onWrapRequest = useCallback(() => {
-    wrapToastId.current = toast.loading(
-      `Wrapping ${inputCurrency?.symbol ?? "token"}…`,
-      {
-        description: "Confirm the wrap transaction in your wallet.",
-      }
-    );
-    activeToastId.current = wrapToastId.current;
-  }, [inputCurrency?.symbol]);
-
-  const onWrapSuccess = useCallback(() => {
-    const id = wrapToastId.current;
-    toast.success(`Wrapped ${inputCurrency?.symbol ?? "token"}`, {
-      id,
-      description: "Funds are ready for the swap.",
-      duration: 4_000,
-    });
-    activeToastId.current = undefined;
-  }, [inputCurrency?.symbol]);
-
-  const onApproveRequest = useCallback(() => {
-    approveToastId.current = toast.loading(
-      `Approving ${inputCurrency?.symbol ?? "token"}…`,
-      {
-        description: "Confirm token spending in your wallet.",
-      }
-    );
-    activeToastId.current = approveToastId.current;
-  }, [inputCurrency?.symbol]);
-
-  const onApproveSuccess = useCallback(() => {
-    const id = approveToastId.current;
-    toast.success(`Approved ${inputCurrency?.symbol ?? "token"}`, {
-      id,
-      description: "Approval confirmed.",
-      duration: 4_000,
-    });
-    activeToastId.current = undefined;
-  }, [inputCurrency?.symbol]);
-
-  const onSwapRequest = useCallback(() => {
-    swapToastId.current = toast.loading(
-      <TokensPair
-        prefix="Swapping"
-        srcTokenAddress={inputCurrency?.address}
-        dstTokenAddress={outputCurrency?.address}
-      />
-    );
-    activeToastId.current = swapToastId.current;
-  }, [inputCurrency?.address, outputCurrency?.address]);
-
-  const onSwapConfirming = useCallback(
-    (txHash: `0x${string}`) => {
-      const explorerUrl = getExplorerUrl(chainId, txHash);
-      const transactionText = `Transaction ${makeEllipsisAddress(txHash, {
-        start: 8,
-        end: 6,
-      })}`;
-
-      toast.loading(
-        <TokensPair
-          prefix="Confirming"
-          srcTokenAddress={inputCurrency?.address}
-          dstTokenAddress={outputCurrency?.address}
-        />,
-        {
-          id: swapToastId.current,
-          description: explorerUrl ? (
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-500 hover:text-blue-600"
-            >
-              {transactionText}
-            </a>
-          ) : (
-            transactionText
-          ),
-        }
-      );
-    },
-    [chainId, inputCurrency?.address, outputCurrency?.address]
-  );
-
-  const onSwapSuccess = useCallback((txHash: `0x${string}`) => {
-    toast.success(
-      <TokensPair
-        prefix="Swap completed"
-        srcTokenAddress={inputCurrency?.address}
-        dstTokenAddress={outputCurrency?.address}
-      />,
-      {
-        id: swapToastId.current,
-        description: (
-          <a
-            href={getExplorerUrl(chainId, txHash)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm text-blue-500 hover:text-blue-600"
-          >
-            View on explorer
-          </a>
-        ),
-        duration: 20_000,
-        closeButton: true,
-      }
-    );
-    activeToastId.current = undefined;
-  }, [inputCurrency?.address, outputCurrency?.address, chainId]);
-
-  const onSwapFailed = useCallback((error: unknown) => {
-    const id = activeToastId.current ?? swapToastId.current;
-    dismissPendingToasts();
-    toast.error("Swap failed", {
-      id,
-      description: getReadableSwapError(error),
-      duration: 8_000,
-      closeButton: true,
-    });
-    activeToastId.current = undefined;
-  }, [dismissPendingToasts]);
-
-  const onTransactionRejected = useCallback(() => {
-    const id = activeToastId.current ?? swapToastId.current;
-    dismissPendingToasts();
-    dismissTransactionRejectedToast({
-      id,
-    });
-    activeToastId.current = undefined;
-  }, [dismissPendingToasts]);
-
-  return useMemo(
-    () => ({
-      dismissPendingToasts,
-      onWrapRequest,
-      onApproveRequest,
-      onSwapRequest,
-      onSwapConfirming,
-      onSwapSuccess,
-      onApproveSuccess,
-      onWrapSuccess,
-      onSwapFailed,
-      onTransactionRejected,
-    }),
-    [
-      dismissPendingToasts,
-      onApproveRequest,
-      onApproveSuccess,
-      onSwapConfirming,
-      onSwapFailed,
-      onSwapRequest,
-      onSwapSuccess,
-      onTransactionRejected,
-      onWrapRequest,
-      onWrapSuccess,
-    ]
-  );
-};
+const executor = createSwapExecutor();
 
 export const useSwapBestTrade = () => {
   const status = useBestTradeSwapStore((state) => state.status);
+  const currentStep = useBestTradeSwapStore((state) => state.currentStep);
+  // No transaction step is published until wallet/quote/allowance checks finish.
+  const isPreparing = status === SwapStatus.LOADING && currentStep === undefined;
   const updateStore = useBestTradeSwapStore((state) => state.updateStore);
   const totalSteps = useBestTradeSwapStore((state) => state.totalSteps);
   const currentStepIndex = useBestTradeSwapStore(
@@ -254,10 +32,10 @@ export const useSwapBestTrade = () => {
   const txHash = useBestTradeSwapStore((state) => state.txHash);
 
   const { mutateAsync: signEip } = useSignEip();
-  const { parsedInputAmount, inputCurrency, outputCurrency, trade, refetchTrade } = useDerivedSwap();
+  const { parsedInputAmount, inputCurrency, outputCurrency, inputAmount, outputAmount, trade, refetchTrade } = useDerivedSwap();
   const liquidityHubClient = useLiquidityHub();
   const setPauseQuote = useSwapStore((state) => state.setPauseQuote);
-  const { refetch: refetchBalances } = useBalances();
+  const queryClient = useQueryClient();
   const getTransactionReceiptCallback = useGetTransactionReceipt();
   const { ensureAllowance, approve } = useApproval(
     permit2Address,
@@ -265,60 +43,49 @@ export const useSwapBestTrade = () => {
     parsedInputAmount
   );
   const { mutateAsync: wrap } = useWrap();
-  const toasts = useToasts();
+  const toasts = useSwapToasts();
+  const { address: account, chainId } = useConnection();
+  const { data: walletClient } = useWalletClient();
 
-  const { mutateAsync: swapBestTrade } = useMutation({
+  const { mutate: swapBestTrade } = useMutation({
+    onMutate: () => ({ account, chainId }),
     mutationFn: async () => {
-      if (!inputCurrency || !outputCurrency) {
-        throw new Error("Input or output currency not found");
+      if (!inputCurrency || !outputCurrency || !trade || !account || !chainId || !walletClient) {
+        throw new Error("Connect a wallet and request a quote before swapping");
       }
       toasts.dismissPendingToasts();
-      resetStore();
-      let currentStepIndex = 0;
-      updateStore({ status: SwapStatus.LOADING, currentStepIndex });
+      updateStore({ status: SwapStatus.LOADING, currentStepIndex: 0, review: { inputCurrency, outputCurrency, inputAmount, outputAmount, chainId } });
       setPauseQuote(true);
-
-      const isNativeIn = isNativeAddress(inputCurrency.address);
-
-      const hasAllowance = await ensureAllowance();
-      updateStore({ totalSteps: getTotalSteps(isNativeIn, !hasAllowance) });
-
-      if (isNativeIn) {
-        updateStore({ currentStep: SwapStep.WRAP });
-
-        toasts.onWrapRequest();
-        await wrap(parsedInputAmount);
-        toasts.onWrapSuccess();
-        currentStepIndex++;
-        updateStore({ currentStepIndex });
-      }
-
-      if (!hasAllowance) {
-        updateStore({ currentStep: SwapStep.APPROVE });
-        toasts.onApproveRequest();
-        await approve();
-        toasts.onApproveSuccess();
-        currentStepIndex++;
-        updateStore({ currentStepIndex });
-      }
-
-      updateStore({ currentStep: SwapStep.SWAP });
-      if (!trade) throw new Error("Quote not found");
-      let quote = trade.originalQuote as Quote;
-      if (!isFreshQuote(quote, 60)) {
-        const freshQuote = (await refetchTrade({ throwOnError: true })).data?.originalQuote as Quote | undefined;
-        if (freshQuote && BN(freshQuote.minAmountOut).gte(quote.minAmountOut)) {
-          quote = freshQuote;
-        }
-      }
-      toasts.onSwapRequest();
-      const signature = await signEip(quote);
-      const tx = await liquidityHubClient.swap(quote, signature);
-      const txHash = tx as `0x${string}`;
-      updateStore({ txHash });
-      toasts.onSwapConfirming(txHash);
-      const receipt = await getTransactionReceiptCallback(txHash);
-      return { receipt, txHash };
+      const native = isNativeAddress(inputCurrency.address);
+      const inputToken = native ? getWrappedNativeCurrency(chainId)?.address : inputCurrency.address;
+      if (!inputToken) throw new Error("Wrapped native currency is unavailable");
+      return executor.execute({
+        intent: { account, chainId, amount: parsedInputAmount, inputToken, outputToken: outputCurrency.address, native },
+        quote: trade.originalQuote,
+        assertWallet: async () => {
+          const [accounts, activeChain] = await Promise.all([walletClient.getAddresses(), walletClient.getChainId()]);
+          if (activeChain !== chainId || accounts[0]?.toLowerCase() !== account.toLowerCase()) {
+            throw new Error("Wallet account or network changed. Review the swap again.");
+          }
+        },
+        hasAllowance: ensureAllowance,
+        wrap,
+        approve,
+        refreshQuote: async () => (await refetchTrade({ throwOnError: true })).data?.originalQuote,
+        sign: signEip,
+        submit: (quote, signature) => liquidityHubClient.swap(quote, signature),
+        confirm: getTransactionReceiptCallback,
+        onPlan: totalSteps => updateStore({ totalSteps }),
+        onStep: (step, currentStepIndex) => {
+          updateStore({ currentStep: SwapStep[step], currentStepIndex });
+          if (step === "WRAP") toasts.onWrapRequest();
+          else if (step === "APPROVE") toasts.onApproveRequest();
+          else toasts.onSwapRequest();
+        },
+        onWrapped: toasts.onWrapSuccess,
+        onApproved: toasts.onApproveSuccess,
+        onSubmitted: txHash => { updateStore({ txHash }); toasts.onSwapConfirming(txHash); },
+      });
     },
     onSuccess: ({ txHash }) => {
       toasts.onSwapSuccess(txHash);
@@ -337,21 +104,35 @@ export const useSwapBestTrade = () => {
         toasts.onSwapFailed(error);
       }
     },
-    onSettled: () => {
+    onSettled: (_result, _error, _variables, scope) => {
       setPauseQuote(false);
-      refetchBalances();
+      // The wallet may change while a prompt is open. Refresh the submitted
+      // account's balances, including after a confirmed wrap followed by rejection.
+      if (scope?.account && scope.chainId) {
+        void queryClient.invalidateQueries({
+          queryKey: ["balances", scope.chainId, scope.account.toLowerCase()],
+        }).catch(() => undefined);
+      }
     },
   });
 
+  const onSwapBestTrade = useCallback(() => {
+    if (executor.isBusy() || useBestTradeSwapStore.getState().status === SwapStatus.LOADING) return;
+    resetStore();
+    updateStore({ status: SwapStatus.LOADING });
+    swapBestTrade();
+  }, [resetStore, swapBestTrade, updateStore]);
+
   return useMemo(
     () => ({
-      onSwapBestTrade: swapBestTrade,
+      onSwapBestTrade,
       status,
+      isPreparing,
       totalSteps,
       currentStepIndex,
       txHash,
       reset: resetStore,
     }),
-    [currentStepIndex, resetStore, status, swapBestTrade, totalSteps, txHash]
+    [currentStepIndex, resetStore, status, isPreparing, onSwapBestTrade, totalSteps, txHash]
   );
 };
