@@ -29,7 +29,7 @@ export function SwapBestTradeForm() {
           amount={inputAmount}
           title={t("from")}
         />
-        <ToggleCurrencies />
+        <ToggleCurrencies outputAmount={outputAmount} />
         <CurrencyCard
           currency={outputCurrency}
           onCurrencyChange={(currency: string) =>

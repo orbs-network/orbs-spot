@@ -5,7 +5,7 @@ import { SubmitSwapButton } from "@/components/submit-swap-button";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { Step, SwapFlow, SwapStatus, Token } from "@orbs-network/swap-ui";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useFormatNumber, useToAmountUI } from "@/lib/hooks/common";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
 import { SwapStep, type Currency } from "@/lib/types";
@@ -26,6 +26,7 @@ const useStep = () => {
   const t = useTranslations();
   const currentStep = useBestTradeSwapStore((state) => state.currentStep);
   const txHash = useBestTradeSwapStore((state) => state.txHash);
+  const isAwaitingWallet = useBestTradeSwapStore((state) => state.isAwaitingWallet);
   const inputCurrency = useBestTradeSwapStore(state => state.review?.inputCurrency);
   const chainId = useBestTradeSwapStore(state => state.review?.chainId);
   const explorerUrl = getExplorerUrl(chainId, txHash);
@@ -34,22 +35,22 @@ const useStep = () => {
     if (currentStep === SwapStep.WRAP) {
       return {
         title: `Wrap ${inputCurrency?.symbol ?? "token"}`,
-        footerText: t("proceedInWallet"),
+        footerText: isAwaitingWallet ? t("proceedInWallet") : t("transactionSubmitted"),
       };
     } else if (currentStep === SwapStep.APPROVE) {
       return {
         title: `Approve ${inputCurrency?.symbol ?? "token"}`,
-        footerText: t("proceedInWallet"),
+        footerText: isAwaitingWallet ? t("proceedInWallet") : t("transactionSubmitted"),
       };
     } else if (currentStep === SwapStep.SWAP) {
       return {
         title: "Swap",
         footerLink: explorerUrl,
-        footerText: explorerUrl ? t("viewOnExplorer") : t("proceedInWallet"),
+        footerText: txHash ? t("transactionSubmitted") : isAwaitingWallet ? t("proceedInWallet") : t("orderSubmitted"),
       };
     }
     return undefined;
-  }, [currentStep, explorerUrl, inputCurrency?.symbol, t]);
+  }, [currentStep, explorerUrl, inputCurrency?.symbol, isAwaitingWallet, t, txHash]);
 };
 
 const formatDynamicDecimals = (value: BN) => {
@@ -276,7 +277,12 @@ const SwapReviewContent = ({
 export const SubmitSwap = () => {
   const { isDeveloperMode } = useDeveloperMode();
   const t = useTranslations();
-  const [open, setOpen] = useState(false);
+  const open = useBestTradeSwapStore(state => state.isReviewOpen);
+  const setOpen = useBestTradeSwapStore(state => state.setReviewOpen);
+  useEffect(() => {
+    if (isDeveloperMode) setOpen(false);
+    return () => setOpen(false);
+  }, [isDeveloperMode, setOpen]);
   const current = useDerivedSwap();
   const review = useBestTradeSwapStore(state => state.review);
   const { setInputAmount, } = useActionHandlers();
@@ -338,7 +344,7 @@ export const SubmitSwap = () => {
           <SubmitSwapButton
             onClick={onOpen}
             isLoading={isLoadingTrade}
-            text={isLoadingTrade ? t("fetchingQuote") : "Submit Swap"}
+            text={isLoadingTrade ? t("fetchingQuote") : "Review"}
           />
           <SwapReviewContent
             status={isPreparing ? undefined : status}
@@ -398,7 +404,7 @@ const Main = () => {
           <SubmitSwapButton
             onClick={onSwapBestTrade}
             isLoading={isPreparing}
-            text="Confirm Swap"
+            text="Swap"
           />
         </div>
       )}

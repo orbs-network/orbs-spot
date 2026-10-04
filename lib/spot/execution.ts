@@ -14,8 +14,8 @@ import {
 /** Adapt any wallet to this port. Writes resolve only after successful receipts. */
 export interface SpotWalletPort {
   getAllowance(request: AllowanceRequest): Promise<string>;
-  wrapNativeToken(amountRaw: string): Promise<`0x${string}`>;
-  approveToken(request: ApprovalRequest): Promise<`0x${string}`>;
+  wrapNativeToken(amountRaw: string, onSubmitted?: (hash: `0x${string}`) => void): Promise<`0x${string}`>;
+  approveToken(request: ApprovalRequest, onSubmitted?: (hash: `0x${string}`) => void): Promise<`0x${string}`>;
   signOrder(request: OrderSigningRequest): Promise<`0x${string}`>;
   cancelOrder(request: CancelOrderRequest): Promise<`0x${string}`>;
   assertContext(account: string, chainId: number): Promise<void>;
@@ -145,7 +145,7 @@ export function createOrderExecutor(
       if (wrapAmount > BigInt(0)) {
         await wallet.assertContext(account, client.chainId);
         publish({ phase: ExecutionPhase.WRAPPING, currentStep: Steps.WRAP });
-        const txHash = await wallet.wrapNativeToken(wrapAmount.toString());
+        const txHash = await wallet.wrapNativeToken(wrapAmount.toString(), (wrapTxHash) => publish({ wrapTxHash }));
         completedWrap = { key: wrapKey, amount: wrapped + wrapAmount, txHash };
         publish({
           wrapTxHash: txHash,
@@ -161,7 +161,7 @@ export function createOrderExecutor(
         const txHash = await wallet.approveToken({
           ...allowanceRequest,
           amount: amount.toString(),
-        });
+        }, (approvalTxHash) => publish({ approvalTxHash }));
         publish({ approvalTxHash: txHash });
         // Confirmation and RPC reads can briefly disagree. Reread a bounded
         // number of times; do not send another approval just because a read lags.
@@ -191,8 +191,8 @@ export function createOrderExecutor(
       });
       publish({ phase: ExecutionPhase.SIGNING, currentStep: Steps.CREATE });
       const signature = await wallet.signOrder(prepared.signingRequest);
-      await wallet.assertContext(account, client.chainId);
       publish({ phase: ExecutionPhase.SUBMITTING });
+      await wallet.assertContext(account, client.chainId);
       submitting = true;
       // The signature belongs to this exact prepared order. Do not recalculate
       // the order or replace its nonce, amounts or deadlines after signing.

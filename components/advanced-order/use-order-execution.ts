@@ -111,7 +111,11 @@ export function useExecution() {
       }
     },
     onSuccess: (result) => {
-      toast.success("Order placed", { id: CREATE_ORDER_TOAST_ID });
+      if (useOrderSubmitFlowStore.getState().isReviewOpen) {
+        toast.dismiss(CREATE_ORDER_TOAST_ID);
+      } else {
+        toast.success("Order placed", { id: CREATE_ORDER_TOAST_ID });
+      }
       // A refresh failure must not turn an accepted order into a failed submission.
       // Use the submitted wallet scope, even if the user has since switched accounts.
       void invalidateOrderQueries(queryClient, result);

@@ -51,6 +51,7 @@ function PopoverContent({
   children,
   align = "center",
   sideOffset = 8,
+  collisionPadding,
   drawerTitle = "Menu",
   mobilePresentation = "drawer",
   ...props
@@ -105,6 +106,7 @@ function PopoverContent({
         data-slot="popover-content"
         align={align}
         sideOffset={sideOffset}
+        collisionPadding={collisionPadding}
         className={cn(
           "z-50 rounded-[14px] border border-border/80 bg-popover text-popover-foreground outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2",
           className,

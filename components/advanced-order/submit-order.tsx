@@ -10,7 +10,7 @@ import { IS_ORBS } from "@/lib/partners/client";
 import { Module } from "@orbs-network/spot-ui";
 import { ExecutionStatus } from "@/lib/spot/execution";
 import { useSubmitButton } from "./use-order-execution";
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useConnection } from "wagmi";
 import { Field } from "@/lib/types";
 import { getOrderTitle } from "./utils";
@@ -40,7 +40,12 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
   );
   const { chainId, address: account } = useConnection();
   const pendingWrappedContext = useOrderSubmitFlowStore(state => state.pendingWrappedContext);
-  const [open, setOpen] = useState(false);
+  const open = useOrderSubmitFlowStore(state => state.isReviewOpen);
+  const setOpen = useOrderSubmitFlowStore(state => state.setReviewOpen);
+  useEffect(() => {
+    if (isDeveloperMode) setOpen(false);
+    return () => setOpen(false);
+  }, [isDeveloperMode, setOpen]);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(resetTimer.current), []);
   const orderTitle = getOrderTitle(orderModule, t);
@@ -117,7 +122,7 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
             onClick={onOpen}
             disabled={disabled}
             isLoading={isFetchingQuote}
-            text={isFetchingQuote ? t("fetchingQuote") : t("placeOrder")}
+            text={isFetchingQuote ? t("fetchingQuote") : "Review"}
             validateSwap={false}
             chainId={chainId}
           />

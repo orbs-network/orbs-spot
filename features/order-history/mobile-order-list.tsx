@@ -21,15 +21,14 @@ export function MobileOrderList({ orders, onSelect, children }: {
   ), [orders.length, onSelect]);
 
   return (
-    <div data-mobile-order-list className="min-w-0">
+    <div data-mobile-order-list className="flex min-h-0 min-w-0 flex-1 flex-col">
       {orders.length ? (
         <>
-          <p role="status" className="px-4 py-3 text-xs text-muted-foreground">
+          <p role="status" className="shrink-0 px-4 py-3 text-xs text-muted-foreground">
             {orders.length} {orders.length === 1 ? "order" : "orders"}
           </p>
           <Virtuoso
-            useWindowScroll={presentation === "page"}
-            className={presentation === "page" ? "w-full" : "h-[60dvh]"}
+            className={presentation === "page" ? "min-h-0 flex-1 overscroll-y-contain" : "h-[60dvh]"}
             data={orders}
             computeItemKey={orderKey}
             increaseViewportBy={300}

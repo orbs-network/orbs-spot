@@ -102,6 +102,8 @@
   "maxOrderSize": "Maximum order size is {maxOrderSize} USD",
   "viewOnExplorer": "View on explorer",
   "proceedInWallet": "Proceed in wallet",
+  "transactionSubmitted": "Transaction submitted",
+  "orderSubmitted": "Order submitted",
   "wrapMsg": "Note: {symbol} was wrapped to {wSymbol}",
   "createOrderActionSuccess": "{name} order placed"
 }

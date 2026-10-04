@@ -9,6 +9,7 @@ export const useApproval = (
   spender: string,
   _currencyAddress?: string,
   amount?: string,
+  onSubmitted?: (hash: `0x${string}`) => void,
 ) => {
   const currencyAddress = useParseNativeCurrencyAddress(_currencyAddress);
   const { mutateAsync: approveToken } = useApproveToken();
@@ -35,6 +36,7 @@ export const useApproval = (
         tokenAddress: currencyAddress,
         spenderAddress: spender,
         amount,
+        onSubmitted,
       });
       // Check the actual allowance after confirmation, rather than assuming the write took effect.
       if (!(await ensureAllowance())) throw new Error("Approval failed");

@@ -15,7 +15,7 @@ function load(file, dependencies) {
   const code = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
-  vm.runInNewContext(code, { exports, require: (id) => {
+  vm.runInNewContext(code, { exports, structuredClone, require: (id) => {
     if (Object.hasOwn(dependencies, id)) return dependencies[id];
     if (id === '@/lib/spot/queries') return load('lib/spot/queries.ts', {});
     if (id.startsWith('.') || id.startsWith('@/')) throw new Error(`Unmocked dependency: ${id}`);
@@ -42,6 +42,112 @@ test('missing approval amount rejects before an execution allowance read', async
   assert.equal(await useApproval('spender', 'token', '9').ensureAllowance(), true);
   assert.equal(await useApproval('spender', 'token', '11').ensureAllowance(), false);
   assert.equal(reads, 2);
+});
+
+test('approval and wrapping report wallet submission while the transaction is still confirming', async () => {
+  const hash = '0x1234';
+  for (const kind of ['approve', 'wrap']) {
+    let releaseReceipt;
+    let receiptRequested;
+    const awaitingReceipt = new Promise(resolve => { receiptRequested = resolve; });
+    const receipt = new Promise(resolve => { releaseReceipt = resolve; });
+    const submitted = [];
+    let completed = false;
+    const mocks = {
+      '@tanstack/react-query': { useMutation: ({ mutationFn }) => ({ mutateAsync: mutationFn }) },
+      wagmi: {
+        useConnection: () => ({ address: '0xaccount', chainId: 56 }),
+        useWalletClient: () => ({ data: { chain: { id: 56 }, writeContract: async () => hash } }),
+      },
+      './use-get-transaction-receipt': { useGetTransactionReceipt: () => () => {
+        receiptRequested();
+        return receipt;
+      } },
+      '../utils': { getWrappedNativeCurrency: () => ({ address: '0xwrapped' }) },
+      '../abi/wethAbi.json': [],
+    };
+    const onSubmitted = value => submitted.push(value);
+    const operation = kind === 'approve'
+      ? load('lib/hooks/use-token-approval.ts', mocks).useApproveToken().mutateAsync({
+        tokenAddress: '0xtoken', spenderAddress: '0xspender', amount: '1', onSubmitted,
+      })
+      : load('lib/hooks/use-wrap.ts', mocks).useWrapNativeToken().mutateAsync({ amount: '1', onSubmitted });
+    operation.then(() => { completed = true; });
+    await awaitingReceipt;
+    assert.deepEqual(submitted, [hash]);
+    assert.equal(completed, false, 'submission notification must not skip transaction confirmation');
+    releaseReceipt({ status: 'success' });
+    assert.equal((await operation).hash, hash);
+  }
+});
+
+test('swap wallet prompts clear after each wallet response and return for the next request', async () => {
+  const { createSwapExecutor } = load('lib/swap/execution.ts', {});
+  const account = '0x1111111111111111111111111111111111111111';
+  const inputToken = '0x2222222222222222222222222222222222222222';
+  const outputToken = '0x3333333333333333333333333333333333333333';
+  const hash = '0x' + 'ab'.repeat(32);
+  const state = {};
+  const waitingStates = [];
+  const toastEvents = [];
+  state.updateStore = patch => {
+    Object.assign(state, patch);
+    if ('isAwaitingWallet' in patch) waitingStates.push(patch.isAwaitingWallet);
+  };
+  let mutation;
+  const quote = { user: account, inToken: inputToken, outToken: outputToken, inAmount: '1',
+    outAmount: '2', minAmountOut: '1', timestamp: Date.now(), eip712: { domain: { chainId: 56 } } };
+  const submitWalletTx = onSubmitted => async () => {
+    assert.equal(state.isAwaitingWallet, true);
+    onSubmitted(hash);
+    assert.equal(state.isAwaitingWallet, false, 'hide while the receipt is pending');
+    return { status: 'success' };
+  };
+  const { useSwapBestTrade } = load('lib/hooks/use-swap-best-trade.tsx', {
+    react: { useMemo: fn => fn(), useCallback: fn => fn },
+    '@tanstack/react-query': {
+      useMutation: options => { mutation = options; return {}; },
+      useQueryClient: () => ({}),
+    },
+    './use-sign-eip': { useSignEip: () => ({ mutateAsync: async () => {
+      assert.equal(state.isAwaitingWallet, true);
+      return '0xsignature';
+    } }) },
+    './use-approval': { useApproval: (_spender, _token, _amount, onSubmitted) => ({
+      ensureAllowance: async () => false, approve: submitWalletTx(onSubmitted),
+    }) },
+    './use-wrap': { useWrap: onSubmitted => ({ mutateAsync: submitWalletTx(onSubmitted) }) },
+    '../utils': { isNativeAddress: () => true, getWrappedNativeCurrency: () => ({ address: inputToken }) },
+    './use-derived-swap': { useDerivedSwap: () => ({ inputCurrency: { address: inputToken }, outputCurrency: { address: outputToken },
+      parsedInputAmount: '1', inputAmount: '1', outputAmount: '2', trade: { originalQuote: quote } }) },
+    '@/lib/swap/execution': { createSwapExecutor },
+    '@/lib/swap/use-swap-toasts': { useSwapToasts: () => new Proxy({}, { get: (_target, name) => () => toastEvents.push(name) }) },
+    './liquidity-hub': { useLiquidityHub: () => ({ swap: async () => {
+      assert.equal(state.isAwaitingWallet, false, 'hide after signing, before the relay returns a hash');
+      return hash;
+    } }) },
+    './use-get-transaction-receipt': { useGetTransactionReceipt: () => async () => {
+      assert.equal(state.isAwaitingWallet, false);
+      return { status: 'success' };
+    } },
+    './store': { useBestTradeSwapStore: Object.assign(selector => selector(state), { getState: () => state }), useSwapStore: selector => selector({ setPauseQuote: () => {} }) },
+    '../types': { SwapStep: { WRAP: 'WRAP', APPROVE: 'APPROVE', SWAP: 'SWAP' } },
+    wagmi: { useConnection: () => ({ address: account, chainId: 56 }), useWalletClient: () => ({ data: {
+      getAddresses: async () => [account], getChainId: async () => 56,
+    } }) },
+    '../tx-rejection': { isUserRejectedError: () => false },
+  });
+  useSwapBestTrade();
+  await mutation.mutationFn();
+  assert.deepEqual(waitingStates, [true, false, true, false, true, false]);
+  // Visibility changes after the hook rendered must affect the completion notification.
+  for (const isReviewOpen of [true, false, true]) {
+    state.isReviewOpen = isReviewOpen;
+    toastEvents.length = 0;
+    mutation.onSuccess({ txHash: hash });
+    assert.deepEqual(toastEvents, [isReviewOpen ? 'dismissPendingToasts' : 'onSwapSuccess']);
+    assert.equal(state.status, require('@orbs-network/swap-ui').SwapStatus.SUCCESS);
+  }
 });
 
 function historyFixture() {
@@ -152,17 +258,23 @@ function executionFixture() {
   const state = {
     connection: { address: '0xaaaa', chainId: 56 }, client: { data: { partner: 'partner' } },
     model: { form: { canSubmit: true }, inputToken: {}, outputToken: {}, market: { isLoading: false, noLiquidity: false } },
-    execution: {}, busy: false, submissions: 0, notices: [], mutation: undefined,
+    execution: {}, busy: false, submissions: 0, notices: [], dismissed: [], invalidated: [], mutation: undefined,
   };
   const store = (selector) => selector(state);
   store.setState = (patch) => Object.assign(state, patch);
+  store.getState = () => state;
   const hooks = load('components/advanced-order/use-order-execution.ts', {
     '@tanstack/react-query': {
       useQueryClient: () => ({}),
       useMutation: (options) => { state.mutation = options; return { mutate: () => {}, isPending: false }; },
     },
     wagmi: { useConnection: () => state.connection },
-    sonner: { toast: { error: (title, options) => state.notices.push({ title, ...options }) } },
+    sonner: { toast: {
+      error: (title, options) => state.notices.push({ title, ...options }),
+      success: (title, options) => state.notices.push({ title, ...options }),
+      dismiss: id => state.dismissed.push(id),
+    } },
+    '@/lib/spot/queries': { invalidateOrderQueries: async (_client, result) => { state.invalidated.push(result); } },
     './constants': { CREATE_ORDER_TOAST_ID: 'create' },
     '@/lib/hooks/store': { useOrderSubmitFlowStore: store },
     '@/lib/utils': { getWrappedNativeCurrency: () => ({}) },
@@ -176,6 +288,22 @@ function executionFixture() {
   });
   return { state, ...hooks };
 }
+
+test('order completion uses current review visibility and always refreshes orders', () => {
+  const f = executionFixture();
+  f.useExecution();
+  const result = { order: {}, partner: 'partner', chainId: 56, account: '0xaaaa' };
+  for (const isReviewOpen of [true, false, true]) {
+    f.state.isReviewOpen = isReviewOpen;
+    f.state.notices.length = 0;
+    f.state.dismissed.length = 0;
+    f.state.mutation.onSuccess(result);
+    assert.deepEqual(f.state.notices, isReviewOpen ? [] : [{ title: 'Order placed', id: 'create' }]);
+    assert.deepEqual(f.state.dismissed, isReviewOpen ? ['create'] : []);
+    assert.equal(f.state.invalidated.at(-1), result);
+  }
+  assert.equal(f.state.invalidated.length, 3);
+});
 
 test('submission preflight failures reject visibly without executing or succeeding', async () => {
   const cases = [

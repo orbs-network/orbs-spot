@@ -11,7 +11,7 @@ import { useFormatNumber } from "@/lib/hooks/common";
 import { useCurrency } from "@/lib/hooks/use-currencies";
 import { useTranslations } from "@/lib/use-translations";
 import { DISCLAIMER_URL, isNativeAddress, type Token } from "@orbs-network/spot-ui";
-import { Steps, ExecutionStatus, type ParsedError } from "@/lib/spot/execution";
+import { Steps, ExecutionPhase, ExecutionStatus, type ParsedError } from "@/lib/spot/execution";
 import { Step, SwapFlow, SwapStatus } from "@orbs-network/swap-ui";
 import BN from "bignumber.js";
 import { ArrowRightIcon, CheckIcon } from "lucide-react";
@@ -57,7 +57,6 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
   const limitPrice = useFormatNumber({
     value: order.limitPriceUI,
   });
-  const feesUsd = useFormatNumber({ value: order.feesUsd, decimalScale: 2 });
 
   return (
     <div data-review-details className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
@@ -140,15 +139,6 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
       >
         {formatDuration(order.tradeInterval)}
       </DetailRow>
-      <DetailRow
-        label={t("fees", { value: `(${order.feesPercentage}%)` })}
-        hidden={order.feesUsd === undefined || order.feesUsd === null}
-        align="start"
-        labelClassName="text-xs leading-5"
-        valueClassName="text-xs leading-5"
-      >
-        ${feesUsd || "0"}
-      </DetailRow>
     </div>
   );
 }
@@ -173,7 +163,7 @@ function TxError({ error }: { error?: ParsedError }) {
 
 function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
   const t = useTranslations();
-  const { currentStep: step, wrapTxHash, approvalTxHash: approveTxHash, status, chainId } =
+  const { currentStep: step, wrapTxHash, approvalTxHash: approveTxHash, status, phase, chainId } =
     useSubmitOrderExecution();
   const network = SUPPORTED_CHAINS.find((chain) => chain.id === chainId);
   const wrapExplorerUrl = getExplorerUrl(chainId, wrapTxHash);
@@ -187,29 +177,36 @@ function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
       return {
         title: t("wrapAction", { symbol }),
         footerLink: wrapExplorerUrl,
-        footerText: wrapExplorerUrl
-          ? t("viewOnExplorer")
-          : t("proceedInWallet"),
+        footerText: wrapTxHash
+          ? t("orderSubmitted")
+          : !wrapTxHash && status === ExecutionStatus.LOADING ? t("proceedInWallet") : undefined,
       };
     }
     if (step === Steps.APPROVE) {
       return {
         title: t("approveAction", { symbol }),
         footerLink: approveExplorerUrl,
-        footerText: approveExplorerUrl
-          ? t("viewOnExplorer")
-          : t("proceedInWallet"),
+        footerText: approveTxHash
+          ? t("orderSubmitted")
+          : !approveTxHash && status === ExecutionStatus.LOADING ? t("proceedInWallet") : undefined,
       };
     }
     return {
       title: t("createOrderAction", { name: orderTitle }),
       footerText:
-        status === ExecutionStatus.LOADING ? t("proceedInWallet") : undefined,
+        status === ExecutionStatus.LOADING
+          ? phase === ExecutionPhase.SIGNING
+            ? t("proceedInWallet")
+            : phase === ExecutionPhase.SUBMITTING ? t("orderSubmitted") : undefined
+          : undefined,
     };
   }, [
     approveExplorerUrl,
     orderTitle,
     status,
+    phase,
+    wrapTxHash,
+    approveTxHash,
     step,
     symbol,
     t,
@@ -265,7 +262,7 @@ function OrderFlowMain({
             isLoading={Boolean(isSubmitting)}
             onClick={onSubmit}
           >
-            Submit order
+            Submit
           </Button>
         </div>
       )}

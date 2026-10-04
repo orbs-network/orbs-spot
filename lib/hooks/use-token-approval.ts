@@ -7,6 +7,7 @@ export type ApproveTokenParams = {
   tokenAddress?: string;
   spenderAddress?: string;
   amount?: string;
+  onSubmitted?: (hash: `0x${string}`) => void;
 };
 
 export type TransactionResult = {
@@ -24,6 +25,7 @@ export const useApproveToken = () => {
       amount,
       spenderAddress,
       tokenAddress,
+      onSubmitted,
     }: ApproveTokenParams): Promise<TransactionResult> => {
       if (!walletClient) {
         throw new Error("Wallet client not found");
@@ -41,6 +43,7 @@ export const useApproveToken = () => {
         chain: walletClient.chain,
       });
 
+      onSubmitted?.(hash);
       // Keep the mutation pending until confirmation so signing cannot race approval.
       const receipt = await getTransactionReceipt(hash);
       return { hash, receipt };

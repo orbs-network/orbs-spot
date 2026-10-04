@@ -117,6 +117,8 @@ export const useFormTabStore = create<FormTabStore>((set) => ({
 }));
 
 type OrderSubmitFlowStore = {
+  isReviewOpen: boolean;
+  setReviewOpen: (open: boolean) => void;
   execution: ExecutionSnapshot;
   pendingWrappedInputAddress?: string;
   pendingWrappedContext?: { chainId: number; account: string };
@@ -127,6 +129,8 @@ type OrderSubmitFlowStore = {
 // native-token order. Queue the form update so that changing the input token
 // cannot reset or alter the in-progress order flow.
 export const useOrderSubmitFlowStore = create<OrderSubmitFlowStore>((set) => ({
+  isReviewOpen: false,
+  setReviewOpen: (isReviewOpen) => set({ isReviewOpen }),
   execution: { phase: ExecutionPhase.IDLE },
   pendingWrappedInputAddress: undefined,
   setPendingWrappedInputAddress: (pendingWrappedInputAddress, pendingWrappedContext) =>
@@ -134,6 +138,9 @@ export const useOrderSubmitFlowStore = create<OrderSubmitFlowStore>((set) => ({
 }));
 
 type BestTradeSwapStore = {
+  isReviewOpen: boolean;
+  setReviewOpen: (open: boolean) => void;
+  isAwaitingWallet?: boolean;
   review?: { inputCurrency: Currency; outputCurrency: Currency; inputAmount: string; outputAmount: string; chainId: number };
   status?: SwapStatus;
   totalSteps?: number;
@@ -145,6 +152,8 @@ type BestTradeSwapStore = {
 };
 
 export const useBestTradeSwapStore = create<BestTradeSwapStore>((set) => ({
+  isReviewOpen: false,
+  setReviewOpen: (isReviewOpen) => set({ isReviewOpen }),
   updateStore: (data: Partial<BestTradeSwapStore>) =>
     set((state) => ({ ...state, ...data })),
   resetStore: () =>
@@ -154,6 +163,7 @@ export const useBestTradeSwapStore = create<BestTradeSwapStore>((set) => ({
       currentStep: undefined,
       currentStepIndex: undefined,
       txHash: undefined,
+      isAwaitingWallet: false,
       review: undefined,
     }),
 }));

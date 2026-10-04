@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { CheckIcon, ChevronDownIcon, SearchIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ export function NetworkSelector({ chains, value, onValueChange, includeAllNetwor
   const selected = networkOptions.find(option => option.value === value);
 
   return (
-    <Popover responsive={false} open={open} onOpenChange={nextOpen => { setOpen(nextOpen); setSearch(""); }}>
+    <Popover open={open} onOpenChange={nextOpen => { setOpen(nextOpen); setSearch(""); }}>
       <PopoverTrigger asChild>
         <button
           ref={triggerRef}
@@ -53,10 +53,12 @@ export function NetworkSelector({ chains, value, onValueChange, includeAllNetwor
         tabIndex={-1}
         align="end"
         collisionPadding={16}
+        drawerTitle="Select network"
         aria-label={ariaLabel}
+        aria-describedby={undefined}
         onOpenAutoFocus={event => { event.preventDefault(); contentRef.current?.focus({ preventScroll: true }); }}
         onCloseAutoFocus={event => { event.preventDefault(); triggerRef.current?.focus(); }}
-        className="flex max-h-[min(480px,var(--radix-popover-content-available-height))] w-64 max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0"
+        className="flex w-64 max-w-[calc(100vw-2rem)] flex-col overflow-hidden p-0 sm:max-h-[min(480px,var(--radix-popover-content-available-height))]"
         onKeyDown={event => {
           const inSearch = event.target instanceof HTMLInputElement;
           if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key) || (inSearch && event.key !== "ArrowDown")) return;
@@ -68,11 +70,22 @@ export function NetworkSelector({ chains, value, onValueChange, includeAllNetwor
           buttons[nextIndex].focus();
         }}
       >
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3 sm:hidden">
+          <h2 className="text-base font-semibold">Select network</h2>
+          <button
+            type="button"
+            aria-label="Close network selector"
+            onClick={() => setOpen(false)}
+            className="flex size-9 items-center justify-center text-muted-foreground focus-visible:outline-2 focus-visible:outline-primary"
+          >
+            <XIcon aria-hidden="true" className="size-5" />
+          </button>
+        </div>
         <div className="relative shrink-0 border-b border-border p-2">
           <SearchIcon aria-hidden="true" className="pointer-events-none absolute left-5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input aria-label="Search networks" placeholder="Search networks…" value={search} onChange={event => setSearch(event.target.value)} className="pl-9" />
         </div>
-        <div role="group" aria-label="Networks" className="min-h-0 overflow-y-auto overscroll-contain p-1">
+        <div role="group" aria-label="Networks" className="min-h-0 overflow-y-auto overscroll-contain p-1 max-sm:pb-[max(0.25rem,env(safe-area-inset-bottom))]">
           {options.map(option => (
             <button
               key={option.value}
@@ -81,7 +94,7 @@ export function NetworkSelector({ chains, value, onValueChange, includeAllNetwor
               data-chain-option
               aria-pressed={option.value === value}
               onClick={() => { onValueChange(option.value); setOpen(false); setSearch(""); }}
-              className="flex min-h-9 w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50 aria-pressed:bg-primary/10"
+              className="flex min-h-9 w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-secondary focus-visible:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/50 aria-pressed:bg-primary/10 max-sm:min-h-11"
             >
               {option.label}
               {option.value === value && <CheckIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />}

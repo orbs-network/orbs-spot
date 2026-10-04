@@ -20,9 +20,9 @@ export function MobileTradingMenu({ children }: { children: ReactNode }) {
         </NavPillButton>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay data-slot="dialog-overlay" className="fixed inset-0 z-[60] bg-black/40" />
+        <Dialog.Overlay data-slot="dialog-overlay" className="dialog-overlay-motion fixed inset-0 z-[60] bg-black/40" />
         <Dialog.Content data-mobile-trading-menu aria-describedby={undefined}
-          className="fixed inset-y-0 right-0 z-[60] flex w-full max-w-[360px] flex-col border-l border-border bg-background text-foreground">
+          className="mobile-trading-menu-motion fixed inset-y-0 right-0 z-[60] flex w-full max-w-[360px] flex-col border-l border-border bg-background text-foreground">
           <div className="flex min-h-16 items-center justify-between border-b border-border px-5">
             <Dialog.Title className="text-lg font-medium">Trading</Dialog.Title>
             <Dialog.Close asChild>

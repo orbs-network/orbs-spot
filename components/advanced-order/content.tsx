@@ -10,17 +10,19 @@ import { ModuleInputs, TokenPanel } from "./token-panels";
 import { PricesPanel } from "./price-panels";
 import { SubmitOrder } from "./submit-order";
 import { IS_ORBS } from "@/lib/partners/client";
+import { useOutputAmount } from "./use-order-form";
 
 export const AdvancedOrderContent = memo(function AdvancedOrderContent({
   orderModule,
 }: {
   orderModule: Module;
 }) {
+  const { amount } = useOutputAmount();
   return (
     <div className="flex flex-col gap-3">
       <div data-currency-pair className="flex flex-col gap-1.5">
         <TokenPanel isSource />
-        <ToggleCurrencies />
+        <ToggleCurrencies outputAmount={amount.ui} />
         <TokenPanel isSource={false} />
       </div>
       <PricesPanel orderModule={orderModule} />

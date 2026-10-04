@@ -24,6 +24,7 @@ export const useSwapBestTrade = () => {
   // No transaction step is published until wallet/quote/allowance checks finish.
   const isPreparing = status === SwapStatus.LOADING && currentStep === undefined;
   const updateStore = useBestTradeSwapStore((state) => state.updateStore);
+  const onWalletSubmitted = useCallback(() => updateStore({ isAwaitingWallet: false }), [updateStore]);
   const totalSteps = useBestTradeSwapStore((state) => state.totalSteps);
   const currentStepIndex = useBestTradeSwapStore(
     (state) => state.currentStepIndex
@@ -40,9 +41,10 @@ export const useSwapBestTrade = () => {
   const { ensureAllowance, approve } = useApproval(
     permit2Address,
     inputCurrency?.address,
-    parsedInputAmount
+    parsedInputAmount,
+    onWalletSubmitted,
   );
-  const { mutateAsync: wrap } = useWrap();
+  const { mutateAsync: wrap } = useWrap(onWalletSubmitted);
   const toasts = useSwapToasts();
   const { address: account, chainId } = useConnection();
   const { data: walletClient } = useWalletClient();
@@ -72,12 +74,16 @@ export const useSwapBestTrade = () => {
         wrap,
         approve,
         refreshQuote: async () => (await refetchTrade({ throwOnError: true })).data?.originalQuote,
-        sign: signEip,
+        sign: async (quote) => {
+          const signature = await signEip(quote);
+          onWalletSubmitted();
+          return signature;
+        },
         submit: (quote, signature) => liquidityHubClient.swap(quote, signature),
         confirm: getTransactionReceiptCallback,
         onPlan: totalSteps => updateStore({ totalSteps }),
         onStep: (step, currentStepIndex) => {
-          updateStore({ currentStep: SwapStep[step], currentStepIndex });
+          updateStore({ currentStep: SwapStep[step], currentStepIndex, isAwaitingWallet: true });
           if (step === "WRAP") toasts.onWrapRequest();
           else if (step === "APPROVE") toasts.onApproveRequest();
           else toasts.onSwapRequest();
@@ -88,7 +94,11 @@ export const useSwapBestTrade = () => {
       });
     },
     onSuccess: ({ txHash }) => {
-      toasts.onSwapSuccess(txHash);
+      if (useBestTradeSwapStore.getState().isReviewOpen) {
+        toasts.dismissPendingToasts();
+      } else {
+        toasts.onSwapSuccess(txHash);
+      }
       updateStore({ status: SwapStatus.SUCCESS });
     },
     onError: (error) => {
@@ -105,6 +115,7 @@ export const useSwapBestTrade = () => {
       }
     },
     onSettled: (_result, _error, _variables, scope) => {
+      onWalletSubmitted();
       setPauseQuote(false);
       // The wallet may change while a prompt is open. Refresh the submitted
       // account's balances, including after a confirmed wrap followed by rejection.

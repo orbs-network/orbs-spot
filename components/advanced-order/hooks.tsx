@@ -122,8 +122,8 @@ export function useWalletInteractions() {
           );
         }
       },
-      wrapNativeToken: async (amount) => {
-        const { hash } = await wrapNativeToken(amount);
+      wrapNativeToken: async (amount, onSubmitted) => {
+        const { hash } = await wrapNativeToken({ amount, onSubmitted });
         // Apply the token change when the review closes, after the confirmed deposit.
         const wrappedAddress = getWrappedNativeCurrency(
           walletClient?.chain.id,
@@ -132,8 +132,8 @@ export function useWalletInteractions() {
         void refetchBalances().catch(() => undefined);
         return hash;
       },
-      approveToken: async (request) => {
-        const { hash } = await approveToken(request);
+      approveToken: async (request, onSubmitted) => {
+        const { hash } = await approveToken({ ...request, onSubmitted });
         return hash;
       },
       cancelOrder: async (request) => {

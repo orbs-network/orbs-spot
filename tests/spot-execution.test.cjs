@@ -46,6 +46,39 @@ function fixture({ native = false, allowance = '0' } = {}) {
   return { input, executor, events, snapshots, order, preparedOrder };
 }
 
+test('order execution publishes submissions before receipts and stops prompting after signing', async () => {
+  const f = fixture({ native: true });
+  const stages = [];
+  for (const [method, phase, field, hash] of [
+    ['wrapNativeToken', ExecutionPhase.WRAPPING, 'wrapTxHash', '0xwrap'],
+    ['approveToken', ExecutionPhase.APPROVING, 'approvalTxHash', '0xapprove'],
+  ]) {
+    const original = f.input.wallet[method];
+    f.input.wallet[method] = async (request, onSubmitted) => {
+      assert.equal(f.snapshots.at(-1)[field], undefined);
+      onSubmitted(hash);
+      assert.equal(f.snapshots.at(-1)[field], hash);
+      assert.equal(f.snapshots.at(-1).phase, phase, 'wait for the receipt before advancing');
+      assert.equal(f.events.includes('sign'), false);
+      await Promise.resolve();
+      stages.push(phase);
+      return original(request);
+    };
+  }
+  let signed = false;
+  f.input.wallet.signOrder = async () => {
+    assert.equal(f.snapshots.at(-1).phase, ExecutionPhase.SIGNING);
+    signed = true;
+    return '0xoriginal';
+  };
+  f.input.wallet.assertContext = async () => {
+    if (signed) assert.equal(f.snapshots.at(-1).phase, ExecutionPhase.SUBMITTING,
+      'hide the signing prompt during the post-signature context check');
+  };
+  await f.executor.submit(f.input);
+  assert.deepEqual(stages, [ExecutionPhase.WRAPPING, ExecutionPhase.APPROVING]);
+});
+
 test('SDK execution confirms wrap and exact approval before preparing, preserving the signature', async () => {
   const f = fixture({ native: true });
   assert.equal(await f.executor.submit(f.input), f.order);
