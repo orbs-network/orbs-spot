@@ -19,7 +19,7 @@ import { MarketTokenLink } from "./market-token-link";
 import { NetworkLabel } from "@/components/network-label";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { MobileOrderList } from "./mobile-order-list";
-const HISTORY_COLUMNS = ["Created", "Deadline", "Network", "Order type", "Market", "Sell amount", "Filled", "Status", "Details"];
+const HISTORY_COLUMNS = ["Chain", "Order type", "Market", "Sell amount", "Filled", "Status", "Timing", "Details"];
 
 function HistoryTableHeader() {
   return (
@@ -41,17 +41,7 @@ const OrderTableCells = memo(function OrderTableCells({ order, onSelect }: {
 
   return (
     <>
-      <TableCell role="cell" data-label="Created">
-        <time dateTime={timestamp ? new Date(timestamp).toISOString() : undefined}>
-          {formatOrderDate(order.createdAt) || "—"}
-        </time>
-      </TableCell>
-      <TableCell role="cell" data-label="Deadline">
-        <time dateTime={deadline ? new Date(deadline).toISOString() : undefined}>
-          {formatOrderDate(order.deadline) || "—"}
-        </time>
-      </TableCell>
-      <TableCell role="cell" data-label="Network"><NetworkLabel chainId={order.chainId} /></TableCell>
+      <TableCell role="cell" data-label="Chain"><NetworkLabel chainId={order.chainId} /></TableCell>
       <TableCell role="cell" data-label="Order type">{getOrderTypeLabel(order.type)}</TableCell>
       <TableCell role="cell" data-label="Market">
         <div className="flex flex-wrap items-center gap-2">
@@ -65,6 +55,22 @@ const OrderTableCells = memo(function OrderTableCells({ order, onSelect }: {
       </TableCell>
       <TableCell role="cell" data-label="Filled" className="tabular-nums">{Math.max(0, Math.min(100, Math.round(order.progress ?? 0)))}%</TableCell>
       <TableCell role="cell" data-label="Status"><span data-order-status={order.status}><OrderStatusLabel order={order} /></span></TableCell>
+      <TableCell role="cell" data-label="Timing">
+        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-xs">
+          <dt className="text-muted-foreground">Created</dt>
+          <dd>
+            <time dateTime={timestamp ? new Date(timestamp).toISOString() : undefined}>
+              {formatOrderDate(order.createdAt) || "—"}
+            </time>
+          </dd>
+          <dt className="text-muted-foreground">Deadline</dt>
+          <dd>
+            <time dateTime={deadline ? new Date(deadline).toISOString() : undefined}>
+              {formatOrderDate(order.deadline) || "—"}
+            </time>
+          </dd>
+        </dl>
+      </TableCell>
       <TableCell role="cell" data-label="Details">
         <button
           type="button"

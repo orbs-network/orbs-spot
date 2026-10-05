@@ -2,10 +2,8 @@
 
 /* eslint-disable @next/next/no-img-element */
 import React from "react";
-import { ExternalLinkIcon } from "lucide-react";
-import { useRouter } from "next/navigation";
 
-import { FORM_TABS, PERPS_URL } from "@/lib/consts";
+import { FORM_TABS } from "@/lib/consts";
 import { useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { useFormTabStore } from "@/lib/hooks/store";
 import { FormTab } from "@/lib/types";
@@ -14,6 +12,7 @@ import { StyledSelect } from "./ui/styled-select";
 import { SegmentedTabs } from "./ui/tabs";
 import { IS_ORBS } from "@/lib/partners/client";
 import { SettingsModal } from "./settings-modal";
+import { AdvancedOrderNavigation } from "./trading-navigation";
 import { TradeNetworkSelector } from "./trade-network-selector";
 
 const MOBILE_FORM_TAB_OPTIONS = FORM_TABS.map((tab) => ({
@@ -43,21 +42,9 @@ const FormHeader = () => {
       <SegmentedTabs
         aria-label="Order type"
         value={selectedTab.value}
-        options={IS_ORBS ? MOBILE_FORM_TAB_OPTIONS : DESKTOP_FORM_TAB_OPTIONS}
+        options={DESKTOP_FORM_TAB_OPTIONS}
         onValueChange={setSelectedTab}
       />
-      {IS_ORBS && (
-        <a
-          href={PERPS_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-1.5 border border-border px-3 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          Perps
-          <ExternalLinkIcon aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.5} />
-          <span className="sr-only">(opens in a new tab)</span>
-        </a>
-      )}
     </div>
   );
 };
@@ -80,8 +67,8 @@ const FormSectionHeader = ({
         {title}
       </h2>
       <div data-trade-header-actions className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
-        {showOrderHistory && (
-          <div data-trade-history-action className={IS_ORBS ? "lg:hidden max-sm:[&_span]:hidden max-sm:[&_button]:px-2.5" : undefined}>
+        {!IS_ORBS && showOrderHistory && (
+          <div data-trade-history-action>
             <OrderHistoryTrigger onOpen={onOpenOrderHistory} />
           </div>
         )}
@@ -124,11 +111,9 @@ export function FormContainer({
   const setOrderHistoryOpen = useFormTabStore(
     (state) => state.setOrderHistoryOpen,
   );
-  const router = useRouter();
   const openOrderHistory = React.useCallback(() => {
-    if (IS_ORBS) router.push("/orders");
-    else setOrderHistoryOpen(true);
-  }, [router, setOrderHistoryOpen]);
+    setOrderHistoryOpen(true);
+  }, [setOrderHistoryOpen]);
 
   return (
     <div
@@ -139,11 +124,11 @@ export function FormContainer({
         data-form-container
         className="flex w-full flex-col gap-3 rounded-[21px] border border-border/80 bg-card/95 p-3 backdrop-blur"
       >
-        <FormHeader />
+        {IS_ORBS ? <AdvancedOrderNavigation /> : <FormHeader />}
         <FormSectionHeader
           title={selectedTab.fullLabel}
           onOpenOrderHistory={openOrderHistory}
-          showOrderHistory={IS_ORBS || selectedTab.value !== FormTab.SWAP}
+          showOrderHistory={selectedTab.value !== FormTab.SWAP}
         />
         {children}
       </div>

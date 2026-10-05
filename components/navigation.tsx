@@ -4,7 +4,7 @@ import { type ComponentProps, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon, SunIcon, MoonIcon } from "lucide-react";
+import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon, SunIcon, MoonIcon, ExternalLinkIcon, GlobeIcon } from "lucide-react";
 import { useConnection, useDisconnect } from "wagmi";
 import { preserveDeveloperModeInHref, useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 import { cn, makeEllipsisAddress } from "@/lib/utils";
@@ -13,11 +13,10 @@ import { NavPillButton } from "./ui/nav-pill";
 import { useTheme } from "@/lib/theme";
 import type { PartnerBrand } from "@/lib/partners/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { Spinner } from "./ui/spinner";
 import { useWalletConnectModal } from "@/features/wallet-connection/provider";
 import { IS_ORBS } from "@/lib/partners/client";
-import { MobileTradingMenu } from "./mobile-trading-menu";
+import { TradingNavigation } from "./trading-navigation";
 
 function PopoverMenuButton({
   children,
@@ -50,7 +49,7 @@ function PopoverMenuButton({
 
 const WalletAvatar = ({ label }: { label?: string }) => {
   return (
-    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+    <span data-wallet-avatar className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
       <WalletIcon aria-hidden="true" className="size-3.5" />
       <span className="sr-only">{label ?? "Wallet"}</span>
     </span>
@@ -87,7 +86,7 @@ const WalletAccountPopover = ({
           data-wallet-account-trigger
         >
           <WalletAvatar label={displayName} />
-          <span className="min-w-0 truncate">{displayName}</span>
+          <span data-wallet-account-label className="min-w-0 truncate">{displayName}</span>
           <ChevronDownIcon
             aria-hidden="true"
             className={cn(
@@ -189,8 +188,8 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
   const isDeveloperGuideRoute = pathname === "/developers" || pathname.startsWith("/developers/");
 
   return (
-    <nav className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
-      <div className="flex w-full flex-nowrap items-center gap-2 sm:gap-3">
+    <header data-app-header className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
+      <div data-nav-layout className="flex w-full flex-nowrap items-center gap-2 sm:gap-3">
         <Link
           data-nav-brand
           href={preserveDeveloperModeInHref("/", isDeveloperMode)}
@@ -222,15 +221,23 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
             </span>
           )}
         </Link>
-        <div className="ml-auto flex w-auto shrink-0 items-center justify-end gap-1.5 sm:gap-2">
+        {IS_ORBS && <TradingNavigation />}
+        <div data-nav-actions className="ml-auto flex w-auto shrink-0 items-center justify-end gap-1.5 sm:gap-2">
           <DeveloperNavigation />
+          {IS_ORBS && (
+            <a data-orbs-website-link href="https://www.orbs.com/" target="_blank" rel="noopener noreferrer">
+              <GlobeIcon aria-hidden="true" className="size-4 sm:hidden" />
+              <span className="sr-only sm:not-sr-only">Orbs website</span>
+              <ExternalLinkIcon aria-hidden="true" className="hidden size-3 sm:block" />
+              <span className="sr-only">(opens in a new tab)</span>
+            </a>
+          )}
           {!isDeveloperGuideRoute && <NavWalletControls />}
           <DeveloperMoreNavigation isDeveloperMode={isDeveloperMode} />
-          <div className={IS_ORBS ? "hidden lg:block" : undefined}><ThemeToggle /></div>
-          {IS_ORBS && <MobileTradingMenu><ThemeToggle /></MobileTradingMenu>}
+          <ThemeToggle />
         </div>
       </div>
-    </nav>
+    </header>
   );
 }
 
@@ -238,14 +245,9 @@ function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <NavPillButton aria-label={label} onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-10 shrink-0 justify-center p-0">
-          <SunIcon aria-hidden="true" className="hidden size-4 dark:block" />
-          <MoonIcon aria-hidden="true" className="size-4 dark:hidden" />
-        </NavPillButton>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
-    </Tooltip>
+    <NavPillButton aria-label={label} onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-10 shrink-0 justify-center p-0">
+      <SunIcon aria-hidden="true" className="hidden size-4 dark:block" />
+      <MoonIcon aria-hidden="true" className="size-4 dark:hidden" />
+    </NavPillButton>
   );
 }

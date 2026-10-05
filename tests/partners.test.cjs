@@ -108,7 +108,7 @@ test("Orbs explicit dark theme reaches CSS and wallet tokens without changing it
   const dark = getThemeStyles(styles, "dark");
   assert.equal(light.colors.background, "#f6f6f6");
   assert.equal(dark.colors.background, "#121214");
-  assert.equal(dark.colors.primary, "#7a89e9");
+  assert.equal(dark.colors.primary, "#c4a1ff");
   assert.equal(dark.colors.primaryForeground, "#121214");
   assert.equal(dark.formContainerBackground, "#1e1e20");
   assert.equal(dark.formPanelRadius, "0px");

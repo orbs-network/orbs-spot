@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { OrderFilter } from "@orbs-network/spot-ui";
 import { useConnection } from "wagmi";
 import { bsc } from "viem/chains";
+import { usePathname, useSearchParams } from "next/navigation";
+import { updateUrlSearchParams } from "@/lib/url-state";
 import { SPOT_CHAINS } from "@/lib/consts";
 import { getChainName } from "@/lib/utils";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { useOrders, useHistoryNotifications } from "@/components/advanced-order/use-order-client";
-import { ORDER_HISTORY_CLOSE_RESET_DELAY, filterAndSortOrders } from "./format";
+import { ORDER_FILTER_OPTIONS, ORDER_HISTORY_CLOSE_RESET_DELAY, filterAndSortOrders } from "./format";
 import { useOrderSelection } from "./use-order-selection";
 import { useNetworkOrders } from "./use-network-orders";
 
@@ -21,9 +23,23 @@ export function useOrderHistory(presentation: "page" | "modal", onOpenChange: (o
   const networks = useNetworkOrders(presentation === "page");
   const orders = presentation === "page" ? networks.data.orders : singleNetwork.data.all;
   useHistoryNotifications(orders);
-  const [selectedFilter, setSelectedFilter] = useState<OrderFilter>(
+  const [modalFilter, setModalFilter] = useState<OrderFilter>(
     OrderFilter.All,
   );
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const pageFilter = ORDER_FILTER_OPTIONS.find(filter => filter.toLowerCase() === searchParams.get("filter")) ?? OrderFilter.All;
+  const selectedFilter = presentation === "page" ? pageFilter : modalFilter;
+  const setSelectedFilter = useCallback((filter: OrderFilter) => {
+    if (presentation === "modal") {
+      setModalFilter(filter);
+      return;
+    }
+    updateUrlSearchParams(pathname, searchParams, params => {
+      if (filter === OrderFilter.All) params.delete("filter");
+      else params.set("filter", filter.toLowerCase());
+    });
+  }, [pathname, searchParams, presentation]);
   const [selectedOrderId, setSelectedOrderId] = useState<string>();
   const [selectedNetwork, setSelectedNetwork] = useState("all");
   const drawer = useOrderSelection(presentation === "page", chainId);

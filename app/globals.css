@@ -40,19 +40,8 @@
   to { opacity: 0; }
 }
 
-@keyframes mobile-menu-enter {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
-
-@keyframes mobile-menu-exit {
-  from { transform: translateX(0); }
-  to { transform: translateX(100%); }
-}
-
 .dialog-center-motion,
-.dialog-overlay-motion,
-.mobile-trading-menu-motion {
+.dialog-overlay-motion {
   animation-duration: 250ms;
   animation-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
   animation-fill-mode: both;
@@ -62,14 +51,10 @@
 .dialog-center-motion[data-state="closed"] { animation-name: dialog-center-exit; }
 .dialog-overlay-motion[data-state="open"] { animation-name: dialog-fade-enter; }
 .dialog-overlay-motion[data-state="closed"] { animation-name: dialog-fade-exit; }
-.mobile-trading-menu-motion[data-state="open"] { animation-name: mobile-menu-enter; }
-.mobile-trading-menu-motion[data-state="closed"] { animation-name: mobile-menu-exit; }
 
 @media (prefers-reduced-motion: reduce) {
   .dialog-center-motion[data-state="open"] { animation-name: dialog-fade-enter; }
   .dialog-center-motion[data-state="closed"] { animation-name: dialog-fade-exit; }
-  .mobile-trading-menu-motion[data-state="open"] { animation-name: dialog-fade-enter; }
-  .mobile-trading-menu-motion[data-state="closed"] { animation-name: dialog-fade-exit; }
 }
 
 @theme inline {

@@ -348,7 +348,7 @@ test('Swap does not mount the advanced form or its subscriptions', () => {
     '@/components/best-trade-form': { SwapBestTradeForm: () => null },
     '@/components/form-container': { FormContainer: ({ children }) => children },
     '@/components/order-history-modal': { OrderHistoryModal: () => { historyMounts++; return null; } },
-    '@/components/trading-sidebar': { TradingSidebar: () => null },
+    '@/features/order-history/open-orders-notification': { OpenOrdersNotification: () => null },
     '@/lib/hooks/store': { useFormTabStore: (select) => select({ orderHistoryOpen: historyOpen, setOrderHistoryOpen: () => {} }) },
     '@/lib/partners/client': { get IS_ORBS() { return partnerId === 'orbs'; } },
     '@/lib/hooks/use-form-tab': { useSelectedFormTab: () => ({ selectedTab: { value: selectedTab } }) },
@@ -383,4 +383,28 @@ test('history shows an unknown amount as a placeholder while preserving actual z
   assert.equal(format(undefined, 'USDC'), '-');
   assert.equal(format('0', 'USDC'), '0 USDC');
   assert.equal(format('1.5', 'USDC'), '1.5 USDC');
+});
+
+test('open-order notification follows current query data and hides on disconnect', () => {
+  let connected = true;
+  let orders = [{ status: sdk.OrderStatus.Open }, { status: sdk.OrderStatus.Open }, { status: sdk.OrderStatus.Completed }];
+  const { OpenOrdersNotification } = load('features/order-history/open-orders-notification.tsx', {
+    'next/link': { default: ({ children, ...props }) => react.createElement('a', props, children), __esModule: true },
+    wagmi: { useConnection: () => ({ address: connected ? '0x123' : undefined, isConnected: connected }) },
+    '@/lib/hooks/use-form-tab': {
+      useSelectedFormTab: () => ({ selectedTab: { value: 'limit' } }),
+      preserveFormTabInHref: (href, tab) => `${href}&tab=${tab}`,
+    },
+    './use-network-orders': { useNetworkOrders: () => ({ data: { orders } }) },
+  });
+  const render = () => renderToStaticMarkup(react.createElement(OpenOrdersNotification));
+  assert.match(render(), /2 open orders/);
+  assert.match(render(), /href="\/orders\?filter=open&amp;tab=limit"/);
+  orders = [{ status: sdk.OrderStatus.Open }, { status: sdk.OrderStatus.Completed }];
+  assert.match(render(), /1 open order</);
+  orders = [{ status: sdk.OrderStatus.Cancelled }, { status: sdk.OrderStatus.Completed }];
+  assert.equal(render(), '');
+  orders = [{ status: sdk.OrderStatus.Open }];
+  connected = false;
+  assert.equal(render(), '', 'Cached orders must not show after disconnect');
 });

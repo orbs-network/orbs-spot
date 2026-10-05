@@ -1,8 +1,7 @@
 import { MAX_PERCENT_SETTING } from "@/lib/percent-settings";
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -18,6 +17,9 @@ import type { PercentSettingMode } from "@/lib/hooks/store";
 import { SegmentedTabs } from "./ui/tabs";
 import { FormLabel, InfoTooltip } from "./ui/form-label";
 import { FormNumberField } from "./ui/form-number-field";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { useIsMobile } from "@/lib/hooks/use-is-mobile";
+import { IS_ORBS } from "@/lib/partners/client";
 
 const SLIPPAGE_PRESETS = [0.1, 0.5, 1] as const;
 const PRICE_PROTECTION_PRESETS = [1, 3, 5] as const;
@@ -29,27 +31,33 @@ const PRICE_PROTECTION_TOOLTIP =
 const SettingsHeader = ({
   title,
   tooltip,
+  titleId,
+  presentation,
+  onClose,
 }: {
   title: string;
   tooltip?: string;
+  titleId: string;
+  presentation: "popover" | "dialog";
+  onClose: () => void;
 }) => {
+  const Title = presentation === "popover" ? "h2" : DialogTitle;
   return (
     <DialogHeader className="flex-row items-center justify-between gap-4 border-b border-border/70 px-5 py-4 text-left sm:px-6">
       <div className="flex min-w-0 items-center gap-2">
-        <DialogTitle className="text-[16px] font-semibold leading-none tracking-normal sm:text-[18px]">
+        <Title id={titleId} className="text-[16px] font-semibold leading-none tracking-normal sm:text-[18px]">
           {title}
-        </DialogTitle>
+        </Title>
         <InfoTooltip tooltip={tooltip} ariaLabel={`${title} info`} />
       </div>
-      <DialogClose asChild>
-        <button
-          type="button"
-          className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-          aria-label="Close settings"
-        >
-          <XIcon aria-hidden="true" className="size-5" />
-        </button>
-      </DialogClose>
+      <button
+        type="button"
+        onClick={onClose}
+        className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+        aria-label="Close settings"
+      >
+        <XIcon aria-hidden="true" className="size-5" />
+      </button>
     </DialogHeader>
   );
 };
@@ -168,8 +176,10 @@ type SettingsTriggerVariant = "card" | "action" | "icon";
 
 const SettingsInlineTrigger = ({
   variant = "card",
+  Trigger,
 }: {
   variant?: Exclude<SettingsTriggerVariant, "icon">;
+  Trigger: typeof DialogTrigger;
 }) => {
   const isSpotTab = useIsSpotTab();
   const { slippage, slippageMode, priceProtection, priceProtectionMode } =
@@ -201,7 +211,7 @@ const SettingsInlineTrigger = ({
       >
         {label}
       </FormLabel>
-      <DialogTrigger asChild>
+      <Trigger asChild>
         <button
           type="button"
           data-settings-trigger
@@ -217,7 +227,7 @@ const SettingsInlineTrigger = ({
           {displayValue}
           <PencilIcon aria-hidden="true" className="size-4 max-sm:size-3.5" />
         </button>
-      </DialogTrigger>
+      </Trigger>
     </div>
   );
 };
@@ -231,12 +241,30 @@ export const SettingsModal = ({
 }) => {
   const isSpotTab = useIsSpotTab();
   const [open, setOpen] = useState(false);
+  const isMobile = useIsMobile();
+  const isPopover = IS_ORBS && !isMobile;
+  const Root = isPopover ? Popover : Dialog;
+  const Trigger = isPopover ? PopoverTrigger : DialogTrigger;
+  const titleId = useId();
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const content = (
+    <>
+      <SettingsHeader
+        title={isSpotTab ? "Price Protection" : "Slippage Setting"}
+        tooltip={isSpotTab ? PRICE_PROTECTION_TOOLTIP : SLIPPAGE_TOOLTIP}
+        titleId={titleId}
+        presentation={isPopover ? "popover" : "dialog"}
+        onClose={() => setOpen(false)}
+      />
+      {isSpotTab ? <SpotSettings /> : <SwapSettings />}
+    </>
+  );
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Root open={open} onOpenChange={setOpen}>
       <div className={className}>
         {triggerVariant === "icon" ? (
-          <DialogTrigger asChild>
+          <Trigger asChild>
             <button
               type="button"
               data-settings-trigger
@@ -246,20 +274,38 @@ export const SettingsModal = ({
             >
               <SlidersHorizontalIcon aria-hidden="true" className="size-5" strokeWidth={1.5} />
             </button>
-          </DialogTrigger>
-        ) : <SettingsInlineTrigger variant={triggerVariant} />}
+          </Trigger>
+        ) : <SettingsInlineTrigger variant={triggerVariant} Trigger={Trigger} />}
       </div>
-      <DialogContent
-        presentation="center"
-        showCloseButton={false}
-        className="w-[calc(100vw-1.5rem)] max-w-[512px] gap-0 overflow-hidden rounded-[22px] border-border/80 bg-card p-0"
-      >
-        <SettingsHeader
-          title={isSpotTab ? "Price Protection" : "Slippage Setting"}
-          tooltip={isSpotTab ? PRICE_PROTECTION_TOOLTIP : SLIPPAGE_TOOLTIP}
-        />
-        {isSpotTab ? <SpotSettings /> : <SwapSettings />}
-      </DialogContent>
-    </Dialog>
+      {isPopover ? (
+        <PopoverContent
+          ref={popoverRef}
+          data-settings-popover
+          aria-labelledby={titleId}
+          tabIndex={-1}
+          align="end"
+          side="bottom"
+          sideOffset={8}
+          collisionPadding={16}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            popoverRef.current?.focus();
+          }}
+          className="w-[440px] max-w-[calc(100vw-2rem)] overflow-hidden p-0 motion-reduce:animate-none"
+        >
+          {content}
+        </PopoverContent>
+      ) : (
+        <DialogContent
+          presentation="center"
+          showCloseButton={false}
+          aria-labelledby={titleId}
+          aria-describedby={undefined}
+          className="w-[calc(100vw-1.5rem)] max-w-[512px] gap-0 overflow-hidden rounded-[22px] border-border/80 bg-card p-0"
+        >
+          {content}
+        </DialogContent>
+      )}
+    </Root>
   );
 };

@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { OrderHistoryPage } from "@/components/order-history-modal";
-import { TradingSidebar } from "@/components/trading-sidebar";
 import { useFormTabStore } from "@/lib/hooks/store";
 
 export function OrdersWorkspace() {
@@ -13,11 +12,8 @@ export function OrdersWorkspace() {
   }, [setHistoryOpen]);
 
   return (
-    <>
-      <TradingSidebar />
-      <div data-orders-workspace>
-        <OrderHistoryPage />
-      </div>
-    </>
+    <div data-orders-workspace>
+      <OrderHistoryPage />
+    </div>
   );
 }

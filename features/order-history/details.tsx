@@ -4,6 +4,7 @@ import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 
 import { CancelOrderDeveloperButton } from "@developer-tools";
 import { Button } from "@/components/ui/button";
+import { getNetworkLabel } from "@/components/network-label";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 
 import { DetailRow } from "@/components/ui/detail-row";
@@ -15,7 +16,7 @@ import { useOrderCurrency } from "./use-order-currency";
 import { OrderStatusLabel } from "./order-status-label";
 import { TokenSymbol } from "./token-symbol";
 
-import { cn, getChainName, getExplorerUrl, makeEllipsisAddress } from "@/lib/utils";
+import { cn, getExplorerUrl, makeEllipsisAddress } from "@/lib/utils";
 import { OrderStatus, type Order } from "@orbs-network/spot-ui";
 import { ArrowLeftIcon, ArrowRightIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon } from "lucide-react";
 import { useContext, useId, useState } from "react";
@@ -522,7 +523,7 @@ export function SelectedOrderDetails({
             disabled={isCancelling || switchChain.isPending}
             className="min-h-12 h-auto min-w-0 flex-1 whitespace-normal rounded-[14px] text-base"
           >
-            {needsNetworkSwitch ? `Switch to ${getChainName(rawOrder.chainId)} to cancel` : t("cancelOrder")}
+            {needsNetworkSwitch ? `Switch to ${getNetworkLabel(rawOrder.chainId)} to cancel` : t("cancelOrder")}
           </Button>
           {!needsNetworkSwitch && <CancelOrderDeveloperButton
             isCancelling={isCancelling}

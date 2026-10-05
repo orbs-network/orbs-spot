@@ -2,6 +2,20 @@
 
 import { Button } from "@/components/ui/button";
 import { HistoryIcon } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { preserveFormTabInHref, useSelectedFormTab } from "@/lib/hooks/use-form-tab";
+
+export function OrderHistoryLink() {
+  const { selectedTab } = useSelectedFormTab();
+  const pathname = usePathname();
+  return (
+    <Link href={preserveFormTabInHref("/orders", selectedTab.value)}
+      aria-current={pathname === "/orders" ? "page" : undefined}>
+      Orders
+    </Link>
+  );
+}
 
 export function OrderHistoryTrigger({ onOpen }: { onOpen: () => void }) {
   return (

@@ -129,7 +129,7 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
           <DialogContent
             data-trade-review
             presentation="center"
-            className="w-[calc(100vw-1rem)] sm:max-w-[460px]"
+            className={`w-[calc(100vw-1rem)] ${IS_ORBS ? "sm:max-w-[520px]" : "sm:max-w-[460px]"}`}
           >
             {IS_ORBS && (status || parsedError) ? (
               <DialogTitle className="sr-only">{dialogTitle}</DialogTitle>

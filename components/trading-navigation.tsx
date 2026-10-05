@@ -1,49 +1,65 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ArrowDownUpIcon, ChartCandlestickIcon, Clock3Icon, CrosshairIcon, ExternalLinkIcon, HistoryIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { ExternalLinkIcon } from "lucide-react";
 import { FORM_TABS, PERPS_URL } from "@/lib/consts";
 import { preserveFormTabInHref, useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { FormTab } from "@/lib/types";
+import { OrderHistoryLink } from "./order-history-trigger";
 
-const icons = {
-  [FormTab.SWAP]: ArrowDownUpIcon,
-  [FormTab.TWAP]: Clock3Icon,
-  [FormTab.LIMIT]: CrosshairIcon,
-  [FormTab.STOP_LOSS]: TrendingDownIcon,
-  [FormTab.TAKE_PROFIT]: TrendingUpIcon,
-};
+function useTradingHref() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // Keep network/token and other trading parameters when changing order types.
+  return pathname === "/" ? `/?${searchParams.toString()}` : "/";
+}
 
-export function TradingNavigation({ onNavigate }: { onNavigate?: () => void }) {
+export function TradingNavigation() {
   const { selectedTab } = useSelectedFormTab();
-  const isHistory = usePathname() === "/orders";
+  const pathname = usePathname();
+  const isTrading = pathname === "/";
+  const href = useTradingHref();
+  const isAdvanced = selectedTab.value !== FormTab.SWAP;
+  const [lastAdvanced, setLastAdvanced] = useState<FormTab>(FormTab.TWAP);
+
+  // This navigation stays mounted across routes, including Order history.
+  // Remember URL selections (also browser Back/Forward) without duplicating them.
+  if (isTrading && isAdvanced && lastAdvanced !== selectedTab.value) {
+    setLastAdvanced(selectedTab.value);
+  }
 
   return (
-    <nav aria-label="Order types" className="flex flex-col">
-      {FORM_TABS.map((tab) => {
-        const Icon = icons[tab.value];
-        return (
-          <Link key={tab.value} href={preserveFormTabInHref("/", tab.value)} onClick={onNavigate}
-            aria-current={!isHistory && selectedTab.value === tab.value ? "page" : undefined} data-sidebar-item>
-            <Icon aria-hidden="true" className="size-4" strokeWidth={1.5} />
-            {tab.fullLabel}
-          </Link>
-        );
-      })}
-      <a href={PERPS_URL} target="_blank" rel="noopener noreferrer" onClick={onNavigate} data-sidebar-item>
-        <ChartCandlestickIcon aria-hidden="true" className="size-4" strokeWidth={1.5} />
-        <span className="inline-flex items-center gap-1.5">
-          Perps
-          <ExternalLinkIcon aria-hidden="true" className="size-3.5 shrink-0" strokeWidth={1.5} />
+    <nav aria-label="Trading" data-trading-navigation>
+      <div data-trading-modes>
+        <Link href={preserveFormTabInHref(href, FormTab.SWAP)} scroll={false}
+          aria-current={isTrading && !isAdvanced ? "page" : undefined}>Swap</Link>
+        <Link href={preserveFormTabInHref(href, isAdvanced ? selectedTab.value : lastAdvanced)} scroll={false}
+          aria-current={isTrading && isAdvanced ? "page" : undefined}>Advanced</Link>
+        <OrderHistoryLink />
+        <a data-perps-link href={PERPS_URL} target="_blank" rel="noopener noreferrer">
+          Perps <ExternalLinkIcon aria-hidden="true" className="size-3" />
           <span className="sr-only">(opens in a new tab)</span>
-        </span>
-      </a>
-      <div className="mt-5 border-t border-border pt-5">
-        <Link href="/orders" onClick={onNavigate} data-sidebar-item aria-current={isHistory ? "page" : undefined}>
-          <HistoryIcon aria-hidden="true" className="size-4" strokeWidth={1.5} />Order history
-        </Link>
+        </a>
       </div>
+    </nav>
+  );
+}
+
+export function AdvancedOrderNavigation() {
+  const { selectedTab } = useSelectedFormTab();
+  const href = useTradingHref();
+  if (selectedTab.value === FormTab.SWAP) return null;
+
+  return (
+    <nav aria-label="Advanced order type" data-advanced-order-navigation>
+      {FORM_TABS.filter((tab) => tab.value !== FormTab.SWAP).map((tab) => (
+        <Link key={tab.value} href={preserveFormTabInHref(href, tab.value)} scroll={false}
+          aria-current={selectedTab.value === tab.value ? "page" : undefined}>
+          {tab.fullLabel}
+        </Link>
+      ))}
     </nav>
   );
 }
