@@ -19,7 +19,7 @@ export function MarketTokenLink({ address, chainId, symbol, isLoading }: {
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`View ${label} on ${explorer.name} (opens in a new tab)`}
-      className="text-[13px] font-semibold text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      className="text-[13px] font-semibold text-foreground underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
     >
       <TokenSymbol symbol={symbol} isLoading={isLoading} />
     </a>

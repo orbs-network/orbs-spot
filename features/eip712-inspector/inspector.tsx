@@ -246,7 +246,7 @@ export function Eip712Inspector() {
     <div className="w-full max-w-[860px] min-w-0 py-6 sm:py-10">
       <Link
         href={preserveDeveloperModeInHref("/", isDeveloperMode)}
-        className="inline-flex min-h-9 items-center gap-2 rounded text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        className="inline-flex min-h-9 items-center gap-2 rounded text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <ArrowLeftIcon aria-hidden="true" className="size-4" />
         {isDeveloperMode ? "Back to playground" : "Back to trading"}
@@ -290,7 +290,7 @@ export function Eip712Inspector() {
           {editorForm}
         </section>
       ) : (
-        <Dialog open={editOpen} onOpenChange={setEditOpen} responsive={false}>
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" className="mt-5">
               <BracesIcon aria-hidden="true" className="size-4 text-primary" />

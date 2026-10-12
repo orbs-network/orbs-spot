@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Code2Icon, RefreshCwIcon } from "lucide-react";
 import type { Order } from "@orbs-network/spot-ui";
 import { useConnection } from "wagmi";
 
 import { Button } from "@/components/ui/button";
-import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
-import { useClient } from "@/components/advanced-order/use-order-client";
+import { spotClientQueryOptions } from "@/lib/spot/queries";
 import { getActiveSpotPartner } from "@/lib/partners/spot";
 
 import {
@@ -28,18 +28,14 @@ export function FetchOrdersDeveloperButtonContent({
   orders: Order[];
 }) {
   const { address } = useConnection();
-  const chainId = useDataChainId();
-  const client = useClient();
   const exchange = getActiveSpotPartner() || "external";
   const request = useMemo(() => {
     const query = {
       swapper: address ?? "<connected-wallet-address>",
-      chainId: chainId ?? 1,
       exchange,
     };
     const searchParams = new URLSearchParams({
       swapper: query.swapper,
-      chainId: String(query.chainId),
       exchange: query.exchange,
     });
 
@@ -47,12 +43,12 @@ export function FetchOrdersDeveloperButtonContent({
       data: {
         method: "GET",
         endpoint: `${ORDER_SINK_URL}/orders`,
-        partner: client.data?.partner ?? getActiveSpotPartner(),
+        partner: exchange,
         query,
       } satisfies JsonContainer,
       url: `${ORDER_SINK_URL}/orders?${searchParams.toString()}`,
     };
-  }, [address, chainId, exchange, client.data?.partner]);
+  }, [address, exchange]);
   const rePermitOrders = useMemo(
     () =>
       orders
@@ -68,14 +64,6 @@ export function FetchOrdersDeveloperButtonContent({
     [rePermitOrders],
   );
 
-  if (!chainId) {
-    return (
-      <span className="text-[11px] font-medium text-muted-foreground">
-        Select network to inspect
-      </span>
-    );
-  }
-
   return (
     <JsonInspectorModal
       data={request.data}
@@ -86,7 +74,7 @@ export function FetchOrdersDeveloperButtonContent({
         headers: { Accept: "application/json" },
       }}
       description=""
-      explanation="The Request tab shows the actual HTTP GET request used by Order history. The Response tab shows the current raw RePermit orders returned for the connected wallet, chain, and exchange. The partner identifies the SDK configuration only. The SDK snippet returns normalized v2 orders; the Response tab shows their raw API records."
+      explanation="The Request tab shows the HTTP GET request used by order history across all networks for the connected wallet and exchange. The Response tab shows the raw RePermit records for the displayed orders. The SDK snippet returns normalized v2 orders without loading configuration."
       requestResponseTabs
       requiresDeveloperMode={false}
       responseData={responseData}
@@ -108,7 +96,7 @@ export function FetchOrdersDeveloperButtonContent({
           variant="outline"
           size="icon-sm"
           isLoading={isLoading}
-          className="rounded-[10px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
+          className="rounded-[10px] border-primary/35 text-primary "
           aria-label="Show how to fetch orders"
         >
           <Code2Icon aria-hidden="true" className="size-4" />
@@ -128,7 +116,11 @@ export function CancelOrderDeveloperButtonContent({
   rawOrder: Order;
 }) {
   const { address } = useConnection();
-  const client = useClient();
+  const [inspected, setInspected] = useState(false);
+  const client = useQuery({
+    ...spotClientQueryOptions(getActiveSpotPartner(), rawOrder.chainId, true),
+    enabled: inspected,
+  });
   const data = useMemo<JsonContainer>(() => {
     const request = client.data?.getCancelOrderRequest(rawOrder);
     return {
@@ -150,7 +142,7 @@ export function CancelOrderDeveloperButtonContent({
         variant="outline"
         size="lg"
         onClick={() => void client.refetch()}
-        className="h-12 rounded-[14px] border-destructive/55 text-destructive hover:border-destructive hover:text-destructive"
+        className="h-12 rounded-[14px] border-destructive/55 text-destructive "
         aria-label="Retry Orders Sink configuration"
       >
         <RefreshCwIcon aria-hidden="true" className="size-4" />
@@ -162,6 +154,7 @@ export function CancelOrderDeveloperButtonContent({
   return (
     <JsonInspectorModal
       data={data}
+      onOpenChange={open => { if (open) setInspected(true); }}
       codeSnippet={CANCEL_CODE_SNIPPET}
       description=""
       explanation="The SDK selects the cancellation contract, ABI and arguments for this order. The TypeScript example sends the request, waits for confirmation and refreshes history."
@@ -177,7 +170,7 @@ export function CancelOrderDeveloperButtonContent({
           variant="outline"
           size="icon-lg"
           isLoading={client.isLoading}
-          className="size-12 rounded-[14px] border-primary/35 text-primary hover:border-primary/60 hover:text-primary"
+          className="size-12 rounded-[14px] border-primary/35 text-primary "
           aria-label="Open cancel order code"
         >
           <Code2Icon aria-hidden="true" className="size-5" />

@@ -10,8 +10,17 @@ function getTheme(): Theme {
 }
 
 function applyTheme(theme: Theme) {
+  // Apply theme colors together, without triggering hover/focus transitions.
+  const transitionBlock = document.createElement("style");
+  transitionBlock.dataset.themeTransitionBlock = "";
+  transitionBlock.textContent = "*, *::before, *::after { transition: none !important; }";
+  document.head.appendChild(transitionBlock);
   document.documentElement.classList.toggle("dark", theme === "dark");
   document.documentElement.classList.toggle("light", theme === "light");
+  // Commit the new colors while transitions are disabled, then restore normal
+  // interactions after the theme and its React consumers have painted.
+  void document.documentElement.offsetHeight;
+  requestAnimationFrame(() => requestAnimationFrame(() => transitionBlock.remove()));
 }
 
 function subscribe(onChange: () => void) {

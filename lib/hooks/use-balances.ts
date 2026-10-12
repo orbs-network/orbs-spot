@@ -14,10 +14,10 @@ import { useUserStore } from "./store";
 import { DEFAULT_CHAIN_ID } from "../consts";
 import { zeroAddress } from "viem";
 import { useDataChainId } from "./use-data-chain-id";
+import { useCurrenciesQuery } from "./use-currencies-query";
+import { MAX_BALANCE_TOKENS } from "../balance-config";
 
 type BalanceResponse = Record<string, string>;
-
-const MAX_WATCHED_BALANCE_TOKENS = 80;
 
 const postBalances = async ({
   chainId,
@@ -30,24 +30,27 @@ const postBalances = async ({
   tokens: string[];
   signal?: AbortSignal;
 }) => {
-  const response = await fetch("/api/balances", {
-    signal,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chainId, address, tokens }),
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch balances");
-  }
-
-  return response.json() as Promise<BalanceResponse>;
+  const batches = Array.from({ length: Math.ceil(tokens.length / MAX_BALANCE_TOKENS) }, (_, index) =>
+    tokens.slice(index * MAX_BALANCE_TOKENS, (index + 1) * MAX_BALANCE_TOKENS),
+  );
+  const balances = await Promise.all(batches.map(async batch => {
+    const response = await fetch("/api/balances", {
+      signal,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chainId, address, tokens: batch }),
+    });
+    if (!response.ok) throw new Error("Failed to fetch balances");
+    return response.json() as Promise<BalanceResponse>;
+  }));
+  return Object.assign({}, ...balances) as BalanceResponse;
 };
 
 const useWatchedBalanceAddresses = () => {
   const { chainId } = useConnection();
   const dataChainId = useDataChainId();
   const tokenChainId = chainId ?? dataChainId ?? DEFAULT_CHAIN_ID;
+  const { data: currencies } = useCurrenciesQuery(tokenChainId);
   const { inputCurrency, outputCurrency } = useSwapParams();
   const customCurrencies = useUserStore((state) => state.customCurrencies);
 
@@ -63,9 +66,10 @@ const useWatchedBalanceAddresses = () => {
       inputCurrency,
       outputCurrency,
       ...getPopularTokenForChain(tokenChainId),
+      ...(currencies?.map(currency => currency.address) ?? []),
       ...custom,
-    ]).slice(0, MAX_WATCHED_BALANCE_TOKENS);
-  }, [customCurrencies, inputCurrency, outputCurrency, tokenChainId]);
+    ]).sort();
+  }, [currencies, customCurrencies, inputCurrency, outputCurrency, tokenChainId]);
 };
 
 const useBalanceQueryMeta = () => {

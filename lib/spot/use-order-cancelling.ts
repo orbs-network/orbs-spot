@@ -15,5 +15,9 @@ export function useOrderCancelling(order?: Order) {
     },
     select: () => true,
   });
-  return order?.status === OrderStatus.Open && pending.length > 0;
+  const batches = useMutationState({
+    filters: { mutationKey: ["spot-bulk-cancellation"], status: "pending" },
+    select: mutation => (mutation.state.variables as Order[] | undefined)?.some(item => item.historyKey === order?.historyKey && item.chainId === order?.chainId && item.maker.toLowerCase() === order?.maker.toLowerCase()) ?? false,
+  });
+  return order?.status === OrderStatus.Open && (pending.length > 0 || batches.some(Boolean));
 }

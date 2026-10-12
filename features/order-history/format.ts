@@ -1,4 +1,4 @@
-import { formatDecimals } from "@/lib/utils";
+import { formatDisplayAmount } from "@/lib/token-display";
 import { OrderFilter, OrderStatus, OrderType, TimeUnit, type Order } from "@orbs-network/spot-ui";
 
 import { formatDateTime } from "@/lib/date";
@@ -7,6 +7,19 @@ import BN from "bignumber.js";
 import type { useHistoryOrder } from "@/components/advanced-order/use-order-client";
 
 export const ORDER_HISTORY_CLOSE_RESET_DELAY = 180;
+
+/** Order display values only; calculations retain full precision. */
+export function formatActivityNumber(value: string) {
+  const number = BN(value);
+  if (!number.isFinite()) return "—";
+  return formatDisplayAmount(value);
+}
+
+export type HistoryFilter = OrderFilter | "history";
+
+export function getPageHistoryFilter(value: string | null): OrderFilter.Open | "history" {
+  return ["history", "swaps", "all", "completed", "cancelled", "expired"].includes(value?.toLowerCase() ?? "") ? "history" : OrderFilter.Open;
+}
 
 export const ORDER_FILTER_OPTIONS = [
   OrderFilter.All,
@@ -56,7 +69,8 @@ export function getOrderFilterLabel(filter: OrderFilter) {
   }
 }
 
-export function getNoOrdersTitle(filter: OrderFilter) {
+export function getNoOrdersTitle(filter: HistoryFilter) {
+  if (filter === "history") return "No past orders";
   if (filter === OrderFilter.All) {
     return "No orders";
   }
@@ -93,7 +107,9 @@ export function formatDurationUnit(value: number, unit: string) {
 }
 
 export function formatDuration(ms?: number) {
-  if (!ms) return "-";
+  if (!ms || !Number.isFinite(ms) || ms < 0) return "-";
+  if (ms < 1000) return "<1 Second";
+  if (ms < TimeUnit.Minutes) return formatDurationUnit(Math.round(ms / 1000), "Second");
   const minutes = Math.round(ms / TimeUnit.Minutes);
   if (minutes < 60) return formatDurationUnit(minutes, "Minute");
   const hours = Math.round(ms / TimeUnit.Hours);
@@ -102,11 +118,11 @@ export function formatDuration(ms?: number) {
   return formatDurationUnit(days, "Day");
 }
 
-export function filterAndSortOrders(orders: Order[], filter: OrderFilter) {
+export function filterAndSortOrders(orders: Order[], filter: HistoryFilter) {
   const filtered =
     filter === OrderFilter.All
       ? orders
-      : orders.filter(
+      : filter === "history" ? orders.filter(order => order.status !== OrderStatus.Open) : orders.filter(
           (order) => order.status === (filter as unknown as OrderStatus),
         );
 
@@ -122,7 +138,7 @@ export function getOrderStatusTitle(status: OrderStatus) {
 }
 
 export function formatDisplayNumber(value?: string | number, decimalScale = 4) {
-  return formatDecimals(value?.toString() || "0", decimalScale) || "0";
+  return formatDisplayAmount(value ?? "0", { decimalScale }) || "0";
 }
 
 export function formatTokenValue(
@@ -141,7 +157,9 @@ export function formatPriceValue(
   dstSymbol?: string,
 ) {
   if (!price) return "-";
-  return `1 ${srcSymbol ?? ""} = ${formatDisplayNumber(price, 3)} ${
+  const value = BN(price);
+  if (!value.isFinite()) return "-";
+  return `1 ${srcSymbol ?? ""} = ${formatActivityNumber(price)} ${
     dstSymbol ?? ""
   }`.trim();
 }
@@ -151,3 +169,7 @@ export function isZeroValue(value?: string | number) {
   return BN(value).isZero();
 }
 
+/** Do not show numeric amounts before the token's decimals are known. */
+export function formatOrderAmount(value?: string, token?: { symbol: string; decimals: number }) {
+  return value && token ? formatActivityNumber(value) : "—";
+}

@@ -1,6 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { Code2Icon, XIcon } from "lucide-react";
 import {
   type RefObject,
@@ -236,21 +238,24 @@ function SpotlightCard({
   onAction,
   onDismiss,
   totalSteps,
+  embedded = false,
 }: {
   actionButtonRef: RefObject<HTMLButtonElement | null>;
   activeStepNumber: number;
   activeStep: SpotlightStepConfig;
   cardRef: RefObject<HTMLDivElement | null>;
-  layout: SpotlightLayout;
+  layout?: SpotlightLayout;
+  embedded?: boolean;
   onAction: () => void;
   onDismiss: () => void;
   totalSteps: number;
 }) {
+  const Title = embedded ? DrawerTitle : "h2";
   return (
     <div
       ref={cardRef}
-      className="fixed z-[82] rounded-2xl border border-primary/35 bg-card p-4 text-card-foreground shadow-2xl motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-200"
-      style={layout.card}
+      className={embedded ? "p-4 text-card-foreground" : "fixed z-[82] rounded-2xl border border-primary/35 bg-card p-4 text-card-foreground shadow-2xl motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-200"}
+      style={embedded ? undefined : layout?.card}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
@@ -261,18 +266,18 @@ function SpotlightCard({
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-primary">
               Developer mode · {activeStepNumber} of {totalSteps}
             </p>
-            <h2
+            <Title
               id="developer-spotlight-title"
               className="text-pretty text-base font-semibold text-foreground"
             >
               {activeStep.title}
-            </h2>
+            </Title>
           </div>
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          className="-mr-1 -mt-1 grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+          className="-mr-1 -mt-1 grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
           aria-label="Dismiss developer mode guide"
         >
           <XIcon aria-hidden="true" className="size-4" />
@@ -398,6 +403,7 @@ function DeveloperModeSpotlightContent({
   targetRef: RefObject<HTMLElement | null>;
   variant: DeveloperModeSpotlightVariant;
 }) {
+  const isMobile = useIsMobile("(max-width: 767px)");
   const walkthroughSeenStorageKey = WALKTHROUGH_SEEN_STORAGE_KEYS[variant];
   const [open, setOpen] = useState(() => {
     try {
@@ -432,7 +438,7 @@ function DeveloperModeSpotlightContent({
   }, []);
 
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open || isMobile) return;
 
     const target =
       activeStep.target === "demo-action"
@@ -483,6 +489,7 @@ function DeveloperModeSpotlightContent({
     activeStep.gap,
     activeStep.shape,
     activeStep.target,
+    isMobile,
     open,
     targetRef,
     variant,
@@ -493,9 +500,20 @@ function DeveloperModeSpotlightContent({
     cardRef,
     isReady: layout !== null,
     onDismiss: dismiss,
-    open,
+    open: open && !isMobile,
     rootRef,
   });
+
+  const advance = () => {
+    if (stepIndex < steps.length - 1) setStepIndex(current => current + 1);
+    else dismiss();
+  };
+
+  if (isMobile) return <Drawer open={open} onOpenChange={nextOpen => { if (!nextOpen) dismiss(); }}>
+    <DrawerContent data-developer-spotlight-drawer aria-describedby="developer-spotlight-description" onOpenAutoFocus={event => { event.preventDefault(); actionButtonRef.current?.focus({ preventScroll: true }); }}>
+      <SpotlightCard embedded actionButtonRef={actionButtonRef} cardRef={cardRef} activeStep={activeStep} activeStepNumber={stepIndex + 1} totalSteps={steps.length} onAction={advance} onDismiss={dismiss} />
+    </DrawerContent>
+  </Drawer>;
 
   if (!open || !layout || typeof document === "undefined") return null;
 
@@ -515,13 +533,7 @@ function DeveloperModeSpotlightContent({
         activeStepNumber={stepIndex + 1}
         cardRef={cardRef}
         layout={layout}
-        onAction={() => {
-          if (stepIndex < steps.length - 1) {
-            setStepIndex((current) => current + 1);
-          } else {
-            dismiss();
-          }
-        }}
+        onAction={advance}
         onDismiss={dismiss}
         totalSteps={steps.length}
       />

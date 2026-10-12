@@ -2,8 +2,33 @@
 @import "tw-animate-css";
 @import "react-json-view-lite/dist/index.css";
 @import "./orbs.css";
+@import "./orbs-interactions.css";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Keep invalid fields visible even in themes that remove panel borders.
+   An inset outline preserves the layout as validation changes. */
+html[data-partner] [data-form-panel]:has([aria-invalid="true"]) {
+  background: var(--orbs-error-tint, color-mix(in srgb, var(--destructive) 8%, var(--card)));
+  border-color: var(--destructive);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--destructive) 55%, transparent);
+}
+
+html[data-partner] [data-number-field]:has([aria-invalid="true"]),
+html[data-partner] [data-slot="select-trigger"][aria-invalid="true"] {
+  border-color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 5%, var(--card));
+}
+
+html[data-partner] [data-currency-card]:has([aria-invalid="true"]):focus-within {
+  outline-color: var(--destructive);
+}
+
+/* Strengthen the existing error edge on focus instead of adding a second ring. */
+html[data-partner="orbs"] [data-currency-card]:has([aria-invalid="true"]):focus-within {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--destructive) 55%, transparent);
+}
 
 /* Avoid sticky hover feedback on touch devices and mobile layouts. */
 @custom-variant hover {
@@ -245,13 +270,8 @@
 }
 
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  [data-developer-trigger]:hover {
-    border-color: color-mix(in srgb, var(--primary) 78%, transparent) !important;
+  [data-developer-trigger]:not(a):hover {
     background: color-mix(in srgb, var(--primary) 17%, transparent) !important;
-    box-shadow:
-      0 0 0 1px color-mix(in srgb, var(--primary) 48%, transparent),
-      0 0 24px color-mix(in srgb, var(--primary) 54%, transparent) !important;
-    animation: none;
   }
 }
 
@@ -419,7 +439,7 @@ html[data-partner="ht-digital"] [data-submit-button] {
 }
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
   [data-sonner-toast][data-styled=true] [data-close-button]:hover {
-   background: var(--accent) !important;
+   background: var(--orbs-icon-background, var(--accent)) !important;
   }
 }
 

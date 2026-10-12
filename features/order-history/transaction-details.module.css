@@ -1,0 +1,32 @@
+.body { padding: 0 24px 20px; }
+.identity { min-width: 0; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; font-size: 12px; font-weight: 500; }
+.statusLabel { font-size: 12px; color: var(--primary); }
+.metadata { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 8px; margin-top: 2px; font-size: 11px; color: var(--muted-foreground); }
+.date { font-size: 11px; color: var(--muted-foreground); }
+.orderId { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.orderId > span { white-space: nowrap; font-size: 11px; }
+.orderId :global([data-copy-identifier]) { color: var(--foreground); }
+.tokenPair { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 8px 0 2px; font-size: 18px; font-weight: 500; }
+.tokenPair > span { min-width: 0; overflow-wrap: anywhere; }
+.arrow { width: 18px; height: 18px; flex-shrink: 0; color: var(--muted-foreground); }
+.rows { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 18px; background: var(--secondary); }
+:global(html[data-partner="orbs"] [data-order-preview]) .rows :global([data-detail-row]) { grid-template-columns: auto minmax(0, 1fr); gap: 12px; font-size: 12px; }
+:global(html[data-partner="orbs"] [data-order-preview]) .rows :global([data-detail-row]) > :last-child { text-align: right; justify-content: flex-end; font-weight: 400; overflow-wrap: anywhere; }
+.disclosure { min-width: 0; margin-top: 12px; padding: 0 16px; border: 1px solid var(--border); border-radius: 18px; background: var(--secondary); }
+.disclosure[open] { padding-bottom: 8px; }
+.disclosure > summary { display: flex; align-items: center; gap: 8px; list-style: none; cursor: pointer; min-height: 48px; color: var(--foreground); font-size: 12px; font-weight: 500; border-radius: 6px; }
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary > svg { margin-left: auto; width: 14px; height: 14px; flex-shrink: 0; }
+.disclosure[open] > summary > svg { transform: rotate(180deg); }
+.disclosure > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.meta { margin-left: auto; font-variant-numeric: tabular-nums; }
+.meta + svg { margin-left: 0 !important; }
+.cancel:has(button) { margin-top: 16px; }
+.cancel:empty { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  :global(html[data-partner="orbs"] [data-order-preview]) .disclosure > summary:hover { background: transparent; color: var(--primary); }
+}
+@media (max-width: 479px) {
+  .body { padding-inline: 16px; }
+}

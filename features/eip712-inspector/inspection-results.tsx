@@ -346,7 +346,7 @@ export function InspectionResults({
                     </LoadingValue>
                   </Detail>
                   <Detail
-                    label="Minimum received per trade"
+                    label="Min. received per trade"
                     hint={
                       order.smallerFinalTrade
                         ? "For a full trade; the smaller final trade receives proportionally less."
@@ -358,7 +358,7 @@ export function InspectionResults({
                     </LoadingValue>
                   </Detail>
                   <Detail
-                    label="Trade interval"
+                    label="Time between trades"
                     hint="Minimum time between trades; execution depends on market conditions."
                   >
                     {duration(order.witness.epoch)}
@@ -422,7 +422,7 @@ export function InspectionResults({
         </section>
       )}
       {result.payload && (
-        <Dialog responsive={false}>
+        <Dialog>
           <DialogTrigger asChild>
             <Button variant="outline">Technical details</Button>
           </DialogTrigger>

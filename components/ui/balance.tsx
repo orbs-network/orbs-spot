@@ -1,6 +1,8 @@
 import type { Currency } from "@/lib/types";
 import { Skeleton } from "./skeleton";
-import { useBalance } from "@/lib/hooks/use-balances";
+import { useSpendableBalance } from "@/lib/hooks/use-spendable-balance";
+import { IS_ORBS } from "@/lib/partners/client";
+import { toPresetAmount } from "@/lib/input-amount";
 
 export const Balance = ({
     currency,
@@ -9,14 +11,15 @@ export const Balance = ({
     currency?: Currency;
     onAmountChange?: (amount: string) => void;
   }) => {
-    const { formatted, ui, isLoading } = useBalance(currency);
+    const { formatted, spendable, maxDisabled, maxHint, isLoading } = useSpendableBalance(currency);
+    const label = IS_ORBS ? `Balance: ${formatted}` : `${formatted} ${currency?.symbol ?? ""}`;
 
     if (!onAmountChange) {
       return isLoading ? (
         <Skeleton className="h-4 w-[40px]" />
       ) : (
         <p className="max-w-full truncate text-right text-sm font-medium text-muted-foreground">
-          {formatted} {currency?.symbol}
+          {label}
         </p>
       );
     }
@@ -24,16 +27,18 @@ export const Balance = ({
     return (
       <button
         type="button"
-        aria-label={`Use full ${currency?.symbol ?? "token"} balance`}
-        disabled={isLoading}
+        data-balance-action
+        aria-label={`Use available ${currency?.symbol ?? "token"} balance`}
+        disabled={maxDisabled}
+        title={maxHint}
         className="flex min-w-0 cursor-pointer items-center justify-end gap-2 rounded-md text-right focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 disabled:cursor-wait"
-        onClick={() => onAmountChange(ui || "")}
+        onClick={() => onAmountChange(toPresetAmount(spendable, currency?.decimals))}
       >
         {isLoading ? (
           <Skeleton className="h-4 w-[40px]" />
         ) : (
           <p className="max-w-full truncate text-right text-sm font-medium text-muted-foreground">
-            {formatted} {currency?.symbol}
+            {label}
           </p>
         )}
       </button>

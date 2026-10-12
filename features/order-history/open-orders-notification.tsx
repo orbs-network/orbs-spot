@@ -32,7 +32,7 @@ export function OpenOrdersNotification() {
   const { selectedTab } = useSelectedFormTab();
   // Keep observing after dismissal so a newly opened order can bring it back.
   const { data } = useNetworkOrders(isConnected);
-  const openOrders = data.orders.filter(order => order.status === OrderStatus.Open);
+  const openOrders = data.filter(order => order.status === OrderStatus.Open);
   const count = openOrders.length;
   const dismissed = dismissedOrderKeys !== undefined && openOrders.every(order => dismissedOrderKeys.includes(order.historyKey));
 
@@ -42,7 +42,7 @@ export function OpenOrdersNotification() {
     <aside data-open-orders-notification aria-label="Open orders" className="fixed inset-x-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 flex items-stretch border border-primary/20 bg-popover text-popover-foreground shadow-sm sm:left-auto sm:right-6 sm:bottom-6">
       <Link
         href={preserveFormTabInHref("/orders?filter=open", selectedTab.value)}
-        className="flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 px-3 py-3 text-xs hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary sm:text-sm"
+        className="flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 px-3 py-3 text-xs focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary sm:text-sm"
       >
         <span role="status" aria-atomic="true" className="font-medium tabular-nums">{count} open {count === 1 ? "order" : "orders"}</span>
         <span aria-hidden="true" className="text-muted-foreground">·</span>
@@ -51,8 +51,8 @@ export function OpenOrdersNotification() {
       <button
         type="button"
         aria-label="Dismiss open orders notification"
-        onClick={() => dismiss(wallet, data.orders.map(order => order.historyKey))}
-        className="flex min-h-11 w-11 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
+        onClick={() => dismiss(wallet, data.map(order => order.historyKey))}
+        className="flex min-h-11 w-11 shrink-0 items-center justify-center text-muted-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary"
       >
         <XIcon aria-hidden="true" className="size-4" />
       </button>

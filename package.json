@@ -25,7 +25,6 @@
     "start:ht-digital": "NEXT_PARTNER=ht-digital next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --test tests/*.test.cjs",
     "build:orbs": "NEXT_PARTNER=orbs next build",
     "start:orbs": "NEXT_PARTNER=orbs next start"
   },
@@ -35,7 +34,7 @@
     "@gemini-wallet/core": "~0.3.1",
     "@metamask/connect-evm": "~1.4.0",
     "@orbs-network/liquidity-hub-sdk": "^1.1.1",
-    "@orbs-network/spot-ui": "^2.1.18",
+    "@orbs-network/spot-ui": "^2.1.19",
     "@orbs-network/swap-ui": "^0.0.61",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",

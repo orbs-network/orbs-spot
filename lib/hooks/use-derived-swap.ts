@@ -1,9 +1,10 @@
 import { useSwapStore } from "./store";
 import { useSwapParams } from "./use-swap-params";
 import { useCurrency } from "./use-currencies";
-import { useFormatDecimals, useToAmountUI, useToAmountWei } from "./common";
+import { useToAmountUI, useToAmountWei } from "./common";
 import { useTrade } from "./use-trade";
 import { useMemo } from "react";
+import { displayTokenAmount } from "../token-display";
 import BN from "bignumber.js";
 
 export const useDerivedSwap = () => {
@@ -28,10 +29,10 @@ export const useDerivedSwap = () => {
     usesLiquidityHubQuote,
   } = useTrade(inputCurrency, outputCurrency, parsedInputAmount);
 
-  const outputAmount = useFormatDecimals(useToAmountUI(
+  const outputAmount = displayTokenAmount(useToAmountUI(
     outputCurrency?.decimals,
     trade?.outAmount
-  ));
+  ), outputCurrency?.symbol, outputCurrency?.decimals);
 
   const noLiquidity = useMemo(
     () =>

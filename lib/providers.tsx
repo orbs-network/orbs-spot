@@ -13,10 +13,13 @@ import { useWagmiConfig } from "./wagmi-config";
 import { WalletReturnReconnect } from "@/features/wallet-connection/return-reconnect";
 import { WalletConnectionProvider } from "@/features/wallet-connection/provider";
 import { IS_ORBS } from "./partners/client";
+import { AppLoading } from "@/components/app-loading";
+import { PendingSwapMonitor } from "@/features/swap/activity";
+import { useIsMobile } from "./hooks/use-is-mobile";
 
 const AppProvider = dynamic(
   () => import("./context").then((mod) => mod.AppProvider),
-  { ssr: false },
+  { ssr: false, loading: Fallback },
 );
 
 const createQueryClient = () => new QueryClient({
@@ -31,13 +34,14 @@ const createQueryClient = () => new QueryClient({
   },
 });
 
-const Fallback = () => {
+function Fallback() {
+  if (IS_ORBS) return <AppLoading />;
   return (
     <div className="flex h-screen w-screen items-center justify-center bg-background">
       <Spinner className="size-20" />
     </div>
   );
-};
+}
 
 const WagmiWrapper = ({
   children,
@@ -66,6 +70,7 @@ export function Providers({
 }) {
   const [queryClient] = useState(createQueryClient);
   const { theme } = useTheme();
+  const isMobile = useIsMobile("(max-width: 767px)");
   const walletTheme = useMemo(() => {
     if (IS_ORBS) return (theme === "dark" ? darkTheme : lightTheme)();
 
@@ -96,9 +101,10 @@ export function Providers({
         <WagmiWrapper partnerBrand={partnerBrand}>
           <QueryClientProvider client={queryClient}>
             <WalletReturnReconnect />
+            <PendingSwapMonitor />
             <RainbowKitProvider
               theme={walletTheme}
-              modalSize={IS_ORBS || partnerStyles.radius !== "0rem" ? "wide" : "compact"}
+              modalSize={isMobile ? "compact" : IS_ORBS || partnerStyles.radius !== "0rem" ? "wide" : "compact"}
             >
               <WalletConnectionProvider>
                 <AppProvider>

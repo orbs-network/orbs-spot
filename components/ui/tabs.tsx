@@ -29,9 +29,9 @@ const DEFAULT_SEGMENTED_TABS_INDICATOR_CLASS_NAME =
 const DEFAULT_SEGMENTED_TABS_TAB_CLASS_NAME =
   "h-8 rounded-[18px] px-1 text-[12px] leading-none transition-colors duration-200";
 const DEFAULT_SEGMENTED_TABS_SELECTED_CLASS_NAME =
-  "font-bold text-[var(--selected-tab-foreground)] hover:text-[var(--selected-tab-foreground)]";
+  "font-bold text-[var(--selected-tab-foreground)] ";
 const DEFAULT_SEGMENTED_TABS_UNSELECTED_CLASS_NAME =
-  "font-semibold text-muted-foreground hover:bg-accent/45 hover:text-foreground";
+  "font-semibold text-muted-foreground hover:bg-accent/45 ";
 
 export function SegmentedTabs<TValue extends string | number>({
   "aria-label": ariaLabel,
@@ -81,7 +81,7 @@ export function SegmentedTabs<TValue extends string | number>({
         const selected = option.value === value;
 
         return (
-          <Tooltip key={option.value}>
+          <Tooltip action key={option.value}>
             <TooltipTrigger asChild>
               <button
                 data-segmented-tab

@@ -19,7 +19,7 @@ export const AdvancedOrderContent = memo(function AdvancedOrderContent({
 }) {
   const { amount } = useOutputAmount();
   return (
-    <div className="flex flex-col gap-3">
+    <div data-advanced-order-content className="flex flex-col gap-2.5">
       <div data-currency-pair className="flex flex-col gap-1.5">
         <TokenPanel isSource />
         <ToggleCurrencies outputAmount={amount.ui} />

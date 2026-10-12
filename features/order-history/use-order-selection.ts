@@ -17,6 +17,7 @@ export function useOrderSelection(enabled: boolean, currentChainId: number) {
   const select = useCallback((id: string, orderChainId = currentChainId) => {
     trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const url = new URL(window.location.href);
+    url.searchParams.delete("account");
     url.searchParams.set("order", id);
     url.searchParams.set("orderChainId", String(orderChainId));
     openedHref.current = url.href;
@@ -32,6 +33,7 @@ export function useOrderSelection(enabled: boolean, currentChainId: number) {
       return;
     }
     const url = new URL(window.location.href);
+    url.searchParams.delete("account");
     url.searchParams.delete("order");
     url.searchParams.delete("orderChainId");
     window.history.replaceState(window.history.state, "", url);
@@ -42,7 +44,7 @@ export function useOrderSelection(enabled: boolean, currentChainId: number) {
     event.preventDefault();
     const target = trigger.current?.isConnected
       ? trigger.current
-      : document.querySelector<HTMLElement>("[data-history-page] h1");
+      : document.querySelector<HTMLElement>("[data-history-page] h1, #floating-open-orders-title");
     target?.focus({ preventScroll: true });
   }, []);
 

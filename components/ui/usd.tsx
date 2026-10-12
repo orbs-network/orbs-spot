@@ -1,3 +1,4 @@
+import { IS_ORBS } from "@/lib/partners/client";
 import { Skeleton } from "./skeleton";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 
@@ -18,7 +19,7 @@ export const USD = ({
         {isLoading ? (
           <Skeleton className="h-4 w-[40px]" />
         ) : (
-          <p className="truncate text-sm text-muted-foreground">{data === undefined && amount && amount !== "0" ? "—" : `$${usdPrice || "0"}`}</p>
+          <p className="truncate text-sm text-muted-foreground">{data === undefined && amount && amount !== "0" ? "—" : !usdPrice || data === 0 ? IS_ORBS ? "$0.00" : "$0" : usdPrice}</p>
         )}
       </div>
     );

@@ -450,38 +450,19 @@ export function formatFetchOrdersCode(data: JsonContainer) {
     typeof query.swapper === "string"
       ? query.swapper
       : "<connected-wallet-address>";
-  const chainId =
-    typeof query.chainId === "string" ||
-    typeof query.chainId === "number"
-      ? query.chainId
-      : 1;
-  const partner = getExamplePartnerId(query.partner ?? data.partner);
+  const partner = getExamplePartnerId(query.exchange ?? data.partner);
 
-  return `import { createClient, Partners, type Order, type SpotClient } from "@orbs-network/spot-ui";
+  return `import { getOrders, Partners, type Order } from "@orbs-network/spot-ui";
 
-// Use the same enabled partner and connected chain as order submission.
-const partner = Object.values(Partners).find((value) => value === ${JSON.stringify(partner)});
-const chainId = ${JSON.stringify(Number(chainId))};
-
-// Reuse one client per partner and chain. Discard failed initialization so it can retry.
-let clientPromise: Promise<SpotClient> | undefined;
-function getClient(): Promise<SpotClient> {
-  if (!partner) throw new Error("Unknown Spot partner");
-  clientPromise ??= createClient(partner, chainId).catch((error: unknown) => {
-    clientPromise = undefined;
-    throw error;
-  });
-  return clientPromise;
-}
+const exchange = Object.values(Partners).find((value) => value === ${JSON.stringify(partner)});
 
 export async function fetchOrders(
   account = ${JSON.stringify(swapper)},
   signal?: AbortSignal,
 ): Promise<Order[]> {
-  const client = await getClient();
-  // This inspector shows v2 RePermit orders only; disable both legacy sources.
-  // V2 fetches all history with swapper, chainId, and exchange; no pagination.
-  const orders = await client.getAccountOrders({ account, signal, legacyOrders: false, getv1orders: false });
+  if (!exchange) throw new Error("Unknown Spot exchange");
+  // Fetch v2 orders across every network in one request, without a client/config.
+  const orders = await getOrders({ swapper: account, exchange, signal, getv1orders: false });
   // Key rendered rows and cached records by order.historyKey, not order.id.
   return orders;
 }`;
@@ -559,14 +540,28 @@ export const permitDataRequest = fetchRePermitData(partner, chainId);`;
 }
 
 export function formatCancelOrderCode() {
-  return `import type { Order, SpotClient } from "@orbs-network/spot-ui";
+  return `import { createClient, type Order, type Partners, type SpotClient } from "@orbs-network/spot-ui";
 import type { Abi, Address, PublicClient, WalletClient } from "viem";
 
 const pending = new Set<string>();
+const clients = new Map<string, Promise<SpotClient>>();
 
-// Pass the initialized client used for submission and an order from getAccountOrders().
+function getClient(exchange: Partners, chainId: number): Promise<SpotClient> {
+  const key = exchange + ":" + chainId;
+  let client = clients.get(key);
+  if (!client) {
+    client = createClient(exchange, chainId, { disableAnalytics: true }).catch((error: unknown) => {
+      clients.delete(key);
+      throw error;
+    });
+    clients.set(key, client);
+  }
+  return client;
+}
+
+// Call on confirmation with an order returned by getOrders().
 export async function cancelOrder(
-  client: SpotClient,
+  exchange: Partners,
   order: Order,
   walletClient: WalletClient,
   publicClient: PublicClient,
@@ -577,12 +572,13 @@ export async function cancelOrder(
   ]);
   const account = accounts[0];
   if (!account || account.toLowerCase() !== order.maker.toLowerCase() ||
-      chainId !== client.chainId || order.chainId !== chainId || publicChainId !== chainId) {
+      order.chainId !== chainId || publicChainId !== chainId) {
     throw new Error("Connect the order's wallet and network before cancelling");
   }
   if (pending.has(order.historyKey)) throw new Error("Cancellation is already pending");
   pending.add(order.historyKey);
   try {
+    const client = await getClient(exchange, order.chainId);
     const request = client.getCancelOrderRequest(order);
     const hash = await walletClient.writeContract({
       address: request.contractAddress as Address,
@@ -971,8 +967,7 @@ export const FETCH_ORDERS_EXAMPLE_DATA = {
   endpoint: "https://order-sink-v2.orbs.network/orders",
   query: {
     swapper: "0x5555555555555555555555555555555555555555",
-    chainId: 137,
-    exchange: "0x8888888888888888888888888888888888888888",
+    exchange: "external",
   },
 } satisfies JsonContainer;
 
@@ -1008,4 +1003,4 @@ export const CREATE_ORDER_EXAMPLE_RESPONSE_DATA = {
 } satisfies JsonContainer;
 
 export const FETCH_ORDERS_EXAMPLE_URL =
-  "https://order-sink-v2.orbs.network/orders?swapper=0x5555555555555555555555555555555555555555&chainId=137&exchange=0x8888888888888888888888888888888888888888";
+  "https://order-sink-v2.orbs.network/orders?swapper=0x5555555555555555555555555555555555555555&exchange=external";

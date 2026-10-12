@@ -8,7 +8,7 @@ export const DURATION_OPTIONS = [
 
 export const MODULE_META = {
   [Module.TWAP]: {
-    titleKey: "twapMarket",
+    titleKey: "twap",
   },
   [Module.LIMIT]: {
     titleKey: "limit",

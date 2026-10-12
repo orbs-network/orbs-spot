@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { formatDecimals, parseNativeCurrencyAddress, toAmountUI, toAmountWei } from "../utils";
-import {useNumericFormat} from "react-number-format";
+import { formatDisplayAmount } from "../token-display";
 import { useConnection } from "wagmi";
 
 export const useToAmountUI = (decimals?: number, value?: string) => {
@@ -21,21 +21,8 @@ export const useToAmountWei = (decimals?: number, value?: string) => {
     }, [decimals, value]);
 };
 
-export const useFormatNumber = ({ value, decimalScale = 3, prefix, suffix }: { value?: string | number; decimalScale?: number; prefix?: string; suffix?: string }) => {
-    const _value = formatDecimals(value?.toString(), decimalScale);
-  
-    const result = useNumericFormat({
-      allowLeadingZeros: true,
-      thousandSeparator: ",",
-      displayType: "text",
-      value: _value || "",
-      decimalScale: 18,
-      prefix,
-      suffix,
-    });
-  
- 
-    return result.value?.toString();
+export const useFormatNumber = ({ value, decimalScale = 4, prefix, suffix }: { value?: string | number; decimalScale?: number; prefix?: string; suffix?: string }) => {
+    return formatDisplayAmount(value, { decimalScale, prefix, suffix });
   };
   
 

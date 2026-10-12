@@ -1,7 +1,7 @@
 import { FormTab } from "@/lib/types";
 import { formatDateTime } from "@/lib/date";
 import type { useTranslations } from "@/lib/use-translations";
-import { Module, TimeUnit } from "@orbs-network/spot-ui";
+import { InputErrors, Module, TimeUnit, type InputError } from "@orbs-network/spot-ui";
 import { MODULE_META } from "./constants";
 
 export type Translate = ReturnType<typeof useTranslations>;
@@ -44,6 +44,19 @@ function formatDurationUnit(value: number, unit: string) {
   return `${value} ${unit}${value === 1 ? "" : "s"}`;
 }
 
+export function formatPriceInputError(error: InputError | undefined, isInverted: boolean, t: Translate) {
+  if (error?.type === InputErrors.TRIGGER_LIMIT_PRICE_GREATER_THAN_TRIGGER_PRICE) {
+    return `Set the limit rate ${isInverted ? "above" : "below"} the trigger rate so the order can execute after activation. A fast price move may still leave the order unfilled.`;
+  }
+  if (error?.type === InputErrors.STOP_LOSS_TRIGGER_PRICE_GREATER_THAN_MARKET_PRICE) {
+    return `Set the trigger rate ${isInverted ? "above" : "below"} the market rate for a stop-loss order.`;
+  }
+  if (error?.type === InputErrors.TAKE_PROFIT_TRIGGER_PRICE_LESS_THAN_MARKET_PRICE) {
+    return `Set the trigger rate ${isInverted ? "below" : "above"} the market rate for a take-profit order.`;
+  }
+  return formatInputError(error, t);
+}
+
 export function formatDuration(ms?: number) {
   if (!ms) return "";
   const minutes = Math.round(ms / TimeUnit.Minutes);
@@ -57,4 +70,11 @@ export function formatDuration(ms?: number) {
 export function formatDeadline(deadline?: number) {
   if (!deadline) return "";
   return formatDateTime(deadline);
+}
+
+export function formatTwapDuration(ms: number) {
+  const minutes = Math.max(1, Math.round(ms / TimeUnit.Minutes));
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return hours ? `${hours}h${remainder ? ` ${remainder}m` : ""}` : `${minutes}m`;
 }

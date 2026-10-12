@@ -929,10 +929,10 @@
   resolved "https://registry.yarnpkg.com/@orbs-network/liquidity-hub-sdk/-/liquidity-hub-sdk-1.1.1.tgz#aad579e18cb035a8a44973ae67f0f72663ea624f"
   integrity sha512-Kq7EN1i3RFpwrI7N24S39Pqyqn1zWt01OSVrZB527iiokKiOPeY1VtUYkKo4zzWWI2MptI6/R8x1Evmzf0DnDQ==
 
-"@orbs-network/spot-ui@^2.1.18":
-  version "2.1.18"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-2.1.18.tgz#ae7c2e5eea656c0fe626d69606927c6cdecc8cb9"
-  integrity sha512-gpIr8yghWSi8QdVJXWfiKWir0HbtQ5FOSyrLvGRxT6uWfku4lbFLoduBHxLLKnp/jtELR2IWAhrHg7daECd4hA==
+"@orbs-network/spot-ui@^2.1.19":
+  version "2.1.19"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-2.1.19.tgz#1fbb5fbb82af1aca52cf57dbc9e2e2fdcc45ef6e"
+  integrity sha512-A32XZ8INDSyZYJuPKCt3NtiaIRxbvlG4tyYRX+G8yTLURuqxM9J05u7vDoz5pQft/jpgJmaa7tgC1WfzAnuq/g==
 
 "@orbs-network/swap-ui@^0.0.61":
   version "0.0.61"

@@ -53,7 +53,7 @@ export function OrbsConnectModal({ open, onOpenChange, onMoreWallets, onCloseAut
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} responsive={false}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         ref={dialogRef}
         data-orbs-connect

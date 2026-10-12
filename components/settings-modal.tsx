@@ -7,7 +7,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
-import { PencilIcon, SlidersHorizontalIcon, XIcon } from "lucide-react";
+import { ChevronRightIcon, PencilIcon, SettingsIcon, XIcon } from "lucide-react";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { NumericInput } from "./ui/numeric-input";
 import { DEFAULT_PRICE_PROTECTION, DEFAULT_SLIPPAGE } from "@/lib/consts";
@@ -52,8 +52,9 @@ const SettingsHeader = ({
       </div>
       <button
         type="button"
+        data-icon-button
         onClick={onClose}
-        className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+        className="flex size-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
         aria-label="Close settings"
       >
         <XIcon aria-hidden="true" className="size-5" />
@@ -63,8 +64,6 @@ const SettingsHeader = ({
 };
 
 const formatPreset = (value: number) => value.toFixed(1);
-const formatPlaceholder = (value: number) =>
-  Number.isInteger(value) ? value.toString() : value.toFixed(2);
 const formatInlinePercent = (value: number) => {
   if (!Number.isFinite(value)) return "0.00";
   if (value < 1) return value.toFixed(2);
@@ -119,18 +118,18 @@ const PercentSettings = ({
           className="h-full min-w-0 flex-1 rounded-[12px] border border-border/45 bg-secondary/25 p-1"
           indicatorClassName="rounded-[10px] bg-primary"
           tabClassName="rounded-[10px] px-2 text-sm font-semibold transition-colors"
-          selectedTabClassName="text-primary-foreground hover:text-primary-foreground"
-          unselectedTabClassName="text-muted-foreground hover:bg-accent/45 hover:text-foreground"
+          selectedTabClassName="text-primary-foreground "
+          unselectedTabClassName="text-muted-foreground hover:bg-accent/45 "
         />
         <FormNumberField className="h-full w-[92px] shrink-0 rounded-[12px] px-2 sm:w-[114px] sm:px-3">
           <NumericInput
             aria-label="Custom percentage"
             name="custom-percentage"
-            value={value.toString()}
+            value={isAuto ? "" : value.toString()}
             maxValue={MAX_PERCENT_SETTING}
             onChange={(nextValue) => onChange(Number(nextValue), "custom")}
-            className="text-center text-[16px] font-semibold"
-            placeholder={formatPlaceholder(defaultValue)}
+            className="text-center text-[16px] font-semibold placeholder:text-xs sm:placeholder:text-sm"
+            placeholder="Custom"
             decimalScale={2}
           />
           <span className="mx-2 h-5 w-px bg-border" />
@@ -139,6 +138,11 @@ const PercentSettings = ({
           </span>
         </FormNumberField>
       </div>
+      <p role="status" className="mt-3 text-xs text-muted-foreground">
+        {isAuto
+          ? `Auto uses ${defaultValue}%. Enter a custom percentage to override it.`
+          : `Using ${value}% custom tolerance.`}
+      </p>
     </div>
   );
 };
@@ -172,13 +176,36 @@ const SpotSettings = () => {
   );
 };
 
-type SettingsTriggerVariant = "card" | "action" | "icon";
+type SettingsTriggerVariant = "card" | "action" | "icon" | "footer";
+
+const SettingsFooterTrigger = ({ Trigger }: { Trigger: typeof DialogTrigger }) => {
+  const isSpotTab = useIsSpotTab();
+  const { slippage, slippageMode, priceProtection, priceProtectionMode } = useSettings();
+  const value = isSpotTab ? priceProtection : slippage;
+  const mode = isSpotTab ? priceProtectionMode : slippageMode;
+  const label = isSpotTab ? "Price Protection" : "Slippage Tolerance";
+
+  return <Trigger asChild>
+    <button
+      type="button"
+      data-settings-trigger
+      data-mobile-settings-trigger
+      aria-label={`Open ${label} settings`}
+      className="flex min-h-10 w-full items-center gap-2 px-1 text-xs text-muted-foreground focus-visible:outline-2 focus-visible:outline-primary"
+    >
+      <SettingsIcon aria-hidden="true" className="size-3.5" />
+      <span>Trade settings</span>
+      <span className="ml-auto text-primary">{mode === "auto" ? "Auto · " : ""}{formatInlinePercent(value)}%</span>
+      <ChevronRightIcon aria-hidden="true" className="size-3.5 text-primary" />
+    </button>
+  </Trigger>;
+};
 
 const SettingsInlineTrigger = ({
   variant = "card",
   Trigger,
 }: {
-  variant?: Exclude<SettingsTriggerVariant, "icon">;
+  variant?: Exclude<SettingsTriggerVariant, "icon" | "footer">;
   Trigger: typeof DialogTrigger;
 }) => {
   const isSpotTab = useIsSpotTab();
@@ -200,7 +227,7 @@ const SettingsInlineTrigger = ({
         "flex w-full items-center justify-between gap-3 text-left",
         isActionVariant
           ? "min-h-0"
-          : "min-h-[46px] rounded-[18px] border border-border/70 bg-secondary/35 px-4 transition-colors hover:border-primary/25 hover:bg-secondary/40 max-sm:gap-2 max-sm:px-3",
+          : "min-h-[46px] rounded-[18px] border border-border/70 bg-secondary/35 px-4 transition-colors hover:bg-secondary/40 max-sm:gap-2 max-sm:px-3",
       )}
     >
       <FormLabel
@@ -262,20 +289,21 @@ export const SettingsModal = ({
 
   return (
     <Root open={open} onOpenChange={setOpen}>
-      <div className={className}>
+      <div data-settings-control className={className}>
         {triggerVariant === "icon" ? (
           <Trigger asChild>
             <button
               type="button"
               data-settings-trigger
+              data-icon-button
               aria-label={`Open ${isSpotTab ? "Price Protection" : "Slippage Tolerance"} settings`}
               title={isSpotTab ? "Price protection settings" : "Slippage settings"}
-              className="flex size-10 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-2 focus-visible:outline-primary"
+              className="flex size-10 shrink-0 items-center justify-center text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-primary"
             >
-              <SlidersHorizontalIcon aria-hidden="true" className="size-5" strokeWidth={1.5} />
+              <SettingsIcon aria-hidden="true" className="size-5" />
             </button>
           </Trigger>
-        ) : <SettingsInlineTrigger variant={triggerVariant} Trigger={Trigger} />}
+        ) : triggerVariant === "footer" ? <SettingsFooterTrigger Trigger={Trigger} /> : <SettingsInlineTrigger variant={triggerVariant} Trigger={Trigger} />}
       </div>
       {isPopover ? (
         <PopoverContent

@@ -1,6 +1,7 @@
 "use client";
 
 import { FetchOrdersDeveloperButton } from "@developer-tools";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
@@ -8,23 +9,25 @@ import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Spinner } from "@/components/ui/spinner";
 import { StyledSelect } from "@/components/ui/styled-select";
+import { HistoryViewTabs } from "./history-view-tabs";
 
 import { IS_ORBS } from "@/lib/partners/client";
+import { useWalletConnectModal } from "@/features/wallet-connection/provider";
 
-import { getChainName } from "@/lib/utils";
 import { OrderFilter } from "@orbs-network/spot-ui";
 
 import { Virtuoso } from "react-virtuoso";
 
 
-import { ORDER_FILTER_OPTIONS, getOrderFilterLabel, getNoOrdersTitle } from "./format";
+import { ORDER_FILTER_OPTIONS, getOrderFilterLabel, getNoOrdersTitle, type HistoryFilter } from "./format";
 import { HistoryPresentation, HistoryTitle } from "./presentation";
 import { OrderListItem } from "./order-list-item";
 import { SelectedOrderDetails } from "./details";
-import { OrderHistoryTable } from "./table";
-import { OrderDetailsDrawer } from "./details-drawer";
+import { OrderActivityList } from "./activity-list";
+import { OrderDetailsModal } from "./details-modal";
 import { useOrderHistory } from "./use-order-history";
 import { NetworkFilter } from "./network-filter";
+import { OrderSearch } from "./order-search";
 const FILTER_OPTIONS = ORDER_FILTER_OPTIONS.map(filter => ({ label: getOrderFilterLabel(filter), value: filter }));
 const keepPageOpen = () => {};
 
@@ -41,20 +44,22 @@ function OrderHistoryEmpty({
   selectedFilter,
 }: {
   hasWallet: boolean;
-  selectedFilter: OrderFilter;
+  selectedFilter: HistoryFilter;
 }) {
+  const { openConnectModal } = useWalletConnectModal();
   return (
     <EmptyState
       title={
         hasWallet
           ? getNoOrdersTitle(selectedFilter)
-          : "Connect wallet to view orders"
+          : "Your orders, in one place"
       }
       description={
         hasWallet
-          ? "Your order history will appear here after you create an order."
-          : "Connect your wallet to view its order history."
+          ? selectedFilter === OrderFilter.Open ? "New orders will appear here while they’re active." : "Completed, cancelled and expired orders will appear here."
+          : "Connect your wallet to follow active orders and review past trades."
       }
+      action={!hasWallet && <Button onClick={() => openConnectModal?.()}>Connect Wallet</Button>}
     />
   );
 }
@@ -71,15 +76,15 @@ function OrderHistoryView({
   const {
     address, chainName, orders, networks, drawer, selectedOrder,
     selectedFilter, setSelectedFilter, selectedNetwork, setSelectedNetwork,
-    setSelectedOrderId, selectOrder, failedNetworks, loading, error, refetch,
-    selectedNetworkError, filteredOrders, paginationScope, pageIndex,
-    pageSize, onPageChange, onPageSizeChange, handleOpenChange,
+    setSelectedOrderId, selectOrder, loading, error, refetch,
+    filteredOrders, filterScope, handleOpenChange,
   } = useOrderHistory(presentation, onOpenChange);
+  const [search, setSearch] = useState("");
 
   const filterControl = (
     <StyledSelect
       aria-label="Filter orders"
-      value={selectedFilter}
+      value={selectedFilter === "history" ? OrderFilter.All : selectedFilter}
       onValueChange={setSelectedFilter}
       options={FILTER_OPTIONS}
     />
@@ -96,9 +101,10 @@ function OrderHistoryView({
         ) : (
           <>
             <DialogHeader data-history-toolbar className="shrink-0 px-5 pb-6 pt-5 text-left">
+              <div data-history-heading className="min-w-0">
               <div className="flex min-w-0 items-center gap-2">
                 <HistoryTitle className="min-w-0 text-[16px] font-semibold leading-none [overflow-wrap:anywhere]">
-                  {presentation === "page" ? "Order history" : `${chainName} order history`}
+                  {presentation === "page" ? "Orders" : `${chainName} order history`}
                 </HistoryTitle>
                 {presentation === "page" && (
                   <span data-history-refresh role="status" className="inline-flex size-4 shrink-0 items-center justify-center text-muted-foreground">
@@ -113,24 +119,31 @@ function OrderHistoryView({
                   orders={orders}
                 />
               </div>
+              {presentation === "page" && <p data-history-scope className="mt-2 text-xs text-muted-foreground">Track active orders and review your completed trades.</p>}
+              </div>
               {presentation === "page" && (
                 <div data-history-filters className="flex min-w-0 items-center gap-2">
+                  {IS_ORBS && <OrderSearch value={search} onChange={setSearch} />}
                   <div data-history-network-filter>
                     <NetworkFilter value={selectedNetwork} onValueChange={setSelectedNetwork} />
                   </div>
-                  <div data-history-filter>{filterControl}</div>
+                    <HistoryViewTabs
+                      value={selectedFilter === OrderFilter.Open ? "open" : "history"}
+                      onChange={value => setSelectedFilter(value === "open" ? OrderFilter.Open : value)}
+                    />
                 </div>
               )}
             </DialogHeader>
 
-            <div data-history-body className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 pb-5">
-              {presentation === "page" && failedNetworks.length > 0 && (
+            <div data-history-body id={presentation === "page" ? "history-order-results" : undefined} role={presentation === "page" ? "tabpanel" : undefined} aria-labelledby={presentation === "page" ? `history-view-${selectedFilter === OrderFilter.Open ? "open" : "history"}` : undefined} className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 pb-5">
+              {error && orders.length > 0 && (
                 <div role="alert" className="flex flex-wrap items-center gap-2 border border-border p-3 text-xs text-muted-foreground">
-                  <p className="min-w-0 flex-1">History unavailable on {failedNetworks.map(failure => getChainName(failure.chainId)).join(", ")}. Available orders are shown; results may be incomplete.</p>
-                  <Button variant="outline" size="sm" onClick={() => void networks.refetch()} disabled={networks.isFetching}>Retry networks</Button>
+                  <p className="min-w-0 flex-1">Could not refresh order history. Showing the last available orders.</p>
+                  <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={networks.isFetching}>Retry history</Button>
                 </div>
               )}
               {presentation === "modal" && <div className="flex flex-wrap items-center justify-between gap-3">
+                {IS_ORBS && <OrderSearch value={search} onChange={setSearch} />}
                 <div className="w-full sm:w-[144px]">
                   {filterControl}
                 </div>
@@ -140,14 +153,16 @@ function OrderHistoryView({
               </div>}
 
               {IS_ORBS ? (
-                <OrderHistoryTable
-                  filterScope={paginationScope}
+                <OrderActivityList
+                  scope={filterScope}
+                  contained={presentation === "modal"}
+                  view={selectedFilter === OrderFilter.Open ? "open" : "history"}
+                  network={selectedNetwork}
                   orders={filteredOrders}
+                  allOrders={orders}
+                  search={search}
+                  onClearSearch={() => setSearch("")}
                   onSelect={selectOrder}
-                  pageIndex={pageIndex}
-                  pageSize={pageSize}
-                  onPageChange={onPageChange}
-                  onPageSizeChange={onPageSizeChange}
                 >
                   {error ? (
                     <div role="alert" className="flex min-h-60 flex-col items-center justify-center gap-3 p-5 text-sm">
@@ -157,11 +172,11 @@ function OrderHistoryView({
                   ) : loading ? (
                     <div role="status" className="flex min-h-60 items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner className="size-5" />Loading orders…</div>
                   ) : <OrderHistoryEmpty hasWallet={Boolean(address)} selectedFilter={selectedFilter} />}
-                </OrderHistoryTable>
+                </OrderActivityList>
               ) : error ? (
                 <div role="alert" className="flex flex-col items-center gap-3 py-8 text-sm">
                   <p>Could not load order history: {error.message}</p>
-                  <button type="button" className="text-primary underline" onClick={() => void refetch()}>Retry history</button>
+                  <button data-hover="text" type="button" className="text-primary underline" onClick={() => void refetch()}>Retry history</button>
                 </div>
               ) : loading && !filteredOrders.length ? (
                 <div className="flex min-h-[240px] items-center justify-center">
@@ -199,13 +214,13 @@ function OrderHistoryView({
         <section data-order-history data-history-page data-history-view="table">
           {content}
         </section>
-        <OrderDetailsDrawer
+        <OrderDetailsModal
           orderId={drawer.orderId}
           order={selectedOrder}
           chainId={drawer.chainId}
           hasWallet={Boolean(address)}
-          loading={networks.isLoading}
-          error={selectedNetworkError ?? networks.error}
+          loading={loading}
+          error={error}
           onClose={drawer.close}
           onCloseAutoFocus={drawer.restoreFocus}
           onRetry={() => void networks.refetch()}
@@ -215,7 +230,7 @@ function OrderHistoryView({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange} responsive={false}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         data-order-history
         data-history-view={IS_ORBS && !selectedOrder ? "table" : "details"}

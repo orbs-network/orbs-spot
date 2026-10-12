@@ -1,0 +1,55 @@
+/* Keep the shared numeric input and responsive select inside one field. */
+:global(html[data-partner="orbs"]) .control:global([data-order-input-controls]) {
+  gap: 0;
+  height: 48px;
+  min-width: 0;
+  border: 1px solid var(--orbs-control-border);
+  border-radius: 14px;
+  background: var(--orbs-input-background);
+  transition: border-color 150ms ease;
+}
+:global(html[data-partner="orbs"]) .control:global([data-order-input-controls]):focus-within {
+  border-color: var(--primary);
+}
+:global(html[data-partner="orbs"]) .control:global([data-order-input-controls][data-invalid="true"]) {
+  border-color: var(--destructive);
+}
+:global(html[data-partner="orbs"]) .control:global([data-order-input-controls]) :global([data-number-field]) {
+  height: 46px;
+  min-height: 46px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: 13px 0 0 13px;
+  background: transparent;
+}
+:global(html[data-partner="orbs"]) .control:global([data-order-input-controls]) :global([data-order-input-unit]) {
+  position: relative;
+  width: 100px;
+}
+:global(html[data-partner="orbs"]) .control:global([data-order-input-controls]) :global([data-order-input-unit])::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 1px;
+  background: var(--orbs-control-border);
+  pointer-events: none;
+}
+:global(html[data-partner="orbs"]) .control:global([data-order-input-controls]) :global([data-slot="select-trigger"]) {
+  height: 46px;
+  min-height: 46px;
+  padding-inline: 12px;
+  border: 0;
+  border-radius: 0 13px 13px 0;
+  background: transparent;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+@media (hover: hover) and (pointer: fine) {
+  :global(html[data-partner="orbs"]) .control:global([data-order-input-controls]) :global([data-slot="select-trigger"]):hover {
+    background: var(--orbs-control-hover);
+  }
+}

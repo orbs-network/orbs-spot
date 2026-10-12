@@ -1,4 +1,6 @@
 "use client";
+import { useRecentOrder } from "@/lib/spot/recent-order";
+import { trackFunnel } from "@/lib/funnel-analytics";
 
 import { toast } from "sonner";
 import { CREATE_ORDER_TOAST_ID } from "./constants";
@@ -89,6 +91,7 @@ export function useExecution() {
         );
 
       // Capture the form and wallet scope once, before the first wallet request.
+      trackFunnel({ name: "submit_requested", product: "advanced" });
       const order = await executor.submit({
         client: client.data,
         wallet,
@@ -103,6 +106,7 @@ export function useExecution() {
     // Submission may have reached the server even when its response is lost.
     retry: false,
     onError: (error) => {
+      trackFunnel({ name: "submission_failed", product: "advanced" });
       if (error instanceof SubmissionPreflightError) {
         toast.error("Order not submitted", {
           id: CREATE_ORDER_TOAST_ID,
@@ -111,6 +115,8 @@ export function useExecution() {
       }
     },
     onSuccess: (result) => {
+      trackFunnel({ name: "submission_succeeded", product: "advanced" });
+      useRecentOrder.getState().add(result.order);
       if (useOrderSubmitFlowStore.getState().isReviewOpen) {
         toast.dismiss(CREATE_ORDER_TOAST_ID);
       } else {

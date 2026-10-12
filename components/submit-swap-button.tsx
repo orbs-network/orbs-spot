@@ -1,7 +1,10 @@
+import { trackFunnel } from "@/lib/funnel-analytics";
 import { useConnection, useSwitchChain } from "wagmi";
 import { Button } from "./ui/button";
 import { useWalletConnectModal } from "@/features/wallet-connection/provider";
-import { getChainName } from "@/lib/utils";
+import { DEFAULT_CHAIN_ID, MAIN_CHAINS, SPOT_CHAINS } from "@/lib/consts";
+import { toast } from "sonner";
+import { getNetworkLabel } from "./network-label";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useBalance } from "@/lib/hooks/use-balances";
 import BN from "bignumber.js";
@@ -15,6 +18,7 @@ type SubmitSwapButtonProps = {
   chainId?: number;
   disabled?: boolean;
   validateSwap?: boolean;
+  supportedChains?: readonly { id: number }[];
 };
 
 type SubmitButtonBaseProps = Omit<SubmitSwapButtonProps, "validateSwap">;
@@ -25,6 +29,7 @@ const SubmitButtonBase = ({
   text,
   chainId,
   disabled,
+  supportedChains = MAIN_CHAINS,
 }: SubmitButtonBaseProps) => {
   const {
     address,
@@ -44,6 +49,7 @@ const SubmitButtonBase = ({
         isLoading={isWalletLoading}
         aria-busy={isWalletLoading}
         onClick={() => {
+          trackFunnel({ name: "wallet_connect_requested", product: supportedChains === SPOT_CHAINS ? "advanced" : "swap" });
           openConnectModal?.();
         }}
       >
@@ -52,16 +58,20 @@ const SubmitButtonBase = ({
     );
   }
 
-  if (chainId && currentChainId && currentChainId !== chainId) {
+  const targetChainId = chainId && supportedChains.some(chain => chain.id === chainId) ? chainId
+    : currentChainId && supportedChains.some(chain => chain.id === currentChainId) ? currentChainId : DEFAULT_CHAIN_ID;
+  if (currentChainId && currentChainId !== targetChainId) {
     return (
       <Button
         data-submit-button
         className="h-12 w-full rounded-[14px] text-base"
+        disabled={switchChain.isPending}
+        isLoading={switchChain.isPending}
         onClick={() => {
-          switchChain.mutate({ chainId });
+          switchChain.mutate({ chainId: targetChainId }, { onError: () => toast.error("Network switch cancelled or unavailable. Select the network in your wallet.") });
         }}
       >
-        Switch to {getChainName(chainId)} Network
+        Switch to {getNetworkLabel(targetChainId)}
       </Button>
     );
   }
@@ -159,7 +169,7 @@ export const SubmitSwapButton = ({
   ...props
 }: SubmitSwapButtonProps) => {
   if (!validateSwap) {
-    return <SubmitButtonBase {...props} />;
+    return <SubmitButtonBase supportedChains={SPOT_CHAINS} {...props} />;
   }
 
   return <ValidatedSubmitSwapButton {...props} />;

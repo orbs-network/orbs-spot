@@ -1,10 +1,8 @@
 import { OrderStatus } from "@orbs-network/spot-ui";
 import { QueryObserver, type QueryClient } from "@tanstack/react-query";
 import {
-  shareOrders,
-  spotClientQueryOptions,
+  spotOrdersQueryOptions,
   spotKeys,
-  type NetworkOrders,
   type OrderQueryScope,
 } from "./queries";
 
@@ -17,30 +15,24 @@ export function watchCancelledOrder(
   // An older all-chain request must not overwrite the refreshed order status.
   void queryClient.cancelQueries({ queryKey: allOrdersKey, exact: true });
   const observer = new QueryObserver(queryClient, {
-    queryKey: spotKeys.orders(partner, chainId, account),
-    queryFn: async ({ signal }) => {
-      const client = await queryClient.fetchQuery(spotClientQueryOptions(partner, chainId, true));
-      signal.throwIfAborted();
-      return client.getAccountOrders({ account, signal, getv1orders: false });
-    },
+    ...spotOrdersQueryOptions(partner, account, queryClient),
     staleTime: 0,
     refetchOnMount: "always",
     refetchInterval: 2_000,
     refetchIntervalInBackground: true,
     // A failed read is retried by polling; the cancellation itself already succeeded.
     retry: false,
-    structuralSharing: shareOrders,
   });
 
   const unsubscribeCache = queryClient.getQueryCache().subscribe(event => {
     if (event.type === "removed" && event.query === observer.getCurrentQuery()) stop();
   });
-  let onFinished = () => {};
-  const finished = new Promise<void>(resolve => { onFinished = resolve; });
-  function stop() {
+  let onFinished: (status?: OrderStatus) => void = () => {};
+  const finished = new Promise<OrderStatus | undefined>(resolve => { onFinished = resolve; });
+  function stop(status?: OrderStatus) {
     unsubscribeCache();
     observer.destroy();
-    onFinished();
+    onFinished(status);
   }
 
   observer.subscribe(result => {
@@ -49,22 +41,7 @@ export function watchCancelledOrder(
     // An incomplete response is not confirmation that the status changed.
     if (!updatedOrder) return;
 
-    queryClient.setQueryData<NetworkOrders>(allOrdersKey, previous => {
-      if (!previous) return undefined;
-      const refreshed = new Map(result.data.map(order => [order.historyKey, order]));
-      const orders = previous.orders.flatMap(order => {
-        if (order.chainId !== chainId) return [order];
-        const next = refreshed.get(order.historyKey);
-        refreshed.delete(order.historyKey);
-        return next ? [next] : [];
-      });
-      return {
-        orders: shareOrders(previous.orders, [...orders, ...refreshed.values()]),
-        failures: previous.failures.filter(failure => failure.chainId !== chainId),
-      };
-    });
-
-    if (updatedOrder.status !== OrderStatus.Open) stop();
+    if (updatedOrder.status !== OrderStatus.Open) stop(updatedOrder.status);
   });
 
   // The observer survives drawer unmounts and wallet/network switches. Destroying

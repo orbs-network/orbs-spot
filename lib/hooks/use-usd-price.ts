@@ -48,7 +48,7 @@ export const useUSDPrice = ({
       .toNumber();
   }, [usdPrices, token, tokenKey, amount]);
 
-  const usdFormatted = useFormatNumber({ value: data, decimalScale: 2 });
+  const usdFormatted = useFormatNumber({ value: data, decimalScale: 2, prefix: "$" });
 
   return useMemo(
     () => ({

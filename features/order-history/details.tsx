@@ -13,24 +13,29 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import { useOrderCurrency } from "./use-order-currency";
+import { useOrderDisplay } from "./use-order-display";
+import type { HistoryOrder, OrderToken as OrderTokenMetadata } from "@/lib/spot/order-tokens";
 import { OrderStatusLabel } from "./order-status-label";
 import { TokenSymbol } from "./token-symbol";
 
 import { cn, getExplorerUrl, makeEllipsisAddress } from "@/lib/utils";
-import { OrderStatus, type Order } from "@orbs-network/spot-ui";
+import { OrderStatus } from "@orbs-network/spot-ui";
 import { ArrowLeftIcon, ArrowRightIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, CopyIcon } from "lucide-react";
 import { useContext, useId, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
-import { useConnection, useSwitchChain } from "wagmi";
+import { useConnection } from "wagmi";
 
 import { useTranslations } from "@/lib/use-translations";
 
-import { toast } from "sonner";
+import { CancelOrderDialog } from "./cancel-order-dialog";
+import { DirectOrderCancelAction } from "./order-actions";
 
-import { useCancelOrder, useHistoryOrder } from "@/components/advanced-order/use-order-client";
+import { useCancelOrder } from "@/components/advanced-order/use-order-client";
 
 import { DerivedHistoryOrder, DerivedHistoryFill, OpenDetailSection, getOrderTypeLabel, formatDetailDate, formatDuration, formatDisplayNumber, formatTokenValue, formatPriceValue, isZeroValue } from "./format";
 import { HistoryPresentation, HistoryTitle } from "./presentation";
+import { OrderProgress } from "./order-progress";
+import { useWalletConnectModal } from "@/features/wallet-connection/provider";
 
 function OrderDetailRow({
   label,
@@ -84,9 +89,10 @@ function OrderIdRow({ id }: { id?: string }) {
         {id ? (
           <button
             type="button"
+            data-copy-identifier
             onClick={() => copyOrderId(id)}
             aria-label="Copy order ID"
-            className="flex size-6 shrink-0 items-center justify-center rounded-[8px] text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+            className="flex size-6 shrink-0 items-center justify-center rounded-[8px] text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
           >
             <CopyIcon aria-hidden="true" className="size-3.5" />
           </button>
@@ -144,12 +150,14 @@ function OrderDetailTokenBlock({
   address,
   label,
   chainId,
+  token,
 }: {
   address?: string;
   label: string;
   chainId: number;
+  token?: OrderTokenMetadata;
 }) {
-  const { currency, isLoading } = useOrderCurrency(address, chainId);
+  const { currency, isLoading } = useOrderCurrency(address, chainId, token);
 
   return (
     <div className="flex min-w-0 flex-col gap-2">
@@ -187,11 +195,11 @@ function FillDetailCard({ fill, chainId }: { fill: DerivedHistoryFill; chainId: 
         value={formatDetailDate(fill.timestamp)}
       />
       <OrderDetailRow
-        label={t("fillAmountOut")}
+        label="Sold"
         value={formatTokenValue(fill.inputAmount.ui, fill.inputToken?.symbol)}
       />
       <OrderDetailRow
-        label={t("fillAmountReceived")}
+        label="Received"
         value={formatTokenValue(fill.outputAmount.ui, fill.outputToken?.symbol)}
       />
       <OrderDetailRow
@@ -202,7 +210,7 @@ function FillDetailCard({ fill, chainId }: { fill: DerivedHistoryFill; chainId: 
               href={explorerUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-primary transition-colors hover:text-primary/80"
+              className="text-primary transition-colors "
             >
               {isPage ? fill.txHash : makeEllipsisAddress(fill.txHash)}
             </a>
@@ -234,7 +242,7 @@ function DetailNavigationRow({
       data-history-section
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-border/60 bg-secondary/30 px-3 py-3 text-left text-base font-medium text-foreground transition-colors hover:border-primary/14 hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 disabled:cursor-not-allowed disabled:opacity-55"
+      className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-border/60 bg-secondary/30 px-3 py-3 text-left text-base font-medium text-foreground transition-colors hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 disabled:cursor-not-allowed disabled:opacity-55"
     >
       <span className="min-w-0 truncate">{title}</span>
       <span className="flex shrink-0 items-center gap-2 text-sm text-muted-foreground">
@@ -255,9 +263,11 @@ function HistoryBackButton({
   return (
     <button
       type="button"
+      data-icon-button
+      data-history-back-button
       onClick={onClick}
       aria-label={label}
-      className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-border/70 bg-secondary/35 text-foreground transition-colors hover:border-primary/25 hover:bg-secondary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+      className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[10px] border border-border/70 bg-secondary/35 text-foreground transition-colors hover:bg-secondary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
     >
       <ArrowLeftIcon aria-hidden="true" className="size-4" />
     </button>
@@ -313,19 +323,19 @@ export function SelectedOrderDetails({
   rawOrder,
 }: {
   onBack: () => void;
-  rawOrder: Order;
+  rawOrder: HistoryOrder;
 }) {
   const t = useTranslations();
   const presentation = useContext(HistoryPresentation);
-  const { currency: srcCurrency } = useOrderCurrency(rawOrder.srcTokenAddress, rawOrder.chainId);
-  const { currency: dstCurrency } = useOrderCurrency(rawOrder.dstTokenAddress, rawOrder.chainId);
-  const order = useHistoryOrder(rawOrder, srcCurrency, dstCurrency);
+  const { details: order } = useOrderDisplay(rawOrder);
   const [view, setView] = useState<"details" | "fills">("details");
   const [fillsOpen, setFillsOpen] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [openDetailSection, setOpenDetailSection] =
     useState<OpenDetailSection>("summary");
-  const { chainId: connectedChainId } = useConnection();
-  const switchChain = useSwitchChain();
+  const { chainId: connectedChainId, address } = useConnection();
+  const { openConnectModal } = useWalletConnectModal();
+  const isOwner = address?.toLowerCase() === rawOrder.maker.toLowerCase();
   const needsNetworkSwitch = connectedChainId !== rawOrder.chainId;
   const isOpenOrder = order?.original.status === OrderStatus.Open;
   const { cancelOrder, isLoading: isCancelling, isSuccess } =
@@ -342,7 +352,7 @@ export function SelectedOrderDetails({
   return (
     <div data-order-details-content className="px-5 pb-5 pt-5">
       <div data-order-details-scroll>
-        {presentation !== "drawer" && <div className="mb-6 flex items-center gap-4 pr-8">
+        {presentation === "modal" && <div className="mb-6 flex items-center gap-4 pr-8">
           <HistoryBackButton label="Back to orders" onClick={onBack} />
           <HistoryTitle className="truncate text-[16px] font-semibold leading-none">
             {t("orderDetails")}
@@ -350,8 +360,8 @@ export function SelectedOrderDetails({
         </div>}
 
         <div data-history-token-pair className="mb-6 flex flex-col gap-9">
-          <OrderDetailTokenBlock address={rawOrder.srcTokenAddress} chainId={rawOrder.chainId} label="From" />
-          <OrderDetailTokenBlock address={rawOrder.dstTokenAddress} chainId={rawOrder.chainId} label="To" />
+          <OrderDetailTokenBlock address={rawOrder.srcTokenAddress} chainId={rawOrder.chainId} token={rawOrder.inputToken} label={t("sell")} />
+          <OrderDetailTokenBlock address={rawOrder.dstTokenAddress} chainId={rawOrder.chainId} token={rawOrder.outputToken} label={t("buy")} />
         </div>
 
         <div data-order-details-sections className="flex flex-col gap-3">
@@ -362,12 +372,13 @@ export function SelectedOrderDetails({
             }
             title="Execution summary"
           >
+            {presentation === "page" && <div className="pb-3"><OrderProgress order={rawOrder} /></div>}
             <OrderDetailRow
               label={t("status")}
               value={<OrderStatusLabel order={order.original} />}
             />
             <OrderDetailRow
-              label={t("amountOut")}
+              label="Sold"
               value={formatTokenValue(
                 order.inputAmountFilled.ui,
                 order.inputToken?.symbol,
@@ -375,7 +386,7 @@ export function SelectedOrderDetails({
             />
             {order.outputAmountFilled.raw ? (
               <OrderDetailRow
-                label={t("amountReceived")}
+                label="Received"
                 value={formatTokenValue(
                   order.outputAmountFilled.ui,
                   order.outputToken?.symbol,
@@ -391,7 +402,7 @@ export function SelectedOrderDetails({
                 label={t(
                   order.original.totalTradesAmount === 1
                     ? "finalExecutionPrice"
-                    : "averageExecutionPrice",
+                    : "averageFillPrice",
                 )}
                 value={formatPriceValue(
                   order.executionPrice.ui,
@@ -425,12 +436,12 @@ export function SelectedOrderDetails({
               value={formatDetailDate(order.deadline)}
             />
             <OrderDetailRow
-              label={t("amountOut")}
+              label={t("sell")}
               value={formatTokenValue(order.inputAmount.ui, order.inputToken?.symbol)}
             />
             {!isZeroValue(order.minOutputAmountPerTrade.ui) ? (
               <OrderDetailRow
-                label={t("minReceivedPerTrade")}
+                label={t(order.totalTrades > 1 ? "minReceivedPerTrade" : "minReceived")}
                 tooltip={t("minDstAmountTooltip")}
                 value={formatTokenValue(
                   order.minOutputAmountPerTrade.ui,
@@ -495,7 +506,7 @@ export function SelectedOrderDetails({
                 <div key={`${fill.txHash}-${fill.timestamp}-${index}`} className="[content-visibility:auto] [contain-intrinsic-size:auto_240px]">
                   <FillDetailCard fill={fill} chainId={order.original.chainId} />
                 </div>
-              )) : <p className="border border-border p-4 text-sm text-muted-foreground">{t("noFills")}</p>}
+              )) : <p className="py-3 text-sm text-muted-foreground">{t("noFills")}</p>}
             </DetailSection>
           ) : (
             <DetailNavigationRow
@@ -507,24 +518,19 @@ export function SelectedOrderDetails({
         </div>
       </div>
 
-      {isOpenOrder && !isSuccess && (
+      {isOpenOrder && !isOwner && presentation === "page" && <div className="mt-5 flex flex-wrap items-center gap-3 text-sm text-muted-foreground"><p>Connect the wallet that placed this order to cancel it.</p>{!address && <Button variant="outline" onClick={() => openConnectModal?.()}>Connect wallet</Button>}</div>}
+      {isOpenOrder && isOwner && !isSuccess && (
         <div data-order-details-actions className="mt-4 flex w-full items-center gap-2">
-          <Button
+          {presentation === "modal" ? <DirectOrderCancelAction order={rawOrder} className="min-h-12 h-auto min-w-0 flex-1 whitespace-normal rounded-[14px] text-base" /> : <Button
             data-submit-button
             type="button"
-            onClick={() => {
-              if (needsNetworkSwitch) {
-                switchChain.mutate({ chainId: rawOrder.chainId }, {
-                  onError: () => toast.error("Network switch wasn’t completed. Try again in your wallet."),
-                });
-              } else cancelOrder();
-            }}
-            isLoading={isCancelling || switchChain.isPending}
-            disabled={isCancelling || switchChain.isPending}
+            onClick={() => setConfirmCancel(true)}
+            isLoading={isCancelling}
+            disabled={isCancelling}
             className="min-h-12 h-auto min-w-0 flex-1 whitespace-normal rounded-[14px] text-base"
           >
             {needsNetworkSwitch ? `Switch to ${getNetworkLabel(rawOrder.chainId)} to cancel` : t("cancelOrder")}
-          </Button>
+          </Button>}
           {!needsNetworkSwitch && <CancelOrderDeveloperButton
             isCancelling={isCancelling}
             onCancel={cancelOrder}
@@ -532,6 +538,7 @@ export function SelectedOrderDetails({
           />}
         </div>
       )}
+      {confirmCancel && isOpenOrder && isOwner && <CancelOrderDialog order={rawOrder} onClose={() => setConfirmCancel(false)} />}
     </div>
   );
 }

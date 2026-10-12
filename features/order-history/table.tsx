@@ -1,25 +1,28 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useCallback, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { useOrderCurrency } from "./use-order-currency";
+import { useOrderDisplay } from "./use-order-display";
+import { OrderProgress } from "./order-progress";
+import { CancelOrderDialog, OrderCancelButton } from "./cancel-order-dialog";
 import { OrderStatusLabel } from "./order-status-label";
 
 import { cn } from "@/lib/utils";
-import { type Order, toAmountUI } from "@orbs-network/spot-ui";
+import { type Order } from "@orbs-network/spot-ui";
 import { ArrowRightIcon, ChevronLeftIcon, ChevronRightIcon, ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
 
-import { getOrderTypeLabel, normalizeTimestamp, formatOrderDate, formatTokenValue } from "./format";
+import { getOrderTypeLabel, formatTokenValue } from "./format";
 
 import { MarketTokenLink } from "./market-token-link";
 import { NetworkLabel } from "@/components/network-label";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { MobileOrderList } from "./mobile-order-list";
-const HISTORY_COLUMNS = ["Chain", "Order type", "Market", "Sell amount", "Filled", "Status", "Timing", "Details"];
+import { OrderDetailsLink } from "./order-details-link";
+const HISTORY_COLUMNS = ["Market", "Order type", "Sell amount", "Filled", "Status", "Actions"];
 
 function HistoryTableHeader() {
   return (
@@ -29,57 +32,42 @@ function HistoryTableHeader() {
   );
 }
 
-const OrderTableCells = memo(function OrderTableCells({ order, onSelect }: {
+const OrderTableCells = memo(function OrderTableCells({ order, onSelect, onCancel }: {
   order: Order;
   onSelect: (id: string, chainId: number) => void;
+  onCancel: (order: Order) => void;
 }) {
-  const { currency: inputToken, isLoading: inputLoading } = useOrderCurrency(order.srcTokenAddress, order.chainId);
-  const { currency: outputToken, isLoading: outputLoading } = useOrderCurrency(order.dstTokenAddress, order.chainId);
-  const amount = inputToken ? toAmountUI(order.srcAmount, inputToken.decimals) : undefined;
-  const timestamp = normalizeTimestamp(order.createdAt);
-  const deadline = normalizeTimestamp(order.deadline);
+  const { inputToken, outputToken, inputLoading, outputLoading, details } = useOrderDisplay(order);
+  const amount = details?.inputAmount.ui;
 
   return (
     <>
-      <TableCell role="cell" data-label="Chain"><NetworkLabel chainId={order.chainId} /></TableCell>
-      <TableCell role="cell" data-label="Order type">{getOrderTypeLabel(order.type)}</TableCell>
       <TableCell role="cell" data-label="Market">
         <div className="flex flex-wrap items-center gap-2">
           <MarketTokenLink address={order.srcTokenAddress} chainId={order.chainId} symbol={inputToken?.symbol} isLoading={inputLoading} />
           <ArrowRightIcon aria-hidden="true" className="size-3 shrink-0 text-muted-foreground" />
           <MarketTokenLink address={order.dstTokenAddress} chainId={order.chainId} symbol={outputToken?.symbol} isLoading={outputLoading} />
         </div>
+        <div data-history-market-network className="mt-2 text-xs text-muted-foreground"><NetworkLabel chainId={order.chainId} /></div>
       </TableCell>
+      <TableCell role="cell" data-label="Order type">{getOrderTypeLabel(order.type)}</TableCell>
       <TableCell role="cell" data-label="Sell amount" title={amount ? `${amount} ${inputToken?.symbol ?? ""}`.trim() : undefined}>
         {formatTokenValue(amount, inputToken?.symbol)}
       </TableCell>
-      <TableCell role="cell" data-label="Filled" className="tabular-nums">{Math.max(0, Math.min(100, Math.round(order.progress ?? 0)))}%</TableCell>
+      <TableCell role="cell" data-label="Filled"><OrderProgress order={order} /></TableCell>
       <TableCell role="cell" data-label="Status"><span data-order-status={order.status}><OrderStatusLabel order={order} /></span></TableCell>
-      <TableCell role="cell" data-label="Timing">
-        <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-2 gap-y-1 text-xs">
-          <dt className="text-muted-foreground">Created</dt>
-          <dd>
-            <time dateTime={timestamp ? new Date(timestamp).toISOString() : undefined}>
-              {formatOrderDate(order.createdAt) || "—"}
-            </time>
-          </dd>
-          <dt className="text-muted-foreground">Deadline</dt>
-          <dd>
-            <time dateTime={deadline ? new Date(deadline).toISOString() : undefined}>
-              {formatOrderDate(order.deadline) || "—"}
-            </time>
-          </dd>
-        </dl>
-      </TableCell>
-      <TableCell role="cell" data-label="Details">
-        <button
-          type="button"
-          onClick={() => onSelect(order.historyKey, order.chainId)}
-          className="inline-flex min-h-9 items-center gap-1 px-2 text-xs font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-primary"
+      <TableCell role="cell" data-label="Actions">
+        <div className="flex flex-wrap items-center gap-2">
+        <OrderDetailsLink
+          order={order}
+          onSelect={onSelect}
+          className="inline-flex min-h-11 items-center justify-center gap-1.5 px-3 text-xs font-medium hover:bg-secondary focus-visible:outline-2 focus-visible:outline-primary"
           aria-label={`View ${getOrderTypeLabel(order.type)} order ${order.id}, ${inputToken?.symbol ?? "input token"} to ${outputToken?.symbol ?? "output token"}`}
         >
-          View<ChevronRightIcon aria-hidden="true" className="size-3" />
-        </button>
+          Details<ArrowRightIcon aria-hidden="true" className="size-3.5 shrink-0" />
+        </OrderDetailsLink>
+        <OrderCancelButton order={order} onCancel={onCancel} />
+        </div>
       </TableCell>
     </>
   );
@@ -96,12 +84,16 @@ export function OrderHistoryTable({ orders, onSelect, children, pageIndex, pageS
   filterScope: string;
 }) {
   const isMobile = useIsMobile("(max-width: 767px)");
+  const [cancelKey, setCancelKey] = useState<string>();
+  const onCancel = useCallback((order: Order) => setCancelKey(order.historyKey), []);
+  const cancelOrder = orders.find(order => order.historyKey === cancelKey);
+  const confirmation = cancelOrder && <CancelOrderDialog key={cancelOrder.historyKey} order={cancelOrder} onClose={() => setCancelKey(undefined)} />;
   const pageCount = Math.max(1, Math.ceil(orders.length / pageSize));
   const start = pageIndex * pageSize;
   const pageOrders = orders.slice(start, start + pageSize);
 
   if (isMobile) {
-    return <MobileOrderList key={filterScope} orders={orders} onSelect={onSelect}>{children}</MobileOrderList>;
+    return <><MobileOrderList key={filterScope} orders={orders} onSelect={onSelect} onCancel={onCancel}>{children}</MobileOrderList>{confirmation}</>;
   }
 
   return (
@@ -117,21 +109,21 @@ export function OrderHistoryTable({ orders, onSelect, children, pageIndex, pageS
             role: "region",
             "aria-label": "Order history rows",
             tabIndex: 0,
-            className: cn("min-h-0 overflow-x-hidden focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary", orders.length ? "flex-1 overflow-y-auto" : "shrink-0"),
+            className: cn("min-h-0 overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary", orders.length ? "flex-1" : "shrink-0"),
           }}
         >
           <HistoryTableHeader />
           <TableBody role="rowgroup">
             {pageOrders.map((order) => (
               <TableRow role="row" key={order.historyKey}>
-                <OrderTableCells order={order} onSelect={onSelect} />
+                <OrderTableCells order={order} onSelect={onSelect} onCancel={onCancel} />
               </TableRow>
             ))}
           </TableBody>
         </Table>
         {!orders.length && <div data-history-empty className="flex min-h-0 flex-1 flex-col overflow-auto">{children}</div>}
       </div>
-      <div data-history-pagination className="flex shrink-0 flex-wrap items-center justify-between gap-3 text-xs">
+      {orders.length > 0 && <div data-history-pagination className="flex shrink-0 flex-wrap items-center justify-between gap-3 text-xs">
         <p role="status" aria-atomic="true" className="text-muted-foreground">
           {orders.length ? `${start + 1}–${Math.min(start + pageSize, orders.length)} of ${orders.length} orders` : "0 orders"}
         </p>
@@ -153,7 +145,8 @@ export function OrderHistoryTable({ orders, onSelect, children, pageIndex, pageS
           <Button variant="outline" size="icon" aria-label="Next page" disabled={pageIndex >= pageCount - 1} onClick={() => onPageChange(pageIndex + 1)}><ChevronRightIcon aria-hidden="true" /></Button>
           <Button variant="outline" size="icon" className="hidden sm:inline-flex" aria-label="Last page" disabled={pageIndex >= pageCount - 1} onClick={() => onPageChange(pageCount - 1)}><ChevronsRightIcon aria-hidden="true" /></Button>
         </nav>
-      </div>
+      </div>}
+      {confirmation}
     </>
   );
 }

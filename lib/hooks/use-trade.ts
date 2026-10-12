@@ -8,8 +8,7 @@ import {
   isNativeAddress,
 } from "../utils";
 import { useDataChainId } from "./use-data-chain-id";
-import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
-import { DEVELOPER_PREVIEW_ACCOUNT } from "./use-developer-mode";
+import { QUOTE_PREVIEW_ACCOUNT } from "@/lib/swap/quote-preview";
 import { useConnection } from "wagmi";
 import { useSwapStore } from "./store";
 import { useMemo } from "react";
@@ -36,11 +35,10 @@ const useQuoteLiquidityHub = (
   const liquidityHub = useLiquidityHub();
   const { slippage } = useSettings();
   const pauseQuote = useSwapStore((state) => state.pauseQuote);
-  const { chainId: walletChainId, address } = useConnection();
-  const dataChainId = useDataChainId();
-  const { isDeveloperMode } = useDeveloperMode();
-  const chainId = walletChainId ?? (isDeveloperMode ? dataChainId : undefined);
-  const account = address ?? (isDeveloperMode ? DEVELOPER_PREVIEW_ACCOUNT : undefined);
+  const { address } = useConnection();
+  const chainId = useDataChainId();
+  // Wallet identity remains part of the key, so connecting requests a fresh quote.
+  const account = address ?? QUOTE_PREVIEW_ACCOUNT;
   const inputCurrencyAddress = inputCurrency?.address ?? "";
   const outputCurrencyAddress = outputCurrency?.address ?? "";
   return useQuery<BestTradeQuote>({
@@ -55,7 +53,7 @@ const useQuoteLiquidityHub = (
     ],
     queryFn: async ({ signal }) => {
       if (!chainId || !account || !inputCurrency || !outputCurrency || !BN(parsedInputAmount).gt(0)) {
-        throw new Error("Connect a wallet and enter an amount before requesting a quote");
+        throw new Error("Select a token pair and enter an amount before requesting a quote");
       }
       const quote = await liquidityHub.getQuote({
         fromToken: isNativeAddress(inputCurrencyAddress)
@@ -71,9 +69,7 @@ const useQuoteLiquidityHub = (
         account: account,
       });
       return {
-        outAmount: BN(quote.outAmount)
-          .plus(BN(quote.gasAmountOut || "0"))
-          .toFixed(0),
+        outAmount: quote.outAmount,
         minAmountOut: quote.minAmountOut,
         inToken: inputCurrency!.address,
         outToken: outputCurrency!.address,

@@ -11,18 +11,18 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-primary/74",
+          "bg-primary text-primary-foreground enabled:hover:bg-primary/74",
         destructive:
-          "bg-destructive text-white hover:bg-destructive/60 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          "bg-destructive text-white enabled:hover:bg-destructive/60 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
-          "border border-border bg-background/40 hover:border-primary/25 hover:bg-secondary/40 hover:text-foreground dark:bg-input/20 dark:border-input dark:hover:bg-input/25",
+          "border border-border bg-background/40 enabled:hover:bg-secondary/40 dark:bg-input/20 dark:border-input dark:enabled:hover:bg-input/25",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/55",
+          "bg-secondary text-secondary-foreground enabled:hover:bg-secondary/55",
         demo:
-          "border-2 border-primary/50 bg-primary/10 text-primary shadow-[0_0_0_2px_color-mix(in_srgb,var(--primary)_12%,transparent),0_0_20px_color-mix(in_srgb,var(--primary)_16%,transparent)] hover:border-primary/70 hover:bg-primary/15",
+          "border-2 border-primary/50 bg-primary/10 text-primary shadow-[0_0_0_2px_color-mix(in_srgb,var(--primary)_12%,transparent),0_0_20px_color-mix(in_srgb,var(--primary)_16%,transparent)] enabled:hover:bg-primary/15",
         ghost:
-          "hover:bg-accent/45 hover:text-accent-foreground dark:hover:bg-accent/30",
-        link: "text-primary underline-offset-4 hover:underline",
+          "enabled:hover:bg-accent/45 dark:enabled:hover:bg-accent/30",
+        link: "text-primary underline-offset-4 ",
       },
       size: {
         default: "h-9 px-4 py-2 has-[>svg]:px-3",
@@ -62,6 +62,7 @@ function Button({
       {...props}
       type={asChild ? undefined : props.type ?? "button"}
       data-slot="button"
+      data-icon-button={size?.startsWith("icon") || undefined}
       data-variant={variant ?? "default"}
       className={cn(buttonVariants({ variant, size, className }), "cursor-pointer")}
       disabled={isLoading || props.disabled}

@@ -5,6 +5,7 @@ import { useConnection, useReadContracts } from "wagmi";
 import { useBalances } from "./use-balances";
 import { useUSDPrices } from "./use-usd-price";
 import type { Currency } from "../types";
+import { MAX_DEFAULT_TOKENS } from "../token-list";
 import { useCurrenciesQuery } from "./use-currencies-query";
 import { useDataChainId } from "./use-data-chain-id";
 
@@ -44,6 +45,7 @@ const useExternalCurrency = (address?: `0x${string}`, requestedChainId?: number)
   const currency = useMemo((): Currency | undefined => {
     if (!address || !externalCurrency) return undefined;
     return {
+      chainId,
       decimals: externalCurrency[0] ?? 0,
       name: externalCurrency[1] ?? "",
       symbol: externalCurrency[2] ?? "",
@@ -51,7 +53,7 @@ const useExternalCurrency = (address?: `0x${string}`, requestedChainId?: number)
       logoUrl: "",
       imported: true,
     };
-  }, [externalCurrency, address]);
+  }, [externalCurrency, address, chainId]);
   return { currency, isLoading: enabled && isPending };
 };
 
@@ -97,22 +99,24 @@ const useAllCurrencies = () => {
 };
 
 export const useCurrencies = (query?: string) => {
+  const search = query?.trim() ?? "";
   const { balances, currencies, isError, isLoading, refetch, usdPrices } =
     useAllCurrencies();
   const internalCurrencies = useMemo(() => {
-    if (!query) return currencies;
-    return filterCurrencies(currencies, [query]);
-  }, [currencies, query]);
+    if (search) return filterCurrencies(currencies, [search]);
+    // Saved imports stay easy to find; search still covers every saved token.
+    return [...currencies.filter(currency => currency.imported), ...currencies.filter(currency => !currency.imported)];
+  }, [currencies, search]);
 
   const allowExternal =
-    query && !isLoading && !internalCurrencies?.length && isAddress(query);
+    search && !isLoading && !internalCurrencies?.length && isAddress(search);
 
   const { currency: externalCurrency, isLoading: isLoadingExternal } = useExternalCurrency(
-    allowExternal ? query : undefined
+    allowExternal ? search as `0x${string}` : undefined
   );
 
   const result = useMemo(
-    () => externalCurrency ? [externalCurrency] : internalCurrencies,
+    () => externalCurrency ? [externalCurrency] : internalCurrencies.slice(0, MAX_DEFAULT_TOKENS),
     [externalCurrency, internalCurrencies],
   );
 

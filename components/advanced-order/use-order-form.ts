@@ -5,6 +5,7 @@ import {
   calculateOrderForm,
   invertPriceInput,
   Module,
+  type CalculateOrderFormParams,
   type TimeUnit,
 } from "@orbs-network/spot-ui";
 import { useConnection } from "wagmi";
@@ -17,6 +18,8 @@ import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { useSpotMarketReferencePrice, useSpotToken } from "./hooks";
 
 import type { OrderInput } from "@/lib/spot/form";
+import { formatAmount } from "@/lib/token-display";
+import BN from "bignumber.js";
 const EMPTY_INPUT: OrderInput = {};
 
 /** Called once by AdvancedOrderForm. All consumers share this calculated snapshot. */
@@ -30,6 +33,8 @@ export function useCalculatedOrder(module: Module) {
     state.orderDraft.key === key ? state.orderDraft.input : EMPTY_INPUT,
   );
   const setOrderInput = useSwapStore((state) => state.setOrderInput);
+  // The toggle is a user preference, independent of pair-specific draft prices.
+  const limitPriceEnabled = useSwapStore((state) => state.orderLimitPriceEnabled);
   const updateInput = useCallback(
     (patch: OrderInput) => setOrderInput(key, patch),
     [key, setOrderInput],
@@ -45,9 +50,9 @@ export function useCalculatedOrder(module: Module) {
   const quote = market.isLoading ? undefined : market.value;
   // Calculation is synchronous derived data, so useMemo is enough. The SDK
   // owns raw amounts, defaults and validation; only editable inputs live in the store.
-  const form = useMemo(
-    () =>
-      calculateOrderForm({
+  const { form, defaultPrices } = useMemo(
+    () => {
+      const params: CalculateOrderFormParams = {
         module,
         inputTokenDecimals: inputToken?.decimals ?? 18,
         outputTokenDecimals: outputToken?.decimals ?? 18,
@@ -62,9 +67,22 @@ export function useCalculatedOrder(module: Module) {
           ...input,
           inputAmountUi: inputAmount,
           isMarketOrder:
-            module !== Module.LIMIT && (input.isMarketOrder ?? true),
+            module !== Module.LIMIT && !limitPriceEnabled,
         },
-      }),
+      };
+      const form = calculateOrderForm(params);
+      const defaults = calculateOrderForm({
+        ...params,
+        userInput: {
+          ...params.userInput,
+          triggerPriceUi: undefined,
+          triggerPricePercent: undefined,
+          limitPriceUi: undefined,
+          limitPricePercent: module === Module.STOP_LOSS || module === Module.TAKE_PROFIT ? undefined : "0",
+        },
+      });
+      return { form, defaultPrices: { trigger: defaults.triggerPrice.raw, limit: defaults.limitPrice.raw } };
+    },
     [
       module,
       inputToken?.decimals,
@@ -76,12 +94,13 @@ export function useCalculatedOrder(module: Module) {
       balance,
       priceProtection,
       input,
+      limitPriceEnabled,
       inputAmount,
     ],
   );
   return useMemo(
-    () => ({ form, inputToken, outputToken, input, updateInput, market }),
-    [form, inputToken, outputToken, input, updateInput, market],
+    () => ({ form, defaultPrices, inputToken, outputToken, input, updateInput, market }),
+    [form, defaultPrices, inputToken, outputToken, input, updateInput, market],
   );
 }
 
@@ -102,10 +121,12 @@ export function useOutputAmount() {
   return { amount: form.outputAmount, isLoading: market.isLoading };
 }
 export function useTrades() {
-  const { form, inputToken, updateInput } = useOrderModel();
+  const { form, input, inputToken, updateInput } = useOrderModel();
   return {
     ...form.trades,
     inputToken,
+    isAuto: input.tradeCount === undefined,
+    resetToAuto: () => updateInput({ tradeCount: undefined }),
     onChange: (tradeCount: number) => updateInput({ tradeCount }),
   };
 }
@@ -142,6 +163,7 @@ export function usePriceDisplay() {
     isMarketOrder: form.values.isMarketOrder,
     displayInputToken: form.isInverted ? outputToken : inputToken,
     displayOutputToken: form.isInverted ? inputToken : outputToken,
+    marketRate: formatAmount(form.isInverted ? invertPriceInput(form.marketPrice.ui) : form.marketPrice.ui),
     onInvert: () =>
       updateInput({
         isPriceInverted: !form.isInverted,
@@ -151,11 +173,14 @@ export function usePriceDisplay() {
   };
 }
 export function useTriggerPrice() {
-  const { form, updateInput } = useOrderModel();
+  const { form, defaultPrices, market, input, updateInput } = useOrderModel();
   const { displayOutputToken } = usePriceDisplay();
   return {
     ...form.triggerPrice,
+    canReset: !market.isLoading && BN(defaultPrices.trigger).gt(0) && !BN(form.triggerPrice.raw).eq(defaultPrices.trigger),
+    percentage: input.triggerPricePercent ?? form.triggerPrice.percentage,
     price: form.triggerPrice.display,
+    inputValue: input.triggerPriceUi ?? formatAmount(form.triggerPrice.display.ui),
     displayOutputToken,
     onInputChange: (triggerPriceUi: string) =>
       updateInput({ triggerPriceUi, triggerPricePercent: null }),
@@ -169,20 +194,30 @@ export function useTriggerPrice() {
   };
 }
 export function useLimitPrice() {
-  const { form, updateInput } = useOrderModel();
+  const { form, defaultPrices, market, input, updateInput } = useOrderModel();
+  const setLimitPriceEnabled = useSwapStore((state) => state.setOrderLimitPriceEnabled);
   const { displayOutputToken } = usePriceDisplay();
   return {
     ...form.limitPrice,
+    canReset: !market.isLoading && BN(defaultPrices.limit).gt(0) && !BN(form.limitPrice.raw).eq(defaultPrices.limit),
+    percentage: input.limitPricePercent ?? form.limitPrice.percentage,
     price: form.limitPrice.display,
+    inputValue: input.limitPriceUi ?? formatAmount(form.limitPrice.display.ui),
     displayOutputToken,
     isEnabled: !form.values.isMarketOrder,
-    toggle: () => updateInput({ isMarketOrder: !form.values.isMarketOrder }),
+    toggle: () => setLimitPriceEnabled(form.values.isMarketOrder),
     onInputChange: (limitPriceUi: string) =>
       updateInput({ limitPriceUi, limitPricePercent: null }),
     onPercentageChange: (limitPricePercent: string) =>
       updateInput({ limitPricePercent, limitPriceUi: undefined }),
     onReset: () =>
-      updateInput({ limitPriceUi: undefined, limitPricePercent: undefined }),
+      updateInput({
+        limitPriceUi: undefined,
+        limitPricePercent:
+          form.module === Module.STOP_LOSS || form.module === Module.TAKE_PROFIT
+            ? undefined
+            : "0",
+      }),
   };
 }
 export function useInputErrors() {

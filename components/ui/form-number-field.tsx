@@ -1,3 +1,5 @@
+"use client";
+
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -5,6 +7,7 @@ import { cn } from "@/lib/utils";
 export function FormNumberField({
   children,
   className,
+  onClick,
   ...props
 }: React.ComponentProps<"div">) {
   return (
@@ -15,6 +18,22 @@ export function FormNumberField({
         className,
       )}
       {...props}
+      onClick={(event) => {
+        onClick?.(event);
+        if (
+          event.defaultPrevented ||
+          (event.target instanceof Element &&
+            event.target.closest(
+              'input, button, a, select, textarea, [role="button"], [role="combobox"], [contenteditable="true"]',
+            ))
+        ) {
+          return;
+        }
+
+        event.currentTarget
+          .querySelector<HTMLInputElement>('input:not(:disabled):not([type="hidden"])')
+          ?.focus();
+      }}
     >
       {children}
     </div>

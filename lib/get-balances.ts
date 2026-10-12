@@ -2,8 +2,8 @@ import { Address, erc20Abi, getAddress, isAddress, zeroAddress } from "viem";
 import { getPublicClient } from "./get-public-client";
 import { getTokenKey, isNativeAddress, uniqueTokenAddresses } from "./utils";
 import { Balances } from "./types";
-
-export const MAX_BALANCE_TOKENS = 80;
+import { MAX_BALANCE_TOKENS } from "./balance-config";
+export { MAX_BALANCE_TOKENS } from "./balance-config";
 
 const MULTICALL_BATCH_SIZE = 100;
 

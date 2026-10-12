@@ -5,7 +5,7 @@ import { useApproval } from "./use-approval";
 import { useWrap } from "./use-wrap";
 import { getWrappedNativeCurrency, isNativeAddress } from "../utils";
 import { useDerivedSwap } from "./use-derived-swap";
-import { createSwapExecutor } from "@/lib/swap/execution";
+import { createSwapExecutor, QuoteUpdatedError } from "@/lib/swap/execution";
 import { useSwapToasts } from "@/lib/swap/use-swap-toasts";
 import { useLiquidityHub } from "./liquidity-hub";
 import { useGetTransactionReceipt } from "./use-get-transaction-receipt";
@@ -15,6 +15,9 @@ import { SwapStep } from "../types";
 import { useCallback, useMemo } from "react";
 import { useConnection, useWalletClient } from "wagmi";
 import { isUserRejectedError } from "../tx-rejection";
+import { useSwapActivity } from "@/lib/swap/activity";
+import { trackFunnel } from "@/lib/funnel-analytics";
+import { toAmountUI } from "../utils";
 
 const executor = createSwapExecutor();
 
@@ -33,7 +36,7 @@ export const useSwapBestTrade = () => {
   const txHash = useBestTradeSwapStore((state) => state.txHash);
 
   const { mutateAsync: signEip } = useSignEip();
-  const { parsedInputAmount, inputCurrency, outputCurrency, inputAmount, outputAmount, trade, refetchTrade } = useDerivedSwap();
+  const { parsedInputAmount, inputCurrency, outputCurrency, inputAmount, trade, refetchTrade } = useDerivedSwap();
   const liquidityHubClient = useLiquidityHub();
   const setPauseQuote = useSwapStore((state) => state.setPauseQuote);
   const queryClient = useQueryClient();
@@ -56,14 +59,15 @@ export const useSwapBestTrade = () => {
         throw new Error("Connect a wallet and request a quote before swapping");
       }
       toasts.dismissPendingToasts();
-      updateStore({ status: SwapStatus.LOADING, currentStepIndex: 0, review: { inputCurrency, outputCurrency, inputAmount, outputAmount, chainId } });
+      const reviewedQuote = useBestTradeSwapStore.getState().reviewedQuote ?? trade.originalQuote;
+      updateStore({ status: SwapStatus.LOADING, currentStepIndex: 0, review: { inputCurrency, outputCurrency, inputAmount, outputAmount: toAmountUI(reviewedQuote.outAmount, outputCurrency.decimals), chainId } });
       setPauseQuote(true);
       const native = isNativeAddress(inputCurrency.address);
       const inputToken = native ? getWrappedNativeCurrency(chainId)?.address : inputCurrency.address;
       if (!inputToken) throw new Error("Wrapped native currency is unavailable");
       return executor.execute({
         intent: { account, chainId, amount: parsedInputAmount, inputToken, outputToken: outputCurrency.address, native },
-        quote: trade.originalQuote,
+        quote: reviewedQuote,
         assertWallet: async () => {
           const [accounts, activeChain] = await Promise.all([walletClient.getAddresses(), walletClient.getChainId()]);
           if (activeChain !== chainId || accounts[0]?.toLowerCase() !== account.toLowerCase()) {
@@ -83,6 +87,7 @@ export const useSwapBestTrade = () => {
         confirm: getTransactionReceiptCallback,
         onPlan: totalSteps => updateStore({ totalSteps }),
         onStep: (step, currentStepIndex) => {
+          trackFunnel({ name: "wallet_step_requested", product: "swap", step: step === "WRAP" ? "wrap" : step === "APPROVE" ? "approve" : "sign" });
           updateStore({ currentStep: SwapStep[step], currentStepIndex, isAwaitingWallet: true });
           if (step === "WRAP") toasts.onWrapRequest();
           else if (step === "APPROVE") toasts.onApproveRequest();
@@ -90,10 +95,16 @@ export const useSwapBestTrade = () => {
         },
         onWrapped: toasts.onWrapSuccess,
         onApproved: toasts.onApproveSuccess,
-        onSubmitted: txHash => { updateStore({ txHash }); toasts.onSwapConfirming(txHash); },
+        onSubmitted: txHash => {
+          useSwapActivity.getState().add({ hash: txHash, account, chainId, inputAmount,
+            inputSymbol: inputCurrency.symbol, outputSymbol: outputCurrency.symbol, createdAt: Date.now(), status: "pending" });
+          updateStore({ txHash }); toasts.onSwapConfirming(txHash);
+        },
       });
     },
-    onSuccess: ({ txHash }) => {
+    onSuccess: ({ txHash }, _variables, scope) => {
+      if (scope?.chainId) useSwapActivity.getState().settle(scope.chainId, txHash, "confirmed");
+      trackFunnel({ name: "submission_succeeded", product: "swap" });
       if (useBestTradeSwapStore.getState().isReviewOpen) {
         toasts.dismissPendingToasts();
       } else {
@@ -102,6 +113,13 @@ export const useSwapBestTrade = () => {
       updateStore({ status: SwapStatus.SUCCESS });
     },
     onError: (error) => {
+      if (error instanceof QuoteUpdatedError) {
+        trackFunnel({ name: "price_update_shown", product: "swap" });
+        toasts.dismissPendingToasts();
+        updateStore({ status: undefined, currentStep: undefined, isAwaitingWallet: false,
+          quoteUpdate: { previous: error.previous, next: error.next } });
+        return;
+      }
       if (process.env.NODE_ENV !== "production" && !isUserRejectedError(error)) {
         console.error(error);
       }
@@ -110,7 +128,8 @@ export const useSwapBestTrade = () => {
         toasts.onTransactionRejected();
         updateStore({ status: undefined });
       } else {
-        updateStore({ status: SwapStatus.FAILED });
+        trackFunnel({ name: "submission_failed", product: "swap" });
+        updateStore({ status: SwapStatus.FAILED, error: { message: error.message } });
         toasts.onSwapFailed(error);
       }
     },
@@ -129,10 +148,10 @@ export const useSwapBestTrade = () => {
 
   const onSwapBestTrade = useCallback(() => {
     if (executor.isBusy() || useBestTradeSwapStore.getState().status === SwapStatus.LOADING) return;
-    resetStore();
-    updateStore({ status: SwapStatus.LOADING });
+    trackFunnel({ name: "submit_requested", product: "swap" });
+    updateStore({ status: SwapStatus.LOADING, currentStep: undefined, quoteUpdate: undefined, error: undefined });
     swapBestTrade();
-  }, [resetStore, swapBestTrade, updateStore]);
+  }, [swapBestTrade, updateStore]);
 
   return useMemo(
     () => ({

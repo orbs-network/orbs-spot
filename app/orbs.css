@@ -1,18 +1,22 @@
-/* Orbs neutral surfaces with purple accents and a purple-to-blue action gradient.
+/* Orbs lavender surfaces, rounded controls and violet gradient actions.
    Keep interaction colors scoped to Orbs, including content rendered in portals. */
 html[data-partner="orbs"] {
   --orbs-surface: var(--popover);
-  --orbs-input-background: var(--orbs-surface);
-  --orbs-control-background: var(--orbs-input-background);
+  --orbs-input-background: var(--card);
+  --orbs-control-background: var(--card);
   --orbs-positive: #125f65;
   --orbs-control-border: var(--border);
   --orbs-secondary-text: var(--muted-foreground);
   --orbs-primary-hover: #593098;
-  --orbs-action-gradient: linear-gradient(110deg, #7944c5, #4659cc);
-  --orbs-action-hover: linear-gradient(110deg, #6836b0, #384abb);
-  --orbs-wash-purple: rgb(129 101 199 / 9%);
-  --orbs-wash-blue: rgb(70 89 204 / 5%);
-  --orbs-accent-tint: #eee8fc;
+  --orbs-primary-gradient: linear-gradient(105deg, #5145ef 0%, #a64abb 62%, #6877c4 100%);
+  --orbs-primary-gradient-hover: linear-gradient(105deg, #4437dc 0%, #9439a9 62%, #5968b4 100%);
+  --orbs-action-foreground: #ffffff;
+  --orbs-tab-background: #f3f0fa;
+  --orbs-wash-purple: rgb(129 101 199 / 2%);
+  --orbs-wash-blue: rgb(70 89 204 / 1%);
+  --orbs-navigation-background: #f5f3ff;
+  --orbs-accent-tint: #eee6ff;
+  --orbs-card-shadow: 0 12px 40px rgb(71 42 128 / 7%);
   --orbs-link: var(--primary);
   --orbs-error-tint: #fff2f2;
   --orbs-overlay: rgb(18 18 20 / 50%);
@@ -23,10 +27,16 @@ html[data-partner="orbs"] {
 html.dark[data-partner="orbs"] {
   --orbs-positive: #2cedfc;
   --orbs-primary-hover: #d5bdff;
-  --orbs-wash-purple: rgb(161 122 233 / 10%);
-  --orbs-wash-blue: rgb(70 89 204 / 7%);
-  --orbs-accent-tint: #30243f;
-  --orbs-link: #c4a1ff;
+  --orbs-primary-gradient: linear-gradient(105deg, #b4a4ff 0%, #dea1e4 62%, #a3b8f3 100%);
+  --orbs-primary-gradient-hover: linear-gradient(105deg, #c3b6ff 0%, #e8b4ed 62%, #b6c8ff 100%);
+  --orbs-action-foreground: #19152e;
+  --orbs-tab-background: #2d243e;
+  --orbs-wash-purple: rgb(161 122 233 / 4%);
+  --orbs-wash-blue: rgb(70 89 204 / 3%);
+  --orbs-navigation-background: #211b31;
+  --orbs-accent-tint: #35264f;
+  --orbs-card-shadow: 0 16px 48px rgb(0 0 0 / 20%);
+  --orbs-link: #c6a7ff;
   --orbs-error-tint: #332122;
 }
 
@@ -41,14 +51,17 @@ html[data-partner="orbs"] [data-nav-brand] { flex-shrink: 0; }
 }
 
 html[data-partner="orbs"] [data-form-root] {
-  max-width: 540px;
+  max-width: 520px;
   margin-top: 32px;
 }
 
 html[data-partner="orbs"] [data-form-container] {
-  padding: 24px;
-  gap: 20px;
-  background: var(--background);
+  padding: 20px;
+  gap: 18px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0 0 22px 22px;
+  box-shadow: var(--orbs-card-shadow);
   backdrop-filter: none;
 }
 
@@ -72,57 +85,55 @@ html[data-partner="orbs"] [data-powered-by] img {
 }
 
 html[data-partner="orbs"] :is(
-  [data-slot="button"], [data-slot="input"], [data-slot="select-trigger"],
+  [data-slot="button"], [data-slot="input"]:where(:not([data-input-variant="bare"])), [data-slot="select-trigger"],
   [data-slot="select-item"], [data-number-field], [data-nav-pill],
   [data-settings-trigger], [data-settings-row], [data-empty-state],
   [data-history-section], [data-order-row], [data-review-details],
   [data-review-disclaimer], [data-review-pair], [data-inline-message]
 ) {
-  border-radius: 0;
+  border-radius: 14px;
 }
 
 html[data-partner="orbs"] :is([data-slot="dialog-content"], [data-slot="popover-content"]) button:not([role="switch"]) {
-  border-radius: 0;
+  border-radius: 14px;
 }
 
-html[data-partner="orbs"] :is([data-number-field], [data-slot="input"]) {
+html[data-partner="orbs"] :is([data-number-field], [data-slot="input"]:where(:not([data-input-variant="bare"]))) {
   background: var(--orbs-input-background);
   border-color: var(--orbs-control-border);
 }
 
-html[data-partner="orbs"] :is([data-number-field]:focus-within, [data-slot="input"]:focus-visible) {
+html[data-partner="orbs"] [data-slot="switch"][data-state="unchecked"] {
+  background: var(--orbs-accent-tint);
+}
+
+html[data-partner="orbs"] :is([data-number-field]:focus-within, [data-slot="input"]:where(:not([data-input-variant="bare"])):focus-visible) {
   border-color: var(--primary);
 }
 
-html[data-partner="orbs"] [data-slot="input"]:focus-visible {
-  border-color: var(--muted-foreground);
-  outline: none;
-  box-shadow: none;
-}
+html[data-partner="orbs"] [data-slot="input"][aria-invalid="true"] { border-color: var(--destructive); }
 
 html[data-partner="orbs"] :is([data-slot="button"], [data-primary-nav-pill], [data-submit-button]) {
   font-weight: 400;
 }
 
 html[data-partner="orbs"] :is([data-primary-nav-pill], [data-submit-button], [data-slot="button"][data-variant="default"]) {
-  background: var(--orbs-action-gradient);
-  color: #ffffff;
+  background: var(--orbs-primary-gradient);
+  color: var(--orbs-action-foreground);
   box-shadow: none;
 }
 
 html[data-partner="orbs"] :is([data-primary-nav-pill], [data-submit-button]) {
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 600;
 }
 html[data-partner="orbs"] [data-primary-nav-pill] { text-transform: none; letter-spacing: 0; font-weight: 500; }
-html[data-partner="orbs"] [data-form-panel]:not([data-form-action-panel]) { background: var(--orbs-input-background); }
-
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] :is([data-primary-nav-pill], [data-submit-button], [data-slot="button"][data-variant="default"]):hover:not(:disabled) {
-    background: var(--orbs-action-hover);
-    color: #ffffff;
-  }
+html[data-partner="orbs"] [data-form-panel]:not([data-form-action-panel]) {
+  background: var(--secondary);
+  border: 0;
+  border-radius: var(--form-panel-radius);
 }
 
 html[data-partner="orbs"] [data-slot="button"][data-variant="outline"] {
@@ -131,54 +142,22 @@ html[data-partner="orbs"] [data-slot="button"][data-variant="outline"] {
   color: var(--foreground);
 }
 
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-slot="button"][data-variant="outline"]:hover:not(:disabled) {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: transparent;
-  }
-}
-
-html[data-partner="orbs"] :is([data-percentage-button], [data-token-selector-trigger], [data-slot="select-trigger"], [data-nav-pill]:not([data-primary-nav-pill])) {
+html[data-partner="orbs"] :where([data-percentage-button], [data-token-selector-trigger], [data-slot="select-trigger"], [data-nav-pill]:not([data-primary-nav-pill])) {
   border-color: var(--orbs-control-border);
   background: transparent;
   font-weight: 400;
-}
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] :is([data-percentage-button], [data-token-selector-trigger], [data-slot="select-trigger"], [data-nav-pill]:not([data-primary-nav-pill])):hover:not(:disabled) {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: transparent;
-  }
 }
 html[data-partner="orbs"] [data-nav-pill][data-chain-selector-trigger],
 html[data-partner="orbs"] [data-chain-option] { cursor: pointer; }
 
 html[data-partner="orbs"] [data-slot="select-trigger"][data-chain-selector-trigger]:is(:focus-visible, [data-state="open"]):not(:disabled) {
   background: var(--orbs-accent-tint);
-  border-color: var(--primary);
+  border-color: transparent;
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-slot="select-trigger"][data-chain-selector-trigger]:hover:not(:disabled) {
-    background: var(--orbs-accent-tint);
-    border-color: var(--primary);
-  }
-}
-html[data-partner="orbs"] [data-chain-option]:is(:focus-visible, [aria-pressed="true"]):not(:disabled) {
+html[data-partner="orbs"] [data-chain-option]:focus-visible:not(:disabled) {
   background: var(--orbs-accent-tint);
   color: var(--primary);
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-chain-option]:hover:not(:disabled) {
-    background: var(--orbs-accent-tint);
-    color: var(--primary);
-  }
-}
-
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-slot="button"][data-variant="link"]:hover { color: var(--orbs-primary-hover); }
-}
-
 html[data-partner="orbs"] [data-segmented-tab] {
   font-size: 11px;
   font-weight: 500;
@@ -199,12 +178,25 @@ html[data-partner="orbs"] :is(
   [data-slot="popover-content"], [data-slot="select-content"],
   [data-slot="tooltip-content"]
 ) {
-  border-radius: 0;
+  border-radius: 24px;
   border-color: var(--border);
   background: var(--orbs-surface);
   color: var(--foreground);
   box-shadow: 0 8px 24px rgb(18 18 20 / 8%);
   font-family: var(--font-inter);
+}
+
+html[data-partner="orbs"] [data-slot="tooltip-content"] {
+  max-width: min(320px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border-radius: 16px;
+  line-height: 1.5;
+}
+
+html[data-partner="orbs"] [data-slot="tooltip-arrow"] {
+  border-color: var(--border);
+  background: var(--orbs-surface);
+  fill: var(--orbs-surface);
 }
 
 html[data-partner="orbs"] [data-slot="dialog-title"] {
@@ -214,6 +206,8 @@ html[data-partner="orbs"] [data-slot="dialog-title"] {
   letter-spacing: -0.01em;
   text-transform: none;
 }
+html[data-partner="orbs"] [data-token-selector-dialog] [data-slot="dialog-title"] { font-size: 20px; }
+html[data-partner="orbs"] [data-token-selector-dialog] input[name="token-search"] { height: 44px; }
 
 html[data-partner="orbs"] [data-slot="dialog-close"] {
   min-width: 28px;
@@ -225,8 +219,13 @@ html[data-partner="orbs"] [data-slot="dialog-close"] {
 
 html[data-partner="orbs"] [data-trade-review] {
   gap: 24px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+
+html[data-partner="orbs"] [data-trade-review] > [data-slot="dialog-header"] { flex-shrink: 0; }
+html[data-partner="orbs"] [data-review-scroll] { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
 html[data-partner="orbs"] [data-trade-review] [data-slot="dialog-header"] {
   text-align: left;
@@ -345,28 +344,29 @@ html[data-partner="orbs"] [data-order-row] {
   background: transparent;
 }
 
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-order-row]:hover {
-    background: transparent;
-  }
-}
-
 html[data-partner="orbs"] [data-order-status] {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: var(--secondary);
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  line-height: 1.4;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--muted-foreground);
 }
 
-html[data-partner="orbs"] [data-order-status="OPEN"] { color: var(--primary); }
-html[data-partner="orbs"] [data-order-status="COMPLETED"] { color: var(--orbs-positive); }
-html[data-partner="orbs"] :is([data-order-status="CANCELLED"], [data-order-status="EXPIRED"]) { color: var(--destructive); }
+html[data-partner="orbs"] [data-order-status="OPEN"] { color: var(--primary); background: var(--orbs-accent-tint); }
+html[data-partner="orbs"] [data-order-status="COMPLETED"] { color: var(--orbs-positive); background: color-mix(in srgb, var(--orbs-positive) 10%, var(--card)); }
+html[data-partner="orbs"] :is([data-order-status="CANCELLED"], [data-order-status="EXPIRED"]) { color: var(--destructive); background: var(--orbs-error-tint); }
 
 html[data-partner="orbs"] [data-order-progress] > div,
 html[data-partner="orbs"] [data-order-progress] > div > div {
   height: 2px;
-  border-radius: 0;
+  border-radius: 14px;
 }
 
 html[data-partner="orbs"] [data-order-progress] > div > div {
@@ -397,14 +397,14 @@ html[data-partner="orbs"] .orbs_MainTokenAmount {
 }
 
 html[data-partner="orbs"] [data-flow-success-icon] {
-  border-radius: 0;
+  border-radius: 14px;
   border-color: var(--border);
   background: transparent;
   color: var(--orbs-positive);
 }
 
 html[data-partner="orbs"] [data-sonner-toast][data-styled="true"] {
-  border-radius: 0;
+  border-radius: 14px;
   font-family: var(--font-inter);
   background: var(--orbs-surface);
   box-shadow: 0 8px 24px rgb(18 18 20 / 8%);
@@ -412,7 +412,7 @@ html[data-partner="orbs"] [data-sonner-toast][data-styled="true"] {
 
 @media (max-width: 639px) {
   html[data-partner="orbs"] [data-form-root] { margin-top: 16px; }
-  html[data-partner="orbs"] [data-form-container] { padding: 12px; gap: 12px; }
+  html[data-partner="orbs"] [data-form-container] { gap: 12px; }
   html[data-partner="orbs"] [data-form-panel] { padding: 12px; }
   html[data-partner="orbs"] [data-segmented-tab] { font-size: 10px; letter-spacing: 0; }
   html[data-partner="orbs"] [data-percentage-button] { padding-inline: 6px; font-size: 10px; }
@@ -468,7 +468,7 @@ html[data-partner="orbs"] .ef-app-shell {
     radial-gradient(ellipse 600px 460px at 75% 340px, var(--orbs-wash-blue), transparent 75%),
     var(--background);
 }
-html[data-partner="orbs"] [data-app-header] { padding-bottom: 0; border-bottom: 1px solid var(--border); }
+html[data-partner="orbs"] [data-app-header] { padding-bottom: 0; border-bottom: 0; }
 html[data-partner="orbs"] [data-nav-layout] {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -485,9 +485,10 @@ html[data-partner="orbs"] [data-trading-navigation] {
   align-items: stretch;
   justify-content: space-between;
   gap: 16px;
-  width: 100%;
-  max-width: 540px;
-  margin: 12px auto 0;
+  width: calc(100% + 32px);
+  margin: 12px -16px 0;
+  padding-inline: 16px;
+  background: var(--orbs-navigation-background);
   min-height: 52px;
 }
 @media (min-width: 1024px) {
@@ -501,6 +502,8 @@ html[data-partner="orbs"] [data-trading-navigation] {
     max-width: none;
     min-height: 68px;
     margin: 0 0 0 24px;
+    padding-inline: 0;
+    background: transparent;
   }
   html[data-partner="orbs"] #main-content { padding-top: 69px; }
 }
@@ -510,7 +513,10 @@ html[data-partner="orbs"] [data-trading-modes] a {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  position: relative;
   padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--muted-foreground);
   font-size: 14px;
   font-weight: 500;
@@ -518,53 +524,54 @@ html[data-partner="orbs"] [data-trading-modes] a {
 html[data-partner="orbs"] [data-trading-modes] a[aria-current="page"] {
   color: var(--primary);
 }
-html[data-partner="orbs"] [data-orbs-website-link] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0;
-  color: var(--muted-foreground);
-  font-size: 12px;
-}
-html[data-partner="orbs"] [data-advanced-order-navigation] {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-html[data-partner="orbs"] [data-advanced-order-navigation] a {
+html[data-partner="orbs"] [data-product-mark] { flex-shrink: 0; }
+html[data-partner="orbs"] [data-product-mark="spot"] { color: #5145ff; }
+html[data-partner="orbs"] [data-product-mark="perps"] { color: #d980df; }
+html.dark[data-partner="orbs"] [data-product-mark="spot"] { color: #b4a4ff; }
+html[data-partner="orbs"] [data-trading-card] { display: block; min-width: 0; }
+html[data-partner="orbs"] [data-spot-order-navigation] {
   display: flex;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+  gap: 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding: 0;
+  margin-bottom: -1px;
+}
+html[data-partner="orbs"] [data-spot-order-navigation]::-webkit-scrollbar { display: none; }
+html[data-partner="orbs"] [data-spot-order-navigation] a {
+  display: flex;
+  flex: 1 0 auto;
+  white-space: nowrap;
   align-items: center;
   justify-content: center;
   min-height: 44px;
-  padding: 8px 4px;
-  border-bottom: 2px solid transparent;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-bottom: 1px solid var(--border);
+  border-radius: 14px 14px 0 0;
+  background: var(--orbs-tab-background);
   text-align: center;
   color: var(--muted-foreground);
   font-size: 12px;
   font-weight: 500;
 }
-html[data-partner="orbs"] [data-advanced-order-navigation] a[aria-current="page"] {
-  background: var(--orbs-accent-tint);
+html[data-partner="orbs"] [data-spot-order-navigation] a[aria-current="page"] {
+  background: var(--card);
+  border-color: var(--border);
+  border-bottom-color: var(--card);
   color: var(--primary);
-  border-bottom-color: var(--primary);
+  font-weight: 600;
 }
-html[data-partner="orbs"] :is([data-trading-navigation], [data-advanced-order-navigation]) a:focus-visible,
-html[data-partner="orbs"] [data-orbs-website-link]:focus-visible {
+html[data-partner="orbs"] :is([data-trading-navigation], [data-spot-order-navigation]) a:focus-visible {
   outline: 2px solid var(--primary);
   outline-offset: -3px;
 }
-@media (hover: hover) and (pointer: fine) {
-  html[data-partner="orbs"] [data-trading-navigation] a:hover,
-  html[data-partner="orbs"] [data-orbs-website-link]:hover { color: var(--primary); }
-  html[data-partner="orbs"] [data-advanced-order-navigation] a:hover:not([aria-current="page"]) { background-color: var(--orbs-accent-tint); color: var(--primary); }
-}
 @media (max-width: 639px) {
   html[data-partner="orbs"] [data-trading-navigation] { gap: 8px; }
-  html[data-partner="orbs"] [data-orbs-website-link] { width: 44px; padding-inline: 0; }
   html[data-partner="orbs"] [data-wallet-account-trigger] { min-width: 124px; max-width: none; gap: 6px; padding-inline: 10px; font-size: 12px; }
   html[data-partner="orbs"] [data-wallet-account-trigger] [data-wallet-avatar] { display: none; }
   html[data-partner="orbs"] [data-wallet-account-label] { flex-shrink: 0; overflow: visible; }
@@ -585,6 +592,8 @@ html[data-partner="orbs"] [data-history-table-region] {
   min-height: 0;
   overflow: hidden;
   border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--card);
 }
 html[data-partner="orbs"] [data-history-table-region] > div:focus-visible { box-shadow: inset 0 0 0 2px var(--primary); }
 html[data-partner="orbs"] [data-history-table-region] [data-empty-state] { border: 0; }
@@ -592,7 +601,7 @@ html[data-partner="orbs"] [data-history-empty] > * { flex: 1; min-height: 180px;
 html[data-partner="orbs"] [data-history-pagination] nav { border: 0; }
 html[data-partner="orbs"] [data-history-table] {
   width: 100%;
-  min-width: 0;
+  min-width: 960px;
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
@@ -600,83 +609,52 @@ html[data-partner="orbs"] [data-history-table] {
   text-align: left;
 }
 html[data-partner="orbs"] [data-history-table] th {
-  padding: 16px 10px;
-  background: var(--orbs-surface);
+  padding: 18px 12px;
+  background: var(--secondary);
   border-bottom: 1px solid var(--border);
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
   white-space: normal;
 }
 html[data-partner="orbs"] [data-history-table] td {
-  padding: 20px 10px;
+  padding: 24px 12px;
+  font-size: 13px;
+  line-height: 1.6;
   border-bottom: 1px solid var(--border);
   white-space: normal;
-  overflow-wrap: anywhere;
-}
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-history-table] tbody tr:hover { background: transparent; }
+  overflow-wrap: break-word;
 }
 html[data-partner="orbs"] [data-history-table] :is(th, td) { text-align: left; }
-html[data-partner="orbs"] [data-history-table] th:nth-child(1) { width: 10%; }
-html[data-partner="orbs"] [data-history-table] th:nth-child(2) { width: 11%; }
-html[data-partner="orbs"] [data-history-table] th:nth-child(3) { width: 18%; }
+html[data-partner="orbs"] [data-history-table] th:nth-child(1) { width: 22%; }
+html[data-partner="orbs"] [data-history-table] th:nth-child(2) { width: 15%; }
+html[data-partner="orbs"] [data-history-table] th:nth-child(3) { width: 17%; }
 html[data-partner="orbs"] [data-history-table] th:nth-child(4) { width: 13%; }
-html[data-partner="orbs"] [data-history-table] th:nth-child(5) { width: 6%; }
-html[data-partner="orbs"] [data-history-table] th:nth-child(6) { width: 10%; }
-html[data-partner="orbs"] [data-history-table] th:nth-child(7) { width: 24%; }
-html[data-partner="orbs"] [data-history-table] th:nth-child(8) { width: 8%; }
-html[data-partner="orbs"] [data-history-table] [data-network-name] { white-space: normal; }
+html[data-partner="orbs"] [data-history-table] th:nth-child(5) { width: 11%; }
+html[data-partner="orbs"] [data-history-table] th:nth-child(6) { width: 22%; }
+html[data-partner="orbs"] [data-history-table] :is(td[data-label="Sell amount"], td[data-label="Filled"]) { font-variant-numeric: tabular-nums; }
+html[data-partner="orbs"] [data-history-table] [data-history-fill-progress] { max-width: 120px; }
+html[data-partner="orbs"] [data-history-market-network] [data-network-logo] { width: 16px; height: 16px; }
+html[data-partner="orbs"] [data-history-table] [data-order-details-trigger] { min-height: 44px; padding-inline: 12px; }
+html[data-partner="orbs"] [data-history-table] [data-network-name] { white-space: nowrap; }
 html[data-partner="orbs"] [data-history-table] a { min-width: 0; overflow-wrap: anywhere; }
-
-@container history-table (max-width: 850px) {
-  html[data-partner="orbs"] [data-history-table] { display: block; }
-  html[data-partner="orbs"] [data-history-table] thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-  html[data-partner="orbs"] [data-history-table] tbody { display: block; }
-  html[data-partner="orbs"] [data-history-table] tbody tr {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px 12px;
-    padding: 16px;
-    border-bottom: 1px solid var(--border);
-  }
-  html[data-partner="orbs"] [data-history-table] td {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 0;
-    border: 0;
-  }
-  html[data-partner="orbs"] [data-history-table] td::before {
-    content: attr(data-label);
-    color: var(--muted-foreground);
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
+html[data-partner="orbs"] [data-history-table] td[data-label="Sell amount"] { white-space: nowrap; }
+html[data-partner="orbs"] [data-history-table] td[data-label="Actions"] > div { gap: 8px; }
+html[data-partner="orbs"] [data-history-table] :is(th:last-child, td[data-label="Actions"]) {
+  position: sticky;
+  right: 0;
+  z-index: 1;
+  background: var(--card);
 }
-@container history-table (min-width: 560px) and (max-width: 850px) {
-  html[data-partner="orbs"] [data-history-table] tbody tr {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-html[data-partner="orbs"] :is([data-history-page], [data-order-details-drawer]) [data-detail-row] {
+html[data-partner="orbs"] [data-history-table] th:last-child { background: var(--secondary); }
+html[data-partner="orbs"] :is([data-history-page], [data-order-details-modal]) [data-detail-row] {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
   align-items: start;
 }
-html[data-partner="orbs"] :is([data-history-page], [data-order-details-drawer]) [data-detail-row] > :last-child {
+html[data-partner="orbs"] :is([data-history-page], [data-order-details-modal]) [data-detail-row] > :last-child {
   text-align: left;
   justify-content: flex-start;
 }
@@ -707,45 +685,52 @@ html[data-partner="orbs"] [data-history-page][data-history-view="table"] {
 html[data-partner="orbs"] [data-history-page][data-history-view="table"] [data-history-body] {
   flex: 1;
   overflow: hidden;
+  padding: 0 24px 24px;
 }
 html[data-partner="orbs"] [data-history-page][data-history-view] {
   width: 100%;
   max-width: none;
-  border: 1px solid var(--border);
-  background: var(--background);
+  border: 0;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: var(--orbs-card-shadow);
+  background: var(--card);
 }
 html[data-partner="orbs"] [data-history-page] h1 {
-  font-weight: 500;
+  font-size: 24px;
+  font-weight: 600;
   letter-spacing: -0.025em;
   line-height: 1.4;
   scroll-margin-top: 84px;
-}
-html[data-partner="orbs"] [data-history-page] button:not([role="switch"]) { border-radius: 0; }
-
-/* Drawers also cover the page's reserved scrollbar gutter. */
-html[data-partner="orbs"]:has([data-order-details-drawer]) { scrollbar-gutter: auto; }
-html[data-partner="orbs"] [data-order-details-drawer] {
-  position: fixed;
-  inset: 0 0 0 auto;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  width: min(600px, 100vw);
-  height: 100dvh;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  gap: 0;
-  translate: none;
-  border: 0;
-  border-left: 1px solid var(--border);
-  background: var(--orbs-surface);
-  color: var(--foreground);
   outline: none;
 }
-html[data-partner="orbs"] [data-order-details-drawer]:not([data-vaul-drawer-direction])[data-state="open"] { animation: order-details-enter 200ms ease-out; }
-html[data-partner="orbs"] [data-order-details-drawer]:not([data-vaul-drawer-direction])[data-state="closed"] { animation: order-details-enter 200ms ease-out reverse; }
+html[data-partner="orbs"] [data-history-page] button:not([role="switch"]) { border-radius: var(--orbs-control-radius); }
+
+/* Preview dialogs keep the activity list visible behind them. */
+html[data-partner="orbs"] [data-order-details-modal] {
+  display: flex;
+  flex-direction: column;
+  width: min(680px, calc(100vw - 32px));
+  max-width: none;
+  max-height: min(88dvh, 900px);
+  padding: 0;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 18%);
+}
+html[data-partner="orbs"] [data-order-preview-footer] {
+  flex-shrink: 0;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 767px) {
+  html[data-partner="orbs"] [data-order-details-modal] { width: calc(100vw - 24px); max-height: 88dvh; border-radius: 24px; }
+  html[data-partner="orbs"] [data-order-details-modal] [data-order-details-header] { padding: 16px; gap: 10px; }
+  html[data-partner="orbs"] [data-order-details-modal] [data-order-details-header] h2 { font-size: 20px; }
+}
 html[data-partner="orbs"] [data-order-details-header] {
   display: flex;
   flex-shrink: 0;
@@ -768,23 +753,12 @@ html[data-partner="orbs"] [data-order-details-body] {
   overscroll-behavior: contain;
   padding-bottom: env(safe-area-inset-bottom);
 }
-html[data-partner="orbs"] [data-order-details-drawer] button { border-radius: 0; }
-@keyframes order-details-enter { from { transform: translateX(100%); } to { transform: translateX(0); } }
-html[data-partner="orbs"] [data-order-details-drawer][data-vaul-drawer-direction="bottom"] {
-  inset: auto 0 0;
-  width: 100%;
-  height: 80dvh;
-  max-height: 80dvh;
-  border-left: 0;
-  border-top: 1px solid var(--border);
-}
-html[data-partner="orbs"] [data-order-details-drawer][data-vaul-drawer-direction="bottom"] [data-order-details-header] { padding: 16px 20px; }
-html[data-partner="orbs"] [data-order-details-drawer][data-vaul-drawer-direction="bottom"] [data-order-details-header] h2 { font-size: 22px; }
+html[data-partner="orbs"] [data-order-details-modal] button { border-radius: var(--orbs-control-radius); }
 /* Only the details scroll; cancellation stays in a separate, visible footer. */
 html[data-partner="orbs"] [data-order-details-body]:has([data-order-details-content]) { display: flex; overflow: hidden; padding-bottom: 0; }
-html[data-partner="orbs"] [data-order-details-drawer] [data-order-details-content] { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; padding: 0; }
-html[data-partner="orbs"] [data-order-details-drawer] [data-order-details-scroll] { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; }
-html[data-partner="orbs"] [data-order-details-drawer] [data-order-details-actions] {
+html[data-partner="orbs"] [data-order-details-modal] [data-order-details-content] { display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; padding: 0; }
+html[data-partner="orbs"] [data-order-details-modal] [data-order-details-scroll] { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; }
+html[data-partner="orbs"] [data-order-details-modal] [data-order-details-actions] {
   flex-shrink: 0;
   margin-top: 0;
   padding: 12px 20px max(16px, env(safe-area-inset-bottom));
@@ -792,16 +766,16 @@ html[data-partner="orbs"] [data-order-details-drawer] [data-order-details-action
   background: var(--orbs-surface);
 }
 @media (prefers-reduced-motion: reduce) {
-  html[data-partner="orbs"] [data-order-details-drawer][data-state] { animation: none !important; transition: none !important; }
+  html[data-partner="orbs"] [data-order-details-modal][data-state] { animation: none !important; transition: none !important; }
 }
 @media (min-width: 1024px) {
   html[data-partner="orbs"] #main-content:has([data-orders-workspace]) { padding-inline: 24px; }
 }
 @media (max-width: 639px) {
-  html[data-partner="orbs"] [data-orders-workspace] { margin-top: 16px; }
+  html[data-partner="orbs"] [data-orders-workspace] { margin-top: 8px; }
   html[data-partner="orbs"] [data-history-page] [data-history-body] { padding-inline: 12px; }
   html[data-partner="orbs"] [data-form-root] { margin-top: 16px; }
-  html[data-partner="orbs"] [data-form-container] { padding: 12px; gap: 12px; }
+  html[data-partner="orbs"] [data-form-container] { gap: 12px; }
   html[data-partner="orbs"] [data-form-section-header] { padding: 0; min-height: 44px; }
   html[data-partner="orbs"] [data-trade-header-actions] button { min-height: 44px; }
   html[data-partner="orbs"] [data-trade-header-actions] [data-chain-selector-trigger] { flex-shrink: 1; min-width: 0; }
@@ -812,49 +786,70 @@ html[data-partner="orbs"] [data-order-details-drawer] [data-order-details-action
   html[data-partner="orbs"] [data-history-pagination] select { min-height: 44px; }
 }
 
-/* Shared trading controls keep the same layout at every viewport. */
+/* TWAP scheduling stays stacked on mobile and shares one row on desktop. */
+@media (min-width: 1024px) {
+  html[data-partner="orbs"] [data-twap-schedule] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  html[data-partner="orbs"] [data-twap-schedule] [data-form-panel] { min-width: 0; padding: 12px; justify-content: flex-start; }
+  html[data-partner="orbs"] [data-twap-schedule] [data-order-input-heading] { display: flex; align-items: center; gap: 8px; min-height: 32px; }
+  html[data-partner="orbs"] [data-twap-schedule] [data-number-field] { padding-inline: 12px; }
+}
+
+/* Shared trading controls. */
+html[data-partner="orbs"] :is([data-order-input-controls], [data-spot-price-input]) { gap: 8px; }
+html[data-partner="orbs"] :is([data-order-input-controls], [data-spot-price-input]) [data-number-field] { min-height: 48px; }
+html[data-partner="orbs"] [data-order-input-controls] [data-number-field] { height: 48px; }
+html[data-partner="orbs"] [data-order-input-controls] input { font-size: 16px; }
+html[data-partner="orbs"] [data-order-input-controls] > p { align-self: center; margin-block: 0; font-size: 12px; }
+html[data-partner="orbs"] [data-order-input-unit] { width: 96px; }
+html[data-partner="orbs"] [data-order-input-unit] [data-slot="select-trigger"] { min-height: 48px; padding-inline: 8px; gap: 4px; font-size: 12px; }
 html[data-partner="orbs"] [data-form-action-panel] { border: 0; padding: 0; background: transparent; }
 html[data-partner="orbs"] [data-form-header] { display: none; }
 html[data-partner="orbs"] [data-form-section-header] { flex-wrap: wrap; gap: 8px; padding: 0; }
 html[data-partner="orbs"] [data-trade-header-actions] { flex-wrap: nowrap; flex-shrink: 0; gap: 4px; }
-html[data-partner="orbs"] [data-currency-pair] { gap: 0; border: 1px solid var(--border); }
-html[data-partner="orbs"] [data-currency-card] { gap: 12px; border: 0; padding: 24px 20px 28px; }
-html[data-partner="orbs"] [data-currency-card]:first-child { padding-bottom: 36px; border-bottom: 1px solid var(--border); }
-html[data-partner="orbs"] [data-currency-card]:last-child { padding-top: 28px; }
-html[data-partner="orbs"] [data-currency-card-header] p { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+html[data-partner="orbs"] [data-currency-pair] { gap: 4px; border: 0; }
+html[data-partner="orbs"] :is([data-currency-card], [data-order-prices-panel]) { border: 0; padding: 18px; }
+html[data-partner="orbs"] [data-currency-card] { gap: 10px; }
+html[data-partner="orbs"] [data-currency-card]:first-child { border-bottom: 0; }
+html[data-partner="orbs"] [data-currency-card]:last-child { padding-top: 18px; }
+html[data-partner="orbs"] [data-currency-card-header] p { font-size: 12px; font-weight: 500; color: var(--foreground); text-transform: none; letter-spacing: 0; }
 html[data-partner="orbs"] [data-currency-amount-row] { grid-template-columns: minmax(0, 1fr) auto; margin-top: 0; min-height: 44px; }
-html[data-partner="orbs"] [data-currency-amount-row] input { grid-column: 1; grid-row: 1; text-align: left; font-size: 29px; font-weight: 400; letter-spacing: -0.025em; }
+html[data-partner="orbs"] [data-currency-amount-row] input { grid-column: 1; grid-row: 1; text-align: left; font-size: 34px; font-weight: 600; letter-spacing: -0.025em; }
 html[data-partner="orbs"] [data-currency-amount-row] [data-token-selector-trigger] { grid-column: 2; grid-row: 1; justify-self: end; }
 html[data-partner="orbs"] [data-form-container] [data-slot="select-trigger"] { background: var(--orbs-input-background); }
 html[data-partner="orbs"] [data-currency-value-row] :is(p, button) { color: var(--orbs-secondary-text); font-weight: 400; }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-currency-value-row] button:hover:not(:disabled) { color: var(--foreground); }
-}
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-currency-value-row] button:hover:not(:disabled) p { color: inherit; }
-}
 html[data-partner="orbs"] [data-currency-card] [data-token-selector-trigger] { min-height: 44px; max-width: 164px; border-color: var(--orbs-control-border); padding-inline: 10px; background: var(--orbs-control-background); }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-currency-card] [data-token-selector-trigger]:hover:not(:disabled) { background: var(--orbs-accent-tint); color: var(--primary); }
-}
-html[data-partner="orbs"] [data-percentage-controls] { position: static; display: flex; flex-wrap: nowrap; gap: 4px; margin-left: auto; }
-html[data-partner="orbs"] [data-currency-card] [data-percentage-button] { min-width: 36px; min-height: 36px; justify-content: center; border-color: var(--orbs-control-border); padding: 0 6px; background: var(--orbs-control-background); color: var(--orbs-secondary-text); font-size: 11px; }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-currency-card] [data-percentage-button]:hover:not(:disabled) { background: var(--orbs-accent-tint); color: var(--primary); }
-}
-html[data-partner="orbs"] [data-toggle-currencies-button] { top: -24px; width: 48px; height: 48px; box-shadow: none; background: var(--background); }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-toggle-currencies-button]:hover { background: var(--secondary); }
-}
+html[data-partner="orbs"] [data-percentage-controls] { position: static; display: flex; flex-wrap: nowrap; justify-content: flex-start; gap: 8px; margin: 0; }
+html[data-partner="orbs"] [data-percentage-button] { min-width: 64px; min-height: 44px; justify-content: center; border: 0; border-radius: 14px; padding: 0 12px; background: var(--orbs-tab-background); color: var(--foreground); font-size: 14px; }
+html[data-partner="orbs"] [data-toggle-currencies-button] { top: 0; width: 42px; height: 42px; border: 0; border-radius: 50%; box-shadow: none; color: var(--primary); background: var(--orbs-accent-tint); }
+html[data-partner="orbs"] [data-currency-pair] > div:has(> [data-toggle-currencies-button]) { height: 42px; }
 html[data-partner="orbs"] [data-toggle-currencies-button]:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-html[data-partner="orbs"] [data-submit-button] { min-height: 48px; }
+html[data-partner="orbs"] [data-submit-button] { min-height: 56px; border: 0; border-radius: 14px; }
 
-/* Mobile trading keeps the compact header and joined, bordered panels. */
+/* Mobile uses the same soft card hierarchy within a compact header. */
 @media (max-width: 767px) {
   /* Avoid reserving two empty scrollbar gutters beside the mobile workspace. */
   html[data-partner="orbs"],
   html[data-partner="orbs"] body { scrollbar-gutter: auto; }
   html[data-partner="orbs"] body { overflow-y: auto; }
+  /* Keep the order table's scroll arrows sticky to the page viewport. */
+  html[data-partner="orbs"] body:has([data-activity-list]) { overflow: clip visible; }
+  html[data-partner="orbs"] [data-history-page] [data-activity-scroll-controls] button { border-radius: 50%; }
+  html[data-partner="orbs"] [data-app-header] { padding-top: 12px; }
+  html[data-partner="orbs"] [data-trading-navigation] { min-height: 44px; margin-top: 8px; }
+  html[data-partner="orbs"] [data-trading-modes] { width: 100%; justify-content: space-between; }
+  html[data-partner="orbs"] [data-trading-modes] a { font-size: 12px; }
+  html[data-partner="orbs"] #main-content { padding-top: 112px; }
+  html[data-partner="orbs"] [data-spot-order-navigation] {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.25fr) minmax(0, 1.4fr);
+    gap: 3px;
+  }
+  html[data-partner="orbs"] [data-spot-order-navigation] a {
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 2px;
+    font-size: clamp(11px, 3vw, 12px);
+  }
   html[data-partner="orbs"] [data-mobile-connect-label] { display: inline; }
   html[data-partner="orbs"] :is([data-connect-wallet-icon], [data-connect-wallet-label]) { display: none; }
   html[data-partner="orbs"] [data-primary-nav-pill]:has([data-mobile-connect-label]) {
@@ -865,28 +860,32 @@ html[data-partner="orbs"] [data-submit-button] { min-height: 48px; }
     letter-spacing: 0;
     text-transform: none;
   }
-  html[data-partner="orbs"] #main-content:has([data-form-root]) { padding-inline: 0; }
-  html[data-partner="orbs"] [data-form-root] { max-width: 520px; margin-top: 0; }
-  html[data-partner="orbs"] [data-form-container] { gap: 20px; padding: 24px; border-top: 0; background: var(--background); }
+  html[data-partner="orbs"] #main-content:has([data-form-root]) { padding-inline: 16px; }
+  html[data-partner="orbs"] [data-form-root] { max-width: 520px; margin-top: 24px; gap: 20px; }
+  html[data-partner="orbs"] [data-form-container] { gap: 14px; padding: clamp(16px, 4vw, 20px); background: var(--card); }
+  html[data-partner="orbs"] [data-form-section-header] { min-height: 44px; }
+  html[data-partner="orbs"] [data-percentage-button] { min-height: 40px; min-width: 56px; }
+  html[data-partner="orbs"] :is([data-currency-card], [data-order-prices-panel]) { padding: 16px; }
+  html[data-partner="orbs"] [data-currency-card] { gap: 12px; }
+  html[data-partner="orbs"] [data-currency-card]:last-child { padding-top: 16px; }
+  html[data-partner="orbs"] [data-currency-amount-row] { min-height: 42px; }
   html[data-partner="orbs"] [data-form-section-header] h2,
   html[data-partner="orbs"] [data-history-page] h1 { font-size: 22px; }
-  html[data-partner="orbs"] [data-trade-header-actions] [data-chain-selector-trigger] { max-width: 160px; padding-inline: 8px; font-size: 12px; }
-  html[data-partner="orbs"] [data-currency-amount-row] input { font-size: 28px; }
+  html[data-partner="orbs"] [data-trade-header-actions] [data-chain-selector-trigger] { max-width: 120px; padding-inline: 8px; font-size: 12px; }
+  html[data-partner="orbs"] [data-currency-amount-row] input { font-size: clamp(30px, 7.6vw, 38px); }
   html[data-partner="orbs"] [data-currency-card] [data-token-selector-trigger] > span { font-size: 13px; }
   html[data-partner="orbs"] [data-currency-value-row] :is(p, button) { font-size: 12px; }
-  html[data-partner="orbs"] [data-submit-button] { font-size: 11px; }
-  html[data-partner="orbs"] [data-spot-price-input] { grid-template-columns: minmax(0, 1fr) 72px; gap: 6px; }
-  html[data-partner="orbs"] [data-spot-price-value] { flex-direction: row; align-items: center; gap: 8px; padding-inline: 8px; }
+  html[data-partner="orbs"] [data-submit-button] { min-height: 52px; }
+  html[data-partner="orbs"] [data-spot-price-input] { grid-template-columns: minmax(0, 1fr) 72px; }
+  html[data-partner="orbs"] [data-spot-price-value] { flex-direction: column; align-items: stretch; gap: 4px; padding-inline: 8px; }
   html[data-partner="orbs"] [data-spot-price-value] [data-token-selector-trigger] { max-width: 45%; flex-shrink: 0; font-size: 12px; }
   html[data-partner="orbs"] [data-spot-price-input] input { font-size: 16px; }
-  html[data-partner="orbs"] [data-spot-price-value] p { font-size: 12px; }
 }
 @media (max-width: 379px) {
-  html[data-partner="orbs"] [data-form-container] { padding: 16px; }
-  html[data-partner="orbs"] [data-currency-card] { padding-inline: 16px; }
+  html[data-partner="orbs"] :is([data-currency-card], [data-order-prices-panel]) { padding-inline: 12px; }
   html[data-partner="orbs"] [data-form-section-header] h2,
   html[data-partner="orbs"] [data-history-page] h1 { font-size: 20px; }
-  html[data-partner="orbs"] [data-currency-amount-row] input { font-size: 26px; }
+  html[data-partner="orbs"] [data-currency-amount-row] input { font-size: 28px; }
   html[data-partner="orbs"] [data-trade-header-actions] [data-network-name] { display: none; }
   html[data-partner="orbs"] [data-currency-card] [data-token-selector-trigger] { max-width: 140px; padding-inline: 8px; }
 }
@@ -895,9 +894,7 @@ html[data-partner="orbs"] [data-submit-button] { min-height: 48px; }
   html[data-partner="orbs"] [data-history-table-region],
   html[data-partner="orbs"] [data-history-pagination] { display: none; }
   html[data-partner="orbs"] #main-content:has([data-history-page][data-history-view="table"]) { min-height: 0; }
-  html[data-partner="orbs"] [data-history-page][data-history-view] { background: var(--background); border: 0; overflow: hidden; }
-  html[data-partner="orbs"] [data-history-page][data-history-view="table"] [data-history-body] { padding: 0; }
-  html[data-partner="orbs"] [data-history-page] [data-history-toolbar] { border: 1px solid var(--border); background: var(--orbs-surface); }
+  html[data-partner="orbs"] [data-history-page][data-history-view="table"] [data-history-body] { padding: 0 12px 12px; }
   html[data-partner="orbs"] [data-mobile-order-list] { padding-bottom: env(safe-area-inset-bottom); }
   html[data-partner="orbs"] [data-mobile-order-list] [data-network-name] { white-space: normal; overflow-wrap: anywhere; }
   html[data-partner="orbs"] [data-history-page] [data-history-toolbar] { gap: 12px; }
@@ -908,15 +905,61 @@ html[data-partner="orbs"] [data-history-page] [data-history-toolbar] {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 16px 20px;
+  padding: 24px;
+  margin-bottom: 0;
+  border: 0;
   flex-wrap: wrap;
 }
-html[data-partner="orbs"] [data-history-network-filter] { width: 200px; min-width: 0; }
+html[data-partner="orbs"] [data-history-filters] { display: grid; grid-template-columns: minmax(200px, 1fr) 180px auto; width: min(100%, 720px); }
+html[data-partner="orbs"] [data-history-network-filter] { width: 100%; min-width: 0; }
 html[data-partner="orbs"] [data-history-filter] { width: 160px; }
+html[data-partner="orbs"] [data-history-filters] [data-slot="select-trigger"] {
+  min-height: 44px;
+  background: var(--secondary);
+  border-color: var(--orbs-control-border);
+}
+html[data-partner="orbs"] [data-history-pagination] { padding-top: 4px; }
+html[data-partner="orbs"] [data-history-pagination] :is(select, button) {
+  border-radius: 12px;
+  background: var(--secondary);
+  border-color: var(--orbs-control-border);
+}
+html[data-partner="orbs"] [data-order-details-trigger] {
+  min-height: 40px;
+  padding-inline: 12px;
+  border-radius: 12px;
+  color: var(--primary);
+  background: var(--orbs-accent-tint);
+}
+html[data-partner="orbs"] [data-history-page] [data-empty-state] {
+  width: 100%;
+  min-height: 240px;
+  padding-block: 32px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+html[data-partner="orbs"] [data-history-page] [data-empty-state] > p { max-width: 32rem; }
+html[data-partner="orbs"] [data-history-body] > [role="alert"] { border-radius: 16px; background: var(--orbs-error-tint); }
+html[data-partner="orbs"] [data-mobile-order-card] {
+  border-radius: 20px;
+  border-color: var(--form-panel-border);
+  overflow: hidden;
+  background: var(--secondary);
+}
+html[data-partner="orbs"] [data-order-amounts] { padding: 12px; border-radius: 14px; background: var(--card); }
+html[data-partner="orbs"] [data-order-card-footer] { padding-block: 8px; background: var(--card); }
+html[data-partner="orbs"] [data-order-card-footer] [data-order-details-trigger] { min-height: 44px; }
+html[data-partner="orbs"] [data-order-details-modal] { background: var(--card); }
+html[data-partner="orbs"] [data-order-details-modal] [data-history-section] { border-radius: 20px; background: var(--secondary); }
+html[data-partner="orbs"] [data-order-details-modal] [data-history-section] [data-history-section] { border-radius: 14px; background: var(--card); }
+html[data-partner="orbs"] [data-order-details-modal] [data-history-token-pair] { padding-bottom: 0; border: 0; gap: 12px; }
+html[data-partner="orbs"] [data-order-details-modal] [data-history-token-pair] > div { padding: 16px; border-radius: 20px; background: var(--secondary); }
 @media (max-width: 639px) {
-  html[data-partner="orbs"] [data-history-page] [data-history-toolbar] { padding: 12px; gap: 8px; }
+  html[data-partner="orbs"] [data-history-page] [data-history-toolbar] { padding: 12px 16px 20px; gap: 16px; }
   html[data-partner="orbs"] [data-history-filter] { width: 104px; }
-  html[data-partner="orbs"] [data-history-filters] { width: 100%; }
+  html[data-partner="orbs"] [data-history-filters] { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  html[data-partner="orbs"] [data-history-filters] [data-order-search] { grid-column: 1 / -1; }
   html[data-partner="orbs"] [data-history-filters] [data-slot="select-trigger"] { padding-inline: 8px; gap: 6px; font-size: 12px; }
   html[data-partner="orbs"] [data-history-network-filter] { flex: 1; width: auto; }
   html[data-partner="orbs"] [data-history-network-filter] [data-slot="select-trigger"] > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -958,9 +1001,6 @@ html[data-partner="orbs"] [data-wallet-option] {
   text-transform: uppercase;
   cursor: pointer;
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-wallet-option]:hover:not(:disabled) { background: var(--secondary); color: var(--primary); }
-}
 html[data-partner="orbs"] [data-wallet-option]:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 html[data-partner="orbs"] [data-wallet-option]:disabled { opacity: 0.55; cursor: wait; }
 html[data-partner="orbs"] [data-wallet-badge] { padding: 4px 6px; background: var(--orbs-accent-tint); color: var(--foreground); font-size: 9px; letter-spacing: 0.08em; }
@@ -988,80 +1028,43 @@ html[data-partner="orbs"] :where(
   [data-slot="button"][data-variant="ghost"],
   [data-slot="dialog-close"], [data-wallet-action="default"]
 ):focus-visible:not(:disabled) {
-  background: var(--accent);
+  background: var(--orbs-control-hover);
   color: var(--foreground);
-}
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] :where(
-    [data-slot="button"][data-variant="secondary"],
-    [data-slot="button"][data-variant="ghost"],
-    [data-slot="dialog-close"], [data-wallet-action="default"]
-  ):hover:not(:disabled) {
-    background: var(--accent);
-    color: var(--foreground);
-  }
 }
 html[data-partner="orbs"] [data-slot="button"][data-variant="destructive"] {
   background: var(--destructive);
   color: #ffffff;
 }
 html.dark[data-partner="orbs"] [data-slot="button"][data-variant="destructive"] { color: var(--background); }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-slot="button"][data-variant="destructive"]:hover:not(:disabled) {
-    background: var(--orbs-error-tint);
-    color: var(--destructive);
-  }
-}
 html[data-partner="orbs"] [data-wallet-action="destructive"]:focus-visible {
   background: var(--orbs-error-tint);
   color: var(--destructive);
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-wallet-action="destructive"]:hover {
-    background: var(--orbs-error-tint);
-    color: var(--destructive);
-  }
+html[data-partner="orbs"] [data-token-option]:is(:focus-visible, [data-highlighted]) {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
 }
-html[data-partner="orbs"] [data-popular-token] {
-  background: var(--secondary);
-  border-color: var(--border);
-}
-html[data-partner="orbs"] :is([data-popular-token], [data-token-option]):is(:focus-visible, [data-highlighted]) {
-  background: var(--orbs-accent-tint);
-  border-color: var(--primary);
-}
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] :is([data-popular-token], [data-token-option]):hover {
-    background: var(--orbs-accent-tint);
-    border-color: var(--primary);
-  }
-}
+
 html[data-partner="orbs"] [data-slot="select-item"]:is(:focus, [data-highlighted]) {
-  background: var(--accent);
+  background: var(--orbs-option-hover);
   color: var(--foreground);
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-segmented-tab]:hover:not([aria-selected="true"]) {
-    background: var(--accent);
-    color: var(--foreground);
-  }
+html[data-partner="orbs"] [data-styled-select] { border-radius: 12px; }
+html[data-partner="orbs"] [data-styled-select] [data-slot="select-item"] {
+  border-radius: 8px;
+  background: transparent;
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-settings-trigger]:hover:not(:disabled) { background: var(--accent); }
+html[data-partner="orbs"] [data-styled-select] [data-slot="select-item"]:is(:focus, [data-highlighted]) {
+  background: var(--orbs-option-hover);
 }
+html[data-partner="orbs"] [data-styled-select] [data-slot="select-item"][data-state="checked"] { color: var(--primary); }
 html[data-partner="orbs"] [data-order-details-body] button:not([data-slot="button"]):focus-visible {
   background: var(--orbs-accent-tint);
   border-color: var(--primary);
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] [data-order-details-body] button:not([data-slot="button"]):hover {
-    background: var(--orbs-accent-tint);
-    border-color: var(--primary);
-  }
-}
 html[data-partner="orbs"] [data-inline-message="error"] {
   background: var(--orbs-error-tint);
-  border-color: var(--destructive);
+  border: 0;
 }
 html[data-partner="orbs"] [data-inline-message="info"] {
   background: var(--card);
@@ -1074,11 +1077,6 @@ html[data-partner="orbs"] :is([data-review-details], [data-review-pair], [data-r
 html[data-partner="orbs"] :is([data-order-market], [data-history-table], [data-order-details-body]) a {
   color: var(--orbs-link);
 }
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  html[data-partner="orbs"] :is([data-order-market], [data-history-table], [data-order-details-body]) a:hover {
-    color: var(--orbs-primary-hover);
-  }
-}
 html[data-partner="orbs"] [data-sonner-toast][data-styled="true"] {
   --normal-border: var(--border);
   --normal-border-hover: var(--border);
@@ -1087,4 +1085,296 @@ html[data-partner="orbs"] [data-sonner-toast][data-styled="true"] {
   --info-border: var(--border);
   --warning-border: var(--primary);
   --error-border: var(--destructive);
+}
+
+/* Soft surface details shared by forms, review, and account controls. */
+html[data-partner="orbs"] [data-currency-card] [data-token-selector-trigger] { border-radius: 999px; padding-inline: 10px; }
+html[data-partner="orbs"] [data-currency-amount-row] input::placeholder { opacity: 0.5; }
+html[data-partner="orbs"] [data-currency-amount-row]:focus-within { border-radius: 8px; }
+html[data-partner="orbs"] [data-form-section-header] h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+html[data-partner="orbs"] [data-nav-pill] { border-radius: 14px; }
+html[data-partner="orbs"] [data-primary-nav-pill] { border: 0; }
+html[data-partner="orbs"] [data-open-orders-notification] { border-radius: 16px; box-shadow: var(--orbs-card-shadow); }
+html[data-partner="orbs"] [data-open-orders-notification] :is(a, button) { border-radius: 14px; }
+html[data-partner="orbs"] [data-mobile-order-card] { border-radius: 20px; border-color: var(--border); }
+html[data-partner="orbs"] [data-slot="drawer-content"][data-vaul-drawer-direction="bottom"] { border-radius: 24px 24px 0 0; }
+
+/* RainbowKit owns its wallet dialogs; keep their mobile sheets consistent too. */
+@media (max-width: 767px) {
+  html[data-partner="orbs"] [data-rk] [role="dialog"] { inset: 0; width: 100%; height: 100dvh; align-items: flex-end; padding: 0; }
+  html[data-partner="orbs"] [data-rk] [role="document"] { width: 100%; max-width: none; }
+  html[data-partner="orbs"] [data-rk] [role="document"] > div > div { box-sizing: border-box; top: 0; margin-top: 0; padding-bottom: env(safe-area-inset-bottom); width: 100%; min-width: 0; max-width: 100%; max-height: 90dvh; overflow-y: auto; border-radius: 24px 24px 0 0; }
+}
+@media (max-width: 379px) {
+  html[data-partner="orbs"] #main-content:has([data-form-root]) { padding-inline: 12px; }
+  html[data-partner="orbs"] [data-form-container] { padding: 12px; }
+  html[data-partner="orbs"] [data-percentage-button] { min-width: 48px; }
+}
+
+/* Active orders stay visible beside the trading workflow and in navigation. */
+html[data-partner="orbs"] [data-orders-nav-count] { color: var(--primary); }
+html[data-partner="orbs"] [data-history-view-tabs] { width: 192px; flex-shrink: 0; }
+html[data-partner="orbs"] [data-history-view-tabs] [role="tab"] { font-size: 13px; }
+html[data-partner="orbs"] [data-order-cancel-trigger] { min-height: 32px; border-radius: 8px; background: transparent; white-space: nowrap; }
+html[data-partner="orbs"] [data-activity-row] button[data-order-cancel-trigger] { border-radius: 8px; cursor: pointer; }
+html[data-partner="orbs"] [data-history-fill-progress] { min-width: 0; }
+html[data-partner="orbs"] [data-history-table] [data-history-fill-progress] > span { white-space: nowrap; }
+html[data-partner="orbs"] [data-history-table] thead { position: sticky; top: 0; z-index: 10; }
+html[data-partner="orbs"] [data-history-scope] { max-width: 480px; line-height: 1.5; }
+html[data-partner="orbs"] [data-mobile-order-card] [data-order-cancel-trigger] { min-height: 44px; }
+@media (max-width: 639px) {
+  html[data-partner="orbs"] [data-history-view-tabs] { width: 160px; }
+  html[data-partner="orbs"] [data-history-view-tabs] [role="tab"] { padding-inline: 8px; font-size: 12px; }
+  html[data-partner="orbs"] [data-history-filters] { flex-wrap: wrap; }
+  html[data-partner="orbs"] [data-history-network-filter] { min-width: 100px; }
+}
+
+/* One shared trading table; empty states never render a wide table header. */
+html[data-partner="orbs"] [data-history-view-tabs] { width: 270px; }
+html[data-partner="orbs"] [data-order-details-modal] [data-order-details-body] { overflow-y: auto; }
+html[data-partner="orbs"] [data-order-details-modal] { container-type: inline-size; }
+html[data-partner="orbs"] [data-trading-workspace] > [data-workspace-trade] { width: 100%; max-width: 520px; margin-inline: auto; }
+@media (max-width: 639px) {
+  html[data-partner="orbs"] [data-history-view-tabs] { width: 100%; }
+  html[data-partner="orbs"] [data-history-filters] { flex-wrap: wrap; }
+}
+
+/* Stacked activity rows use the page scroll on small screens. */
+@media (max-width: 767px) {
+  html[data-partner="orbs"] #main-content:has([data-history-page][data-history-view="table"]) { height: auto; min-height: calc(100dvh - 146px); }
+  html[data-partner="orbs"] [data-orders-workspace] { flex: none; height: auto; }
+  html[data-partner="orbs"] [data-history-page][data-history-view="table"] { flex: none; }
+  html[data-partner="orbs"] [data-history-page][data-history-view="table"] [data-history-body] { flex: none; overflow: visible; }
+}
+
+/* Activity follows the page scroll; only the inline trading panel has its own viewport. */
+html[data-partner="orbs"] #main-content:has([data-history-page] [data-activity-list]) { height: auto; min-height: calc(100dvh - 146px); }
+html[data-partner="orbs"] [data-orders-workspace]:has([data-activity-list]) { flex: none; height: auto; }
+html[data-partner="orbs"] [data-history-page][data-history-view="table"]:has([data-activity-list]),
+html[data-partner="orbs"] [data-history-page][data-history-view="table"] [data-history-body]:has([data-activity-list]) { flex: none; overflow: visible; }
+
+/* Updated mobile trading reference: simple navigation and floating pill controls. */
+html[data-partner="orbs"]:not(.dark) {
+  --orbs-primary-gradient: linear-gradient(105deg, #4936ff 0%, #7928ff 48%, #c875df 100%);
+  --orbs-primary-gradient-hover: linear-gradient(105deg, #3e2ce7 0%, #6a20e7 48%, #b960d2 100%);
+  --orbs-tab-background: #f9f8ff;
+  --orbs-secondary-text: #616b99;
+}
+html[data-partner="orbs"] [data-mobile-navigation-menu] { display: none; }
+@media (max-width: 767px) {
+  html[data-partner="orbs"] [data-app-header] { padding: 12px 20px 0; }
+  html[data-partner="orbs"] [data-nav-layout] { grid-template-columns: 24px auto minmax(0, 1fr); column-gap: 12px; }
+  html[data-partner="orbs"] [data-mobile-navigation-menu] { display: block; grid-column: 1; grid-row: 1; }
+  html[data-partner="orbs"] [data-mobile-navigation-menu] > button { width: 44px; margin-left: -10px; }
+  html[data-partner="orbs"] [data-nav-brand] { grid-column: 2; gap: 8px; }
+  html[data-partner="orbs"] [data-nav-brand] img { width: 32px !important; height: 32px !important; }
+  html[data-partner="orbs"] [data-nav-wordmark] { display: inline; font-size: 19px; letter-spacing: .12em; }
+  html[data-partner="orbs"] [data-nav-actions] { grid-column: 3; min-width: 0; gap: 0; }
+  html[data-partner="orbs"] [data-header-theme-toggle] { display: none; }
+  html[data-partner="orbs"] [data-primary-nav-pill]:has([data-mobile-connect-label]) { height: 40px; min-height: 40px; padding-inline: 16px; border-radius: 14px; font-weight: 600; font-size: 12px; }
+  html[data-partner="orbs"] [data-trading-navigation] { width: calc(100% + 40px); margin: 8px -20px 0; padding-inline: 22px; min-height: 44px; }
+  html[data-partner="orbs"] [data-trading-modes] { gap: 12px; }
+  html[data-partner="orbs"] [data-trading-modes] a { display: inline-flex; align-items: center; justify-content: center; position: relative; font-size: 14px; font-weight: 400; color: var(--orbs-secondary-text); white-space: nowrap; cursor: pointer; }
+  html[data-partner="orbs"] [data-trading-modes] a[aria-current="page"] { font-weight: 600; color: var(--primary); }
+  html[data-partner="orbs"] [data-trading-modes] svg { display: none; }
+  html[data-partner="orbs"] #main-content { padding-top: 112px; }
+  html[data-partner="orbs"] #main-content:has([data-form-root]) { padding-inline: 20px; }
+  html[data-partner="orbs"] [data-form-root] { margin-top: 14px; }
+  html[data-partner="orbs"] [data-spot-order-navigation] { display: flex; gap: 8px; margin: 0 -20px 12px; padding-inline: 20px; }
+  html[data-partner="orbs"] [data-spot-order-navigation] a { flex: 0 0 auto; min-width: 62px; min-height: 40px; padding: 8px 16px; border: 0; border-radius: 16px; background: var(--secondary); color: var(--foreground); font-size: 14px; font-weight: 500; }
+  html[data-partner="orbs"] [data-spot-order-navigation] a[aria-current="page"] { background: var(--primary); color: var(--primary-foreground); border: 0; }
+  html[data-partner="orbs"] [data-form-container] { padding: 16px; gap: 8px; border: 0; border-radius: 28px; }
+  html[data-partner="orbs"] [data-form-section-header] { display: flex; }
+  html[data-partner="orbs"] [data-currency-pair] { gap: 4px; }
+  html[data-partner="orbs"] [data-percentage-controls] { margin-bottom: 10px; gap: 8px; }
+  html[data-partner="orbs"] [data-percentage-button] { min-width: 56px; min-height: 40px; border-radius: 15px; padding-inline: 14px; font-size: 14px; }
+  html[data-partner="orbs"] [data-currency-card] { padding: 14px; gap: 8px; border-radius: 20px; }
+  html[data-partner="orbs"] [data-currency-card]:last-child { padding-top: 14px; }
+  html[data-partner="orbs"] [data-currency-card-header] p { font-size: 14px; font-weight: 500; }
+  html[data-partner="orbs"] [data-currency-amount-row] input { font-size: 30px; }
+  html[data-partner="orbs"] [data-currency-card] [data-token-selector-trigger] { min-height: 44px; max-width: 132px; padding-inline: 10px; border-radius: 18px; }
+  html[data-partner="orbs"] [data-currency-card] [data-token-selector-trigger] > span { font-size: 14px; font-weight: 600; }
+  html[data-partner="orbs"] [data-currency-value-row] :is(p, button) { font-size: 11px; }
+  html[data-partner="orbs"] [data-currency-pair] > div:has(> [data-toggle-currencies-button]) { height: 0; }
+  html[data-partner="orbs"] [data-toggle-currencies-button] { top: -23px; width: 42px; height: 42px; --tw-ring-shadow: 0 0 #0000; }
+  html[data-partner="orbs"] [data-submit-button] { --submit-button-radius: 20px; min-height: 56px; border-radius: 20px; font-weight: 600; }
+}
+@media (max-width: 359px) {
+  html[data-partner="orbs"] [data-app-header] { padding-inline: 14px; }
+  html[data-partner="orbs"] [data-nav-layout] { column-gap: 7px; }
+  html[data-partner="orbs"] [data-nav-wordmark] { font-size: 16px; }
+  html[data-partner="orbs"] [data-primary-nav-pill]:has([data-mobile-connect-label]) { padding-inline: 10px; font-size: 11px; }
+  html[data-partner="orbs"] [data-trading-navigation] { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 20px; }
+  html[data-partner="orbs"] [data-percentage-button] { min-width: 0; flex: 1; padding-inline: 8px; }
+}
+
+/* Compact transaction previews with a stacked amount summary. */
+html[data-partner="orbs"] [data-order-preview] { width: min(420px, calc(100vw - 24px)); border-radius: 20px; }
+html[data-partner="orbs"] [data-order-details-modal][data-order-preview] { width: min(520px, calc(100vw - 24px)); }
+html[data-partner="orbs"] [data-order-preview] [data-order-details-header] { margin-inline: 24px; padding: 12px 0 8px; align-items: center; border-bottom: 0; }
+html[data-partner="orbs"] [data-order-preview] [data-order-details-header] h2 { font-size: 16px; }
+html[data-partner="orbs"] [data-order-preview] [data-order-preview-footer] { padding: 12px 24px 24px; border: 0; }
+html[data-partner="orbs"] [data-order-preview] [data-order-details-body] > div { padding-inline: 24px; }
+html[data-partner="orbs"] [data-order-preview] [data-review-details] [data-detail-row] { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+@media (max-width: 479px) {
+  html[data-partner="orbs"] [data-order-preview] [data-order-details-header] { margin-inline: 16px; padding-top: 18px; }
+  html[data-partner="orbs"] [data-order-preview] [data-order-details-body] > div { padding-inline: 16px; }
+  html[data-partner="orbs"] [data-order-preview] [data-order-preview-footer] { padding: 12px 16px 16px; }
+}
+html[data-partner="orbs"] [data-order-preview] [data-review-details] [data-detail-row] > :last-child { justify-content: flex-end; text-align: right; width: 100%; }
+html[data-partner="orbs"] [data-order-preview][data-vaul-drawer-direction="bottom"] {
+  height: 90dvh;
+  max-height: 90dvh;
+  margin-top: 0;
+  border-bottom: 0;
+  border-radius: 24px 24px 0 0;
+}
+html[data-partner="orbs"] [data-order-preview][data-vaul-drawer-direction="bottom"] [data-order-details-header] { padding-top: 12px; }
+html[data-partner="orbs"] [data-order-preview][data-vaul-drawer-direction="bottom"] [data-order-preview-footer] { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+
+/* Reference controls: lavender pills, violet selection, and gradient primary actions. */
+html[data-partner="orbs"] {
+  --orbs-control-radius: 16px;
+  --orbs-primary-radius: 18px;
+}
+html[data-partner="orbs"] :is([data-slot="button"], [data-nav-pill], [data-percentage-button], [data-slot="select-trigger"]) {
+  border-radius: var(--orbs-control-radius);
+}
+html[data-partner="orbs"] :is([data-primary-nav-pill], [data-slot="button"][data-variant="default"]) {
+  border: 0;
+  border-radius: var(--orbs-primary-radius);
+  font-weight: 600;
+}
+html[data-partner="orbs"] [data-submit-button] {
+  --submit-button-radius: 20px;
+  min-height: 56px;
+  border-radius: var(--submit-button-radius);
+  font-size: 16px;
+  font-weight: 600;
+}
+html[data-partner="orbs"] [data-slot="button"]:is([data-variant="outline"], [data-variant="secondary"]) {
+  border-color: transparent;
+  background: var(--orbs-tab-background);
+  color: var(--foreground);
+  font-weight: 500;
+}
+html[data-partner="orbs"] [data-percentage-button] {
+  min-height: 34px;
+  background: var(--orbs-tab-background);
+  font-size: 12px;
+  font-weight: 500;
+}
+html[data-partner="orbs"] [data-currency-card] [data-token-selector-trigger] { border-radius: var(--orbs-primary-radius); }
+html[data-partner="orbs"] [data-spot-order-navigation] {
+  gap: 8px;
+  background: transparent;
+}
+html[data-partner="orbs"] [data-spot-order-navigation] { margin-bottom: 12px; }
+html[data-partner="orbs"] [data-form-toolbar] { margin-bottom: 12px; }
+html[data-partner="orbs"] [data-form-toolbar] [data-spot-order-navigation] { flex: 1; margin: 0; padding: 0; }
+html[data-partner="orbs"] [data-history-view-tabs] { padding: 4px; width: 200px; gap: 4px; border-radius: 16px; background: var(--secondary); }
+html[data-partner="orbs"] [data-history-view-tabs] [role="tab"] {
+  min-height: 36px;
+  padding: 6px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+html[data-partner="orbs"] [data-history-view-tabs] [role="tab"][aria-selected="true"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+html[data-partner="orbs"] [data-spot-order-navigation] a {
+  min-height: 44px;
+  padding: 8px 16px;
+  border: 0;
+  border-radius: var(--orbs-control-radius);
+  background: var(--orbs-tab-background);
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+html[data-partner="orbs"] [data-spot-order-navigation] a[aria-current="page"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+html[data-partner="orbs"] [data-spot-order-navigation] a {
+  min-height: 34px;
+  padding: 6px 14px;
+  border-radius: 14px;
+  font-size: 12px;
+}
+@media (min-width: 768px) {
+  html[data-partner="orbs"] [data-spot-order-navigation] a {
+    flex: 0 0 auto;
+    padding-inline: 10px;
+  }
+}
+html[data-partner="orbs"] [data-form-container] { border-radius: 28px; }
+html[data-partner="orbs"] [data-nav-actions] :is([data-chain-selector-trigger], [data-wallet-account-trigger]) {
+  height: 40px;
+  min-height: 40px;
+}
+@media (max-width: 767px) {
+  html[data-partner="orbs"] [data-history-view-tabs] { width: 100%; }
+  html[data-partner="orbs"] [data-nav-actions] { max-width: 100%; gap: 6px; }
+  html[data-partner="orbs"] [data-header-network-selector] { flex-shrink: 0; }
+  html[data-partner="orbs"] [data-header-network-selector] [data-chain-selector-trigger] { padding-inline: 8px; gap: 4px; }
+  html[data-partner="orbs"] [data-header-network-selector] [data-network-name] { display: none; }
+  html[data-partner="orbs"] [data-wallet-account-trigger] { min-width: 0; max-width: 124px; flex-shrink: 1; }
+  html[data-partner="orbs"] [data-wallet-account-label] { flex-shrink: 1; overflow: hidden; }
+}
+
+/* Keep the mobile Orders controls in two compact rows. */
+@media (max-width: 639px) {
+  html[data-partner="orbs"] [data-history-page] [data-history-toolbar] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 148px;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+  html[data-partner="orbs"] [data-history-heading] { grid-column: 1; grid-row: 1; }
+  html[data-partner="orbs"] [data-history-scope] { display: none; }
+  html[data-partner="orbs"] [data-history-filters] { display: contents; }
+  html[data-partner="orbs"] [data-history-view-tabs] { grid-column: 2; grid-row: 1; justify-self: end; width: 144px; }
+  html[data-partner="orbs"] [data-history-view-tabs] [role="tab"] { padding-inline: 10px; font-size: 12px; }
+  html[data-partner="orbs"] [data-history-filters] [data-order-search] { grid-column: 1; grid-row: 2; min-width: 0; width: 100%; }
+  html[data-partner="orbs"] [data-order-search] > svg { left: 10px; width: 14px; height: 14px; }
+  html[data-partner="orbs"] [data-order-search] input { padding-inline: 30px 10px; }
+  html[data-partner="orbs"] [data-order-search]:has(button) input { padding-right: 36px; }
+  html[data-partner="orbs"] [data-order-search] > button { width: 32px; }
+  html[data-partner="orbs"] [data-history-network-filter] { grid-column: 2; grid-row: 2; width: 100%; }
+}
+
+/* Compact mobile spacing without shrinking inputs or primary actions. */
+@media (max-width: 639px) {
+  html[data-partner="orbs"] [data-app-header] { padding-top: 8px; }
+  html[data-partner="orbs"] [data-trading-navigation] { margin-top: 4px; }
+  html[data-partner="orbs"] #main-content { padding-top: 104px; }
+  html[data-partner="orbs"] #main-content:has([data-form-root]) { padding-inline: 16px; }
+  html[data-partner="orbs"] [data-form-root] { margin-top: 8px; margin-bottom: 32px; gap: 12px; }
+  html[data-partner="orbs"] [data-form-toolbar] { margin-bottom: 8px; }
+  html[data-partner="orbs"] [data-form-container] { padding: 12px; }
+  html[data-partner="orbs"] [data-percentage-controls] { margin-bottom: 6px; gap: 6px; }
+  html[data-partner="orbs"] [data-currency-card] { padding: 12px; gap: 6px; }
+  html[data-partner="orbs"] [data-currency-card]:last-child { padding-top: 12px; }
+  html[data-partner="orbs"] [data-order-prices-panel] { padding: 12px; }
+  html[data-partner="orbs"] [data-form-panel]:has([data-order-input-controls]) { padding: 12px; gap: 8px; }
+  html[data-partner="orbs"] [data-orders-workspace] { margin-top: 6px; margin-bottom: 16px; }
+  html[data-partner="orbs"] [data-history-page] [data-history-toolbar] { padding: 10px 12px; }
+  html[data-partner="orbs"] [data-history-page] [data-activity-list] { gap: 12px; }
+  html[data-partner="orbs"] [data-history-page] [data-empty-state] { min-height: 220px; padding-block: 24px; }
+  html[data-partner="orbs"] [data-order-preview] [data-order-details-header] { padding-bottom: 12px; }
+  html[data-partner="orbs"] [data-order-preview] [data-order-preview-footer] { padding-top: 8px; }
+  html[data-partner="orbs"] [data-order-preview][data-vaul-drawer-direction="bottom"] { height: auto; }
+  html[data-partner="orbs"] [data-token-selector-dialog] [data-slot="dialog-header"] { padding-top: 12px; }
+  html[data-partner="orbs"] [data-token-selector-dialog] [data-token-option] { margin-bottom: 4px; }
 }

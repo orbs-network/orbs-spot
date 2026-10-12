@@ -74,6 +74,7 @@ function SelectContent({
       >
         <SelectScrollUpButton />
         <SelectPrimitive.Viewport
+          data-slot="select-viewport"
           className={cn(
             "p-1",
             position === "popper" &&
@@ -104,8 +105,9 @@ function SelectLabel({
 function SelectItem({
   className,
   children,
+  indicator,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+}: React.ComponentProps<typeof SelectPrimitive.Item> & { indicator?: React.ReactNode }) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
@@ -116,6 +118,7 @@ function SelectItem({
       {...props}
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      {indicator && <SelectPrimitive.ItemIndicator className="absolute right-2.5 flex size-4 items-center justify-center" data-slot="select-item-indicator">{indicator}</SelectPrimitive.ItemIndicator>}
     </SelectPrimitive.Item>
   )
 }

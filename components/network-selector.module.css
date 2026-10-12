@@ -1,0 +1,53 @@
+.menu {
+  display: flex;
+  width: 268px;
+  max-width: calc(100vw - 32px);
+  max-height: min(380px, var(--radix-popover-content-available-height, 85dvh));
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border-radius: 24px;
+}
+.search { position: relative; flex-shrink: 0; padding: 8px 8px 6px; }
+.search input { height: 48px; border-radius: 16px; font-size: 14px; }
+.options {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 6px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.sectionLabel { padding: 12px 10px 6px; font-size: 11px; line-height: 16px; color: var(--muted-foreground); }
+.option {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 0;
+  border-radius: 14px;
+  padding: 10px;
+  background: transparent;
+  color: var(--foreground);
+  text-align: left;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.option > span:first-child { gap: 12px; }
+.option :global([data-network-logo]) { width: 24px; height: 24px; border-radius: 7px; }
+.selected { display: grid; width: 18px; height: 18px; flex-shrink: 0; place-items: center; border-radius: 50%; background: var(--foreground); color: var(--background); }
+.networkGrid { display: grid; width: 24px; height: 24px; flex-shrink: 0; grid-template-columns: repeat(2, 10px); gap: 2px; align-content: center; justify-content: center; }
+.networkGrid img { width: 10px; height: 10px; border-radius: 3px; object-fit: contain; }
+@media (hover: hover) and (pointer: fine) {
+  .option:hover { background: var(--orbs-option-hover, var(--accent)); }
+}
+@media (max-width: 767px) {
+  .menu { max-height: 85dvh; }
+  .search { padding: 8px 12px; }
+  .options { padding: 0 10px max(10px, env(safe-area-inset-bottom)); }
+  .option { min-height: 52px; }
+}

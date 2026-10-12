@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { DEFAULT_CHAIN_ID } from "../consts";
 import { getCurrencies } from "../get-currencies";
 import type { Currency } from "../types";
+import { MAX_DEFAULT_TOKENS } from "../token-list";
 import { dedupeCurrenciesByAddress } from "../utils";
 import { useUserStore } from "./store";
 import { useDataChainId } from "./use-data-chain-id";
@@ -13,7 +14,7 @@ const EMPTY_CURRENCIES: Currency[] = [];
 
 export function currenciesQueryOptions(chainId: number) {
   return queryOptions({
-    queryKey: ["currencies", chainId],
+    queryKey: ["currencies", chainId, MAX_DEFAULT_TOKENS],
     queryFn: ({ signal }) => getCurrencies(chainId, signal),
     staleTime: CURRENCIES_STALE_TIME,
     gcTime: 30 * 60_000,
@@ -32,8 +33,8 @@ export function useCurrenciesQuery(requestedChainId?: number) {
   // or hide an existing list while a new cache entry loads.
   const data = useMemo(() => query.data
     ? customCurrencies.length
-      ? dedupeCurrenciesByAddress([...query.data, ...customCurrencies])
+      ? dedupeCurrenciesByAddress([...query.data, ...customCurrencies.map(currency => ({ ...currency, chainId: queryChainId }))])
       : query.data
-    : undefined, [query.data, customCurrencies]);
+    : undefined, [query.data, customCurrencies, queryChainId]);
   return { ...query, data };
 }

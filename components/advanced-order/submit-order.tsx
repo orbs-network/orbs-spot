@@ -1,4 +1,5 @@
 "use client";
+import { trackFunnel } from "@/lib/funnel-analytics";
 import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 import { LiveOrderFlowTrigger } from "@developer-tools";
 import { SubmitSwapButton } from "@/components/submit-swap-button";
@@ -54,7 +55,7 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
     : !status
       ? t("orderReview")
       : status === ExecutionStatus.SUCCESS
-        ? "Order submitted"
+        ? "Order placed"
         : "Order execution";
 
   useEffect(() => {
@@ -85,6 +86,7 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
   ]);
 
   const onOpen = useCallback(() => {
+    trackFunnel({ name: "review_opened", product: "advanced" });
     clearTimeout(resetTimer.current);
     setOpen(true);
     if (status !== ExecutionStatus.LOADING) {
@@ -128,19 +130,22 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
           />
           <DialogContent
             data-trade-review
+            data-order-submit-review
             presentation="center"
-            className={`w-[calc(100vw-1rem)] ${IS_ORBS ? "sm:max-w-[520px]" : "sm:max-w-[460px]"}`}
+            className={`flex flex-col w-[calc(100vw-1rem)] overflow-hidden ${IS_ORBS ? "sm:max-w-[520px]" : "sm:max-w-[460px]"}`}
           >
             {IS_ORBS && (status || parsedError) ? (
               <DialogTitle className="sr-only">{dialogTitle}</DialogTitle>
             ) : (
               <DialogHeader><DialogTitle>{dialogTitle}</DialogTitle></DialogHeader>
             )}
-            <SubmitOrderPanel
-              orderTitle={orderTitle}
-              onSubmit={onSubmit}
-              isSubmitting={confirmButtonLoading}
-            />
+            <div data-review-scroll className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain">
+              <SubmitOrderPanel
+                orderTitle={orderTitle}
+                onSubmit={onSubmit}
+                isSubmitting={confirmButtonLoading}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       </div>

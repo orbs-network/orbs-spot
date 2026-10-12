@@ -37,7 +37,7 @@ import { useConnection } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { getSpotDocsHref } from "@/features/developer-tools/docs";
 import { DeveloperGuideLink } from "./developer-guide-link";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -870,8 +870,9 @@ export function LiquidityHubDeveloperContent({
   );
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} dismissible={!isRunning} onOpenChange={handleOpenChange}>
       <Tooltip
+        action
         open={triggerTooltipOpen}
         onOpenChange={handleTriggerTooltipOpenChange}
       >
@@ -894,11 +895,11 @@ export function LiquidityHubDeveloperContent({
       </Tooltip>
       <DialogContent
         presentation="center"
-        mobilePresentation="fullscreen"
         onInteractOutside={(event) => event.preventDefault()}
         showCloseButton
-        className="overflow-clip h-[min(1040px,98dvh)] max-w-[960px] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-0 overscroll-contain p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
+        className="overflow-clip h-[min(1040px,98dvh)] max-w-[960px] max-md:h-[90dvh] max-md:grid-rows-[auto_minmax(0,1fr)] grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-0 overscroll-contain p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
       >
+        <DialogTitle className="sr-only">Swap execution</DialogTitle>
         <div className="h-full min-h-0 overflow-hidden">
           <JsonInspectorPanel
             key={viewedStep}

@@ -10,8 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { useFormatNumber } from "@/lib/hooks/common";
 import { useCurrency } from "@/lib/hooks/use-currencies";
 import { useTranslations } from "@/lib/use-translations";
-import { DISCLAIMER_URL, isNativeAddress, type Token } from "@orbs-network/spot-ui";
-import { Steps, ExecutionPhase, ExecutionStatus, type ParsedError } from "@/lib/spot/execution";
+import { DISCLAIMER_URL, isNativeAddress, Module, type Token } from "@orbs-network/spot-ui";
+import { Steps, ExecutionPhase, ExecutionStatus } from "@/lib/spot/execution";
 import { Step, SwapFlow, SwapStatus } from "@orbs-network/swap-ui";
 import BN from "bignumber.js";
 import { ArrowRightIcon, CheckIcon } from "lucide-react";
@@ -20,21 +20,24 @@ import { type Currency } from "@/lib/types";
 import { formatDuration } from "./utils";
 import { useSubmitOrderExecution } from "./use-submit-order-execution";
 import { OrbsTradeReviewSummary } from "@/components/orbs-trade-review-summary";
+import { tokenDisplayDecimals } from "@/lib/token-display";
 import { IS_ORBS } from "@/lib/partners/client";
+import { TransactionError } from "@/components/transaction-error";
 
 function OrderAmountSummary() {
   const order = useOrderReview();
   const srcCurrency = useCurrency(order.srcToken?.address);
   const dstCurrency = useCurrency(order.dstToken?.address);
-  const srcAmount = useFormatNumber({ value: order.srcAmountUI });
-  const dstAmount = useFormatNumber({ value: order.dstAmountUI });
-  const srcUsd = useFormatNumber({ value: order.srcAmountUsd, decimalScale: 2 });
-  const dstUsd = useFormatNumber({ value: order.dstAmountUsd, decimalScale: 2 });
+  const srcAmount = useFormatNumber({ decimalScale: tokenDisplayDecimals(order.srcToken?.symbol, order.srcToken?.decimals), value: order.srcAmountUI });
+  const dstAmount = useFormatNumber({ decimalScale: tokenDisplayDecimals(order.dstToken?.symbol, order.dstToken?.decimals), value: order.dstAmountUI });
+  const srcUsd = useFormatNumber({ value: order.srcAmountUsd, decimalScale: 2, prefix: "$" });
+  const dstUsd = useFormatNumber({ value: order.dstAmountUsd, decimalScale: 2, prefix: "$" });
 
   return (
     <OrbsTradeReviewSummary
-      pay={{ currency: srcCurrency, token: order.srcToken, amount: srcAmount, usd: srcUsd }}
-      receive={{ currency: dstCurrency, token: order.dstToken, amount: dstAmount, usd: dstUsd }}
+      layout="order"
+      pay={{ currency: srcCurrency, token: order.srcToken, amount: srcAmount, usd: srcUsd, icon: <SwapFlowTokenLogo currency={srcCurrency} token={order.srcToken} className="size-10" /> }}
+      receive={{ currency: dstCurrency, token: order.dstToken, amount: dstAmount, usd: dstUsd, label: order.form.values.isMarketOrder ? "Buy · estimated" : "Buy · at limit", icon: <SwapFlowTokenLogo currency={dstCurrency} token={order.dstToken} className="size-10" /> }}
     />
   );
 }
@@ -46,7 +49,7 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
   const dstToken = order.dstToken;
   const minReceived = useFormatNumber({
     value: order.minDestAmountPerTradeUI,
-    decimalScale: 4,
+    decimalScale: tokenDisplayDecimals(dstToken?.symbol, dstToken?.decimals),
   });
   const sizePerTrade = useFormatNumber({
     value: order.sizePerTradeUI,
@@ -57,6 +60,10 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
   const limitPrice = useFormatNumber({
     value: order.limitPriceUI,
   });
+  const triggerPriceUsd = useFormatNumber({ value: order.triggerPriceUsd, decimalScale: 2, prefix: "$" });
+  const limitPriceUsd = useFormatNumber({ value: order.limitPriceUsd, decimalScale: 2, prefix: "$" });
+  const minReceivedUsd = useFormatNumber({ value: order.form.trades.minOutputAmountPerTrade.usd, decimalScale: 2, prefix: "$" });
+  const sizePerTradeUsd = useFormatNumber({ value: order.form.trades.inputAmountPerTrade.usd, decimalScale: 2, prefix: "$" });
 
   return (
     <div data-review-details className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
@@ -66,10 +73,10 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         labelClassName="text-xs leading-5"
         valueClassName="text-xs leading-5"
       >
-        {orderTitle}
+        {orderTitle}{order.form.module !== Module.LIMIT ? order.form.values.isMarketOrder ? " Market" : " Limit" : ""}
       </DetailRow>
       <DetailRow
-        label={t("expirationLabel")}
+        label={t("expiresIn")}
         tooltip={t("expirationTooltip")}
         align="start"
         labelClassName="text-xs leading-5"
@@ -85,17 +92,23 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         labelClassName="text-xs leading-5"
         valueClassName="text-xs leading-5"
       >
-        1 {srcToken?.symbol} = {triggerPrice || "-"} {dstToken?.symbol}
+        <span className="inline-flex flex-wrap justify-end gap-x-1.5">
+          <span>1 {srcToken?.symbol} = {triggerPrice || "-"} {dstToken?.symbol}</span>
+          {triggerPriceUsd && <span data-order-price-usd className="font-normal text-muted-foreground">({triggerPriceUsd})</span>}
+        </span>
       </DetailRow>
       <DetailRow
         label={t("limitPrice")}
         tooltip={t("limitPriceTooltip")}
-        hidden={BN(order.limitPriceUI || 0).isZero()}
+        hidden={order.form.values.isMarketOrder || BN(order.limitPriceUI || 0).isZero()}
         align="start"
         labelClassName="text-xs leading-5"
         valueClassName="text-xs leading-5"
       >
-        1 {srcToken?.symbol} = {limitPrice || "-"} {dstToken?.symbol}
+        <span className="inline-flex flex-wrap justify-end gap-x-1.5">
+          <span>1 {srcToken?.symbol} = {limitPrice || "-"} {dstToken?.symbol}</span>
+          {limitPriceUsd && <span data-order-price-usd className="font-normal text-muted-foreground">({limitPriceUsd})</span>}
+        </span>
       </DetailRow>
       <DetailRow
         label={
@@ -107,17 +120,10 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         labelClassName="text-xs leading-5"
         valueClassName="text-xs leading-5"
       >
-        {minReceived || "-"} {dstToken?.symbol}
-      </DetailRow>
-      <DetailRow
-        label={t("individualTradeSize")}
-        tooltip={t("tradeSizeTooltip")}
-        hidden={order.totalTrades <= 1}
-        align="start"
-        labelClassName="text-xs leading-5"
-        valueClassName="text-xs leading-5"
-      >
-        {sizePerTrade || "-"} {srcToken?.symbol}
+        <span className="inline-flex flex-wrap justify-end gap-x-1.5">
+          <span>{minReceived || "-"} {dstToken?.symbol}</span>
+          {minReceivedUsd && <span data-order-amount-usd className="font-normal text-muted-foreground">({minReceivedUsd})</span>}
+        </span>
       </DetailRow>
       <DetailRow
         label={t("numberOfTrades")}
@@ -130,6 +136,19 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
         {order.totalTrades}
       </DetailRow>
       <DetailRow
+        label={t("individualTradeSize")}
+        tooltip={t("tradeSizeTooltip")}
+        hidden={order.totalTrades <= 1}
+        align="start"
+        labelClassName="text-xs leading-5"
+        valueClassName="text-xs leading-5"
+      >
+        <span className="inline-flex flex-wrap justify-end gap-x-1.5">
+          <span>{sizePerTrade || "-"} {srcToken?.symbol}</span>
+          {sizePerTradeUsd && <span data-order-amount-usd className="font-normal text-muted-foreground">({sizePerTradeUsd})</span>}
+        </span>
+      </DetailRow>
+      <DetailRow
         label={t("tradeIntervalLabel")}
         tooltip={t("tradeIntervalTooltip")}
         hidden={order.totalTrades <= 1}
@@ -139,24 +158,6 @@ function OrderReviewDetails({ orderTitle }: { orderTitle: string }) {
       >
         {formatDuration(order.tradeInterval)}
       </DetailRow>
-    </div>
-  );
-}
-
-function TxError({ error }: { error?: ParsedError }) {
-  return (
-    <div className="flex flex-col items-center gap-2 text-center">
-      <h3 className="text-lg font-semibold">Transaction failed</h3>
-      {error?.code ? (
-        <p className="text-sm text-muted-foreground">
-          Error code: {error.code}
-        </p>
-      ) : null}
-      {error?.message ? (
-        <p className="max-h-28 overflow-auto text-sm text-muted-foreground">
-          {error.message}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -178,7 +179,7 @@ function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
         title: t("wrapAction", { symbol }),
         footerLink: wrapExplorerUrl,
         footerText: wrapTxHash
-          ? t("orderSubmitted")
+          ? t("transactionSubmitted")
           : !wrapTxHash && status === ExecutionStatus.LOADING ? t("proceedInWallet") : undefined,
       };
     }
@@ -187,7 +188,7 @@ function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
         title: t("approveAction", { symbol }),
         footerLink: approveExplorerUrl,
         footerText: approveTxHash
-          ? t("orderSubmitted")
+          ? t("transactionSubmitted")
           : !approveTxHash && status === ExecutionStatus.LOADING ? t("proceedInWallet") : undefined,
       };
     }
@@ -197,7 +198,7 @@ function useOrderStep(orderTitle: string, srcToken?: Token): Step | undefined {
         status === ExecutionStatus.LOADING
           ? phase === ExecutionPhase.SIGNING
             ? t("proceedInWallet")
-            : phase === ExecutionPhase.SUBMITTING ? t("orderSubmitted") : undefined
+            : phase === ExecutionPhase.SUBMITTING ? t("transactionSubmitted") : undefined
           : undefined,
     };
   }, [
@@ -225,6 +226,7 @@ function OrderFlowMain({
 }) {
   const t = useTranslations();
   const [accepted, setAccepted] = useState(true);
+  const order = useOrderReview();
   const { status } = useSubmitOrderExecution();
   const isSubmitted = Boolean(status);
 
@@ -238,16 +240,26 @@ function OrderFlowMain({
       />}
       {!isSubmitted && (
         <div className="mt-3 flex w-full flex-col gap-3">
+          {order.form.values.isMarketOrder && (
+            <p data-review-output-estimate className="text-xs leading-relaxed text-muted-foreground">
+              {order.totalTrades > 1
+                ? "Output is estimated. Each trade may execute at a different market rate, so the total received may vary."
+                : "Output is estimated. The final amount depends on the market rate at execution."}
+            </p>
+          )}
           <OrderReviewDetails orderTitle={orderTitle} />
           <div data-review-disclaimer className="flex w-full items-center justify-between gap-3 rounded-[14px] bg-secondary/55 p-3">
-            <a
-              href={DISCLAIMER_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="border-b border-muted-foreground/60 text-sm font-medium text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
-            >
-              Accept Disclaimer
-            </a>
+            <span className="text-sm font-medium text-muted-foreground">
+              Accept{" "}
+              <a
+                href={DISCLAIMER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="border-b border-muted-foreground/60 transition-colors"
+              >
+                Disclaimer
+              </a>
+            </span>
             <Switch
               checked={accepted}
               onCheckedChange={setAccepted}
@@ -273,8 +285,8 @@ function OrderFlowMain({
 function OrderUsd({ kind }: { kind: "src" | "dst" }) {
   const order = useOrderReview();
   const value = kind === "src" ? order.srcAmountUsd : order.dstAmountUsd;
-  const formatted = useFormatNumber({ value, decimalScale: 2 });
-  return <p className="text-sm text-muted-foreground">${formatted || "0"}</p>;
+  const formatted = useFormatNumber({ value, decimalScale: 2, prefix: "$" });
+  return <p className="text-sm text-muted-foreground">{formatted || "$0"}</p>;
 }
 
 function OrderSuccessIcon() {
@@ -316,7 +328,6 @@ function OrderFlowSuccess({
   dstAmount,
   dstCurrency,
   dstToken,
-  orderTitle,
   srcAmount,
   srcCurrency,
   srcToken,
@@ -324,17 +335,17 @@ function OrderFlowSuccess({
   dstAmount?: string;
   dstCurrency?: Currency;
   dstToken?: Token;
-  orderTitle: string;
   srcAmount?: string;
   srcCurrency?: Currency;
   srcToken?: Token;
 }) {
-  const t = useTranslations();
+  const execution = useSubmitOrderExecution();
+  const explorerUrl = getExplorerUrl(execution.chainId, execution.approvalTxHash ?? execution.wrapTxHash);
 
   return (
     <SwapFlow.StepLayout
       className="orbs_Success"
-      title={t("createOrderActionSuccess", { name: orderTitle })}
+      title="Order placed"
       body={
         <div className="flex w-full flex-col items-center gap-3">
           <div data-review-pair className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
@@ -351,6 +362,7 @@ function OrderFlowSuccess({
               token={dstToken}
             />
           </div>
+          {explorerUrl && <a href={explorerUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">View {execution.approvalTxHash ? "approval" : "wrap"} on explorer</a>}
         </div>
       }
     />
@@ -370,10 +382,10 @@ export function SubmitOrderPanel({
     useSubmitOrderExecution();
   const order = useOrderReview();
   const srcAmount = useFormatNumber({
-    value: order.srcAmountUI,
+    decimalScale: tokenDisplayDecimals(order.srcToken?.symbol, order.srcToken?.decimals), value: order.srcAmountUI,
   });
   const dstAmount = useFormatNumber({
-    value: order.dstAmountUI,
+    decimalScale: tokenDisplayDecimals(order.dstToken?.symbol, order.dstToken?.decimals), value: order.dstAmountUI,
   });
   const currentStep = useOrderStep(orderTitle, srcToken);
   const inToken = useMemo(
@@ -413,14 +425,13 @@ export function SubmitOrderPanel({
             className={tokenLogoClassName}
           />
         ),
-        Failed: <SwapFlow.Failed error={<TxError error={parsedError} />} />,
+        Failed: <SwapFlow.Failed error={<TransactionError error={parsedError} />} />,
         FailedIcon: <SwapFlowErrorIcon />,
         Success: (
           <OrderFlowSuccess
             dstAmount={dstAmount}
             dstCurrency={dstCurrency}
             dstToken={dstToken}
-            orderTitle={orderTitle}
             srcAmount={srcAmount}
             srcCurrency={srcCurrency}
             srcToken={srcToken}

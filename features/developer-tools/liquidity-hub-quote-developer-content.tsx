@@ -66,7 +66,7 @@ export function LiquidityHubQuoteDeveloperModal({
           variant="outline"
           size="icon-sm"
           aria-busy={isLoadingQuote}
-          className="relative size-8 rounded-[10px] border-primary/35 bg-primary/[0.08] text-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.06),0_4px_12px_hsl(var(--primary)/0.12)] after:absolute after:-inset-1.5 after:content-[''] hover:border-primary/60 hover:bg-primary/[0.13] hover:text-primary"
+          className="relative size-8 rounded-[10px] border-primary/35 bg-primary/[0.08] text-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.06),0_4px_12px_hsl(var(--primary)/0.12)] after:absolute after:-inset-1.5 after:content-[''] hover:bg-primary/[0.13] "
           aria-label="Inspect the live Liquidity Hub quote request and response"
         >
           <FileJson2Icon aria-hidden="true" className="size-4" />

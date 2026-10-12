@@ -12,8 +12,9 @@ import { StyledSelect } from "./ui/styled-select";
 import { SegmentedTabs } from "./ui/tabs";
 import { IS_ORBS } from "@/lib/partners/client";
 import { SettingsModal } from "./settings-modal";
-import { AdvancedOrderNavigation } from "./trading-navigation";
+import { SpotOrderNavigation } from "./trading-navigation";
 import { TradeNetworkSelector } from "./trade-network-selector";
+import { TradingWorkspace } from "./trading-workspace";
 
 const MOBILE_FORM_TAB_OPTIONS = FORM_TABS.map((tab) => ({
   value: tab.value,
@@ -73,7 +74,6 @@ const FormSectionHeader = ({
           </div>
         )}
         <TradeNetworkSelector />
-        {IS_ORBS && <SettingsModal triggerVariant="icon" />}
       </div>
     </div>
   );
@@ -86,7 +86,7 @@ const PoweredBy = () => {
       href="https://www.orbs.com/"
       target="_blank"
       rel="noopener noreferrer"
-      className="mt-4 flex flex-row items-center justify-center gap-2.5 text-[15px] font-medium text-foreground transition-colors hover:text-foreground"
+      className="mt-4 flex flex-row items-center justify-center gap-2.5 text-[15px] font-medium text-foreground transition-colors "
     >
       <span>Powered by Orbs</span>
       <img
@@ -114,25 +114,37 @@ export function FormContainer({
   const openOrderHistory = React.useCallback(() => {
     setOrderHistoryOpen(true);
   }, [setOrderHistoryOpen]);
+  const formControls = (
+    <FormSectionHeader
+      title={selectedTab.fullLabel}
+      onOpenOrderHistory={openOrderHistory}
+      showOrderHistory={selectedTab.value !== FormTab.SWAP}
+    />
+  );
+
+  const tradingCard = (
+    <div data-trading-card={IS_ORBS ? "" : undefined} className="contents">
+      {IS_ORBS && (
+        <div data-form-toolbar className="flex min-w-0 items-center gap-2">
+          <SpotOrderNavigation />
+          <SettingsModal triggerVariant="icon" className="hidden sm:block" />
+        </div>
+      )}
+      <div data-form-container className="flex w-full flex-col gap-3 rounded-[21px] border border-border/80 bg-card/95 p-3 backdrop-blur">
+        {!IS_ORBS && <FormHeader />}
+        {!IS_ORBS && formControls}
+        {children}
+        {IS_ORBS && <SettingsModal triggerVariant="footer" className="sm:hidden" />}
+      </div>
+    </div>
+  );
+
+  if (IS_ORBS) return <TradingWorkspace>{tradingCard}</TradingWorkspace>;
 
   return (
-    <div
-      data-form-root
-      className="mx-auto mb-[80px] mt-4 flex w-full min-w-0 max-w-[calc(100vw-2rem)] flex-col gap-4 sm:max-w-[480px]"
-    >
-      <div
-        data-form-container
-        className="flex w-full flex-col gap-3 rounded-[21px] border border-border/80 bg-card/95 p-3 backdrop-blur"
-      >
-        {IS_ORBS ? <AdvancedOrderNavigation /> : <FormHeader />}
-        <FormSectionHeader
-          title={selectedTab.fullLabel}
-          onOpenOrderHistory={openOrderHistory}
-          showOrderHistory={selectedTab.value !== FormTab.SWAP}
-        />
-        {children}
-      </div>
-      {!IS_ORBS && <PoweredBy />}
+    <div data-form-root className="mx-auto mb-[80px] mt-4 flex w-full min-w-0 max-w-[calc(100vw-2rem)] flex-col gap-4 sm:max-w-[480px]">
+      {tradingCard}
+      <PoweredBy />
     </div>
   );
 }

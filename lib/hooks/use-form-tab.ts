@@ -9,7 +9,9 @@ const tabParamToFormTab: Record<string, FormTab> = {
   twap: FormTab.TWAP,
   limit: FormTab.LIMIT,
   "stop-loss": FormTab.STOP_LOSS,
+  stopLoss: FormTab.STOP_LOSS,
   "take-profit": FormTab.TAKE_PROFIT,
+  takeProfit: FormTab.TAKE_PROFIT,
 };
 
 const formTabToTabParam: Record<FormTab, string | undefined> = {

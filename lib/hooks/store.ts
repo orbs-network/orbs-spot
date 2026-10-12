@@ -1,4 +1,5 @@
 import { validPercent } from "../percent-settings";
+import type { Quote } from "@orbs-network/liquidity-hub-sdk";
 import type { OrderInput } from "@/lib/spot/form";
 import { ExecutionPhase, type ExecutionSnapshot } from "@/lib/spot/execution";
 import { SwapStatus } from "@orbs-network/swap-ui";
@@ -81,6 +82,8 @@ export const useUserStore = create<UserStore>()(
 );
 
 type SwapStore = {
+  orderLimitPriceEnabled: boolean;
+  setOrderLimitPriceEnabled: (enabled: boolean) => void;
   orderDraft: { key: string; input: OrderInput };
   setOrderInput: (key: string, input: OrderInput) => void;
   inputAmount: string;
@@ -90,6 +93,8 @@ type SwapStore = {
 };
 
 export const useSwapStore = create<SwapStore>((set) => ({
+  orderLimitPriceEnabled: false,
+  setOrderLimitPriceEnabled: (orderLimitPriceEnabled) => set({ orderLimitPriceEnabled }),
   orderDraft: { key: "", input: {} },
   setOrderInput: (key, input) => set((state) => ({
     orderDraft: {
@@ -138,6 +143,9 @@ export const useOrderSubmitFlowStore = create<OrderSubmitFlowStore>((set) => ({
 }));
 
 type BestTradeSwapStore = {
+  reviewedQuote?: Quote;
+  quoteUpdate?: { previous: Quote; next: Quote };
+  error?: { message: string };
   isReviewOpen: boolean;
   setReviewOpen: (open: boolean) => void;
   isAwaitingWallet?: boolean;
@@ -165,5 +173,8 @@ export const useBestTradeSwapStore = create<BestTradeSwapStore>((set) => ({
       txHash: undefined,
       isAwaitingWallet: false,
       review: undefined,
+      reviewedQuote: undefined,
+      quoteUpdate: undefined,
+      error: undefined,
     }),
 }));

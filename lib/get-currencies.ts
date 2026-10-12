@@ -1,14 +1,13 @@
 import axios from "axios";
-import { getAddress, isAddress, zeroAddress } from "viem";
+import { zeroAddress } from "viem";
 import * as chains from "viem/chains";
 
 import { ADDITIONAL_CHAIN_TOKENS } from "./additional-chain-tokens";
 import { wCurrencies } from "./wrapped-currencies";
 import { SUPPORTED_CHAINS } from "./consts";
 import type { Currency } from "./types";
+import { MAX_DEFAULT_TOKENS, mergeTokenLists, parseTokenList } from "./token-list";
 import {
-  dedupeCurrenciesByAddress,
-  eqCompare,
   getNativeTokenLogoUrl,
   sortByBaseAssets,
 } from "./utils";
@@ -39,36 +38,6 @@ const coinGeckoChainNames: Readonly<Partial<Record<number, string>>> = {
   [chains.ink.id]: "ink",
 };
 
-type CoinGeckoToken = {
-  address?: string;
-  decimals?: number;
-  logoURI?: string;
-  name?: string;
-  symbol?: string;
-};
-
-type ValidCoinGeckoToken = CoinGeckoToken & {
-  address: string;
-  decimals: number;
-  name: string;
-  symbol: string;
-};
-
-const CURRENCY_LIST_LIMIT = 350;
-
-function isValidCoinGeckoToken(
-  token: CoinGeckoToken,
-): token is ValidCoinGeckoToken {
-  return (
-    token !== null && typeof token === "object" &&
-    typeof token.address === "string" &&
-    isAddress(token.address) &&
-    typeof token.symbol === "string" &&
-    typeof token.name === "string" &&
-    typeof token.decimals === "number" && Number.isInteger(token.decimals) && token.decimals >= 0 && token.decimals <= 255
-  );
-}
-
 export async function getCurrencies(
   chainId: number,
   signal?: AbortSignal,
@@ -90,33 +59,21 @@ export async function getCurrencies(
   const seedTokens = ADDITIONAL_CHAIN_TOKENS[chainId]
     ?? (wCurrencies[chainId] ? [wCurrencies[chainId]] : []);
   if (!name) {
-    return nativeToken ? [nativeToken, ...seedTokens] : [...seedTokens];
+    return sortByBaseAssets(mergeTokenLists(nativeToken ? [nativeToken, ...seedTokens] : seedTokens, chainId), chainId).slice(0, MAX_DEFAULT_TOKENS);
   }
 
-  const response = await axios.get<{ tokens?: CoinGeckoToken[] }>(
+  const response = await axios.get<{ tokens?: unknown[] }>(
     `https://tokens.coingecko.com/${name}/all.json`,
     { signal, timeout: 15_000 },
   );
-  const responseTokens = Array.isArray(response.data.tokens)
-    ? response.data.tokens
-    : [];
-  const tokens = dedupeCurrenciesByAddress([
+  if (!Array.isArray(response.data?.tokens)) throw new Error("Invalid token list response");
+  const tokens = mergeTokenLists([
+    ...(nativeToken ? [nativeToken] : []),
     ...seedTokens,
-    ...responseTokens.filter(isValidCoinGeckoToken).map((token) => ({
-      address: getAddress(token.address),
-      symbol: token.symbol,
-      decimals: token.decimals,
-      logoUrl: "",
-      name: token.name,
-    })),
-  ]);
-  const tokensWithoutNativeSymbol = tokens.filter(
-    (token) => !eqCompare(token.symbol, nativeCurrency?.symbol ?? ""),
-  );
-  const sortedTokens = sortByBaseAssets(tokensWithoutNativeSymbol, chainId);
-  const currencies = nativeToken
-    ? [nativeToken, ...sortedTokens]
-    : sortedTokens;
+    ...parseTokenList(response.data.tokens, chainId),
+  ], chainId);
 
-  return dedupeCurrenciesByAddress(currencies).slice(0, CURRENCY_LIST_LIMIT);
+  // Keep native, default, and popular assets before trimming the remote list.
+  // Other tokens remain available through contract-address import.
+  return sortByBaseAssets(tokens, chainId).slice(0, MAX_DEFAULT_TOKENS);
 }

@@ -20,18 +20,15 @@ const ResponsiveDialogContext = React.createContext({ isDrawer: false })
 
 function Dialog({
   children,
-  responsive = true,
+  dismissible = true,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root> & {
-  responsive?: boolean
-}) {
-  const isMobile = useIsMobile()
-  const isDrawer = responsive && isMobile
+}: React.ComponentProps<typeof DialogPrimitive.Root> & { dismissible?: boolean }) {
+  const isDrawer = useIsMobile("(max-width: 767px)")
 
   return (
     <ResponsiveDialogContext.Provider value={{ isDrawer }}>
       {isDrawer ? (
-        <Drawer {...props}>{children}</Drawer>
+        <Drawer dismissible={dismissible} {...props}>{children}</Drawer>
       ) : (
         <DialogPrimitive.Root data-slot="dialog" {...props}>
           {children}
@@ -92,14 +89,12 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
-  mobilePresentation = "drawer",
   presentation = "drawer",
   forceMount,
   onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
-  mobilePresentation?: "drawer" | "fullscreen"
   presentation?: "drawer" | "center"
 }) {
   const { isDrawer } = React.use(ResponsiveDialogContext)
@@ -127,12 +122,11 @@ function DialogContent({
           onOpenAutoFocus?.(event);
         }}
         data-slot="dialog-content"
+        aria-describedby={undefined}
         className={cn(
           "grid gap-4 overscroll-contain bg-card/98 p-6 text-card-foreground",
           className,
-          mobilePresentation === "fullscreen"
-            ? "!mt-0 !h-[100dvh] !max-h-[100dvh] !w-screen !max-w-none !rounded-none !border-0 bg-card !p-0 [&>div:first-child]:hidden"
-            : "!w-screen !max-w-none rounded-b-none"
+          "!w-screen !max-w-none !max-h-[90dvh] overflow-y-auto! rounded-t-[24px]! rounded-b-none"
         )}
         {...props}
       >
@@ -140,7 +134,8 @@ function DialogContent({
         {showCloseButton && (
           <DrawerClose
             data-slot="dialog-close"
-            className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            data-icon-button
+            className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon aria-hidden="true" />
             <span className="sr-only">Close</span>
@@ -160,6 +155,7 @@ function DialogContent({
           onOpenAutoFocus?.(event);
         }}
         data-slot="dialog-content"
+        aria-describedby={undefined}
         className={desktopContentClasses}
         {...props}
       >
@@ -167,7 +163,8 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            data-icon-button
+            className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
           >
             <XIcon aria-hidden="true" />
             <span className="sr-only">Close</span>

@@ -4,9 +4,10 @@ import { type ComponentProps, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon, SunIcon, MoonIcon, ExternalLinkIcon, GlobeIcon } from "lucide-react";
+import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon, SunIcon, MoonIcon, ExternalLinkIcon } from "lucide-react";
 import { useConnection, useDisconnect } from "wagmi";
 import { preserveDeveloperModeInHref, useDeveloperMode } from "@/lib/hooks/use-developer-mode";
+import { SUPPORTED_CHAINS } from "@/lib/consts";
 import { cn, makeEllipsisAddress } from "@/lib/utils";
 import { DeveloperNavigation, DeveloperMoreNavigation } from "@developer-tools";
 import { NavPillButton } from "./ui/nav-pill";
@@ -17,6 +18,8 @@ import { Spinner } from "./ui/spinner";
 import { useWalletConnectModal } from "@/features/wallet-connection/provider";
 import { IS_ORBS } from "@/lib/partners/client";
 import { TradingNavigation } from "./trading-navigation";
+import { TradeNetworkSelector } from "./trade-network-selector";
+import { MobileNavigationMenu } from "./mobile-navigation-menu";
 
 function PopoverMenuButton({
   children,
@@ -65,6 +68,9 @@ const WalletAccountPopover = ({
 }) => {
   const [open, setOpen] = useState(false);
   const disconnect = useDisconnect();
+  const { chainId } = useConnection();
+  const network = SUPPORTED_CHAINS.find(chain => chain.id === chainId);
+  const explorer = network?.blockExplorers?.default.url;
 
   const { mutate: copyAddress } = useCopyToClipboard({
     successMessage: "Address copied",
@@ -99,9 +105,10 @@ const WalletAccountPopover = ({
       <PopoverContent
         align="end"
         drawerTitle="Wallet menu"
-        className="w-[176px] rounded-[14px] border-primary/60 bg-popover/98 p-2"
+        className="w-[240px] rounded-[14px] border-primary/60 bg-popover/98 p-2"
       >
         <div className="flex flex-col gap-1">
+          {explorer && <a className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-primary" href={`${explorer}/address/${address}`} target="_blank" rel="noopener noreferrer"><ExternalLinkIcon aria-hidden="true" className="size-4" />View wallet on explorer</a>}
           <PopoverMenuButton onClick={() => void copyAddress(address)}>
             <CopyIcon aria-hidden="true" className="size-4 text-muted-foreground" />
             <span>Copy address</span>
@@ -161,13 +168,13 @@ const NavWalletControls = () => {
             >
               <WalletIcon data-connect-wallet-icon aria-hidden="true" className="size-4 sm:hidden" />
               <span data-connect-wallet-label className="hidden sm:inline">Connect Wallet</span>
-              {IS_ORBS && <span data-mobile-connect-label className="hidden">Connect</span>}
+              {IS_ORBS && <span data-mobile-connect-label className="hidden">Connect Wallet</span>}
             </NavPillButton>
           );
         }
 
         return (
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <WalletAccountPopover
               address={account.address}
               displayName={makeEllipsisAddress(account.address, {
@@ -186,10 +193,12 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
   const { isDeveloperMode } = useDeveloperMode();
   const pathname = usePathname();
   const isDeveloperGuideRoute = pathname === "/developers" || pathname.startsWith("/developers/");
+  const isOrdersRoute = pathname === "/orders" || pathname.startsWith("/orders/");
 
   return (
     <header data-app-header className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
       <div data-nav-layout className="flex w-full flex-nowrap items-center gap-2 sm:gap-3">
+        {IS_ORBS && <MobileNavigationMenu />}
         <Link
           data-nav-brand
           href={preserveDeveloperModeInHref("/", isDeveloperMode)}
@@ -224,17 +233,14 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
         {IS_ORBS && <TradingNavigation />}
         <div data-nav-actions className="ml-auto flex w-auto shrink-0 items-center justify-end gap-1.5 sm:gap-2">
           <DeveloperNavigation />
-          {IS_ORBS && (
-            <a data-orbs-website-link href="https://www.orbs.com/" target="_blank" rel="noopener noreferrer">
-              <GlobeIcon aria-hidden="true" className="size-4 sm:hidden" />
-              <span className="sr-only sm:not-sr-only">Orbs website</span>
-              <ExternalLinkIcon aria-hidden="true" className="hidden size-3 sm:block" />
-              <span className="sr-only">(opens in a new tab)</span>
-            </a>
+          {!isDeveloperGuideRoute && (
+            <>
+              {IS_ORBS && !isOrdersRoute && <div data-header-network-selector><TradeNetworkSelector /></div>}
+              <NavWalletControls />
+            </>
           )}
-          {!isDeveloperGuideRoute && <NavWalletControls />}
           <DeveloperMoreNavigation isDeveloperMode={isDeveloperMode} />
-          <ThemeToggle />
+          <div data-header-theme-toggle><ThemeToggle /></div>
         </div>
       </div>
     </header>
@@ -245,7 +251,7 @@ function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
   return (
-    <NavPillButton aria-label={label} onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-10 shrink-0 justify-center p-0">
+    <NavPillButton data-icon-button aria-label={label} onClick={() => setTheme(theme === "dark" ? "light" : "dark")} className="w-10 shrink-0 justify-center p-0">
       <SunIcon aria-hidden="true" className="hidden size-4 dark:block" />
       <MoonIcon aria-hidden="true" className="size-4 dark:hidden" />
     </NavPillButton>

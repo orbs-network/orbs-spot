@@ -28,8 +28,10 @@ export function InfoTooltip({
       <TooltipTrigger asChild>
         <button
           type="button"
+          data-hover="text"
+          data-icon-button={children == null || undefined}
           className={cn(
-            "rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
+            "rounded-sm text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35",
             buttonClassName,
           )}
           aria-label={ariaLabel}

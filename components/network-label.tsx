@@ -13,14 +13,14 @@ export function getNetworkLabel(chainId: number) {
   return NETWORK_SHORT_NAMES[chainId] ?? (getChainName(chainId) || `Chain ${chainId}`);
 }
 
-export function NetworkLabel({ chainId }: { chainId: number }) {
+export function NetworkLabel({ chainId, variant = "compact" }: { chainId: number; variant?: "compact" | "full" }) {
   const logo = CHAIN_LOGO_URLS[chainId as keyof typeof CHAIN_LOGO_URLS];
   const fullName = getChainName(chainId) || `Chain ${chainId}`;
   return (
     <span title={fullName} className="inline-flex min-w-0 items-center gap-2 align-middle leading-none whitespace-nowrap">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       {logo && <img data-network-logo src={logo} alt="" width={20} height={20} className="block size-5 shrink-0 rounded-full object-contain" />}
-      <span data-network-name className="min-w-0 truncate leading-5">{getNetworkLabel(chainId)}</span>
+      <span data-network-name className="min-w-0 truncate leading-5">{variant === "full" ? fullName : getNetworkLabel(chainId)}</span>
     </span>
   );
 }

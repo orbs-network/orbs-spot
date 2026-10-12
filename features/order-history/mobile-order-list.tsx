@@ -8,17 +8,18 @@ import { MobileOrderCard } from "./mobile-order-card";
 
 const orderKey = (_: number, order: Order) => order.historyKey;
 
-export function MobileOrderList({ orders, onSelect, children }: {
+export function MobileOrderList({ orders, onSelect, onCancel, children }: {
   orders: Order[];
   onSelect: (id: string, chainId: number) => void;
+  onCancel: (order: Order) => void;
   children?: React.ReactNode;
 }) {
   const presentation = useContext(HistoryPresentation);
   const itemContent = useCallback((index: number, order: Order) => (
     <div role="article" aria-label={`Order ${index + 1} of ${orders.length}`} className="pb-3">
-      <MobileOrderCard order={order} onSelect={onSelect} />
+      <MobileOrderCard order={order} onSelect={onSelect} onCancel={onCancel} />
     </div>
-  ), [orders.length, onSelect]);
+  ), [orders.length, onSelect, onCancel]);
 
   return (
     <div data-mobile-order-list className="flex min-h-0 min-w-0 flex-1 flex-col">

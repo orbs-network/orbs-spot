@@ -97,7 +97,7 @@ export function LiveFlowNotice<Step extends string>({
                 index === viewedPhaseIndex
                   ? "border-primary/40 bg-primary/10"
                   : canSelect
-                    ? "border-transparent hover:border-primary/25 hover:bg-primary/[0.06]"
+                    ? "border-transparent hover:bg-primary/[0.06]"
                     : "border-transparent"
               }`}
             >

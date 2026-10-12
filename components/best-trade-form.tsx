@@ -10,15 +10,16 @@ import { FormActionPanel } from "@/components/form-action-panel";
 import { IS_ORBS } from "@/lib/partners/client";
 import { LiquidityHubQuoteDeveloperTrigger } from "@developer-tools";
 import { SubmitSwap } from "@/features/swap/review";
+import { SwapQuoteSummary } from "@/features/swap/quote-summary";
 
 export function SwapBestTradeForm() {
   const t = useTranslations();
-  const { inputCurrency, outputCurrency, inputAmount, outputAmount, isLoadingTrade, noLiquidity, quoteError, refetchTrade } =
+  const { inputCurrency, outputCurrency, inputAmount, outputAmount, trade, isLoadingTrade, noLiquidity, quoteError, refetchTrade } =
     useDerivedSwap();
   const { setInputAmount, handleCurrencyChange } = useActionHandlers();
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2.5">
       <div data-currency-pair className="flex flex-col gap-1.5">
         <CurrencyCard
           currency={inputCurrency}
@@ -51,6 +52,9 @@ export function SwapBestTradeForm() {
         {!IS_ORBS && <SettingsModal triggerVariant="action" />}
         <SubmitSwap />
       </FormActionPanel>
+      {IS_ORBS && trade && inputCurrency && outputCurrency && !isLoadingTrade && !quoteError && !noLiquidity && (
+        <SwapQuoteSummary key={`${inputCurrency.address}:${outputCurrency.address}`} trade={trade} inputCurrency={inputCurrency} outputCurrency={outputCurrency} />
+      )}
     </div>
   );
 }

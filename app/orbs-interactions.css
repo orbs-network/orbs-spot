@@ -1,0 +1,116 @@
+/* Shared interaction palette. Component variants choose a role; hover never
+   changes borders, dimensions, or keyboard-focus indicators. */
+html[data-partner="orbs"] {
+  --orbs-control-hover: var(--orbs-accent-tint);
+  --orbs-option-hover: color-mix(in srgb, var(--primary) 6%, transparent);
+  --orbs-row-hover: color-mix(in srgb, var(--primary) 6%, var(--card));
+  --orbs-danger-hover: var(--orbs-error-tint);
+}
+
+/* Reset on each button so nested controls don't inherit their parent's role. */
+html[data-partner="orbs"] button {
+  --orbs-hover-background: var(--orbs-control-hover);
+}
+html[data-partner="orbs"] :is(
+  [data-primary-nav-pill], [data-submit-button],
+  [data-slot="button"][data-variant="default"]
+) {
+  --orbs-hover-background: var(--orbs-primary-gradient-hover);
+}
+html[data-partner="orbs"] :is(
+  [data-token-option], [data-chain-option], [data-network-option],
+  [data-wallet-option], [data-hover="option"]
+) {
+  --orbs-hover-background: var(--orbs-option-hover);
+}
+html[data-partner="orbs"] [data-order-row] {
+  --orbs-hover-background: var(--orbs-row-hover);
+}
+html[data-partner="orbs"] :is(
+  [data-wallet-action="destructive"], [data-order-cancel-trigger], [data-hover="danger"]
+) {
+  --orbs-hover-background: var(--orbs-danger-hover);
+}
+html[data-partner="orbs"] [data-slot="button"][data-variant="outline"][data-hover="danger"] {
+  --orbs-hover-background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  color: var(--destructive);
+}
+html[data-partner="orbs"] [data-slot="button"][data-variant="destructive"] {
+  --orbs-hover-background: color-mix(in srgb, var(--destructive) 85%, var(--background));
+}
+html[data-partner="orbs"] :is(
+  [data-balance-action], [data-copy-identifier], [data-variant="link"],
+  [data-settings-trigger], [data-hover="text"]
+) {
+  --orbs-hover-background: transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* Selected tabs and toggles retain their active treatment. Disabled controls
+     never react to the pointer. Anchors retain their existing background. */
+  html[data-partner="orbs"] button:hover:not(:disabled):where(
+    :not([aria-disabled="true"], [aria-selected="true"], [aria-pressed="true"],
+      [role="switch"], [role="checkbox"], [role="radio"])
+  ) {
+    background: var(--orbs-hover-background);
+  }
+  html[data-partner="orbs"] :is(
+    a, [data-copy-identifier], [data-variant="link"], [data-settings-trigger], [data-hover="text"]
+  ):hover:not(:disabled):where(:not([aria-disabled="true"], [aria-current="page"])) {
+    color: var(--primary);
+  }
+  html[data-partner="orbs"] [data-balance-action]:hover:not(:disabled) p {
+    color: var(--primary);
+  }
+  html[data-partner="orbs"] [data-trading-modes] a:hover:not([aria-current="page"]) {
+    color: var(--foreground);
+  }
+  html[data-partner="orbs"] :is(
+    [data-order-details-body] summary, [data-history-table] tbody tr
+  ):hover {
+    background: var(--orbs-row-hover);
+  }
+  html[data-partner="orbs"] [data-history-table] tbody tr:hover td[data-label="Actions"] {
+    background: var(--orbs-row-hover);
+  }
+}
+
+/* Icon-only actions keep their resting surface. Animate the glyph, never the
+   hit area, so hovering doesn't move targets or add a background highlight. */
+html[data-partner="orbs"] [data-icon-button] {
+  --orbs-icon-background: transparent;
+}
+html[data-partner="orbs"] [data-icon-button][data-variant="default"] {
+  --orbs-icon-background: var(--orbs-primary-gradient);
+}
+html[data-partner="orbs"] [data-icon-button]:is([data-variant="outline"], [data-variant="secondary"]) {
+  --orbs-icon-background: var(--orbs-tab-background);
+}
+html[data-partner="orbs"] [data-icon-button][data-variant="destructive"] {
+  --orbs-icon-background: var(--destructive);
+}
+html[data-partner="orbs"] [data-toggle-currencies-button] {
+  --orbs-icon-background: var(--orbs-accent-tint);
+}
+html[data-partner="orbs"] [data-activity-scroll-controls] [data-icon-button] {
+  --orbs-icon-background: var(--card);
+}
+html[data-partner="orbs"] [data-history-back-button] {
+  --orbs-icon-background: color-mix(in srgb, var(--secondary) 35%, transparent);
+}
+html[data-partner="orbs"] [data-sonner-toast] [data-close-button] {
+  --orbs-icon-background: var(--popover);
+}
+@media (hover: hover) and (pointer: fine) {
+  html[data-partner="orbs"] :is([data-icon-button], [data-sonner-toast] [data-close-button]):hover:not(:disabled):not([aria-disabled="true"]) {
+    background: var(--orbs-icon-background);
+  }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  html[data-partner="orbs"] :is([data-icon-button], [data-sonner-toast] [data-close-button]) > svg:not(.animate-spin) {
+    transition: transform 160ms ease;
+  }
+  html[data-partner="orbs"] :is([data-icon-button], [data-sonner-toast] [data-close-button]):hover:not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]) > svg:not(.animate-spin) {
+    transform: scale(1.05);
+  }
+}

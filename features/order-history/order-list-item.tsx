@@ -1,23 +1,21 @@
 "use client";
 
-import { CurrencyLogo } from "@/components/ui/currency-logo";
-
 import { useOrderCurrency } from "./use-order-currency";
+import type { HistoryOrder, OrderToken as OrderTokenMetadata } from "@/lib/spot/order-tokens";
 import { OrderStatusLabel } from "./order-status-label";
 import { TokenSymbol } from "./token-symbol";
 
 import { cn } from "@/lib/utils";
-import { OrderStatus, type Order } from "@orbs-network/spot-ui";
+import { OrderStatus } from "@orbs-network/spot-ui";
 import { ArrowRightIcon } from "lucide-react";
 
 import { STATUS_CLASS_NAMES, getOrderTypeLabel, formatOrderDate } from "./format";
 
-export function OrderToken({ address, chainId }: { address?: string; chainId?: number }) {
-  const { currency, isLoading } = useOrderCurrency(address, chainId);
+export function OrderToken({ address, chainId, token }: { address?: string; chainId?: number; token?: OrderTokenMetadata }) {
+  const { currency, isLoading } = useOrderCurrency(address, chainId, token);
 
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      <CurrencyLogo currency={currency} className="size-5" />
       <p className="truncate text-[13px] font-semibold text-foreground">
         <TokenSymbol symbol={currency?.symbol} isLoading={isLoading} />
       </p>
@@ -58,7 +56,7 @@ export function OrderListItem({
   order,
 }: {
   onSelect: (orderId: string, chainId: number) => void;
-  order: Order;
+  order: HistoryOrder;
 }) {
   const orderTitle = getOrderTypeLabel(order.type);
   const orderDate = formatOrderDate(order.createdAt);
@@ -68,7 +66,7 @@ export function OrderListItem({
       type="button"
       data-order-row
       onClick={() => onSelect(order.historyKey, order.chainId)}
-      className="mb-1.5 flex w-full cursor-pointer flex-col gap-2 rounded-[13px] border border-border/50 bg-secondary/30 px-3 py-2 text-left transition-colors hover:border-primary/14 hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+      className="mb-1.5 flex w-full cursor-pointer flex-col gap-2 rounded-[13px] border border-border/50 bg-secondary/30 px-3 py-2 text-left transition-colors hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
     >
       <div className="flex items-start justify-between gap-3">
         <p className="min-w-0 truncate text-[13px] font-medium text-foreground">
@@ -87,9 +85,9 @@ export function OrderListItem({
       </div>
       <OrderProgress status={order.status} value={order.progress} />
       <div className="flex min-w-0 items-center gap-2">
-        <OrderToken address={order.srcTokenAddress} chainId={order.chainId} />
+        <OrderToken address={order.srcTokenAddress} chainId={order.chainId} token={order.inputToken} />
         <ArrowRightIcon aria-hidden="true" className="size-4 shrink-0 text-foreground" />
-        <OrderToken address={order.dstTokenAddress} chainId={order.chainId} />
+        <OrderToken address={order.dstTokenAddress} chainId={order.chainId} token={order.outputToken} />
       </div>
     </button>
   );

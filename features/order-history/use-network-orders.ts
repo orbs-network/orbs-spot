@@ -1,54 +1,31 @@
 "use client";
 
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import type { HistoryOrder } from "@/lib/spot/order-tokens";
 import { useConnection } from "wagmi";
-import { SPOT_CHAINS } from "@/lib/consts";
+import { useRecentOrder } from "@/lib/spot/recent-order";
 import { getActiveSpotPartner } from "@/lib/partners/spot";
+import { spotOrdersQueryOptions } from "@/lib/spot/queries";
 
-import { shareOrders, spotClientQueryOptions, spotKeys, type NetworkOrders } from "@/lib/spot/queries";
+const EMPTY_ORDERS: HistoryOrder[] = [];
 
-const EMPTY_NETWORK_ORDERS: NetworkOrders = { orders: [], failures: [] };
-
-/** One history query; failed networks do not discard successful results. */
-export function useNetworkOrders(enabled: boolean) {
+/** All networks share one wallet/exchange request; network filters are local. */
+export function useNetworkOrders(enabled: boolean, linkedAccount?: string) {
   const { address } = useConnection();
-  const partner = getActiveSpotPartner();
+  const account = linkedAccount ?? address;
   const queryClient = useQueryClient();
   const query = useQuery({
-    queryKey: spotKeys.orders(partner, "all", address),
-    enabled: enabled && Boolean(address),
-    queryFn: async ({ signal }): Promise<NetworkOrders> => {
-      if (!address) throw new Error("Connect a wallet to load order history");
-      signal.throwIfAborted();
-      const results = await Promise.allSettled(SPOT_CHAINS.map(async chain => {
-        const client = await queryClient.fetchQuery(spotClientQueryOptions(partner, chain.id, true));
-        signal.throwIfAborted();
-        return client.getAccountOrders({ account: address, signal, getv1orders: false });
-      }));
-      // An abandoned request is cancellation, not a failed-network result.
-      signal.throwIfAborted();
-      const data: NetworkOrders = { orders: [], failures: [] };
-      results.forEach((result, index) => {
-        if (result.status === "fulfilled") data.orders.push(...result.value);
-        else data.failures.push({
-          chainId: SPOT_CHAINS[index].id,
-          error: result.reason instanceof Error ? result.reason : new Error(String(result.reason)),
-        });
-      });
-      return data;
-    },
-    staleTime: 5_000,
-    refetchInterval: 30_000,
-    refetchIntervalInBackground: false,
-    retry: false,
-    structuralSharing: (previous: unknown, next: unknown) => {
-      const oldData = previous as NetworkOrders | undefined;
-      const newData = next as NetworkOrders;
-      return {
-        ...newData,
-        orders: shareOrders(oldData?.orders, newData.orders),
-      };
-    },
+    ...spotOrdersQueryOptions(getActiveSpotPartner(), account, queryClient),
+    enabled: enabled && Boolean(account),
   });
-  return { ...query, data: query.data ?? EMPTY_NETWORK_ORDERS };
+  const orders = query.data ?? EMPTY_ORDERS;
+  useEffect(() => {
+    useRecentOrder.getState().indexed(new Set(orders.map(order => order.historyKey)));
+  }, [orders]);
+  return {
+    ...query,
+    data: orders,
+    isLoading: enabled && Boolean(account) && query.isPending,
+  };
 }

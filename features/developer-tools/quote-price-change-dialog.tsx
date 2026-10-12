@@ -24,7 +24,7 @@ export function QuotePriceChangeDialog({
     : `${formatUnits(BigInt(amount), outputDecimals)} ${outputSymbol ?? ""}`.trim();
 
   return (
-    <Dialog open responsive={false} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent presentation="center" className="max-w-md" aria-describedby="quote-price-change-description">
         <DialogTitle>Approve the new price</DialogTitle>
         <p id="quote-price-change-description" className="text-sm text-muted-foreground">

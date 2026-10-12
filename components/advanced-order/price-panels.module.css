@@ -1,0 +1,95 @@
+.fields,
+:global(html[data-partner="orbs"]) .fields:global([data-spot-price-input]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  height: 52px;
+  border: 1px solid var(--orbs-control-border, var(--border));
+  border-radius: 14px;
+  background: var(--orbs-input-background, transparent);
+  transition: border-color 150ms ease;
+}
+.fields:focus-within,
+:global(html[data-partner="orbs"]) .fields:global([data-spot-price-input]):focus-within {
+  border-color: var(--primary);
+}
+.fields[data-invalid="true"],
+:global(html[data-partner="orbs"]) .fields:global([data-spot-price-input][data-invalid="true"]) {
+  border-color: var(--destructive);
+}
+.fields .rateField,
+.fields .adjustmentField,
+:global(html[data-partner="orbs"]) .fields :global([data-number-field]) {
+  height: 50px;
+  min-height: 50px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 12px;
+}
+.fields .rateField,
+:global(html[data-partner="orbs"]) .fields .rateField:global([data-number-field]) {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  border-radius: 13px 0 0 13px;
+}
+.fields .adjustmentField,
+:global(html[data-partner="orbs"]) .fields .adjustmentField:global([data-number-field]) {
+  border-radius: 0 13px 13px 0;
+}
+.amount {
+  min-width: 0;
+}
+.amount input {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 24px;
+  font-size: 16px;
+}
+.fields .adjustmentField {
+  position: relative;
+}
+.adjustmentField::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background: var(--orbs-control-border, var(--border));
+  pointer-events: none;
+}
+.marketAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 4px;
+  min-height: 32px;
+  padding: 0 4px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+.marketAction:hover {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+.marketAction:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+}
+.marketAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+  text-decoration: none;
+}

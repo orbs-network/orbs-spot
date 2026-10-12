@@ -22,7 +22,7 @@ export function HelpTip({
           type="button"
           aria-label={label}
           onClick={() => setOpen(true)}
-          className="inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none"
+          className="inline-flex min-h-8 min-w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none"
         >
           {trigger ?? <InfoIcon aria-hidden="true" className="size-3.5" />}
         </button>

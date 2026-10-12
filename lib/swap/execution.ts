@@ -12,6 +12,13 @@ export interface SwapIntent {
 const sameAddress = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const positiveInteger = (value: string) => /^\d+$/.test(value) && BigInt(value) > BigInt(0);
 
+export class QuoteUpdatedError extends Error {
+  constructor(public previous: Quote, public next: Quote) {
+    super("Quote changed. Review the new price before continuing.");
+    this.name = "QuoteUpdatedError";
+  }
+}
+
 export function assertSwapQuote(quote: Quote, intent: SwapIntent, now = Date.now()) {
   if (quote.error || !sameAddress(quote.user, intent.account) ||
       !sameAddress(quote.inToken, intent.inputToken) || !sameAddress(quote.outToken, intent.outputToken) ||
@@ -59,9 +66,10 @@ export function createSwapExecutor() {
       const freshQuote = async () => {
         if (Date.now() - quote.timestamp >= 60_000 || !Number.isFinite(quote.timestamp)) {
           const fresh = await input.refreshQuote();
-          if (!fresh || BigInt(fresh.minAmountOut) < reviewedMinimum) {
-            throw new Error("Quote changed. Review the new price before continuing.");
-          }
+          if (!fresh) throw new Error("Quote is unavailable. Request a new quote.");
+          assertSwapQuote(fresh, intent);
+          if (BigInt(fresh.minAmountOut) < reviewedMinimum || BigInt(fresh.outAmount) < BigInt(quote.outAmount))
+            throw new QuoteUpdatedError(quote, structuredClone(fresh));
           quote = structuredClone(fresh);
         }
         assertSwapQuote(quote, intent);
@@ -92,6 +100,13 @@ export function createSwapExecutor() {
       input.onStep("SWAP", index);
       const signature = await input.sign(quote);
       await input.assertWallet();
+      if (Date.now() - quote.timestamp >= 60_000) {
+        const fresh = await input.refreshQuote();
+        if (!fresh) throw new Error("Quote expired. Request a new quote.");
+        assertSwapQuote(fresh, intent);
+        // A signature belongs to one quote. Always review and re-sign after expiry.
+        throw new QuoteUpdatedError(quote, structuredClone(fresh));
+      }
       assertSwapQuote(quote, intent);
       submitted = true;
       // Once submitted, a lost response must not treat the wrapped funds as unspent.

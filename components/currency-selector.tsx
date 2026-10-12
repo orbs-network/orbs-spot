@@ -6,6 +6,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -18,15 +19,13 @@ import {
 } from "./ui/dialog";
 import { PlusIcon } from "lucide-react";
 import { Button } from "./ui/button";
-import { Virtuoso, type Components } from "react-virtuoso";
+import { Virtuoso } from "react-virtuoso";
 import type { Currency } from "@/lib/types";
 import { useFormatNumber } from "@/lib/hooks/common";
 import BN from "bignumber.js";
 import { useConnection } from "wagmi";
 import {
   getTokenKey,
-  getPopularTokenForChain,
-  dynamicDecimals,
   isNativeAddress,
   makeEllipsisAddress,
   toAmountUI,
@@ -60,55 +59,6 @@ const formatTokenName = (name?: string) => {
     .replace(/\s*\([^)]*\)/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
-};
-
-const TOKEN_AMOUNT_VISIBLE_CHARACTERS = 7;
-
-const limitTokenAmountText = (amount?: string) => {
-  if (!amount || amount.length <= TOKEN_AMOUNT_VISIBLE_CHARACTERS) {
-    return amount;
-  }
-
-  return `${amount.slice(0, TOKEN_AMOUNT_VISIBLE_CHARACTERS)}…`;
-};
-
-const PopularTokens = ({
-  onCurrencyChange,
-  currencies,
-}: {
-  onCurrencyChange: (currency: Currency) => void;
-  currencies: Currency[];
-}) => {
-  if (!currencies.length) {
-    return null;
-  }
-
-  return (
-    <div className="grid grid-cols-5 gap-2 px-3 pb-3">
-      {currencies.map((c) => (
-        <DialogClose key={c.address} asChild>
-          <button
-            type="button"
-            data-popular-token
-            className="flex cursor-pointer flex-col items-center gap-1 rounded-lg border border-border/60 bg-secondary p-3 transition-colors hover:border-primary/25 hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
-            onClick={() => onCurrencyChange(c)}
-            aria-label={`Select ${formatTokenName(c.name) || formatTokenSymbol(c.symbol)}`}
-          >
-            <CurrencyLogo
-              currency={c}
-              name={formatTokenName(c.name)}
-              symbol={formatTokenSymbol(c.symbol)}
-              className="size-6"
-              fallbackClassName="text-[10px]"
-            />
-            <p className="max-w-full cursor-pointer truncate text-center text-xs font-semibold leading-tight">
-              {formatTokenSymbol(c.symbol)}
-            </p>
-          </button>
-        </DialogClose>
-      ))}
-    </div>
-  );
 };
 
 const SearchInput = ({
@@ -156,10 +106,10 @@ export function CurrencySelector({ onCurrencyChange, trigger }: Props) {
 
   const onChange = useCallback(
     (currency: Currency) => {
-      onCurrencyChange(currency);
       if (currency.imported) {
-        setCustomCurrency(chainId ?? DEFAULT_CHAIN_ID, currency);
+        setCustomCurrency(currency.chainId ?? chainId ?? DEFAULT_CHAIN_ID, currency);
       }
+      onCurrencyChange(currency);
     },
     [chainId, onCurrencyChange, setCustomCurrency],
   );
@@ -189,6 +139,7 @@ const CurrencySelectorContent = ({
 }: {
   onCurrencyChange: (currency: Currency) => void;
 }) => {
+  const contentRef = useRef<HTMLDivElement>(null);
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const [isListReady, setIsListReady] = useState(false);
@@ -200,14 +151,21 @@ const CurrencySelectorContent = ({
 
   return (
     <DialogContent
-      mobilePresentation="fullscreen"
+      data-token-selector-dialog
+      ref={contentRef}
+      tabIndex={-1}
+      onOpenAutoFocus={(event) => {
+        event.preventDefault();
+        contentRef.current?.focus({ preventScroll: true });
+      }}
       presentation="center"
-      className="!flex max-h-[88dvh] flex-col gap-2 overflow-hidden p-0 sm:!max-w-[440px]"
+      className="!flex h-[80dvh] max-h-[88dvh] flex-col gap-2 overflow-hidden p-0 md:h-auto md:!max-w-[440px]"
     >
       <DialogHeader className="p-3 pt-5 pb-0">
         <DialogTitle>Select a token</DialogTitle>
       </DialogHeader>
       <SearchInput onChange={setSearch} value={search} />
+      <p className="px-4 text-xs text-muted-foreground">Can’t find a token? Paste its contract address to import and save it.</p>
       {isListReady ? (
         <CurrencySelectorList
           search={deferredSearch}
@@ -232,29 +190,12 @@ const TokenListShell = ({
   return (
     <div
       data-token-list={status}
-      className="flex min-h-[300px] flex-1 flex-col gap-2 overflow-hidden sm:h-[80vh] sm:max-h-[520px] sm:flex-none"
+      data-vaul-no-drag
+      className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden md:min-h-[300px] md:h-[80vh] md:max-h-[520px] md:flex-none"
     >
       {children}
     </div>
   );
-};
-
-type CurrencyListContext = {
-  currencies: Currency[];
-  onCurrencyChange: (currency: Currency) => void;
-};
-
-function CurrencyListHeader({ context }: { context: CurrencyListContext }) {
-  return (
-    <PopularTokens
-      onCurrencyChange={context.onCurrencyChange}
-      currencies={context.currencies}
-    />
-  );
-}
-
-const CURRENCY_LIST_COMPONENTS: Components<Currency, CurrencyListContext> = {
-  Header: CurrencyListHeader,
 };
 
 const CurrencySelectorList = memo(function CurrencySelectorList({
@@ -264,7 +205,6 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
   search: string;
   onCurrencyChange: (currency: Currency) => void;
 }) {
-  const { chainId } = useConnection();
   const {
     balances,
     currencies,
@@ -274,17 +214,6 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
     usdPrices,
   } = useCurrencies(search);
   const isEmptyList = !isLoading && currencies.length === 0;
-  const popularCurrencies = useMemo(() => {
-    if (search) return [];
-
-    const popularTokenKeys = new Set(getPopularTokenForChain(chainId));
-    if (!popularTokenKeys.size) return [];
-
-    return currencies.filter((currency) =>
-      popularTokenKeys.has(getTokenKey(currency.address)),
-    );
-  }, [chainId, currencies, search]);
-
   const itemContent = useCallback(
     (_: number, currency: Currency) => {
       const tokenKey = getTokenKey(currency.address);
@@ -299,12 +228,6 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
     },
     [balances, onCurrencyChange, usdPrices],
   );
-  const virtuosoContext = useMemo(() => {
-    return {
-      currencies: popularCurrencies,
-      onCurrencyChange,
-    };
-  }, [onCurrencyChange, popularCurrencies]);
   const computeItemKey = useCallback(
     (_: number, currency: Currency) => getTokenKey(currency.address),
     [],
@@ -338,8 +261,6 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
           style={{ height: "100%" }}
           data={currencies}
           itemContent={itemContent}
-          components={CURRENCY_LIST_COMPONENTS}
-          context={virtuosoContext}
           computeItemKey={computeItemKey}
           defaultItemHeight={66}
           increaseViewportBy={240}
@@ -367,15 +288,7 @@ const CurrencyItem = memo(function CurrencyItem({
     () => toAmountUI(balanceWei, currency.decimals),
     [balanceWei, currency.decimals],
   );
-  const formattedBalance = useFormatNumber({ value: balance });
-  const displayBalance = useMemo(() => {
-    const balanceText =
-      BN(balance || 0).gt(0) && formattedBalance === "0"
-        ? dynamicDecimals(balance, 4, 18)
-        : formattedBalance;
-
-    return limitTokenAmountText(balanceText);
-  }, [balance, formattedBalance]);
+  const displayBalance = useFormatNumber({ value: balance });
   const usdValue = useMemo(
     () =>
      BN(balance || 0)
@@ -386,6 +299,7 @@ const CurrencyItem = memo(function CurrencyItem({
   const formattedUsdValue = useFormatNumber({
     value: usdValue,
     decimalScale: 2,
+    prefix: "$",
   });
   const hasBalance = BN(balanceWei ?? "0").gt(0);
 
@@ -394,7 +308,7 @@ const CurrencyItem = memo(function CurrencyItem({
       <button
         type="button"
         data-token-option
-        className="group mx-3 mb-2 flex w-[calc(100%-1.5rem)] cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 text-left transition-colors hover:border-primary/14 hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 data-[highlighted]:bg-primary/6"
+        className="group mx-3 mb-2 flex w-[calc(100%-1.5rem)] cursor-pointer items-center justify-between gap-3 rounded-[13px] border border-transparent px-3 py-2.5 text-left transition-colors hover:bg-primary/6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 data-[highlighted]:bg-primary/6"
         onClick={() => onCurrencyChange(currency)}
       >
         <div className="flex items-center gap-3 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -402,6 +316,7 @@ const CurrencyItem = memo(function CurrencyItem({
             currency={currency}
             name={displayName}
             symbol={displaySymbol}
+            loadingFallback={<Skeleton aria-hidden="true" className="absolute inset-0 size-full rounded-full" />}
           />
           <div className="flex min-w-0 flex-1 flex-col items-start">
             <p className="max-w-[calc(100%-16px)] overflow-hidden text-ellipsis whitespace-nowrap text-base font-medium">
@@ -420,7 +335,7 @@ const CurrencyItem = memo(function CurrencyItem({
         {hasBalance && (
           <div className="flex flex-col items-end gap-0">
             <p className="text-base font-semibold">
-              ${formattedUsdValue || "0"}
+              {formattedUsdValue || "$0"}
             </p>
 
             <p className="text-sm text-muted-foreground">

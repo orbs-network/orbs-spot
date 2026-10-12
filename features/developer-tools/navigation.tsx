@@ -16,10 +16,10 @@ import { getSpotDocsHref } from "./docs";
 export function DeveloperMoreNavigation({ isDeveloperMode }: { isDeveloperMode: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  const itemClass = "flex min-h-11 items-center gap-3 rounded-[11px] px-3 py-2 text-sm font-semibold transition-colors hover:bg-secondary/55 focus-visible:bg-secondary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45";
+  const itemClass = "flex min-h-11 items-center gap-3 rounded-[11px] px-3 py-2 text-sm font-semibold transition-colors focus-visible:bg-secondary/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45";
 
   return (
-    <Popover open={open} onOpenChange={setOpen} responsive={false}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <NavPillButton aria-label="More" className="w-10 justify-center p-0 sm:w-auto sm:px-3">
           <EllipsisIcon aria-hidden="true" className="size-4 sm:hidden" />
@@ -80,7 +80,7 @@ export function DeveloperNavigation() {
 
   return <>
           {isDeveloperMode && !isDeveloperGuideRoute && (
-            <Tooltip>
+            <Tooltip action>
               <TooltipTrigger asChild>
                 <Link
                   data-nav-pill
@@ -118,7 +118,7 @@ export function DeveloperNavigation() {
               >
                 Dev mode
               </label>
-              <Tooltip>
+              <Tooltip action>
                 <TooltipTrigger asChild>
                   <span className="inline-flex">
                     <Switch

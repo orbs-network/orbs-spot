@@ -8,7 +8,6 @@ import { OrderHistoryModal } from "@/components/order-history-modal";
 import { useFormTabStore } from "@/lib/hooks/store";
 import { IS_ORBS } from "@/lib/partners/client";
 import { FormTab } from "@/lib/types";
-import { OpenOrdersNotification } from "@/features/order-history/open-orders-notification";
 
 export function TradingForm() {
   const { selectedTab } = useSelectedFormTab();
@@ -26,7 +25,6 @@ export function TradingForm() {
         {/* Its draft lives in the store, so unmounting does not discard edits. */}
         {!isSwapTab && <AdvancedOrderForm />}
       </FormContainer>
-      {IS_ORBS && <OpenOrdersNotification />}
       {!IS_ORBS && (!isSwapTab || historyOpen) && (
         <OrderHistoryModal open={historyOpen} onOpenChange={setHistoryOpen} />
       )}

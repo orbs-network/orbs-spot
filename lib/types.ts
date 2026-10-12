@@ -2,6 +2,8 @@ import type { Quote } from "@orbs-network/liquidity-hub-sdk";
 
 
 export type Currency = {
+    chainId?: number;
+    logoFallbackUrls?: string[];
     address: string;
     symbol: string;
     decimals: number;

@@ -31,7 +31,7 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { isNativeAddress, type RePermitData } from "@orbs-network/spot-ui";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -1129,8 +1129,9 @@ function LiveOrderFlowModalContent({
   );
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} dismissible={!isRunning} onOpenChange={handleOpenChange}>
       <Tooltip
+        action
         open={triggerTooltipOpen}
         onOpenChange={handleTriggerTooltipOpenChange}
       >
@@ -1149,11 +1150,11 @@ function LiveOrderFlowModalContent({
       </Tooltip>
       <DialogContent
         presentation="center"
-        mobilePresentation="fullscreen"
         onInteractOutside={(event) => event.preventDefault()}
         showCloseButton
-        className="h-[min(1040px,98dvh)] max-w-[960px] grid-rows-[minmax(0,1fr)] gap-0 overscroll-contain p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
+        className="h-[min(1040px,98dvh)] max-w-[960px] max-md:h-[90dvh] max-md:grid-rows-[auto_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-0 overscroll-contain p-0 [&>button[data-slot=dialog-close]]:right-2 [&>button[data-slot=dialog-close]]:top-2 [&>button[data-slot=dialog-close]]:grid [&>button[data-slot=dialog-close]]:size-12 [&>button[data-slot=dialog-close]]:place-items-center [&>button[data-slot=dialog-close]>svg]:size-6"
       >
+        <DialogTitle className="sr-only">Order execution</DialogTitle>
         <div className="flex h-full min-h-0 flex-col overflow-hidden">
           <div className="min-h-0 flex-1 overflow-hidden">
             <JsonInspectorPanel
@@ -1370,7 +1371,7 @@ export function LiveOrderFlowModal({
           variant="outline"
           size="lg"
           onClick={() => void retryConfig()}
-          className="h-12 rounded-[14px] border-destructive/55 text-destructive hover:border-destructive hover:text-destructive"
+          className="h-12 rounded-[14px] border-destructive/55 text-destructive "
         >
           <RefreshCwIcon aria-hidden="true" className="size-4" />
           Retry config

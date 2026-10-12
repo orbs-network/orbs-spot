@@ -181,14 +181,14 @@ const jsonViewStyles: ComponentProps<typeof JsonView>["style"] = {
   basicChildStyle: "leading-6",
   booleanValue: "text-primary",
   childFieldsContainer: "m-0 pl-4 sm:pl-5",
-  clickableLabel: "cursor-pointer hover:text-primary",
+  clickableLabel: "cursor-pointer ",
   collapseIcon:
-    "mr-1 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground",
+    "mr-1 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-secondary ",
   collapsedContent: "mr-1 text-muted-foreground after:content-['…']",
   container:
     "font-mono text-[13px] leading-6 text-foreground [overflow-wrap:anywhere]",
   expandIcon:
-    "mr-1 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-secondary hover:text-foreground",
+    "mr-1 inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-secondary ",
   label: "mr-1 font-semibold text-foreground",
   nullValue: "italic text-muted-foreground",
   numberValue: "text-chart-3",
@@ -297,9 +297,9 @@ function ExplainedJsonView({
           <button
             type="button"
             onClick={() => togglePath(path)}
-            className={`rounded-sm font-semibold text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 ${
+            className={`rounded-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 ${
               explanation
-                ? "cursor-help border-b border-dashed border-muted-foreground/70 hover:border-foreground focus-visible:border-primary"
+                ? "cursor-help border-b border-dashed border-muted-foreground/70 focus-visible:border-primary"
                 : ""
             }`}
           >
@@ -310,7 +310,7 @@ function ExplainedJsonView({
             tabIndex={explanation ? 0 : undefined}
             className={`font-semibold text-foreground outline-none ${
               explanation
-                ? "cursor-help border-b border-dashed border-muted-foreground/70 hover:border-foreground focus-visible:border-primary"
+                ? "cursor-help border-b border-dashed border-muted-foreground/70 focus-visible:border-primary"
                 : ""
             }`}
           >
@@ -332,7 +332,7 @@ function ExplainedJsonView({
                   aria-label={`${isExpanded ? "Collapse" : "Expand"} ${pathKey}`}
                   aria-expanded={isExpanded}
                   onClick={() => togglePath(path)}
-                  className="mr-1 inline-flex size-5 items-center justify-center rounded align-middle text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
+                  className="mr-1 inline-flex size-5 items-center justify-center rounded align-middle text-muted-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35"
                 >
                   {isExpanded ? (
                     <ChevronDownIcon aria-hidden="true" className="size-3.5" />
@@ -344,7 +344,7 @@ function ExplainedJsonView({
               {!parentIsArray && (
                 <>
                   {explanation ? (
-                    <Tooltip>
+                    <Tooltip action={hasChildren}>
                       <TooltipTrigger asChild>{keyNode}</TooltipTrigger>
                       <TooltipContent>{explanation}</TooltipContent>
                     </Tooltip>
@@ -398,7 +398,7 @@ function ExplainedJsonView({
                   <TooltipTrigger asChild>
                     <span
                       tabIndex={0}
-                      className="cursor-help border-b border-dashed border-muted-foreground/70 font-semibold text-foreground outline-none hover:border-foreground focus-visible:border-primary"
+                      className="cursor-help border-b border-dashed border-muted-foreground/70 font-semibold text-foreground outline-none focus-visible:border-primary"
                       aria-label={`Explain ${formatPath(path)}`}
                     >
                       {key}
@@ -667,9 +667,8 @@ function InspectorContent({
   return (
     <DialogContent
       presentation="center"
-      mobilePresentation="fullscreen"
       aria-describedby={ariaDescription}
-      className="h-[min(1040px,98dvh)] max-w-[960px] grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-[22px] bg-card p-0 max-sm:h-[100dvh] max-sm:max-h-[100dvh] max-sm:w-screen max-sm:rounded-none max-sm:border-0"
+      className="h-[min(1040px,98dvh)] max-w-[960px] grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-[22px] bg-card p-0 max-md:h-[90dvh] max-md:grid-rows-[auto_auto_minmax(0,1fr)_auto]"
     >
       {children}
     </DialogContent>
@@ -1284,7 +1283,7 @@ function JsonInspectorModalContent({
                   <label
                     htmlFor={inputId}
                     tabIndex={0}
-                    className="cursor-help truncate border-b border-dashed border-muted-foreground/70 text-sm font-medium text-foreground outline-none hover:border-foreground focus-visible:border-primary"
+                    className="cursor-help truncate border-b border-dashed border-muted-foreground/70 text-sm font-medium text-foreground outline-none focus-visible:border-primary"
                     aria-label={`Explain ${pathKey}`}
                   >
                     {label}
@@ -1485,7 +1484,7 @@ function JsonInspectorModalContent({
             className={`relative flex h-10 shrink-0 items-center gap-2 border-r border-border/70 px-3 font-mono text-[11px] transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/40 ${
               isActive
                 ? "bg-background/60 text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-primary"
-                : "text-muted-foreground hover:bg-secondary/45 hover:text-foreground"
+                : "text-muted-foreground hover:bg-secondary/45 "
             }`}
           >
             <Code2Icon aria-hidden="true" className="size-3.5 text-primary" />
@@ -1591,7 +1590,7 @@ function JsonInspectorModalContent({
       {!embedded &&
         trigger !== null &&
         (triggerTooltip ? (
-          <Tooltip>
+          <Tooltip action>
             <TooltipTrigger asChild>
               <DialogTrigger asChild>
                 {trigger ?? (
@@ -1867,7 +1866,7 @@ function JsonInspectorModalContent({
                             variant="ghost"
                             onClick={() => void handleResetToDefaults()}
                             isLoading={isSaving}
-                            className="h-10 px-2.5 text-[11px] text-primary hover:text-primary"
+                            className="h-10 px-2.5 text-[11px] text-primary "
                           >
                             <RotateCcwIcon
                               aria-hidden="true"
@@ -1909,7 +1908,7 @@ function JsonInspectorModalContent({
                         {codeToolbarAction}
                         {editable && activeCodeIsEditable && (
                           <label
-                            className={`flex h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[11px] font-medium transition-colors hover:bg-secondary/60 hover:text-foreground ${
+                            className={`flex h-10 cursor-pointer items-center gap-2 rounded-md px-2.5 text-[11px] font-medium transition-colors hover:bg-secondary/60 ${
                               mode === "edit"
                                 ? "text-foreground"
                                 : "text-muted-foreground"
@@ -2105,7 +2104,7 @@ function JsonInspectorModalContent({
                                               &quot;
                                             </span>
                                           )}
-                                          <Tooltip>
+                                          <Tooltip action>
                                             <TooltipTrigger asChild>
                                               <Input
                                                 name={`json-inline-${pathKey}`}

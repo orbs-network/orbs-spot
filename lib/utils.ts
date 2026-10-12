@@ -89,7 +89,7 @@ export const getWrappedNativeCurrency = (chainId?: number): Currency | undefined
 const getBaseAssetRankMap = (chainId?: number) => {
   const ranks = new Map<string, number>([[zeroAddress, -1]]);
 
-  getBaseCurrencies(chainId).forEach((address, index) => {
+  uniqueTokenAddresses([...getBaseCurrencies(chainId), ...getPopularTokenForChain(chainId ?? DEFAULT_CHAIN_ID)]).forEach((address, index) => {
     const key = getTokenKey(address);
     if (!ranks.has(key)) {
       ranks.set(key, index);
@@ -114,6 +114,23 @@ const COMMON_BASE_SYMBOL_RANKS = new Map(
     "BTC",
     "ETH",
     "WETH",
+    "USDT0",
+    "USDS",
+    "SUSDS",
+    "FRAX",
+    "WSTETH",
+    "STETH",
+    "RETH",
+    "CBETH",
+    "WEETH",
+    "LINK",
+    "UNI",
+    "AAVE",
+    "CAKE",
+    "ARB",
+    "OP",
+    "PENDLE",
+    "ORBS",
   ].map((symbol, index) => [symbol, index])
 );
 

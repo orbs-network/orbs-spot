@@ -51,4 +51,4 @@ export const useDeveloperMode = () => {
 };
 
 /** Read-only preview identity. Never used for wallet writes. */
-export const DEVELOPER_PREVIEW_ACCOUNT = "0x5555555555555555555555555555555555555555" as const;
+export { QUOTE_PREVIEW_ACCOUNT as DEVELOPER_PREVIEW_ACCOUNT } from "@/lib/swap/quote-preview";

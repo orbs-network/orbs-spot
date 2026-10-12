@@ -12,7 +12,7 @@ import { SwapStep, type Currency } from "@/lib/types";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import BN from "bignumber.js";
-import { cn, dynamicDecimals, getExplorerUrl } from "@/lib/utils";
+import { cn, getExplorerUrl } from "@/lib/utils";
 import { useTranslations } from "@/lib/use-translations";
 import { SwapFlowErrorIcon, SwapFlowLoader } from "@/components/swap-flow-loader";
 import { DetailRow } from "@/components/ui/detail-row";
@@ -21,6 +21,12 @@ import { ArrowRightIcon, CheckIcon } from "lucide-react";
 import { IS_ORBS } from "@/lib/partners/client";
 import { OrbsTradeReviewSummary } from "@/components/orbs-trade-review-summary";
 import { LiquidityHubDeveloperTrigger } from "@developer-tools";
+import { trackFunnel } from "@/lib/funnel-analytics";
+import { useReviewQuote } from "./use-review-quote";
+import { TransactionError } from "@/components/transaction-error";
+import { Button } from "@/components/ui/button";
+import { toAmountUI } from "@/lib/utils";
+import { tokenDisplayDecimals, displayTokenAmount, formatDisplayAmount } from "@/lib/token-display";
 
 const useStep = () => {
   const t = useTranslations();
@@ -46,7 +52,7 @@ const useStep = () => {
       return {
         title: "Swap",
         footerLink: explorerUrl,
-        footerText: txHash ? t("transactionSubmitted") : isAwaitingWallet ? t("proceedInWallet") : t("orderSubmitted"),
+        footerText: txHash ? t("transactionSubmitted") : isAwaitingWallet ? t("proceedInWallet") : "Submitting swap…",
       };
     }
     return undefined;
@@ -55,20 +61,21 @@ const useStep = () => {
 
 const formatDynamicDecimals = (value: BN) => {
   if (!value.isFinite() || value.isNaN()) return "0.00";
-  return dynamicDecimals(value.toString()) || "0.00";
+  return formatDisplayAmount(value.toString()) || "0.00";
 };
 
 const NetworkCost = () => {
-  const { trade, outputCurrency } = useDerivedSwap();
-  const amount = useToAmountUI(outputCurrency?.decimals, trade?.gas);
+  const { quote, outputCurrency } = useReviewQuote();
+  const amount = useToAmountUI(outputCurrency?.decimals, quote?.gasAmountOut);
   const usd = useUSDPrice({
     token: outputCurrency?.address,
     amount: amount,
   });
   return (
     <DetailRow
-      label="Network Cost"
-      value={usd.data === undefined ? "—" : `$${usd.formatted}`}
+      label="Estimated execution cost"
+      tooltip="Quoted execution cost in the output token. Wallet gas for approval or wrapping is additional and shown by your wallet."
+      value={quote?.gasAmountOut === undefined ? "Not provided" : usd.data === undefined ? `${formatDisplayAmount(amount)} ${outputCurrency?.symbol}` : usd.formatted}
       labelClassName="font-medium text-foreground"
       valueClassName="font-normal text-foreground"
     />
@@ -77,7 +84,7 @@ const NetworkCost = () => {
 
 const Rate = () => {
   const { inputAmount, outputAmount, inputCurrency, outputCurrency } =
-    useDerivedSwap();
+    useReviewQuote();
 
   const rateText = useMemo(() => {
     const input = BN(inputAmount || 0);
@@ -101,22 +108,22 @@ const Rate = () => {
 };
 
 const MinimumAmountOut = () => {
-  const { trade, outputCurrency } = useDerivedSwap();
-  const amount = useToAmountUI(outputCurrency?.decimals, trade?.minAmountOut);
+  const { quote, outputCurrency } = useReviewQuote();
+  const amount = useToAmountUI(outputCurrency?.decimals, quote?.minAmountOut);
   const usd = useUSDPrice({
     token: outputCurrency?.address,
     amount,
   });
-  const formatted = useFormatNumber({ value: amount, decimalScale: 2 });
+  const formatted = useFormatNumber({ value: amount, decimalScale: tokenDisplayDecimals(outputCurrency?.symbol, outputCurrency?.decimals) });
   return (
     <DetailRow
-      label="Min. Amount Out"
+      label="Minimum received"
       value={
         <span className="inline-flex flex-wrap justify-end gap-x-1">
           <span>
             {formatted ?? "0"} {outputCurrency?.symbol}
           </span>
-          {usd.data !== undefined && <span className="text-muted-foreground">(${usd.formatted})</span>}
+          {usd.data !== undefined && <span className="text-muted-foreground">({usd.formatted})</span>}
         </span>
       }
       labelClassName="font-medium text-foreground"
@@ -125,14 +132,36 @@ const MinimumAmountOut = () => {
   );
 };
 const Details = () => {
+  const { quote } = useReviewQuote();
   return (
     <div data-review-details className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
       <NetworkCost />
       <MinimumAmountOut />
       <Rate />
+      <DetailRow label="Slippage" value={quote ? `${quote.slippage}%` : "—"} />
+      <DetailRow label="Price impact" value="Not provided" />
+      <DetailRow label="Route" value="Orbs Liquidity Hub" tooltip="Swaps are executed through Orbs Liquidity Hub." />
     </div>
   );
 };
+
+function SwapFailure() {
+  const error = useBestTradeSwapStore(state => state.error);
+  return <SwapFlow.Failed error={<TransactionError error={error} />} />;
+}
+
+function UpdatedQuoteNotice() {
+  const update = useBestTradeSwapStore(state => state.quoteUpdate);
+  const updateStore = useBestTradeSwapStore(state => state.updateStore);
+  const { outputCurrency } = useDerivedSwap();
+  if (!update) return null;
+  const amount = (raw: string) => displayTokenAmount(toAmountUI(raw, outputCurrency?.decimals), outputCurrency?.symbol, outputCurrency?.decimals);
+  return <div role="status" className="rounded-2xl bg-secondary p-4 text-sm">
+    <p className="font-medium">Price updated: {amount(update.previous.outAmount)} → {amount(update.next.outAmount)} {outputCurrency?.symbol}</p>
+    <p className="mt-1 text-xs text-muted-foreground">Minimum received: {amount(update.previous.minAmountOut)} → {amount(update.next.minAmountOut)} {outputCurrency?.symbol}. Review the updated price before signing.</p>
+    <Button className="mt-3 w-full" onClick={() => updateStore({ reviewedQuote: update.next, quoteUpdate: undefined })}>Accept updated price</Button>
+  </div>;
+}
 
 function SwapSuccessIcon() {
   return (
@@ -225,13 +254,13 @@ const SwapReviewContent = ({
   const title = !status ? "Review swap" : status === SwapStatus.SUCCESS ? "Swap completed" : status === SwapStatus.FAILED ? "Swap not completed" : "Swap execution";
 
   return (
-    <DialogContent data-trade-review data-orbs-swap-review={IS_ORBS && !status ? "" : undefined} presentation="center">
+    <DialogContent className="flex flex-col overflow-hidden" data-trade-review data-orbs-swap-review={IS_ORBS && !status ? "" : undefined} presentation="center">
       {IS_ORBS && status ? (
         <DialogTitle className="sr-only">{title}</DialogTitle>
       ) : (
         <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
       )}
-      <SwapFlow
+      <div data-review-scroll className="min-h-0 overflow-y-auto overscroll-contain"><SwapFlow
         inAmount={inputAmountF}
         outAmount={outputAmountF}
         swapStatus={status}
@@ -255,7 +284,7 @@ const SwapReviewContent = ({
               className={tokenLogoClassName}
             />
           ),
-          Failed: <SwapFlow.Failed />,
+          Failed: <SwapFailure />,
           FailedIcon: <SwapFlowErrorIcon />,
           Success: (
             <Success
@@ -269,7 +298,7 @@ const SwapReviewContent = ({
           Main: <Main />,
           Loader: <SwapFlowLoader />,
         }}
-      />
+      /></div>
     </DialogContent>
   );
 };
@@ -288,8 +317,8 @@ export const SubmitSwap = () => {
   const { setInputAmount, } = useActionHandlers();
   const { status, isPreparing, totalSteps, currentStepIndex, reset } = useSwapBestTrade();
   const { inputCurrency, outputCurrency, inputAmount, outputAmount, isLoadingTrade } = status && review ? { ...current, ...review } : current;
-  const inputAmountF = useFormatNumber({ value: inputAmount });
-  const outputAmountF = useFormatNumber({ value: outputAmount });
+  const inputAmountF = useFormatNumber({ value: inputAmount, decimalScale: tokenDisplayDecimals(inputCurrency?.symbol, inputCurrency?.decimals) });
+  const outputAmountF = useFormatNumber({ value: outputAmount, decimalScale: tokenDisplayDecimals(outputCurrency?.symbol, outputCurrency?.decimals) });
 
   const inToken = useMemo(() => {
     return {
@@ -324,11 +353,13 @@ export const SubmitSwap = () => {
   );
 
   const onOpen = useCallback(() => {
+    trackFunnel({ name: "review_opened", product: "swap" });
     setOpen(true);
    if(status !== SwapStatus.LOADING) {
     reset();
+    useBestTradeSwapStore.getState().updateStore({ reviewedQuote: current.trade?.originalQuote });
    }
-  }, [reset, setOpen, status]);
+  }, [reset, setOpen, status, current.trade]);
 
   if (isDeveloperMode) {
     return <div className="flex w-full items-center gap-2">
@@ -366,7 +397,8 @@ export const SubmitSwap = () => {
 const Main = () => {
   const t = useTranslations();
   const { inputAmount, outputAmount, inputCurrency, outputCurrency } =
-    useDerivedSwap();
+    useReviewQuote();
+  const quoteUpdate = useBestTradeSwapStore(state => state.quoteUpdate);
   const { status, isPreparing, onSwapBestTrade } = useSwapBestTrade();
   const showReview = !status || isPreparing;
   const inputUsd = useUSDPrice({
@@ -377,10 +409,10 @@ const Main = () => {
     token: outputCurrency?.address,
     amount: outputAmount,
   });
-  const inputUsdFormatted = useFormatNumber({ value: inputUsd.data, decimalScale: 2 });
-  const outputUsdFormatted = useFormatNumber({ value: outputUsd.data, decimalScale: 2 });
-  const inputAmountFormatted = useFormatNumber({ value: inputAmount });
-  const outputAmountFormatted = useFormatNumber({ value: outputAmount });
+  const inputUsdFormatted = useFormatNumber({ value: inputUsd.data, decimalScale: 2, prefix: "$" });
+  const outputUsdFormatted = useFormatNumber({ value: outputUsd.data, decimalScale: 2, prefix: "$" });
+  const inputAmountFormatted = useFormatNumber({ value: inputAmount, decimalScale: tokenDisplayDecimals(inputCurrency?.symbol, inputCurrency?.decimals) });
+  const outputAmountFormatted = useFormatNumber({ value: outputAmount, decimalScale: tokenDisplayDecimals(outputCurrency?.symbol, outputCurrency?.decimals) });
   return (
     <>
       {IS_ORBS && showReview ? (
@@ -392,16 +424,18 @@ const Main = () => {
         fromTitle={t("from")}
         toTitle={t("to")}
         inUsd={
-          <p className="text-sm text-muted-foreground">${inputUsdFormatted}</p>
+          <p className="text-sm text-muted-foreground">{inputUsdFormatted}</p>
         }
         outUsd={
-          <p className="text-sm text-muted-foreground">${outputUsdFormatted}</p>
+          <p className="text-sm text-muted-foreground">{outputUsdFormatted}</p>
         }
       />}
       {showReview && (
         <div className="mt-3 flex w-full flex-col gap-3">
           <Details />
+          <UpdatedQuoteNotice />
           <SubmitSwapButton
+            disabled={Boolean(quoteUpdate)}
             onClick={onSwapBestTrade}
             isLoading={isPreparing}
             text="Swap"
