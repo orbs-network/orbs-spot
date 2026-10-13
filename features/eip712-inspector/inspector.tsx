@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { AppLink } from "@/components/app-link";
 import { ArrowLeftIcon, BracesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { preserveDeveloperModeInHref, useDeveloperMode } from "@/lib/hooks/use-developer-mode";
@@ -244,13 +244,13 @@ export function Eip712Inspector() {
 
   return (
     <div className="w-full max-w-[860px] min-w-0 py-6 sm:py-10">
-      <Link
+      <AppLink
         href={preserveDeveloperModeInHref("/", isDeveloperMode)}
         className="inline-flex min-h-9 items-center gap-2 rounded text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <ArrowLeftIcon aria-hidden="true" className="size-4" />
         {isDeveloperMode ? "Back to playground" : "Back to trading"}
-      </Link>
+      </AppLink>
       <header className="mb-7 mt-5">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
           EIP-712 order preview

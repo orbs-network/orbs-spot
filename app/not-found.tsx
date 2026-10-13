@@ -1,11 +1,11 @@
-import Link from "next/link";
+import { AppLink } from "@/components/app-link";
 
 // app/not-found.tsx
 export default function NotFound() {
   return (
     <div>
       <h1>Page not found</h1>
-      <Link href="/">Go back to home</Link>
+      <AppLink href="/">Go back to home</AppLink>
     </div>
   );
 }

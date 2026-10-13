@@ -508,7 +508,7 @@ html[data-partner="orbs"] [data-trading-navigation] {
   html[data-partner="orbs"] #main-content { padding-top: 69px; }
 }
 html[data-partner="orbs"] [data-trading-modes] { display: flex; gap: 28px; }
-html[data-partner="orbs"] [data-trading-modes] a {
+html[data-partner="orbs"] [data-trading-modes] :is(a, [data-trading-mode-placeholder]) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -521,7 +521,7 @@ html[data-partner="orbs"] [data-trading-modes] a {
   font-size: 14px;
   font-weight: 500;
 }
-html[data-partner="orbs"] [data-trading-modes] a[aria-current="page"] {
+html[data-partner="orbs"] [data-trading-modes] :is(a, [data-trading-mode-placeholder])[aria-current="page"] {
   color: var(--primary);
 }
 html[data-partner="orbs"] [data-product-mark] { flex-shrink: 0; }
@@ -542,7 +542,7 @@ html[data-partner="orbs"] [data-spot-order-navigation] {
   margin-bottom: -1px;
 }
 html[data-partner="orbs"] [data-spot-order-navigation]::-webkit-scrollbar { display: none; }
-html[data-partner="orbs"] [data-spot-order-navigation] a {
+html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-placeholder]) {
   display: flex;
   flex: 1 0 auto;
   white-space: nowrap;
@@ -559,7 +559,7 @@ html[data-partner="orbs"] [data-spot-order-navigation] a {
   font-size: 12px;
   font-weight: 500;
 }
-html[data-partner="orbs"] [data-spot-order-navigation] a[aria-current="page"] {
+html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-placeholder])[aria-current="page"] {
   background: var(--card);
   border-color: var(--border);
   border-bottom-color: var(--card);
@@ -837,14 +837,14 @@ html[data-partner="orbs"] [data-submit-button] { min-height: 56px; border: 0; bo
   html[data-partner="orbs"] [data-app-header] { padding-top: 12px; }
   html[data-partner="orbs"] [data-trading-navigation] { min-height: 44px; margin-top: 8px; }
   html[data-partner="orbs"] [data-trading-modes] { width: 100%; justify-content: space-between; }
-  html[data-partner="orbs"] [data-trading-modes] a { font-size: 12px; }
+  html[data-partner="orbs"] [data-trading-modes] :is(a, [data-trading-mode-placeholder]) { font-size: 12px; }
   html[data-partner="orbs"] #main-content { padding-top: 112px; }
   html[data-partner="orbs"] [data-spot-order-navigation] {
     display: grid;
     grid-template-columns: minmax(0, 0.85fr) minmax(0, 0.9fr) minmax(0, 0.8fr) minmax(0, 1.25fr) minmax(0, 1.4fr);
     gap: 3px;
   }
-  html[data-partner="orbs"] [data-spot-order-navigation] a {
+  html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-placeholder]) {
     min-width: 0;
     min-height: 44px;
     padding: 8px 2px;
@@ -1174,15 +1174,15 @@ html[data-partner="orbs"] [data-mobile-navigation-menu] { display: none; }
   html[data-partner="orbs"] [data-primary-nav-pill]:has([data-mobile-connect-label]) { height: 40px; min-height: 40px; padding-inline: 16px; border-radius: 14px; font-weight: 600; font-size: 12px; }
   html[data-partner="orbs"] [data-trading-navigation] { width: calc(100% + 40px); margin: 8px -20px 0; padding-inline: 22px; min-height: 44px; }
   html[data-partner="orbs"] [data-trading-modes] { gap: 12px; }
-  html[data-partner="orbs"] [data-trading-modes] a { display: inline-flex; align-items: center; justify-content: center; position: relative; font-size: 14px; font-weight: 400; color: var(--orbs-secondary-text); white-space: nowrap; cursor: pointer; }
-  html[data-partner="orbs"] [data-trading-modes] a[aria-current="page"] { font-weight: 600; color: var(--primary); }
+  html[data-partner="orbs"] [data-trading-modes] :is(a, [data-trading-mode-placeholder]) { display: inline-flex; align-items: center; justify-content: center; position: relative; font-size: 14px; font-weight: 400; color: var(--orbs-secondary-text); white-space: nowrap; cursor: pointer; }
+  html[data-partner="orbs"] [data-trading-modes] :is(a, [data-trading-mode-placeholder])[aria-current="page"] { font-weight: 600; color: var(--primary); }
   html[data-partner="orbs"] [data-trading-modes] svg { display: none; }
   html[data-partner="orbs"] #main-content { padding-top: 112px; }
   html[data-partner="orbs"] #main-content:has([data-form-root]) { padding-inline: 20px; }
   html[data-partner="orbs"] [data-form-root] { margin-top: 14px; }
   html[data-partner="orbs"] [data-spot-order-navigation] { display: flex; gap: 8px; margin: 0 -20px 12px; padding-inline: 20px; }
-  html[data-partner="orbs"] [data-spot-order-navigation] a { flex: 0 0 auto; min-width: 62px; min-height: 40px; padding: 8px 16px; border: 0; border-radius: 16px; background: var(--secondary); color: var(--foreground); font-size: 14px; font-weight: 500; }
-  html[data-partner="orbs"] [data-spot-order-navigation] a[aria-current="page"] { background: var(--primary); color: var(--primary-foreground); border: 0; }
+  html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-placeholder]) { flex: 0 0 auto; min-width: 62px; min-height: 40px; padding: 8px 16px; border: 0; border-radius: 16px; background: var(--secondary); color: var(--foreground); font-size: 14px; font-weight: 500; }
+  html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-placeholder])[aria-current="page"] { background: var(--primary); color: var(--primary-foreground); border: 0; }
   html[data-partner="orbs"] [data-form-container] { padding: 16px; gap: 8px; border: 0; border-radius: 28px; }
   html[data-partner="orbs"] [data-form-section-header] { display: flex; }
   html[data-partner="orbs"] [data-currency-pair] { gap: 4px; }
@@ -1289,7 +1289,7 @@ html[data-partner="orbs"] [data-history-view-tabs] [role="tab"][aria-selected="t
   color: var(--primary-foreground);
   font-weight: 600;
 }
-html[data-partner="orbs"] [data-spot-order-navigation] a {
+html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-placeholder]) {
   min-height: 44px;
   padding: 8px 16px;
   border: 0;
@@ -1300,19 +1300,19 @@ html[data-partner="orbs"] [data-spot-order-navigation] a {
   font-weight: 500;
   line-height: 1.4;
 }
-html[data-partner="orbs"] [data-spot-order-navigation] a[aria-current="page"] {
+html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-placeholder])[aria-current="page"] {
   background: var(--primary);
   color: var(--primary-foreground);
   font-weight: 600;
 }
-html[data-partner="orbs"] [data-spot-order-navigation] a {
+html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-placeholder]) {
   min-height: 34px;
   padding: 6px 14px;
   border-radius: 14px;
   font-size: 12px;
 }
 @media (min-width: 768px) {
-  html[data-partner="orbs"] [data-spot-order-navigation] a {
+  html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-placeholder]) {
     flex: 0 0 auto;
     padding-inline: 10px;
   }

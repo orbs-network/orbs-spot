@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
+import { AppLink } from "@/components/app-link";
 import { usePathname } from "next/navigation";
 import { ArrowUpRightIcon, ChevronDownIcon, Code2Icon, EllipsisIcon, GithubIcon, ScanLineIcon } from "lucide-react";
 import { preserveDeveloperModeInHref, useDeveloperMode } from "@/lib/hooks/use-developer-mode";
@@ -31,7 +31,7 @@ export function DeveloperMoreNavigation({ isDeveloperMode }: { isDeveloperMode: 
         </NavPillButton>
       </PopoverTrigger>
       <PopoverContent align="end" aria-label="More navigation" className="w-60 max-w-[calc(100vw-2rem)] p-2 motion-reduce:animate-none">
-        <Link
+        <AppLink
           href={preserveDeveloperModeInHref("/developers/eip712", isDeveloperMode)}
           aria-current={pathname === "/developers/eip712" ? "page" : undefined}
           onClick={() => setOpen(false)}
@@ -39,7 +39,7 @@ export function DeveloperMoreNavigation({ isDeveloperMode }: { isDeveloperMode: 
         >
           <ScanLineIcon aria-hidden="true" className="size-4 shrink-0 text-primary" />
           Order preview
-        </Link>
+        </AppLink>
         <a
           href="https://github.com/orbs-network/orbs-spot"
           target="_blank"
@@ -82,7 +82,7 @@ export function DeveloperNavigation() {
           {isDeveloperMode && !isDeveloperGuideRoute && (
             <Tooltip action>
               <TooltipTrigger asChild>
-                <Link
+                <AppLink
                   data-nav-pill
                   data-developer-trigger
                   data-developer-guide-link
@@ -105,7 +105,7 @@ export function DeveloperNavigation() {
                   <span className="hidden sm:inline">
                     {developerGuide.linkLabel}
                   </span>
-                </Link>
+                </AppLink>
               </TooltipTrigger>
               <TooltipContent>{developerGuide.tooltip}</TooltipContent>
             </Tooltip>

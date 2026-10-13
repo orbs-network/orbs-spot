@@ -57,6 +57,14 @@ before attempting another order. Completed native wrapping is retained across an
 
 ### Demo mode
 
+For designer previews, open `/?tab=twap&mockorders=true` or
+`/orders?mockorders=true`. Only the exact query parameter `mockorders=true`
+enables sample open and historical orders. No wallet is required. The sample
+data includes multiple networks, order types, fill activity, and terminal statuses;
+search, filters, and details use the existing UI. A shared history hook appends
+samples to the fetched wallet orders without adding them to the wallet cache.
+Sample orders cannot be cancelled. Remove the parameter to show only real orders.
+
 Open `/?devMode=true&tab=twap` and choose **Demo** to inspect calculation, signing, and submission stages
 without sending wallet transactions. **Live** uses the connected wallet. Limit, stop-loss and take-profit
 forms use the same SDK calculation and execution path.
@@ -100,7 +108,7 @@ Orbs uses the standard RainbowKit wallet picker. The custom chooser is disabled
 by `features.customConnectModal` in `lib/partners/orbs.ts`. The picker uses the
 configured wallet connectors; email, passkey, and social account sign-in are not configured.
 Orbs includes light and dark themes based on the Orbs website. The frontend uses the
-existing `playground` Liquidity Hub integration and external Spot partner.
+`external` partner for both Liquidity Hub and Spot.
 Developer mode, docs links, GitHub links, and developer pages are available only
 on `default`; `devMode=true` has no effect on other partners.
 
@@ -130,20 +138,52 @@ domain allowlist check.
 
 ## Deploy
 
-The manual GitHub Actions workflow `.github/workflows/frontend-deploy.yml`
-deploys `default` or `orbs` to Vercel. Select `all` to deploy both.
+Deploy Orbs with [`scripts/deploy-orbs.sh`](scripts/deploy-orbs.sh). It always targets
+Vercel project `prj_sIICLUBkrigIaJiTQMEPxfgqoRf4` and sets `NEXT_PARTNER=orbs` for
+both the local build and runtime, regardless of the locally linked project.
 
-Required repository/environment secrets:
+Install Vercel CLI (verified with 58.9.0) and authenticate once:
 
-- `VERCEL_TOKEN`
-- `VERCEL_ORG_ID`
-- `NEXT_PUBLIC_PROJECT_ID`
-- `RPC_URL`
+```bash
+npm install --global vercel@58.9.0
+vercel login
+```
 
-Required repository/environment variables for the default and Orbs deployments:
+Set `NEXT_PUBLIC_PROJECT_ID` (the Reown/WalletConnect ID, separate from the Vercel
+project ID) and `RPC_URL` in your local `.env` or `.env.local`. Optional public
+settings such as `NEXT_PUBLIC_APP_URL` are loaded too. The script uses Next.js's
+production environment order for both preview and production builds: exported
+shell values, `.env.production.local`, `.env.local`, `.env.production`, `.env`.
+Variables pulled from the selected Vercel environment fill any remaining gaps.
 
-- `VERCEL_PROJECT_ID_DEFAULT` (read as `vars.VERCEL_PROJECT_ID_DEFAULT`)
-- `VERCEL_PROJECT_ID_ORBS` (read as `vars.VERCEL_PROJECT_ID_ORBS`)
+The script pulls project settings, runs `vercel build` locally to produce
+`.vercel/output`, then uploads that output with `vercel deploy --prebuilt`.
+It stops before building if required variables are missing and never deploys after
+a failed build. `RPC_URL`, `NEXT_PARTNER`, and `NEXT_PUBLIC_*` values are also
+forwarded as deployment runtime variables; other local secrets are not forwarded.
+Local `.env` files are not uploaded as source files or overwritten by the pull.
+Next.js tracing excludes `.env*` files. Because Vercel's builder also adds these
+files independently, the script removes their generated function manifest
+references before upload, including in build-only mode. Runtime variables are
+supplied separately. Rebuild with this script before retrying an older failed
+prebuilt deployment.
+
+```bash
+yarn deploy:orbs --dry-run     # Show the steps without building or deploying
+yarn deploy:orbs --build-only  # Pull settings and build locally, without deploying
+yarn deploy:orbs               # Build locally and deploy the prebuilt preview
+yarn deploy:orbs --prod        # Build locally and deploy prebuilt production
+```
+
+The script uses the repository root even when invoked from another directory,
+waits for Vercel to finish, and returns its exit status. Run `yarn lint` and
+`yarn typecheck` before deploying. For CI, export `VERCEL_TOKEN` and the project's
+`VERCEL_ORG_ID`; the script supplies `VERCEL_PROJECT_ID` automatically.
+Credentials are never printed by the dry run.
+
+See the [Vercel local build workflow](https://vercel.com/docs/cli/build),
+[deployment options](https://vercel.com/docs/cli/deploy), and
+[project selection options](https://vercel.com/docs/cli/global-options#project).
 
 ## Production and developer boundaries
 

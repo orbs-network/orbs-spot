@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { AppLink } from "@/components/app-link";
 import { ArrowLeftIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -23,9 +23,9 @@ export function OrderDetailPage({ chainId, orderId, account }: {
 
   return (
     <article data-order-page className={styles.page}>
-      <Link href="/orders" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-primary">
+      <AppLink href="/orders" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-primary">
         <ArrowLeftIcon aria-hidden="true" className="size-4" />Back to orders
-      </Link>
+      </AppLink>
       <div className={styles.card}>
         <header className={styles.header}>
           <div className="min-w-0">

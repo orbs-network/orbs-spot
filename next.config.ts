@@ -17,6 +17,11 @@ const developerAliases = {
 };
 
 const nextConfig: NextConfig = {
+  // Deploy runtime variables separately; local env files must not become
+  // function dependencies that conflict with .vercelignore during upload.
+  outputFileTracingExcludes: {
+    "*": [".env*"],
+  },
   turbopack: { resolveAlias: developerAliases },
   webpack(config) {
     for (const [alias, target] of Object.entries(developerAliases)) {

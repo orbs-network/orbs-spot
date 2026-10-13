@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink } from "@/components/app-link";
 import type { ReactNode } from "react";
 import { ExternalLinkIcon } from "lucide-react";
 
@@ -37,7 +37,7 @@ export function DeveloperGuideLink({
   if (!isDeveloperToolsAvailable) return null;
 
   return (
-    <Link
+    <AppLink
       href={href}
       target="_blank"
       rel="noopener noreferrer"
@@ -49,6 +49,6 @@ export function DeveloperGuideLink({
     >
       {children}
       <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-    </Link>
+    </AppLink>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 import { type ComponentProps, useState } from "react";
-import Link from "next/link";
+import { AppLink } from "@/components/app-link";
 import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon, SunIcon, MoonIcon, ExternalLinkIcon } from "lucide-react";
@@ -199,7 +199,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
     <header data-app-header className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
       <div data-nav-layout className="flex w-full flex-nowrap items-center gap-2 sm:gap-3">
         {IS_ORBS && <MobileNavigationMenu />}
-        <Link
+        <AppLink
           data-nav-brand
           href={preserveDeveloperModeInHref("/", isDeveloperMode)}
           className="flex min-h-8 min-w-0 shrink items-center gap-2.5 no-underline"
@@ -229,7 +229,7 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
               {brand.navWordmark}
             </span>
           )}
-        </Link>
+        </AppLink>
         {IS_ORBS && <TradingNavigation />}
         <div data-nav-actions className="ml-auto flex w-auto shrink-0 items-center justify-end gap-1.5 sm:gap-2">
           <DeveloperNavigation />

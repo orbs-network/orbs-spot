@@ -26,7 +26,8 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "build:orbs": "NEXT_PARTNER=orbs next build",
-    "start:orbs": "NEXT_PARTNER=orbs next start"
+    "start:orbs": "NEXT_PARTNER=orbs next start",
+    "deploy:orbs": "bash scripts/deploy-orbs.sh"
   },
   "dependencies": {
     "@base-org/account": "~2.4.0",

@@ -1,5 +1,6 @@
 import type { Order, SpotClient } from "@orbs-network/spot-ui";
 import type { SpotWalletPort } from "./execution";
+import { isMockOrder } from "./mock-orders";
 
 // Different UI controls may cancel the same order. Share a lock across callers;
 // historyKey distinguishes orders from different protocol versions.
@@ -12,6 +13,7 @@ export async function cancelOrder(
   order: Order,
   account: string,
 ): Promise<`0x${string}`> {
+  if (isMockOrder(order)) throw new Error("Sample orders are read-only");
   if (
     client.chainId !== order.chainId ||
     order.maker.toLowerCase() !== account.toLowerCase()
@@ -32,6 +34,7 @@ export async function cancelOrder(
 
 /** Combine v2 digests only when every SDK request targets the same contract. */
 export async function cancelOrderBatch(client: SpotClient, wallet: SpotWalletPort, orders: Order[], account: string) {
+  if (orders.some(isMockOrder)) throw new Error("Sample orders are read-only");
   if (!orders.length) throw new Error("No orders selected");
   if (orders.some(order => order.chainId !== client.chainId || order.maker.toLowerCase() !== account.toLowerCase() || order.status !== "OPEN")) throw new Error("Selected orders no longer match the wallet or network");
   const requests = orders.map(order => client.getCancelOrderRequest(order));

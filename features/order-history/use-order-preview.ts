@@ -30,7 +30,7 @@ export function useOrderPreview({ orderId, order, chainId, hasWallet, loading, e
     chainId,
     loading: linkedAccount || linked.isFetched ? linked.isLoading : loading || linked.isLoading,
     error: error ?? linked.error,
-    canRead: hasWallet || Boolean(linkedAccount),
+    canRead: hasWallet || Boolean(linkedAccount) || Boolean(order ?? linked.order),
   };
   const [retainedPreview, setRetainedPreview] = useState(currentPreview);
   // Closing removes the URL selection immediately. Keep the entire rendered

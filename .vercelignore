@@ -1,0 +1,11 @@
+.git
+.vercel
+node_modules
+.next
+dist
+out
+coverage
+.playwright-cli
+.env*
+*.log
+*.tsbuildinfo

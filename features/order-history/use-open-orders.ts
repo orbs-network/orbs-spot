@@ -17,5 +17,5 @@ export function useOpenOrders() {
     const indexed = new Set(query.data.map(order => order.historyKey));
     return pending.filter(order => order.maker.toLowerCase() === address?.toLowerCase() && !indexed.has(order.historyKey));
   }, [pending, query.data, address]);
-  return { ...query, orders, pendingOrders, address, isConnected, count: isConnected ? orders.length + pendingOrders.length : 0 };
+  return { ...query, orders, pendingOrders, address, isConnected, count: orders.length + (isConnected ? pendingOrders.length : 0) };
 }

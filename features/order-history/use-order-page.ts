@@ -8,6 +8,6 @@ export function useOrderPage(chainId: number, orderId: string, linkedAccount?: s
   const { address } = useConnection();
   const account = linkedAccount ?? address;
   const query = useNetworkOrders(enabled, linkedAccount);
-  const order = query.data.find(order => order.historyKey === orderId && order.chainId === chainId && order.maker.toLowerCase() === account?.toLowerCase());
+  const order = query.data.find(order => order.historyKey === orderId && order.chainId === chainId);
   return { ...query, account, order };
 }

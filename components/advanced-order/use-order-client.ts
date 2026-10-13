@@ -14,7 +14,9 @@ import {
 import { useEffect, useMemo, useRef } from "react";
 import { useConnection } from "wagmi";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
-import { spotOrdersQueryOptions, spotClientQueryOptions, spotKeys } from "@/lib/spot/queries";
+import { spotClientQueryOptions, spotKeys } from "@/lib/spot/queries";
+import { useHistoryOrdersQuery } from "@/lib/hooks/use-history-orders-query";
+import { isMockOrder } from "@/lib/spot/mock-orders";
 import { watchCancelledOrder } from "@/lib/spot/cancel-status";
 import { useOrderCancelling } from "@/lib/spot/use-order-cancelling";
 import { SPOT_CHAINS } from "@/lib/consts";
@@ -44,20 +46,13 @@ export function useClient(requestedChainId?: number, enabled = true) {
 
 const EMPTY_ORDERS: HistoryOrder[] = [];
 export function useOrders(enabled = true) {
-  const { address } = useConnection();
   const chainId = useDataChainId();
-  const partner = getActiveSpotPartner();
-  const queryClient = useQueryClient();
-  const query = useQuery({
-    ...spotOrdersQueryOptions(partner, address, queryClient),
-    enabled: enabled && Boolean(address),
-  });
+  const query = useHistoryOrdersQuery(enabled);
   const orders = useMemo(() => query.data?.filter(order => order.chainId === chainId) ?? EMPTY_ORDERS, [query.data, chainId]);
   const data = useMemo(() => ({ all: orders }), [orders]);
   return {
     ...query,
     data,
-    isLoading: enabled && Boolean(address) && query.isPending,
   };
 }
 
@@ -105,6 +100,7 @@ export function useCancelOrder(order?: Order) {
   const mutation = useMutation({
     mutationKey: spotKeys.cancellation(getActiveSpotPartner(), order?.chainId, address, order?.historyKey),
     mutationFn: async () => {
+      if (isMockOrder(order)) throw new Error("Sample orders are read-only");
       if (!order || !address)
         throw new Error("Connect the order's wallet and network to cancel");
       const client = await queryClient.fetchQuery(spotClientQueryOptions(getActiveSpotPartner(), order.chainId, true));

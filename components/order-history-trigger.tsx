@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { HistoryIcon } from "lucide-react";
-import Link from "next/link";
+import { AppLink } from "@/components/app-link";
 import { usePathname } from "next/navigation";
 import { preserveFormTabInHref, useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { useOpenOrders } from "@/features/order-history/use-open-orders";
@@ -12,11 +12,11 @@ export function OrderHistoryLink() {
   const pathname = usePathname();
   const { count } = useOpenOrders();
   return (
-    <Link href={preserveFormTabInHref("/orders", selectedTab.value)}
+    <AppLink href={preserveFormTabInHref("/orders", selectedTab.value)}
       aria-current={pathname === "/orders" || pathname.startsWith("/orders/") ? "page" : undefined}
       aria-label={count ? `Orders, ${count} open advanced orders` : "Orders"}>
       Orders{count > 0 && <span data-orders-nav-count className="tabular-nums"> · {count}</span>}
-    </Link>
+    </AppLink>
   );
 }
 

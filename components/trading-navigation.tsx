@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Link from "next/link";
+import { AppLink } from "@/components/app-link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ExternalLinkIcon } from "lucide-react";
 import { FORM_TABS, PERPS_URL } from "@/lib/consts";
@@ -24,13 +24,13 @@ export function TradingNavigation() {
   return (
     <nav aria-label="Trading" data-trading-navigation>
       <div data-trading-modes>
-        <Link href={preserveFormTabInHref(href, selectedTab.value)} scroll={false}
+        <AppLink href={preserveFormTabInHref(href, selectedTab.value)} scroll={false}
           aria-current={isTrading ? "page" : undefined}>
           <svg data-product-mark="spot" aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
             <path d="M2 3 11 8 2 13ZM22 1 13 6 22 11ZM2 15 11 10 11 22ZM13 13 22 18 13 23Z" />
           </svg>
           dSPOT
-        </Link>
+        </AppLink>
         <a data-perps-link href={PERPS_URL} target="_blank" rel="noopener noreferrer">
           <svg data-product-mark="perps" aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
             <path d="M7 2 12 10H2ZM14 2H24L19 10ZM5 14 10 22H0ZM12 14H22L17 22Z" />
@@ -73,10 +73,10 @@ export function SpotOrderNavigation() {
   return (
     <nav ref={navigationRef} aria-label="dSPOT order type" data-spot-order-navigation>
       {FORM_TABS.map((tab) => (
-        <Link key={tab.value} href={preserveFormTabInHref(href, tab.value)} scroll={false}
+        <AppLink key={tab.value} href={preserveFormTabInHref(href, tab.value)} scroll={false}
           aria-current={selectedTab.value === tab.value ? "page" : undefined}>
           {tab.fullLabel}
-        </Link>
+        </AppLink>
       ))}
     </nav>
   );
