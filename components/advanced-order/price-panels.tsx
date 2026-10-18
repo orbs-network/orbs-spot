@@ -82,7 +82,7 @@ function SpotPriceInput({
             disabled={!hasMarketRate}
             onChange={onPercentageChange}
             className="text-center text-base font-semibold"
-            placeholder={hasMarketRate ? "+0%" : "—"}
+            placeholder="0%"
             suffix="%"
             showPositiveSign
             allowNegative

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
@@ -10,8 +10,8 @@ const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const options = new Set(process.argv.slice(2));
 const usage = `Usage: yarn deploy [--prod] [--build-only] [--dry-run]
 
-Build Orbs locally, then deploy .vercel/output to the fixed Orbs project.
-  --prod        Build and deploy for production (default: preview).
+Build Orbs locally for production, then deploy .vercel/output to the fixed Orbs project.
+  --prod        Accepted for compatibility; production is always the target.
   --build-only  Pull settings and build locally, without deploying.
   --dry-run     Show the steps without contacting Vercel or building.
   --help        Show this help.
@@ -33,16 +33,19 @@ if (options.has("--help") || options.has("-h")) {
   process.exit(0);
 }
 
-const target = options.has("--prod") ? "production" : "preview";
+const target = "production";
 const dryRun = options.has("--dry-run");
-// Preview deployments also use a production Next.js build, not development env.
 process.env.NODE_ENV = "production";
 const require = createRequire(import.meta.url);
 const { loadEnvConfig } = require("@next/env");
 loadEnvConfig(repoRoot, false);
+// Deployment authentication uses the CLI login or VERCEL_TOKEN.
+delete process.env.VERCEL_OIDC_TOKEN;
 const deploymentEnv = {
   ...process.env,
   VERCEL_PROJECT_ID: projectId,
+  // Avoid packaged CLI telemetry subprocess crashes after an otherwise successful build.
+  VERCEL_TELEMETRY_DISABLED: "1",
 };
 
 function run(args) {
@@ -70,7 +73,12 @@ if (!dryRun) {
     process.exit(1);
   }
   // Pull writes only under .vercel; never overwrite the developer's .env files.
-  const remoteEnv = parseEnv(readFileSync(new URL(`../.vercel/.env.${target}.local`, import.meta.url), "utf8"));
+  const remoteEnvPath = new URL(`../.vercel/.env.${target}.local`, import.meta.url);
+  const pulledEnv = readFileSync(remoteEnvPath, "utf8");
+  const appEnv = pulledEnv.replace(/^[\t ]*(?:export[\t ]+)?VERCEL_OIDC_TOKEN[\t ]*=.*(?:\r?\n|$)/gm, "");
+  // Vercel adds this unused token on every pull; discard it before the local build.
+  if (appEnv !== pulledEnv) writeFileSync(remoteEnvPath, appEnv);
+  const remoteEnv = parseEnv(appEnv);
   for (const [key, value] of Object.entries(remoteEnv)) {
     if (deploymentEnv[key] === undefined) deploymentEnv[key] = value;
   }
@@ -81,7 +89,7 @@ if (!dryRun) {
   }
 }
 
-run(["build", "--target", target]);
+run(["build", "--prod"]);
 if (!dryRun && !existsSync(new URL("../.vercel/output/config.json", import.meta.url))) {
   console.error("Local build did not produce .vercel/output/config.json. Nothing was deployed.");
   process.exit(1);
@@ -97,4 +105,4 @@ if (options.has("--build-only")) process.exit(0);
 const runtimeKeys = Object.keys(deploymentEnv).filter(key =>
   key === "RPC_URL" || key.startsWith("NEXT_PUBLIC_"),
 ).sort();
-run(["deploy", "--prebuilt", "--target", target, ...runtimeKeys.flatMap(key => ["--env", key])]);
+run(["deploy", "--prebuilt", "--prod", ...runtimeKeys.flatMap(key => ["--env", key])]);

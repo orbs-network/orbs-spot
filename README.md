@@ -173,7 +173,8 @@ domain allowlist check.
 
 ## Deploy
 
-Deploy the main Orbs app with `yarn deploy` or [`scripts/deploy.sh`](scripts/deploy.sh). It always targets
+Build the main Orbs app locally and deploy directly to production with `yarn deploy` or
+[`scripts/deploy.sh`](scripts/deploy.sh). It always targets production on
 Vercel project `prj_sIICLUBkrigIaJiTQMEPxfgqoRf4`, regardless of the locally linked project.
 
 Install Vercel CLI (verified with 58.9.0) and authenticate once:
@@ -186,12 +187,15 @@ vercel login
 Set `NEXT_PUBLIC_PROJECT_ID` (the Reown/WalletConnect ID, separate from the Vercel
 project ID) and `RPC_URL` in your local `.env` or `.env.local`. Optional public
 settings such as `NEXT_PUBLIC_APP_URL` are loaded too. The script uses Next.js's
-production environment order for both preview and production builds: exported
+production environment order: exported
 shell values, `.env.production.local`, `.env.local`, `.env.production`, `.env`.
 Variables pulled from the selected Vercel environment fill any remaining gaps.
+The script discards the automatically pulled `VERCEL_OIDC_TOKEN`; deployment
+authentication uses `vercel login` or `VERCEL_TOKEN`.
 
-The script pulls project settings, runs `vercel build` locally to produce
-`.vercel/output`, then uploads that output with `vercel deploy --prebuilt`.
+The script pulls production project settings, runs `vercel build --prod` locally to produce
+`.vercel/output`, then uploads that output with `vercel deploy --prebuilt --prod`.
+Application compilation happens locally; Vercel publishes the prebuilt artifacts.
 It stops before building if required variables are missing and never deploys after
 a failed build. `RPC_URL` and `NEXT_PUBLIC_*` values are also
 forwarded as deployment runtime variables; other local secrets are not forwarded.
@@ -205,8 +209,8 @@ prebuilt deployment.
 ```bash
 yarn deploy --dry-run     # Show the steps without building or deploying
 yarn deploy --build-only  # Pull settings and build locally, without deploying
-yarn deploy               # Build locally and deploy the prebuilt preview
-yarn deploy --prod        # Build locally and deploy prebuilt production
+yarn deploy               # Build locally and deploy prebuilt production
+yarn deploy --prod        # Same production workflow; --prod is optional
 ```
 
 The script uses the repository root even when invoked from another directory,
@@ -214,6 +218,8 @@ waits for Vercel to finish, and returns its exit status. Run `yarn lint` and
 `yarn typecheck` before deploying. For CI, export `VERCEL_TOKEN` and the project's
 `VERCEL_ORG_ID`; the script supplies `VERCEL_PROJECT_ID` automatically.
 Credentials are never printed by the dry run.
+The script disables Vercel CLI telemetry for its commands to avoid telemetry
+subprocess crashes after successful local builds.
 
 See the [Vercel local build workflow](https://vercel.com/docs/cli/build),
 [deployment options](https://vercel.com/docs/cli/deploy), and
