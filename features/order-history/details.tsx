@@ -1,5 +1,7 @@
 "use client";
 
+import { OrderRate } from "./order-rate";
+
 import { useCopyToClipboard } from "@/lib/hooks/use-copy-to-clipboard";
 
 import { CancelOrderDeveloperButton } from "@developer-tools";
@@ -32,7 +34,7 @@ import { DirectOrderCancelAction } from "./order-actions";
 
 import { useCancelOrder } from "@/components/advanced-order/use-order-client";
 
-import { DerivedHistoryOrder, DerivedHistoryFill, OpenDetailSection, getOrderTypeLabel, formatDetailDate, formatDuration, formatDisplayNumber, formatTokenValue, formatPriceValue, isZeroValue } from "./format";
+import { DerivedHistoryOrder, DerivedHistoryFill, OpenDetailSection, getOrderTypeLabel, formatDetailDate, formatDuration, formatDisplayNumber, formatTokenValue, isZeroValue } from "./format";
 import { HistoryPresentation, HistoryTitle } from "./presentation";
 import { OrderProgress } from "./order-progress";
 import { useWalletConnectModal } from "@/features/wallet-connection/provider";
@@ -404,11 +406,7 @@ export function SelectedOrderDetails({
                     ? "finalExecutionPrice"
                     : "averageFillPrice",
                 )}
-                value={formatPriceValue(
-                  order.executionPrice.ui,
-                  order.inputToken?.symbol,
-                  order.outputToken?.symbol,
-                )}
+                value={<OrderRate value={order.executionPrice.ui} inputSymbol={order.inputToken?.symbol} outputSymbol={order.outputToken?.symbol} />}
               />
             ) : null}
           </DetailSection>
@@ -475,22 +473,14 @@ export function SelectedOrderDetails({
               <OrderDetailRow
                 label={t("triggerPrice")}
                 tooltip={t("triggerPriceTooltip")}
-                value={formatPriceValue(
-                  order.triggerPrice.ui,
-                  order.inputToken?.symbol,
-                  order.outputToken?.symbol,
-                )}
+                value={<OrderRate value={order.triggerPrice.ui} inputSymbol={order.inputToken?.symbol} outputSymbol={order.outputToken?.symbol} />}
               />
             ) : null}
             {order.limitPrice.ui ? (
               <OrderDetailRow
                 label={t("limitPrice")}
                 tooltip={t("limitPriceTooltip")}
-                value={formatPriceValue(
-                  order.limitPrice.ui,
-                  order.inputToken?.symbol,
-                  order.outputToken?.symbol,
-                )}
+                value={<OrderRate value={order.limitPrice.ui} inputSymbol={order.inputToken?.symbol} outputSymbol={order.outputToken?.symbol} />}
               />
             ) : null}
           </DetailSection>

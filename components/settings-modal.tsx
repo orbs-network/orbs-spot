@@ -19,7 +19,6 @@ import { FormLabel, InfoTooltip } from "./ui/form-label";
 import { FormNumberField } from "./ui/form-number-field";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
-import { IS_ORBS } from "@/lib/partners/client";
 
 const SLIPPAGE_PRESETS = [0.1, 0.5, 1] as const;
 const PRICE_PROTECTION_PRESETS = [1, 3, 5] as const;
@@ -269,7 +268,7 @@ export const SettingsModal = ({
   const isSpotTab = useIsSpotTab();
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
-  const isPopover = IS_ORBS && !isMobile;
+  const isPopover = !isMobile;
   const Root = isPopover ? Popover : Dialog;
   const Trigger = isPopover ? PopoverTrigger : DialogTrigger;
   const titleId = useId();

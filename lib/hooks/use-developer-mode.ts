@@ -1,11 +1,8 @@
-import { useCallback } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { isDeveloperPlaygroundPath } from "@/lib/developer-routes";
 
-import { updateUrlSearchParams } from "@/lib/url-state";
-import { getActiveClientPartnerConfig } from "@/lib/partners/client";
-import { hasDeveloperTools } from "@/lib/partners/config";
 
-export const DEVELOPER_MODE_QUERY_PARAM = "devMode";
+export const DEVELOPER_MODE_QUERY_PARAM = "debug";
 
 export const preserveDeveloperModeInHref = (
   href: string,
@@ -29,25 +26,8 @@ export const preserveDeveloperModeInHref = (
 
 export const useDeveloperMode = () => {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const isDeveloperToolsAvailable = hasDeveloperTools(getActiveClientPartnerConfig());
-  const isDeveloperMode =
-    isDeveloperToolsAvailable && searchParams.get(DEVELOPER_MODE_QUERY_PARAM) === "true";
-
-  const setIsDeveloperMode = useCallback(
-    (enabled: boolean) => {
-      updateUrlSearchParams(pathname, searchParams, (nextParams) => {
-        if (enabled && isDeveloperToolsAvailable) {
-          nextParams.set(DEVELOPER_MODE_QUERY_PARAM, "true");
-        } else {
-          nextParams.delete(DEVELOPER_MODE_QUERY_PARAM);
-        }
-      });
-    },
-    [pathname, searchParams, isDeveloperToolsAvailable],
-  );
-
-  return { isDeveloperMode, setIsDeveloperMode, isDeveloperToolsAvailable };
+  const isDeveloperPlayground = isDeveloperPlaygroundPath(pathname);
+  return { isDeveloperMode: isDeveloperPlayground, isDeveloperPlayground };
 };
 
 /** Read-only preview identity. Never used for wallet writes. */

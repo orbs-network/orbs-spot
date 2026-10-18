@@ -5,6 +5,7 @@ import { FORM_TABS } from "@/lib/consts";
 import { FormActionPanel } from "@/components/form-action-panel";
 import { FormPanel } from "@/components/ui/form-panel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getTradingPathname } from "@/lib/developer-routes";
 
 function LoadingCurrencyCard({ title }: { title: string }) {
   return (
@@ -84,9 +85,9 @@ function LoadingTradingForm() {
 
 /** Static markup: visible before the wallet and trading providers hydrate. */
 export function AppLoading() {
-  const isOrders = usePathname().startsWith("/orders");
+  const isOrders = getTradingPathname(usePathname()).startsWith("/orders");
   return (
-    <div data-app-loading role="status" aria-busy="true" className="ef-app-shell min-h-screen text-foreground">
+    <div data-app-loading role="status" aria-busy="true" className="app-shell min-h-screen text-foreground">
       <span className="sr-only">{isOrders ? "Loading orders…" : "Loading trading interface…"}</span>
       <div aria-hidden="true">
         <div data-app-header className="fixed inset-x-0 top-0 border-b border-border [background:var(--nav-background)] px-4 py-3">

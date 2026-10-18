@@ -6,10 +6,11 @@ import { AppLink } from "@/components/app-link";
 import { usePathname } from "next/navigation";
 import { preserveFormTabInHref, useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { useOpenOrders } from "@/features/order-history/use-open-orders";
+import { getTradingPathname } from "@/lib/developer-routes";
 
 export function OrderHistoryLink() {
   const { selectedTab } = useSelectedFormTab();
-  const pathname = usePathname();
+  const pathname = getTradingPathname(usePathname());
   const { count } = useOpenOrders();
   return (
     <AppLink href={preserveFormTabInHref("/orders", selectedTab.value)}

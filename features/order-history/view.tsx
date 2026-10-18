@@ -2,26 +2,16 @@
 
 import { FetchOrdersDeveloperButton } from "@developer-tools";
 import { useState } from "react";
-
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
-
 import { EmptyState } from "@/components/ui/empty-state";
 import { Spinner } from "@/components/ui/spinner";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { HistoryViewTabs } from "./history-view-tabs";
-
-import { IS_ORBS } from "@/lib/partners/client";
 import { useWalletConnectModal } from "@/features/wallet-connection/provider";
-
 import { OrderFilter } from "@orbs-network/spot-ui";
-
-import { Virtuoso } from "react-virtuoso";
-
-
 import { ORDER_FILTER_OPTIONS, getOrderFilterLabel, getNoOrdersTitle, type HistoryFilter } from "./format";
 import { HistoryPresentation, HistoryTitle } from "./presentation";
-import { OrderListItem } from "./order-list-item";
 import { SelectedOrderDetails } from "./details";
 import { OrderActivityList } from "./activity-list";
 import { OrderDetailsModal } from "./details-modal";
@@ -123,7 +113,7 @@ function OrderHistoryView({
               </div>
               {presentation === "page" && (
                 <div data-history-filters className="flex min-w-0 items-center gap-2">
-                  {IS_ORBS && <OrderSearch value={search} onChange={setSearch} />}
+                  <OrderSearch value={search} onChange={setSearch} />
                   <div data-history-network-filter>
                     <NetworkFilter value={selectedNetwork} onValueChange={setSelectedNetwork} />
                   </div>
@@ -143,65 +133,35 @@ function OrderHistoryView({
                 </div>
               )}
               {presentation === "modal" && <div className="flex flex-wrap items-center justify-between gap-3">
-                {IS_ORBS && <OrderSearch value={search} onChange={setSearch} />}
+                <OrderSearch value={search} onChange={setSearch} />
                 <div className="w-full sm:w-[144px]">
                   {filterControl}
                 </div>
-                {IS_ORBS && !loading && !error && filteredOrders.length > 0 && (
+                {!loading && !error && filteredOrders.length > 0 && (
                   <p role="status" className="text-xs text-muted-foreground">{filteredOrders.length} {filteredOrders.length === 1 ? "order" : "orders"}</p>
                 )}
               </div>}
 
-              {IS_ORBS ? (
-                <OrderActivityList
-                  scope={filterScope}
-                  contained={presentation === "modal"}
-                  view={selectedFilter === OrderFilter.Open ? "open" : "history"}
-                  network={selectedNetwork}
-                  orders={filteredOrders}
-                  allOrders={orders}
-                  search={search}
-                  onClearSearch={() => setSearch("")}
-                  onSelect={selectOrder}
-                >
-                  {error ? (
-                    <div role="alert" className="flex min-h-60 flex-col items-center justify-center gap-3 p-5 text-sm">
-                      <p>Could not load order history.</p>
-                      <Button variant="outline" onClick={() => void refetch()}>Retry history</Button>
-                    </div>
-                  ) : loading ? (
-                    <div role="status" className="flex min-h-60 items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner className="size-5" />Loading orders…</div>
-                  ) : <OrderHistoryEmpty hasWallet={Boolean(address)} selectedFilter={selectedFilter} />}
-                </OrderActivityList>
-              ) : error ? (
-                <div role="alert" className="flex flex-col items-center gap-3 py-8 text-sm">
-                  <p>Could not load order history: {error.message}</p>
-                  <button data-hover="text" type="button" className="text-primary underline" onClick={() => void refetch()}>Retry history</button>
-                </div>
-              ) : loading && !filteredOrders.length ? (
-                <div className="flex min-h-[240px] items-center justify-center">
-                  <Spinner className="size-10" />
-                </div>
-              ) : filteredOrders.length ? (
-                <div className="h-[560px] max-h-[65dvh] overflow-hidden">
-                  <Virtuoso
-                    style={{ height: "100%" }}
-                    data={filteredOrders}
-                    computeItemKey={(_, order) => order.historyKey}
-                    itemContent={(_, order) => (
-                      <OrderListItem
-                        order={order}
-                        onSelect={selectOrder}
-                      />
-                    )}
-                  />
-                </div>
-              ) : (
-                <OrderHistoryEmpty
-                  hasWallet={Boolean(address)}
-                  selectedFilter={selectedFilter}
-                />
-              )}
+              <OrderActivityList
+                scope={filterScope}
+                contained={presentation === "modal"}
+                view={selectedFilter === OrderFilter.Open ? "open" : "history"}
+                network={selectedNetwork}
+                orders={filteredOrders}
+                allOrders={orders}
+                search={search}
+                onClearSearch={() => setSearch("")}
+                onSelect={selectOrder}
+              >
+                {error ? (
+                  <div role="alert" className="flex min-h-60 flex-col items-center justify-center gap-3 p-5 text-sm">
+                    <p>Could not load order history.</p>
+                    <Button variant="outline" onClick={() => void refetch()}>Retry history</Button>
+                  </div>
+                ) : loading ? (
+                  <div role="status" className="flex min-h-60 items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner className="size-5" />Loading orders…</div>
+                ) : <OrderHistoryEmpty hasWallet={Boolean(address)} selectedFilter={selectedFilter} />}
+              </OrderActivityList>
             </div>
           </>
         )}
@@ -233,7 +193,7 @@ function OrderHistoryView({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         data-order-history
-        data-history-view={IS_ORBS && !selectedOrder ? "table" : "details"}
+        data-history-view={!selectedOrder ? "table" : "details"}
         aria-describedby={undefined}
         presentation="center"
         className="!flex h-auto w-[calc(100vw-1.5rem)] max-w-[500px] flex-col gap-0 overflow-hidden rounded-[22px] border-border/80 p-0"

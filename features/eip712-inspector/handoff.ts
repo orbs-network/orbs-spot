@@ -1,6 +1,7 @@
 import type { OrderContext } from "./inspect";
+import { ORDER_INSPECTOR_PATH } from "@/lib/developer-routes";
 
-export const INSPECTOR_PATH = "/developers/eip712";
+export const INSPECTOR_PATH = ORDER_INSPECTOR_PATH;
 const PREFIX = "eip712-inspector:v1:";
 const MAX_AGE = 5 * 60_000;
 export type InspectorDraft = {

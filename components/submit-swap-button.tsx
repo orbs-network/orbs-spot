@@ -2,7 +2,7 @@ import { trackFunnel } from "@/lib/funnel-analytics";
 import { useConnection, useSwitchChain } from "wagmi";
 import { Button } from "./ui/button";
 import { useWalletConnectModal } from "@/features/wallet-connection/provider";
-import { DEFAULT_CHAIN_ID, MAIN_CHAINS, SPOT_CHAINS } from "@/lib/consts";
+import { DEFAULT_CHAIN_ID, MAIN_CHAINS } from "@/lib/consts";
 import { toast } from "sonner";
 import { getNetworkLabel } from "./network-label";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
@@ -10,6 +10,7 @@ import { useBalance } from "@/lib/hooks/use-balances";
 import BN from "bignumber.js";
 import { useMemo } from "react";
 import { useTranslations } from "@/lib/use-translations";
+import { useSpotPartnerChains } from "@/lib/hooks/use-spot-partner-chains";
 
 type SubmitSwapButtonProps = {
   onClick: () => void;
@@ -21,15 +22,18 @@ type SubmitSwapButtonProps = {
   supportedChains?: readonly { id: number }[];
 };
 
-type SubmitButtonBaseProps = Omit<SubmitSwapButtonProps, "validateSwap">;
+type SubmitButtonBaseProps = Omit<SubmitSwapButtonProps, "validateSwap"> & {
+  networkUnavailableMessage?: string;
+};
 
-const SubmitButtonBase = ({
+export const SubmitButtonBase = ({
   onClick,
   isLoading,
   text,
   chainId,
   disabled,
   supportedChains = MAIN_CHAINS,
+  networkUnavailableMessage = "No supported networks",
 }: SubmitButtonBaseProps) => {
   const {
     address,
@@ -49,7 +53,7 @@ const SubmitButtonBase = ({
         isLoading={isWalletLoading}
         aria-busy={isWalletLoading}
         onClick={() => {
-          trackFunnel({ name: "wallet_connect_requested", product: supportedChains === SPOT_CHAINS ? "advanced" : "swap" });
+          trackFunnel({ name: "wallet_connect_requested", product: supportedChains === MAIN_CHAINS ? "swap" : "advanced" });
           openConnectModal?.();
         }}
       >
@@ -59,7 +63,13 @@ const SubmitButtonBase = ({
   }
 
   const targetChainId = chainId && supportedChains.some(chain => chain.id === chainId) ? chainId
-    : currentChainId && supportedChains.some(chain => chain.id === currentChainId) ? currentChainId : DEFAULT_CHAIN_ID;
+    : currentChainId && supportedChains.some(chain => chain.id === currentChainId) ? currentChainId
+    : supportedChains.find(chain => chain.id === DEFAULT_CHAIN_ID)?.id ?? supportedChains[0]?.id;
+  if (!targetChainId) {
+    return <Button data-submit-button className="h-12 w-full rounded-[14px] text-base" disabled>
+      {networkUnavailableMessage}
+    </Button>;
+  }
   if (currentChainId && currentChainId !== targetChainId) {
     return (
       <Button
@@ -169,8 +179,14 @@ export const SubmitSwapButton = ({
   ...props
 }: SubmitSwapButtonProps) => {
   if (!validateSwap) {
-    return <SubmitButtonBase supportedChains={SPOT_CHAINS} {...props} />;
+    return <AdvancedOrderSubmitButton {...props} />;
   }
 
   return <ValidatedSubmitSwapButton {...props} />;
 };
+
+function AdvancedOrderSubmitButton(props: SubmitButtonBaseProps) {
+  const { chains, isLoading, isError } = useSpotPartnerChains();
+  return <SubmitButtonBase {...props} supportedChains={chains}
+    networkUnavailableMessage={isLoading ? "Loading networks…" : isError ? "Networks unavailable" : "No supported networks"} />;
+}

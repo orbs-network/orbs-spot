@@ -62,7 +62,7 @@ export function DetailRow({
       </span>
       <span
         className={cn(
-          "min-w-0 text-right font-medium",
+          "ml-auto min-w-0 text-right font-medium",
           tone === "foreground" && "text-foreground",
           truncateValue && "truncate",
           valueClassName,

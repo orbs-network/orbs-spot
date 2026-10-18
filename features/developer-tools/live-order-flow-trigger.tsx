@@ -1,7 +1,6 @@
 "use client";
 
 import { lazy, Suspense, useRef } from "react";
-
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -9,7 +8,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
-
 import type { DeveloperExecutionMode } from "./demo-order";
 import { DeveloperModeSpotlight } from "./developer-mode-spotlight";
 import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
@@ -108,9 +106,9 @@ export function LiveOrderFlowTrigger({
   submitDisabled?: boolean;
   mode: DeveloperExecutionMode;
 }) {
-  const { isDeveloperMode } = useDeveloperMode();
+  const { isDeveloperPlayground } = useDeveloperMode();
 
-  return isDeveloperMode ? (
+  return isDeveloperPlayground ? (
     <LiveOrderFlowTriggerContent mode={mode} submitDisabled={submitDisabled} />
   ) : null;
 }

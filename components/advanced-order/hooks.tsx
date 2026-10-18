@@ -12,7 +12,7 @@ import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
 import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
 import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
-import { type OrderSigningRequest, type Token } from "@orbs-network/spot-ui";
+import { type Token } from "@orbs-network/spot-ui";
 import type { SpotWalletPort } from "@/lib/spot/execution";
 import BN from "bignumber.js";
 import { useMemo } from "react";
@@ -87,7 +87,8 @@ export function useSpotMarketReferencePrice() {
   );
 }
 
-// Bridge the SDK's Promise-based wallet port to this app's wagmi mutations and queries.
+// Connect the app's executor to wagmi. Spot supplies request data; the host
+// wallet signs it and waits for each on-chain transaction to be confirmed.
 export function useWalletInteractions() {
   const { data: walletClient } = useWalletClient();
   const waitForTransactionReceipt = useGetTransactionReceipt();
@@ -124,11 +125,17 @@ export function useWalletInteractions() {
       },
       wrapNativeToken: async (amount, onSubmitted) => {
         const { hash } = await wrapNativeToken({ amount, onSubmitted });
-        // Apply the token change when the review closes, after the confirmed deposit.
+        // Keep the active submission unchanged; use the wrapped input when the
+        // user returns to review or closes the dialog after confirmation.
         const wrappedAddress = getWrappedNativeCurrency(
           walletClient?.chain.id,
         )?.address;
-        if (wrappedAddress && walletClient) setPendingWrappedInputAddress(wrappedAddress, { chainId: walletClient.chain.id, account: walletClient.account.address });
+        if (wrappedAddress && walletClient) {
+          setPendingWrappedInputAddress(wrappedAddress, {
+            chainId: walletClient.chain.id,
+            account: walletClient.account.address,
+          });
+        }
         void refetchBalances().catch(() => undefined);
         return hash;
       },
@@ -150,17 +157,15 @@ export function useWalletInteractions() {
         return hash;
       },
       // Forward the SDK's typed data unchanged; rebuilding it can invalidate the signature.
-      signOrder: async (request: OrderSigningRequest) => {
+      signOrder: async (request) => {
         if (!walletClient) throw new Error("Wallet client not found");
         return signTypedData({
-          domain: request.typedData.domain,
-          types: request.typedData.types,
-          primaryType: request.typedData.primaryType,
+          ...request.typedData,
           message: { ...request.typedData.message },
           account: request.signerAddress,
         });
       },
-      getAllowance: (request) => getTokenAllowance(request),
+      getAllowance: getTokenAllowance,
     }),
     [
       approveToken,

@@ -28,6 +28,12 @@ export enum SwapStep {
     SWAP = 'SWAP',
 }
 
+export enum SwapStatus {
+    LOADING = 1,
+    SUCCESS = 2,
+    FAILED = 3,
+}
+
 export enum Field {
     INPUT = 'INPUT',
     OUTPUT = 'OUTPUT',

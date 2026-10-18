@@ -42,14 +42,44 @@
   border-radius: 0 13px 13px 0;
 }
 .amount {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
 }
+.amountInput {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 1ch;
+  max-width: 100%;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+.amountMeasure {
+  display: block;
+  overflow: hidden;
+  visibility: hidden;
+  white-space: pre;
+}
 .amount input {
+  position: absolute;
+  inset: 0;
   width: 100%;
   max-width: 100%;
   min-width: 0;
   height: 24px;
   font-size: 16px;
+}
+.symbol {
+  flex-shrink: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-size: 16px;
+  font-weight: 500;
 }
 .fields .adjustmentField {
   position: relative;
@@ -93,3 +123,17 @@
   opacity: 0.4;
   text-decoration: none;
 }
+.limitMode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.triggerLimitMode {
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.limitModeCopy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.limitModeHint { cursor: pointer; color: var(--muted-foreground); font-size: 12px; line-height: 18px; }
+.limitSwitch { position: relative; }
+.limitSwitch::after { content: ""; position: absolute; inset: -10px 0; }

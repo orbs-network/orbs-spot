@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { isAddress } from "viem";
 import { SPOT_CHAINS } from "@/lib/consts";
-import { getActivePartnerConfig } from "@/lib/partners/server";
 import { OrderDetailPage } from "@/features/order-history/order-page";
 
 export const metadata = { title: "Order details | Orbs" };
@@ -10,7 +9,6 @@ export default async function OrderPage({ params, searchParams }: {
   params: Promise<{ chainId: string; orderId: string }>;
   searchParams: Promise<{ account?: string | string[] }>;
 }) {
-  if (getActivePartnerConfig().id !== "orbs") notFound();
   const { chainId: chain, orderId: encodedOrderId } = await params;
   let orderId: string;
   try {

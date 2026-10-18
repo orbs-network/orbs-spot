@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
+    // Standalone apps have their own dependencies and lint configurations.
+    "apps/**",
     // Default ignores of eslint-config-next:
     ".next/**",
     ".vercel/**",

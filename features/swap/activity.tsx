@@ -5,7 +5,7 @@ import { useQueries, useQueryClient, type UseQueryResult } from "@tanstack/react
 import { useConnection } from "wagmi";
 import { SUPPORTED_CHAINS } from "@/lib/consts";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
-import { SwapStatus } from "@orbs-network/swap-ui";
+import { SwapStatus } from "@/lib/types";
 import { useSwapActivity, type SwapActivity } from "@/lib/swap/activity";
 
 const supportedChains = new Set<number>(SUPPORTED_CHAINS.map(chain => chain.id));

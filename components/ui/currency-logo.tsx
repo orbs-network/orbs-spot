@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { createLogoFailureCache, getTokenLogoSources } from "@/lib/token-logos";
+import { createLogoFailureCache, getTokenLogoScale, getTokenLogoSources } from "@/lib/token-logos";
 import type { Currency } from "@/lib/types";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Avatar, AvatarFallback } from "./avatar";
@@ -34,6 +34,7 @@ function CurrencyLogoImage({
   onError: () => void;
 }) {
   if (!src) return null;
+  const scale = getTokenLogoScale(src);
 
   return (
     <img
@@ -45,6 +46,7 @@ function CurrencyLogoImage({
       decoding="async"
       onLoad={onLoad}
       onError={onError}
+      style={scale === 1 ? undefined : { transform: `scale(${scale})` }}
       className={cn(
         "absolute inset-0 z-10 aspect-square size-full rounded-full object-contain",
         isLoaded ? "opacity-100" : "opacity-0"

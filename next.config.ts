@@ -1,33 +1,16 @@
 import type { NextConfig } from "next";
-import { getPartnerConfig, hasDeveloperTools } from "./lib/partners/config";
 
 const spotDocsUrl = (
   process.env.NEXT_PUBLIC_SPOT_DOCS_URL ??
   "https://docs.orbs.com"
 ).replace(/\/$/, "");
 
-const developerToolsEnabled = hasDeveloperTools(getPartnerConfig(process.env.NEXT_PARTNER));
-const developerAliases = {
-  "@developer-tools": developerToolsEnabled
-    ? "./features/developer-tools/entry.tsx"
-    : "./features/developer-tools/disabled.tsx",
-  "@developer-inspector": developerToolsEnabled
-    ? "./features/eip712-inspector/inspector.tsx"
-    : "./features/developer-tools/disabled.tsx",
-};
-
 const nextConfig: NextConfig = {
+  devIndicators: false,
   // Deploy runtime variables separately; local env files must not become
   // function dependencies that conflict with .vercelignore during upload.
   outputFileTracingExcludes: {
     "*": [".env*"],
-  },
-  turbopack: { resolveAlias: developerAliases },
-  webpack(config) {
-    for (const [alias, target] of Object.entries(developerAliases)) {
-      config.resolve.alias[alias] = `${process.cwd()}/${target}`;
-    }
-    return config;
   },
   async rewrites() {
     const hosts: Record<number, string> = {
@@ -49,27 +32,30 @@ const nextConfig: NextConfig = {
     );
   },
   async redirects() {
-    if (!hasDeveloperTools(getPartnerConfig(process.env.NEXT_PARTNER))) return [];
     return [
       {
         destination: `${spotDocsUrl}/liquidity-hub`,
         permanent: true,
         source: "/developers/liquidity-hub",
+        has: [{ type: "query", key: "debug", value: "true" }],
       },
       {
         destination: `${spotDocsUrl}/advanced-orders/direct`,
         permanent: true,
         source: "/developers/orders-sink",
+        has: [{ type: "query", key: "debug", value: "true" }],
       },
       {
         destination: `${spotDocsUrl}/advanced-orders/direct`,
         permanent: true,
         source: "/developers/orders-sink/direct",
+        has: [{ type: "query", key: "debug", value: "true" }],
       },
       {
         destination: `${spotDocsUrl}/advanced-orders/react`,
         permanent: true,
         source: "/developers/orders-sink/react",
+        has: [{ type: "query", key: "debug", value: "true" }],
       },
     ];
   },

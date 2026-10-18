@@ -2,9 +2,7 @@
 
 import { getWrappedNativeCurrency } from "@/lib/utils";
 import { InspectOrderLink } from "@/features/eip712-inspector/inspect-order-link";
-
 import { useMutation } from "@tanstack/react-query";
-
 import {
   DEMO_SIGNATURE,
   DEMO_STEP_COPY,
@@ -13,7 +11,6 @@ import {
 import { remainingWrapAmount, rewindFlow } from "./flow-navigation";
 import { DownloadIntegrationButton } from "./download-integration-button";
 import { formatAdvancedOrdersSdkFlow } from "./snippets/sdk-flow-examples";
-
 import {
   type ReactElement,
   useCallback,
@@ -29,7 +26,7 @@ import { maxUint256, type Hex } from "viem";
 import { useConnection } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { isNativeAddress, type RePermitData } from "@orbs-network/spot-ui";
-
+import type { CalculatedOrderForm } from "@orbs-network/spot-ui";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
@@ -43,12 +40,10 @@ import { useSignTypedDataPayload } from "@/lib/hooks/use-sign-typed-data";
 import { useApproveToken } from "@/lib/hooks/use-token-approval";
 import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
 import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
-import { getActiveSpotPartner } from "@/lib/partners/spot";
 import {
   isUserRejectedError,
   dismissTransactionRejectedToast,
 } from "@/lib/tx-rejection";
-
 import {
   CREATE_ORDER_CODE_SNIPPET,
   CREATED_ORDER_CODE_SNIPPET,
@@ -75,13 +70,13 @@ import { OrdersSinkGuideLink } from "./orders-sink-guide-link";
 import { DeveloperGuideLink } from "./developer-guide-link";
 import { getSpotDocsHref } from "@/features/developer-tools/docs";
 import { useDeveloperOrder } from "./use-developer-order";
-import type { CalculatedOrderForm } from "@orbs-network/spot-ui";
 import {
   calculateEditedOrderForm,
   getLiveOrderFormInput,
   rebuildCalculatedPermit,
   validateOrderFormInput,
 } from "./order-form-calculation";
+import { useSpotPartner } from "@/lib/hooks/use-spot-partner";
 
 type LivePermitData = RePermitData;
 
@@ -325,7 +320,7 @@ function LiveOrderFlowModalContent({
   const actionToastId = useId();
   const { address: connectedAccount } = useConnection();
   const { openConnectModal } = useConnectModal();
-  const partner = getActiveSpotPartner() || "external";
+  const { partner } = useSpotPartner();
   const currentSourceTokenAddress = spot.derivedFormData.srcToken?.address;
   const { setInputAmount } = useActionHandlers();
   const getTokenAllowance = useGetTokenAllowance();
@@ -1358,9 +1353,9 @@ export function LiveOrderFlowModal({
 }) {
   const spot = useDeveloperOrder();
   const currentPermitData = spot.derivedFormData.rePermitData;
-  const configError = spot.submitOrderButton.error;
-  const configLoading = spot.submitOrderButton.loading;
-  const retryConfig = spot.submitOrderButton.retry;
+  const configError = spot.configuration.error;
+  const configLoading = spot.configuration.loading;
+  const retryConfig = spot.configuration.retry;
 
   if (!currentPermitData) {
     if (configError) {

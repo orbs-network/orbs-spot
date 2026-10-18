@@ -42,7 +42,7 @@
   "maxDurationError": "Max. expiry is {duration}",
   "minDurationError": "Min. expiry is {duration}",
   "expiry": "Expiry",
-  "individualTradeSize": "Individual trade size",
+  "individualTradeSize": "Amount per trade",
   "numberOfTrades": "Total trades",
   "expiresIn": "Expires in",
   "buy": "Buy",

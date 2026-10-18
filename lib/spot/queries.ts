@@ -1,6 +1,7 @@
 import { createClient, getOrders } from "@orbs-network/spot-ui";
 import { queryOptions, replaceEqualDeep, type QueryClient } from "@tanstack/react-query";
 import { getOrderTokens, orderTokensQueryOptions, withOrderTokens, type HistoryOrder } from "./order-tokens";
+import { normalizeOrderStatus } from "./order-status";
 
 type Partner = Parameters<typeof createClient>[0];
 
@@ -33,15 +34,17 @@ export function spotOrdersQueryOptions(partner: Partner, account: string | undef
     queryKey: spotKeys.orders(partner, "all", account),
     queryFn: async ({ signal }) => {
       if (!account) throw new Error("Connect a wallet to load order history");
-      const orders = await getOrders({
+      const orders = (await getOrders({
         swapper: account,
         exchange: partner,
         getv1orders: false,
         signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
-      });
+      })).map(normalizeOrderStatus);
       const tokens = await queryClient.fetchQuery(orderTokensQueryOptions(queryClient, getOrderTokens(orders)));
       signal.throwIfAborted();
-      return withOrderTokens(orders, tokens);
+      // The SDK omits the partner name from its normalized order model. Keep
+      // the exchange captured by this request alongside the fetched rows.
+      return withOrderTokens(orders, tokens).map(order => ({ ...order, partner }));
     },
     enabled: Boolean(account),
     staleTime: 60_000,

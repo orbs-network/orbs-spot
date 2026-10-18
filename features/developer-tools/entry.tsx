@@ -1,13 +1,26 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
+import { useIsSwapTab } from "@/lib/hooks/use-form-tab";
+import type { ComponentType } from "react";
 
-// This entry is replaced with disabled.tsx for partner builds. Keep examples,
-// inspectors and simulations behind this boundary, never in trading modules.
-export const LiquidityHubDeveloperTrigger = dynamic(() => import("./liquidity-hub-developer-trigger").then(m => m.LiquidityHubDeveloperTrigger), { ssr: false });
-export const LiquidityHubQuoteDeveloperTrigger = dynamic(() => import("./liquidity-hub-developer-trigger").then(m => m.LiquidityHubQuoteDeveloperTrigger), { ssr: false });
-export const LiveOrderFlowTrigger = dynamic(() => import("./live-order-flow-trigger").then(m => m.LiveOrderFlowTrigger), { ssr: false });
-export const FetchOrdersDeveloperButton = dynamic(() => import("./order-history-actions").then(m => m.FetchOrdersDeveloperButton), { ssr: false });
-export const CancelOrderDeveloperButton = dynamic(() => import("./order-history-actions").then(m => m.CancelOrderDeveloperButton), { ssr: false });
-export const DeveloperNavigation = dynamic(() => import("./navigation").then(m => m.DeveloperNavigation), { ssr: false });
-export const DeveloperMoreNavigation = dynamic(() => import("./navigation").then(m => m.DeveloperMoreNavigation), { ssr: false });
+// All tools mount only inside /dev; debug=true on the main UI enables partner testing only.
+function withDeveloperMode<Props extends object>(Component: ComponentType<Props>) {
+  return function DeveloperComponent(props: Props) {
+    const { isDeveloperPlayground } = useDeveloperMode();
+    return isDeveloperPlayground ? <Component {...props} /> : null;
+  };
+}
+const PlaygroundQuoteTrigger = dynamic(() => import("./liquidity-hub-developer-trigger").then(m => m.LiquidityHubQuoteDeveloperTrigger), { ssr: false });
+export function LiquidityHubQuoteDeveloperTrigger() {
+  const { isDeveloperPlayground } = useDeveloperMode();
+  const isSwapTab = useIsSwapTab();
+  return isDeveloperPlayground && isSwapTab ? <PlaygroundQuoteTrigger /> : null;
+}
+export const LiquidityHubDeveloperTrigger = withDeveloperMode(dynamic(() => import("./liquidity-hub-developer-trigger").then(m => m.LiquidityHubDeveloperTrigger), { ssr: false }));
+export const LiveOrderFlowTrigger = withDeveloperMode(dynamic(() => import("./live-order-flow-trigger").then(m => m.LiveOrderFlowTrigger), { ssr: false }));
+export const FetchOrdersDeveloperButton = withDeveloperMode(dynamic(() => import("./order-history-actions").then(m => m.FetchOrdersDeveloperButton), { ssr: false }));
+export const CancelOrderDeveloperButton = withDeveloperMode(dynamic(() => import("./order-history-actions").then(m => m.CancelOrderDeveloperButton), { ssr: false }));
+export const DeveloperNavigation = withDeveloperMode(dynamic(() => import("./navigation").then(m => m.DeveloperNavigation), { ssr: false }));
+export const DeveloperMoreNavigation = withDeveloperMode(dynamic(() => import("./navigation").then(m => m.DeveloperMoreNavigation), { ssr: false }));

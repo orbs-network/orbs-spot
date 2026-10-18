@@ -2,7 +2,6 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { useTheme } from "@/lib/theme";
-
 import {
   Children,
   type ComponentProps,
@@ -35,7 +34,6 @@ import {
 import { Highlight, themes, type Language } from "prism-react-renderer";
 import { allExpanded, JsonView } from "react-json-view-lite";
 import { toast } from "sonner";
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -2059,7 +2057,7 @@ function JsonInspectorModalContent({
                                         <TooltipTrigger asChild>
                                           <button
                                             type="button"
-                                            className="cursor-help border-0 border-b border-dashed border-current bg-transparent p-0 font-[inherit] text-inherit outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
+                                            className="cursor-help rounded-none! border-b border-dashed border-current bg-transparent px-0 py-0 font-[inherit] text-inherit outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/40"
                                             aria-label={`Explain ${lineExplanation.path}`}
                                           >
                                             {lineExplanation.key}

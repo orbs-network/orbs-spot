@@ -1,27 +1,2 @@
-.root { --ease-out: cubic-bezier(0.23, 1, 0.32, 1); min-width: 0; padding-inline: 4px; font-size: 12px; }
-.trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0; text-align: left; cursor: pointer; color: var(--muted-foreground); border-radius: 6px; }
-.trigger:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.rate { display: flex; flex: 1; flex-wrap: wrap; gap: 2px 4px; min-width: 0; overflow-wrap: anywhere; }
-.usd { opacity: .7; }
-.cost { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; max-width: 35%; text-align: right; overflow-wrap: anywhere; }
-.chevron { width: 14px; height: 14px; flex-shrink: 0; transition: transform 200ms var(--ease-out); }
-.root[data-open="true"] .chevron { transform: rotate(180deg); }
-.cost { transition: opacity 200ms var(--ease-out); }
-.root[data-open="true"] .cost { opacity: 0; }
-/* A zero-fraction grid tracks intrinsic content height, including wrapped mobile rows. */
-.collapse { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 200ms var(--ease-out), opacity 200ms var(--ease-out); }
-.root[data-open="true"] .collapse { grid-template-rows: 1fr; opacity: 1; }
-.clip { min-height: 0; overflow: hidden; }
-.rows { display: flex; flex-direction: column; gap: 8px; padding-block: 2px 8px; }
-.rows :global([data-detail-row]) { font-size: 12px; gap: 6px 12px; }
-.rows :global([data-detail-row]) > :last-child { color: var(--foreground); font-weight: 400; }
+.cost { display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; text-align: right; overflow-wrap: anywhere; }
 .badge { padding: 2px 6px; border-radius: 6px; background: var(--secondary); font-size: 11px; font-weight: 500; }
-@media (hover: hover) and (pointer: fine) {
-  .trigger:hover { color: var(--primary); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .collapse { transition: opacity 150ms var(--ease-out); }
-  .chevron { transition: none; }
-  .cost { transition-duration: 150ms; }
-}
-.root[data-instant="true"] :is(.collapse, .chevron, .cost) { transition: none; }

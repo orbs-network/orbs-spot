@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppLink } from "@/components/app-link";
 import { ArrowLeftIcon, BracesIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { preserveDeveloperModeInHref, useDeveloperMode } from "@/lib/hooks/use-developer-mode";
+import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 import {
   Dialog,
   DialogContent,
@@ -20,9 +20,15 @@ import {
 } from "./inspect";
 import { takeDraft, stringify } from "./handoff";
 import { InspectionResults } from "./inspection-results";
+import { preserveFormTabInHref, useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 
 export function Eip712Inspector() {
-  const { isDeveloperMode } = useDeveloperMode();
+  const { isDeveloperPlayground } = useDeveloperMode();
+  return isDeveloperPlayground ? <Eip712InspectorContent /> : null;
+}
+
+function Eip712InspectorContent() {
+  const { selectedTab } = useSelectedFormTab();
   const [json, setJson] = useState("");
   const [context, setContext] = useState<OrderContext>();
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
@@ -245,11 +251,11 @@ export function Eip712Inspector() {
   return (
     <div className="w-full max-w-[860px] min-w-0 py-6 sm:py-10">
       <AppLink
-        href={preserveDeveloperModeInHref("/", isDeveloperMode)}
+        href={preserveFormTabInHref("/", selectedTab.value)}
         className="inline-flex min-h-9 items-center gap-2 rounded text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
       >
         <ArrowLeftIcon aria-hidden="true" className="size-4" />
-        {isDeveloperMode ? "Back to playground" : "Back to trading"}
+        Back to sandbox
       </AppLink>
       <header className="mb-7 mt-5">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">

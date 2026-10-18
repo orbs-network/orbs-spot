@@ -1,13 +1,15 @@
 "use client";
 
+import { OrderRate } from "./order-rate";
+
 import { useTranslations } from "@/lib/use-translations";
 import { DetailRow } from "@/components/ui/detail-row";
-import { formatOrderAmount, formatDuration, formatPriceValue, isZeroValue, type DerivedHistoryOrder } from "./format";
+import { formatOrderAmount, formatDuration, isZeroValue, type DerivedHistoryOrder } from "./format";
 import styles from "./order-page.module.css";
 
 export function OrderSchedule({ details }: { details: DerivedHistoryOrder }) {
   const t = useTranslations();
-  const price = (value: string) => formatPriceValue(value, details.inputToken?.symbol, details.outputToken?.symbol);
+  const price = (value: string) => <OrderRate value={value} inputSymbol={details.inputToken?.symbol} outputSymbol={details.outputToken?.symbol} />;
   const hasLimit = !details.original.isMarketPrice && !isZeroValue(details.limitPrice.ui);
   const hasTrigger = !isZeroValue(details.triggerPrice.ui);
   if (!hasLimit && !hasTrigger && details.totalTrades <= 1) return null;

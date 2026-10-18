@@ -22,6 +22,14 @@ export function normalizeTokenLogoUrl(value: unknown): string | undefined {
   }
 }
 
+/** Compensate for padding baked into these WETH assets without changing artwork. */
+export function getTokenLogoScale(src?: string): number {
+  return src && (
+    /^https:\/\/tokens-data\.1inch\.io\/images\/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2\.png(?:\?|$)/i.test(src) ||
+    /^https:\/\/assets\.coingecko\.com\/coins\/images\/39713\/(?:thumb|small|large)\/WETH\.PNG(?:\?|$)/i.test(src)
+  ) ? 1.5 : 1;
+}
+
 export function getTokenLogoSources({ currency, logoUrl }: { currency?: Currency; logoUrl?: string }): string[] {
   const chain = currency?.chainId ? ASSET_CHAINS[currency.chainId] : undefined;
   const address = currency?.address;

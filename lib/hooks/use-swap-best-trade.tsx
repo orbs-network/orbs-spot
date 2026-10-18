@@ -4,20 +4,19 @@ import { useSignEip } from "./use-sign-eip";
 import { useApproval } from "./use-approval";
 import { useWrap } from "./use-wrap";
 import { getWrappedNativeCurrency, isNativeAddress } from "../utils";
+import { toAmountUI } from "../utils";
 import { useDerivedSwap } from "./use-derived-swap";
 import { createSwapExecutor, QuoteUpdatedError } from "@/lib/swap/execution";
 import { useSwapToasts } from "@/lib/swap/use-swap-toasts";
 import { useLiquidityHub } from "./liquidity-hub";
 import { useGetTransactionReceipt } from "./use-get-transaction-receipt";
 import { useBestTradeSwapStore, useSwapStore } from "./store";
-import { SwapStatus } from "@orbs-network/swap-ui";
-import { SwapStep } from "../types";
+import { SwapStatus, SwapStep } from "../types";
 import { useCallback, useMemo } from "react";
 import { useConnection, useWalletClient } from "wagmi";
 import { isUserRejectedError } from "../tx-rejection";
 import { useSwapActivity } from "@/lib/swap/activity";
 import { trackFunnel } from "@/lib/funnel-analytics";
-import { toAmountUI } from "../utils";
 
 const executor = createSwapExecutor();
 
@@ -28,6 +27,8 @@ export const useSwapBestTrade = () => {
   const isPreparing = status === SwapStatus.LOADING && currentStep === undefined;
   const updateStore = useBestTradeSwapStore((state) => state.updateStore);
   const onWalletSubmitted = useCallback(() => updateStore({ isAwaitingWallet: false }), [updateStore]);
+  const onWrapSubmitted = useCallback((hash: `0x${string}`) => updateStore({ isAwaitingWallet: false, wrapTxHash: hash }), [updateStore]);
+  const onApprovalSubmitted = useCallback((hash: `0x${string}`) => updateStore({ isAwaitingWallet: false, approvalTxHash: hash }), [updateStore]);
   const totalSteps = useBestTradeSwapStore((state) => state.totalSteps);
   const currentStepIndex = useBestTradeSwapStore(
     (state) => state.currentStepIndex
@@ -45,9 +46,9 @@ export const useSwapBestTrade = () => {
     permit2Address,
     inputCurrency?.address,
     parsedInputAmount,
-    onWalletSubmitted,
+    onApprovalSubmitted,
   );
-  const { mutateAsync: wrap } = useWrap(onWalletSubmitted);
+  const { mutateAsync: wrap } = useWrap(onWrapSubmitted);
   const toasts = useSwapToasts();
   const { address: account, chainId } = useConnection();
   const { data: walletClient } = useWalletClient();
@@ -85,20 +86,32 @@ export const useSwapBestTrade = () => {
         },
         submit: (quote, signature) => liquidityHubClient.swap(quote, signature),
         confirm: getTransactionReceiptCallback,
-        onPlan: totalSteps => updateStore({ totalSteps }),
+        onPlan: steps => updateStore({ steps: steps.map(step => SwapStep[step]), totalSteps: steps.length }),
         onStep: (step, currentStepIndex) => {
           trackFunnel({ name: "wallet_step_requested", product: "swap", step: step === "WRAP" ? "wrap" : step === "APPROVE" ? "approve" : "sign" });
           updateStore({ currentStep: SwapStep[step], currentStepIndex, isAwaitingWallet: true });
+          // The open modal owns progress; use toasts when it is closed.
+          if (useBestTradeSwapStore.getState().isReviewOpen) {
+            toasts.dismissPendingToasts();
+            return;
+          }
           if (step === "WRAP") toasts.onWrapRequest();
           else if (step === "APPROVE") toasts.onApproveRequest();
           else toasts.onSwapRequest();
         },
-        onWrapped: toasts.onWrapSuccess,
-        onApproved: toasts.onApproveSuccess,
+        onWrapped: () => {
+          if (useBestTradeSwapStore.getState().isReviewOpen) toasts.dismissPendingToasts();
+          else toasts.onWrapSuccess();
+        },
+        onApproved: () => {
+          if (useBestTradeSwapStore.getState().isReviewOpen) toasts.dismissPendingToasts();
+          else toasts.onApproveSuccess();
+        },
         onSubmitted: txHash => {
           useSwapActivity.getState().add({ hash: txHash, account, chainId, inputAmount,
             inputSymbol: inputCurrency.symbol, outputSymbol: outputCurrency.symbol, createdAt: Date.now(), status: "pending" });
-          updateStore({ txHash }); toasts.onSwapConfirming(txHash);
+          updateStore({ txHash });
+          if (!useBestTradeSwapStore.getState().isReviewOpen) toasts.onSwapConfirming(txHash);
         },
       });
     },
@@ -123,14 +136,15 @@ export const useSwapBestTrade = () => {
       if (process.env.NODE_ENV !== "production" && !isUserRejectedError(error)) {
         console.error(error);
       }
-    
+
       if (isUserRejectedError(error)) {
         toasts.onTransactionRejected();
         updateStore({ status: undefined });
       } else {
         trackFunnel({ name: "submission_failed", product: "swap" });
         updateStore({ status: SwapStatus.FAILED, error: { message: error.message } });
-        toasts.onSwapFailed(error);
+        if (useBestTradeSwapStore.getState().isReviewOpen) toasts.dismissPendingToasts();
+        else toasts.onSwapFailed(error);
       }
     },
     onSettled: (_result, _error, _variables, scope) => {
@@ -149,7 +163,9 @@ export const useSwapBestTrade = () => {
   const onSwapBestTrade = useCallback(() => {
     if (executor.isBusy() || useBestTradeSwapStore.getState().status === SwapStatus.LOADING) return;
     trackFunnel({ name: "submit_requested", product: "swap" });
-    updateStore({ status: SwapStatus.LOADING, currentStep: undefined, quoteUpdate: undefined, error: undefined });
+    updateStore({ status: SwapStatus.LOADING, currentStep: undefined, steps: undefined,
+      totalSteps: undefined, currentStepIndex: 0, txHash: undefined, wrapTxHash: undefined,
+      approvalTxHash: undefined, quoteUpdate: undefined, error: undefined });
     swapBestTrade();
   }, [swapBestTrade, updateStore]);
 

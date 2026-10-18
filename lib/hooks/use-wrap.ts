@@ -19,8 +19,8 @@ export const useWrapNativeToken = () => {
   return useMutation({
     mutationFn: async (request: string | WrapRequest): Promise<TransactionResult> => {
       const { amount, onSubmitted } = typeof request === "string" ? { amount: request } : request;
-      if (!walletClient) {
-        throw new Error("Wallet client not found");
+      if (!walletClient || !account || walletClient.chain.id !== chainId) {
+        throw new Error("Connect your wallet to the selected network and try again.");
       }
       if (!address) {
         throw new Error("Wrapped native currency address not found");
@@ -49,6 +49,33 @@ export const useWrap = (onSubmitted?: (hash: `0x${string}`) => void) => {
     mutationFn: async (amount: string) => {
       const { receipt } = await wrapNativeToken({ amount, onSubmitted });
       return receipt;
+    },
+  });
+};
+
+export const useUnwrapNativeToken = () => {
+  const { data: walletClient } = useWalletClient();
+  const { address: account, chainId } = useConnection();
+  const getTransactionReceipt = useGetTransactionReceipt();
+  const address = getWrappedNativeCurrency(chainId)?.address;
+
+  return useMutation({
+    mutationFn: async ({ amount, onSubmitted }: WrapRequest): Promise<TransactionResult> => {
+      if (!walletClient || !account || walletClient.chain.id !== chainId) {
+        throw new Error("Connect your wallet to the selected network and try again.");
+      }
+      if (!address) throw new Error("Wrapped native currency address not found");
+      const hash = await walletClient.writeContract({
+        abi: wethAbi,
+        functionName: "withdraw",
+        args: [BigInt(amount)],
+        account,
+        address: address as `0x${string}`,
+        chain: walletClient.chain,
+      });
+      onSubmitted?.(hash);
+      const receipt = await getTransactionReceipt(hash);
+      return { hash, receipt };
     },
   });
 };

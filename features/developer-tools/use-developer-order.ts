@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { useConnection } from "wagmi";
 import { useClient, useOrders } from "@/components/advanced-order/use-order-client";
-import { useSubmitButton } from "@/components/advanced-order/use-order-execution";
 import { getWrappedNativeCurrency, isNativeAddress } from "@/lib/utils";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { getDemoOrderForm, DEMO_ACCOUNT, type DeveloperExecutionMode } from "./demo-order";
@@ -16,7 +15,6 @@ export function useDeveloperOrder(mode: DeveloperExecutionMode = "demo") {
   const client = useClient();
   const market = useSpotMarketReferencePrice();
   const history = useOrders();
-  const button = useSubmitButton();
   const { address: connectedAddress } = useConnection();
   const chainId = useDataChainId();
   const address = connectedAddress ?? (mode === "demo" ? DEMO_ACCOUNT : undefined);
@@ -37,7 +35,7 @@ export function useDeveloperOrder(mode: DeveloperExecutionMode = "demo") {
     derivedFormData: { ...review, form, rePermitData: permit },
     fillDelayPanel: { fillDelay: review.form.schedule.fillDelay },
     durationPanel: { duration: review.form.schedule.duration },
-    submitOrderButton: { ...button, error: client.error, loading: client.isLoading, retry: client.refetch },
+    configuration: { error: client.error, loading: client.isLoading, retry: client.refetch },
     orderHistoryPanel: { refetchOrders: history.refetch },
   };
 }

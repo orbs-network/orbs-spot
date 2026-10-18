@@ -18,7 +18,7 @@ test("removes env upload references and copies while preserving runtime configur
   const config = {
     runtime: "nodejs24.x",
     handler: "___next_launcher.cjs",
-    environment: { NEXT_PARTNER: "orbs" },
+    environment: { RPC_URL: "https://rpc.example.com" },
     filePathMap: {
       ".env": ".env",
       ".env.example": ".env.example",

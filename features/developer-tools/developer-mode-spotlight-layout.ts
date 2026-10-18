@@ -20,10 +20,18 @@ export type SpotlightLayout = {
 };
 
 const CARD_GAP = 14;
-const CARD_HEIGHT_ESTIMATE = 206;
+const CARD_HEIGHT_ESTIMATE = 260;
 const CARD_WIDTH = 320;
 const CARD_VIEWPORT_MARGIN = 16;
 const ROUNDED_RECTANGLE_RADIUS = 20;
+
+export function areSpotlightLayoutsEqual(a: SpotlightLayout | null, b: SpotlightLayout): boolean {
+  return Boolean(a &&
+    a.radius === b.radius &&
+    a.target.left === b.target.left && a.target.right === b.target.right &&
+    a.target.top === b.target.top && a.target.bottom === b.target.bottom &&
+    a.card.left === b.card.left && a.card.top === b.card.top && a.card.width === b.card.width);
+}
 
 export function measureSpotlightLayout(
   element: HTMLElement,
@@ -64,7 +72,7 @@ export function measureSpotlightLayout(
   return {
     card: { left: cardLeft, top: cardTop, width: cardWidth },
     radius:
-      shape === "pill" ? target.height / 2 : ROUNDED_RECTANGLE_RADIUS,
+      Math.min(shape === "pill" ? target.height / 2 : ROUNDED_RECTANGLE_RADIUS, target.height / 2, target.width / 2),
     target,
   };
 }

@@ -10,10 +10,11 @@ import { useWalletInteractions } from "@/components/advanced-order/hooks";
 import { cancelOrderBatch } from "@/lib/spot/cancellation";
 import { watchCancelledOrder } from "@/lib/spot/cancel-status";
 import { spotClientQueryOptions, spotKeys } from "@/lib/spot/queries";
-import { getActiveSpotPartner } from "@/lib/partners/spot";
 import { getChainName } from "@/lib/utils";
+import { useSpotPartner } from "@/lib/hooks/use-spot-partner";
 
 export function BulkCancelDialog({ orders, onClose }: { orders: Order[]; onClose: () => void }) {
+  const { partner } = useSpotPartner();
   const groups = [...Map.groupBy(orders, order => `${order.chainId}:${order.version === 2 ? "v2" : order.historyKey}`).values()];
   const [completed, setCompleted] = useState(0);
   const [failure, setFailure] = useState<string>();
@@ -26,7 +27,6 @@ export function BulkCancelDialog({ orders, onClose }: { orders: Order[]; onClose
     mutationKey: ["spot-bulk-cancellation"],
     mutationFn: async (batch: Order[]) => {
       if (!group || !address) throw new Error("Connect the order’s wallet to cancel");
-      const partner = getActiveSpotPartner();
       const cached = queryClient.getQueryData<Order[]>(spotKeys.orders(partner, "all", address));
       const fresh = batch.map(order => cached?.find(item => item.historyKey === order.historyKey) ?? order).filter(order => order.status === OrderStatus.Open);
       if (fresh.length) {

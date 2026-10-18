@@ -2,13 +2,14 @@
 "use client";
 
 import { Fragment, useRef, useState } from "react";
-import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from "lucide-react";
+import { CheckIcon, SearchIcon, XIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { NetworkLabel, getNetworkLabel } from "./network-label";
 import { CHAIN_LOGO_URLS } from "@/lib/consts";
 import styles from "./network-selector.module.css";
+import { SelectorTrigger } from "@/components/ui/selector-trigger";
 
 function AllNetworksLabel({ chains }: { chains: readonly { id: number }[] }) {
   return <span className="inline-flex min-w-0 items-center gap-3 whitespace-nowrap">
@@ -54,18 +55,15 @@ export function NetworkSelector({ chains, value, onValueChange, includeAllNetwor
   return (
     <Popover open={open} onOpenChange={nextOpen => { setOpen(nextOpen); setSearch(""); }}>
       <PopoverTrigger asChild>
-        <button
+        <SelectorTrigger
           ref={triggerRef}
-          type="button"
-          data-slot="select-trigger"
           data-chain-selector-trigger
           disabled={disabled}
           aria-label={ariaLabel}
-          className={cn("flex min-h-11 w-full items-center justify-between gap-2 rounded-[14px] border border-border/80 bg-transparent px-3 text-sm font-medium text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-wait disabled:opacity-60", className)}
+          className={className}
         >
-          <span className="flex min-w-0 items-center truncate">{selected?.label ?? placeholder}</span>
-          <ChevronDownIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-        </button>
+          {selected?.label ?? placeholder}
+        </SelectorTrigger>
       </PopoverTrigger>
       <PopoverContent
         ref={contentRef}

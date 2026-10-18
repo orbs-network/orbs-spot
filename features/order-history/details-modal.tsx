@@ -16,7 +16,7 @@ export function OrderDetailsModal({
   onClose, onRetry, onCloseAutoFocus,
 }: OrderPreviewOptions & {
   onClose: () => void;
-  onRetry: () => void;
+  onRetry?: () => void;
   onCloseAutoFocus: (event: Event) => void;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
@@ -36,7 +36,7 @@ export function OrderDetailsModal({
   } else if (loading) {
     content = <div role="status" className="flex items-center gap-3"><Spinner className="size-5" />Loading order details…</div>;
   } else if (error) {
-    content = <><p role="alert">Could not load this order.</p><Button variant="outline" onClick={() => { onRetry(); void refetch(); }}>Retry</Button></>;
+    content = <><p role="alert">Could not load this order.</p><Button variant="outline" onClick={() => { onRetry?.(); void refetch(); }}>Retry</Button></>;
   } else {
     content = <><p>Order not found for this wallet on {chainName}.</p><p className="text-muted-foreground">Check that you’ve connected the wallet that placed the order.</p><Button variant="outline" onClick={onClose}>Back to order history</Button></>;
   }

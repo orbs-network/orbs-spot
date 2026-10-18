@@ -7,18 +7,20 @@ import { ExternalLinkIcon } from "lucide-react";
 import { FORM_TABS, PERPS_URL } from "@/lib/consts";
 import { preserveFormTabInHref, useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { OrderHistoryLink } from "./order-history-trigger";
+import { getTradingPathname } from "@/lib/developer-routes";
+import Image from "next/image";
 
 function useTradingHref() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   // Keep network/token and other trading parameters when changing order types.
-  return pathname === "/" ? `/?${searchParams.toString()}` : "/";
+  return getTradingPathname(pathname) === "/" ? `/?${searchParams.toString()}` : "/";
 }
 
 export function TradingNavigation() {
   const { selectedTab } = useSelectedFormTab();
   const pathname = usePathname();
-  const isTrading = pathname === "/";
+  const isTrading = getTradingPathname(pathname) === "/";
   const href = useTradingHref();
 
   return (
@@ -26,15 +28,11 @@ export function TradingNavigation() {
       <div data-trading-modes>
         <AppLink href={preserveFormTabInHref(href, selectedTab.value)} scroll={false}
           aria-current={isTrading ? "page" : undefined}>
-          <svg data-product-mark="spot" aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-            <path d="M2 3 11 8 2 13ZM22 1 13 6 22 11ZM2 15 11 10 11 22ZM13 13 22 18 13 23Z" />
-          </svg>
+          <Image data-product-mark="spot" src="/dspot-logo.svg" alt="" aria-hidden="true" width={25} height={25} />
           dSPOT
         </AppLink>
         <a data-perps-link href={PERPS_URL} target="_blank" rel="noopener noreferrer">
-          <svg data-product-mark="perps" aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-            <path d="M7 2 12 10H2ZM14 2H24L19 10ZM5 14 10 22H0ZM12 14H22L17 22Z" />
-          </svg>
+          <Image data-product-mark="perps" src="/dperps-logo.svg" alt="" aria-hidden="true" width={25} height={25} />
           dPERPS <ExternalLinkIcon aria-hidden="true" className="size-3" />
           <span className="sr-only">(opens in a new tab)</span>
         </a>

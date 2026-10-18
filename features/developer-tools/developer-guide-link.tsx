@@ -1,7 +1,6 @@
 import { AppLink } from "@/components/app-link";
 import type { ReactNode } from "react";
 import { ExternalLinkIcon } from "lucide-react";
-
 import { buttonVariants } from "@/components/ui/button";
 import {
   preserveFormTabInHref,
@@ -24,7 +23,7 @@ export function DeveloperGuideLink({
   className?: string;
   section?: string;
 }) {
-  const { isDeveloperMode, isDeveloperToolsAvailable } = useDeveloperMode();
+  const { isDeveloperMode } = useDeveloperMode();
   const { selectedTab } = useSelectedFormTab();
   const href = preserveDeveloperModeInHref(
     preserveFormTabInHref(
@@ -34,7 +33,7 @@ export function DeveloperGuideLink({
     isDeveloperMode,
   );
 
-  if (!isDeveloperToolsAvailable) return null;
+  if (!isDeveloperMode) return null;
 
   return (
     <AppLink

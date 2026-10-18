@@ -3,7 +3,6 @@
 import { lazy, Suspense } from "react";
 import type { Order } from "@orbs-network/spot-ui";
 import { useConnection } from "wagmi";
-
 import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 
 const FetchOrdersDeveloperButtonContent = lazy(async () => ({
@@ -23,10 +22,10 @@ export function FetchOrdersDeveloperButton({
   isLoading?: boolean;
   orders: Order[];
 }) {
-  const { isDeveloperMode } = useDeveloperMode();
+  const { isDeveloperPlayground } = useDeveloperMode();
   const { address } = useConnection();
 
-  return isDeveloperMode && address ? (
+  return isDeveloperPlayground && address ? (
     <Suspense fallback={null}>
       <FetchOrdersDeveloperButtonContent
         isLoading={isLoading}
@@ -45,10 +44,10 @@ export function CancelOrderDeveloperButton({
   onCancel: () => void;
   rawOrder: Order;
 }) {
-  const { isDeveloperMode } = useDeveloperMode();
+  const { isDeveloperPlayground } = useDeveloperMode();
   const { address } = useConnection();
 
-  return isDeveloperMode && address ? (
+  return isDeveloperPlayground && address ? (
     <Suspense fallback={null}>
       <CancelOrderDeveloperButtonContent
         isCancelling={isCancelling}

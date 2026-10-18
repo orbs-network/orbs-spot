@@ -31,6 +31,8 @@ export function assertSwapQuote(quote: Quote, intent: SwapIntent, now = Date.now
   }
 }
 
+export type SwapExecutionStep = "WRAP" | "APPROVE" | "SWAP";
+
 export interface SwapExecution {
   intent: SwapIntent;
   quote: Quote;
@@ -42,8 +44,8 @@ export interface SwapExecution {
   sign(quote: Quote): Promise<`0x${string}`>;
   submit(quote: Quote, signature: `0x${string}`): Promise<string>;
   confirm(hash: `0x${string}`): Promise<unknown>;
-  onPlan(steps: number): void;
-  onStep(step: "WRAP" | "APPROVE" | "SWAP", index: number): void;
+  onPlan(steps: SwapExecutionStep[]): void;
+  onStep(step: SwapExecutionStep, index: number): void;
   onWrapped(): void;
   onApproved(): void;
   onSubmitted(hash: `0x${string}`): void;
@@ -80,7 +82,11 @@ export function createSwapExecutor() {
       const alreadyWrapped = wrapped?.key === key ? wrapped.amount : BigInt(0);
       const amount = BigInt(intent.amount);
       const wrapAmount = intent.native && amount > alreadyWrapped ? amount - alreadyWrapped : BigInt(0);
-      input.onPlan(1 + Number(wrapAmount > BigInt(0)) + Number(!approved));
+      const steps: SwapExecutionStep[] = [];
+      if (wrapAmount > BigInt(0)) steps.push("WRAP");
+      if (!approved) steps.push("APPROVE");
+      steps.push("SWAP");
+      input.onPlan(steps);
       let index = 0;
       if (wrapAmount > BigInt(0)) {
         await input.assertWallet();

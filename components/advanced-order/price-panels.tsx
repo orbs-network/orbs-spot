@@ -1,73 +1,24 @@
 "use client";
 
-import { usePriceDisplay, useTriggerPrice, useLimitPrice, useOrderModel } from "./use-order-form";
+import { usePriceDisplay, useTriggerPrice, useLimitPrice } from "./use-order-form";
 
-import BN from "bignumber.js";
-import { CurrencySelector } from "@/components/currency-selector";
-import { Button } from "@/components/ui/button";
-import { FormLabel } from "@/components/ui/form-label";
+import { FormLabel, InfoTooltip } from "@/components/ui/form-label";
 import { FormNumberField } from "@/components/ui/form-number-field";
 import { FormPanel } from "@/components/ui/form-panel";
 import { NumericInput } from "@/components/ui/numeric-input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { TokenSelectorTrigger } from "@/components/ui/token-selector-trigger";
-import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
-import { useCurrency } from "@/lib/hooks/use-currencies";
-import { useCurrenciesQuery } from "@/lib/hooks/use-currencies-query";
 import { useTranslations } from "@/lib/use-translations";
-import { Currency, Field } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Module, type Token } from "@orbs-network/spot-ui";
 import { ArrowLeftRightIcon, RotateCcwIcon } from "lucide-react";
-import { useCallback, useId } from "react";
+import { useId } from "react";
+import { numericFormatter } from "react-number-format";
 import styles from "./price-panels.module.css";
 import { formatPriceInputError } from "./utils";
-
-export function PriceTokenSelector({
-  className,
-  fallbackClassName,
-  field,
-  logoClassName,
-  token,
-}: {
-  className?: string;
-  fallbackClassName: string;
-  field: Field;
-  logoClassName: string;
-  token?: Token;
-}) {
-  const currency = useCurrency(token?.address);
-  const { isLoading: tokensLoading } = useCurrenciesQuery();
-  const { handleCurrencyChange } = useActionHandlers();
-  const onCurrencyChange = useCallback(
-    (currency: Currency) => handleCurrencyChange(currency.address, field),
-    [field, handleCurrencyChange],
-  );
-
-  return (
-    <CurrencySelector
-      onCurrencyChange={onCurrencyChange}
-      trigger={
-        <TokenSelectorTrigger
-          aria-label="Select price token"
-          currency={currency}
-          isLoading={tokensLoading}
-          symbol={token?.symbol}
-          logoUrl={token?.logoUrl || currency?.logoUrl}
-          className={cn(
-            "-mx-1 gap-1.5 px-1 py-0.5 hover:bg-primary/8 ",
-            className,
-          )}
-          logoClassName={logoClassName}
-          fallbackClassName={fallbackClassName}
-        />
-      }
-    />
-  );
-}
+import BN from "bignumber.js";
 
 function SpotPriceInput({
+  descriptionId,
   error,
   inputLabel,
   inputName,
@@ -77,6 +28,7 @@ function SpotPriceInput({
   percentage,
   onPercentageChange,
 }: {
+  descriptionId?: string;
   error?: string;
   inputLabel: string;
   inputName: string;
@@ -87,60 +39,58 @@ function SpotPriceInput({
   onPercentageChange: (value: string) => void;
 }) {
   const errorId = useId();
+  const unitId = `${errorId}-unit`;
+  const percentageHelpId = `${errorId}-percentage-help`;
+  const { marketRate } = usePriceDisplay();
+  const hasMarketRate = BN(marketRate).gt(0);
+  const change = BN(percentage || "0");
+  const percentageError = change.isFinite() && change.lte(-100) ? "Enter a percentage greater than -100%." : error;
+  const percentageHelp = hasMarketRate
+    ? "Edit the percentage relative to the current market price. Positive values are above market; negative values are below. The comparison follows the displayed token pair."
+    : "Current market price unavailable.";
+  const measuredAmount = numericFormatter(value || "0", {
+    thousandSeparator: ",", decimalSeparator: ".", decimalScale: 18,
+  });
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
-      <div data-spot-price-input data-invalid={Boolean(error)} className={styles.fields} role="group" aria-label={`${inputLabel} and market adjustment`}>
+      <div data-spot-price-input data-invalid={Boolean(percentageError)} className={styles.fields} role="group" aria-label={`${inputLabel} and market adjustment`}>
         <FormNumberField data-spot-price-value className={styles.rateField}>
           <div data-price-amount className={styles.amount}>
-            <NumericInput
-              error={error}
-              aria-describedby={error ? errorId : undefined}
-              aria-label={inputLabel}
-              name={inputName}
-              value={value}
-              onChange={onChange}
-              suffix={token?.symbol ? ` ${token.symbol}` : undefined}
-              placeholder={token?.symbol ? `0 ${token.symbol}` : "0"}
-              className="text-base font-semibold text-foreground"
-            />
+            <span className={styles.amountInput}>
+              <span aria-hidden="true" className={styles.amountMeasure}>{measuredAmount}</span>
+              <NumericInput
+                error={error}
+                aria-describedby={[token?.symbol ? unitId : undefined, descriptionId, error ? errorId : undefined].filter(Boolean).join(" ") || undefined}
+                aria-label={inputLabel}
+                name={inputName}
+                value={value}
+                onChange={onChange}
+                placeholder="0"
+                className="text-base font-semibold text-foreground"
+              />
+            </span>
+            {token?.symbol && <span id={unitId} title={token.symbol} className={styles.symbol}>{token.symbol}</span>}
           </div>
         </FormNumberField>
-        <FormNumberField className={styles.adjustmentField}>
+        <FormNumberField className={styles.adjustmentField} title={percentageHelp}>
           <NumericInput
-            error={error}
-            aria-describedby={error ? errorId : undefined}
+            error={percentageError}
+            aria-describedby={[percentageHelpId, descriptionId, percentageError ? errorId : undefined].filter(Boolean).join(" ")}
             aria-label={`${inputLabel} adjustment percentage`}
             name={`${inputName}-percentage`}
-            value={percentage}
+            value={hasMarketRate ? percentage : ""}
+            disabled={!hasMarketRate}
             onChange={onPercentageChange}
             className="text-center text-base font-semibold"
-            placeholder="+0%"
+            placeholder={hasMarketRate ? "+0%" : "—"}
             suffix="%"
             showPositiveSign
             allowNegative
           />
         </FormNumberField>
       </div>
-      {error && <p id={errorId} data-price-error role="alert" className="text-xs leading-relaxed text-destructive">{error}</p>}
-    </div>
-  );
-}
-
-function MarketRateSummary() {
-  const { marketRate, displayInputToken, displayOutputToken } = usePriceDisplay();
-  const { form, market } = useOrderModel();
-
-  if (!BN(form.inputAmount.raw).gt(0)) return null;
-
-  return (
-    <div data-market-rate-summary role="group" aria-label="Market rate" className="min-w-0 text-right">
-      {market.isLoading ? (
-        <Skeleton role="status" aria-label="Loading market rate…" className="h-4 w-36 max-w-full" />
-      ) : (
-        <p className="min-w-0 text-xs wrap-anywhere text-muted-foreground">
-          1 {displayInputToken?.symbol} = <span className="font-medium tabular-nums text-foreground"><span className="whitespace-nowrap">{marketRate || "—"}</span> {displayOutputToken?.symbol}</span>
-        </p>
-      )}
+      <span id={percentageHelpId} className="sr-only">{percentageHelp}</span>
+      {percentageError && <p id={errorId} data-price-error role="alert" className="text-xs leading-relaxed text-destructive">{percentageError}</p>}
     </div>
   );
 }
@@ -163,6 +113,21 @@ function PriceResetButton({ onClick, label = "Use market rate" }: { onClick: () 
   );
 }
 
+function PriceInvertButton() {
+  const { displayInputToken, displayOutputToken, isInverted, onInvert } = usePriceDisplay();
+  return <button
+    type="button"
+    aria-label="Invert price"
+    aria-pressed={isInverted}
+    title={`Show ${displayInputToken?.symbol ?? "input token"} per ${displayOutputToken?.symbol ?? "output token"}`}
+    onClick={onInvert}
+    disabled={!displayInputToken || !displayOutputToken}
+    className={cn(styles.marketAction, "min-w-8")}
+  >
+    <ArrowLeftRightIcon aria-hidden="true" className="size-3.5" />
+  </button>;
+}
+
 function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
   const t = useTranslations();
   const { displayInputToken, isInverted } = usePriceDisplay();
@@ -180,23 +145,28 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
   if (orderModule !== Module.STOP_LOSS && orderModule !== Module.TAKE_PROFIT) {
     return null;
   }
+  const activatesBelow = (orderModule === Module.STOP_LOSS) !== isInverted;
+  const activationHelp = `Activates at or ${activatesBelow ? "below" : "above"} this price.`;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div data-spot-price-label className="flex min-h-8 min-w-0 items-center justify-between gap-2">
+    <div className="flex flex-col gap-1">
+      <div data-spot-price-label className="flex min-h-7 min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <FormLabel
           className="min-w-0 gap-1"
-          textClassName="min-w-0 text-xs"
+          textClassName="min-w-0 text-xs text-foreground"
           tooltipAriaLabel="Trigger price information"
-          tooltip={`${t(
+          tooltip={`${activationHelp} ${t(
             orderModule === Module.STOP_LOSS
               ? "stopLossTooltip"
               : "takeProfitTooltip",
           )} ${t("triggerLimitRelationshipTooltip")}`}
         >
-          Trigger <span className="font-normal whitespace-nowrap">(1 {displayInputToken?.symbol})</span>
+          Trigger price <span className="font-normal whitespace-nowrap text-muted-foreground">(per 1 {displayInputToken?.symbol ?? "token"})</span>
         </FormLabel>
-        {canReset && <PriceResetButton onClick={onReset} label="Use default" />}
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          {canReset && <PriceResetButton onClick={onReset} label="Use default" />}
+          <PriceInvertButton />
+        </div>
       </div>
       <SpotPriceInput
         error={formatPriceInputError(error, isInverted, t)}
@@ -214,6 +184,8 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
 
 function LimitPricePanel({ orderModule }: { orderModule: Module }) {
   const t = useTranslations();
+  const toggleId = useId();
+  const descriptionId = `${toggleId}-description`;
   const { displayInputToken, isInverted } = usePriceDisplay();
   const {
     onInputChange,
@@ -229,30 +201,50 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
   } = useLimitPrice();
 
   const isTrigger = orderModule === Module.STOP_LOSS || orderModule === Module.TAKE_PROFIT;
+  const isOptional = orderModule !== Module.LIMIT;
   const limitHelp = orderModule === Module.TWAP
     ? "The limit applies to every individual trade. Trades only fill at your limit rate or better. If the market moves beyond the limit, remaining trades can stay unfilled until conditions improve or the order expires. The order may expire partially filled."
     : isTrigger ? t("triggerLimitRelationshipTooltip") : t("limitPriceTooltip");
   const priceHelp = isLimitPrice ? limitHelp : `${limitHelp} The market rate is an indicative reference, not a guaranteed execution price. It may change before a trade executes.`;
+  const modeDescription = isLimitPrice
+    ? orderModule === Module.TWAP ? "Each trade executes only at your limit price or better." : "Once triggered, execute only at your limit price or better."
+    : orderModule === Module.TWAP ? "Each trade uses the current market price." : "Once triggered, execute at the current market price.";
 
   return (
-    <div data-limit-price-panel className={cn("flex flex-col gap-2", isTrigger && "mt-2 border-t border-border/50 pt-5")}>
-      <div data-spot-price-label className="flex min-h-8 min-w-0 items-center justify-between gap-2">
-        <div className={cn("flex min-w-0 items-center gap-1.5", !isLimitPrice && "shrink-0")}>
-        {orderModule !== Module.LIMIT && (
+    <div data-limit-price-panel className={cn("flex flex-col gap-1.5", isTrigger && "mt-1")}>
+      {isOptional && (
+        <div data-limit-price-setting className={cn(styles.limitMode, isTrigger && styles.triggerLimitMode)}>
+          <div className={styles.limitModeCopy}>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <label htmlFor={toggleId} className="cursor-pointer text-sm font-medium text-foreground">Set a limit price</label>
+              <InfoTooltip tooltip={priceHelp} ariaLabel="Limit price information" iconClassName="size-3.5" />
+            </div>
+            <label id={descriptionId} htmlFor={toggleId} className={styles.limitModeHint}>{modeDescription}</label>
+          </div>
           <Switch
+            id={toggleId}
             checked={isLimitPrice}
             onCheckedChange={toggleLimitPrice}
-            aria-label="Toggle limit price"
+            aria-label="Set a limit price"
+            aria-describedby={descriptionId}
+            className={styles.limitSwitch}
           />
-        )}
-          <FormLabel className="min-w-0 gap-1" textClassName="min-w-0 text-xs" tooltip={priceHelp} tooltipAriaLabel="Limit price information">
-            Limit price {isLimitPrice && <span className="font-normal whitespace-nowrap">(1 {displayInputToken?.symbol})</span>}
-          </FormLabel>
         </div>
-        {isLimitPrice ? canReset && <PriceResetButton onClick={onReset} label={isTrigger ? "Use default" : "Use market rate"} /> : <MarketRateSummary />}
-      </div>
+      )}
+      {isLimitPrice && (
+        <div data-spot-price-label className="flex min-h-7 min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1">
+          <FormLabel className="min-w-0 gap-1" textClassName="min-w-0 text-xs" tooltip={isOptional ? undefined : priceHelp} tooltipAriaLabel="Limit price information">
+            Limit price <span className="font-normal whitespace-nowrap">(per 1 {displayInputToken?.symbol ?? "token"})</span>
+          </FormLabel>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {canReset && <PriceResetButton onClick={onReset} label={isTrigger ? "Use default" : "Use market rate"} />}
+            {!isTrigger && <PriceInvertButton />}
+          </div>
+        </div>
+      )}
       {isLimitPrice ? (
         <SpotPriceInput
+          descriptionId={isOptional ? descriptionId : undefined}
           error={formatPriceInputError(error, isInverted, t)}
           inputLabel="Limit price"
           inputName="limit-price"
@@ -267,28 +259,9 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
   );
 }
 
-function PricesHeader() {
-  const { onInvert, inputToken, outputToken } = usePriceDisplay();
-
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-medium text-muted-foreground">
-        <span>Sell</span>
-        <PriceTokenSelector token={inputToken} field={Field.INPUT} logoClassName="size-4" fallbackClassName="text-[7px]" />
-        <span>for</span>
-        <span className="break-all text-foreground">{outputToken?.symbol ?? "Select token"}</span>
-      </div>
-      <Button variant="ghost" size="icon" onClick={onInvert} aria-label="Invert rate">
-        <ArrowLeftRightIcon aria-hidden="true" className="size-4" />
-      </Button>
-    </div>
-  );
-}
-
 export function PricesPanel({ orderModule }: { orderModule: Module }) {
   return (
-    <FormPanel data-order-prices-panel className="flex flex-col gap-2">
-      <PricesHeader />
+    <FormPanel data-order-prices-panel className="flex flex-col gap-1.5">
       <TriggerPricePanel orderModule={orderModule} />
       <LimitPricePanel orderModule={orderModule} />
     </FormPanel>

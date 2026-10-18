@@ -13,6 +13,7 @@ import { useConnection } from "wagmi";
 import { useSwapStore } from "./store";
 import { useMemo } from "react";
 import { useIsSwapTab } from "./use-form-tab";
+import { getNativeConversion } from "../native-conversion";
 
 const stopQuoteLiquidityHub = (_error?: string) => {
   if (!_error) return false;
@@ -110,23 +111,27 @@ export const useTrade = (
   parsedInputAmount = ""
 ) => {
   const isSwapTab = useIsSwapTab();
+  const chainId = useDataChainId();
+  const usesLiquidityHubQuote = isSwapTab && !getNativeConversion(
+    inputCurrency?.address, outputCurrency?.address, getWrappedNativeCurrency(chainId)?.address,
+  );
   const liquidityHubQuote = useQuoteLiquidityHub(
     inputCurrency,
     outputCurrency,
     parsedInputAmount,
-    isSwapTab
+    usesLiquidityHubQuote
   );
 
   return useMemo(
     () => ({
-      error: isSwapTab ? liquidityHubQuote.error : null,
-      isLoading: isSwapTab ? liquidityHubQuote.isLoading : false,
+      error: usesLiquidityHubQuote ? liquidityHubQuote.error : null,
+      isLoading: usesLiquidityHubQuote ? liquidityHubQuote.isLoading : false,
       refetch: liquidityHubQuote.refetch,
-      data: isSwapTab ? liquidityHubQuote.data : undefined,
-      usesLiquidityHubQuote: isSwapTab,
+      data: usesLiquidityHubQuote ? liquidityHubQuote.data : undefined,
+      usesLiquidityHubQuote,
     }),
     [
-      isSwapTab,
+      usesLiquidityHubQuote,
       liquidityHubQuote.data,
       liquidityHubQuote.error,
       liquidityHubQuote.isLoading,

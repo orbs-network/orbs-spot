@@ -7,107 +7,75 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
 import { useTranslations } from "@/lib/use-translations";
-import { IS_ORBS } from "@/lib/partners/client";
-import { Module } from "@orbs-network/spot-ui";
-import { ExecutionStatus } from "@/lib/spot/execution";
-import { useSubmitButton } from "./use-order-execution";
-import { useCallback, useEffect, useRef } from "react";
+import { Module, type Order } from "@orbs-network/spot-ui";
+import { ExecutionPhase } from "@/lib/spot/execution";
+import { useOrderExecution } from "./use-order-execution";
+import { useEffect, useState } from "react";
 import { useConnection } from "wagmi";
-import { Field } from "@/lib/types";
 import { getOrderTitle } from "./utils";
-import { useSubmitOrderExecution } from "./use-submit-order-execution";
 import { SubmitOrderPanel } from "./review-panel";
+import { useOrderReview } from "./use-order-review";
+import { OrderDetailsModal } from "@/features/order-history/details-modal";
 
 export function SubmitOrder({ orderModule }: { orderModule: Module }) {
-  const { isDeveloperMode } = useDeveloperMode();
+  const { isDeveloperPlayground } = useDeveloperMode();
   const t = useTranslations();
-  const {
-    submitOrder: onSubmit,
-    status,
-    startNewOrder: resetState,
-    returnToOrderForm: resetCurrentSwap,
-    error: parsedError,
-    isExecuting: confirmButtonLoading,
-    isRejected,
-  } = useSubmitOrderExecution();
-  const { disabled, loading } = useSubmitButton();
-  const isFetchingQuote = loading && !confirmButtonLoading;
-  const { handleCurrencyChange, setInputAmount } = useActionHandlers();
+  const execution = useOrderExecution();
+  const [previewOrder, setPreviewOrder] = useState<Order>();
+  const { phase, view, isSubmitting, submitDisabled, quoteLoading, returnToReview } = execution;
+  const isFetchingQuote = quoteLoading && !isSubmitting;
+  const { setInputAmount } = useActionHandlers();
   const pendingWrappedInputAddress = useOrderSubmitFlowStore(
     (state) => state.pendingWrappedInputAddress,
   );
-  const setPendingWrappedInputAddress = useOrderSubmitFlowStore(
-    (state) => state.setPendingWrappedInputAddress,
-  );
-  const { chainId, address: account } = useConnection();
-  const pendingWrappedContext = useOrderSubmitFlowStore(state => state.pendingWrappedContext);
+  const { chainId, address } = useConnection();
   const open = useOrderSubmitFlowStore(state => state.isReviewOpen);
   const setOpen = useOrderSubmitFlowStore(state => state.setReviewOpen);
   useEffect(() => {
-    if (isDeveloperMode) setOpen(false);
+    if (isDeveloperPlayground) setOpen(false);
     return () => setOpen(false);
-  }, [isDeveloperMode, setOpen]);
-  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  useEffect(() => () => clearTimeout(resetTimer.current), []);
+  }, [isDeveloperPlayground, setOpen]);
   const orderTitle = getOrderTitle(orderModule, t);
-  const dialogTitle = parsedError
-    ? "Order not submitted"
-    : !status
-      ? t("orderReview")
-      : status === ExecutionStatus.SUCCESS
-        ? "Order placed"
-        : "Order execution";
+  const order = useOrderReview();
+  const orderType = order.form.module === Module.LIMIT
+    ? orderTitle
+    : `${orderTitle} ${order.form.values.isMarketOrder ? "Market" : "Limit"}`;
 
   useEffect(() => {
-    if (isRejected) resetCurrentSwap();
-  }, [isRejected, resetCurrentSwap]);
+    if (phase === ExecutionPhase.REJECTED) returnToReview();
+  }, [phase, returnToReview]);
 
   useEffect(() => {
-    if (open || !pendingWrappedInputAddress) return;
+    if (open || isSubmitting || (view === "review" && !pendingWrappedInputAddress)) return;
 
-    // The wrapping callback can finish before or after the user closes the
-    // dialog. Let its close animation finish before mutating the form.
-    const switchTokenTimer = window.setTimeout(() => {
-      if (pendingWrappedContext && pendingWrappedContext.chainId === chainId && pendingWrappedContext.account.toLowerCase() === account?.toLowerCase()) {
-        handleCurrencyChange(pendingWrappedInputAddress, Field.INPUT);
-      }
-      setPendingWrappedInputAddress(undefined);
-    }, 400);
+    // Reset after the close animation. If a wallet action finishes while the
+    // dialog is closed, wait for it before applying a confirmed wrapped input.
+    const timer = window.setTimeout(returnToReview, 400);
+    return () => window.clearTimeout(timer);
+  }, [open, isSubmitting, view, pendingWrappedInputAddress, returnToReview]);
 
-    return () => window.clearTimeout(switchTokenTimer);
-  }, [
-    handleCurrencyChange,
-    open,
-    pendingWrappedInputAddress,
-    pendingWrappedContext,
-    chainId,
-    account,
-    setPendingWrappedInputAddress,
-  ]);
-
-  const onOpen = useCallback(() => {
+  function openReview() {
     trackFunnel({ name: "review_opened", product: "advanced" });
-    clearTimeout(resetTimer.current);
+    if (!isSubmitting) returnToReview();
     setOpen(true);
-    if (status !== ExecutionStatus.LOADING) {
-      resetCurrentSwap();
-    }
-  }, [resetCurrentSwap, setOpen, status]);
+  }
 
-  const closeReview = useCallback(() => {
+  function closeReview() {
     setOpen(false);
-    if (status === ExecutionStatus.SUCCESS) {
-      setInputAmount("");
-      resetTimer.current = setTimeout(resetState, 400);
-    } else if (status) {
-      resetTimer.current = setTimeout(resetCurrentSwap, 400);
-    }
-  }, [resetCurrentSwap, resetState, setInputAmount, setOpen, status]);
+    if (view === "success") setInputAmount("");
+  }
 
-  if (isDeveloperMode) {
+  function viewOrder() {
+    if (!execution.order) return;
+    // Retain the created order independently of the submission flow's reset.
+    setPreviewOrder(execution.order);
+    closeReview();
+  }
+
+  if (isDeveloperPlayground) {
     return (
       <div className="flex w-full items-center gap-2">
-        <LiveOrderFlowTrigger mode="live" submitDisabled={disabled || loading} />
+        <LiveOrderFlowTrigger mode="live" submitDisabled={submitDisabled || quoteLoading} />
         <LiveOrderFlowTrigger mode="demo" />
       </div>
     );
@@ -118,11 +86,11 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
       <div className="min-w-0 flex-1">
         <Dialog
           open={open}
-          onOpenChange={(nextOpen) => (nextOpen ? onOpen() : closeReview())}
+          onOpenChange={(nextOpen) => (nextOpen ? openReview() : closeReview())}
         >
           <SubmitSwapButton
-            onClick={onOpen}
-            disabled={disabled}
+            onClick={openReview}
+            disabled={submitDisabled}
             isLoading={isFetchingQuote}
             text={isFetchingQuote ? t("fetchingQuote") : "Review"}
             validateSwap={false}
@@ -132,22 +100,28 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
             data-trade-review
             data-order-submit-review
             presentation="center"
-            className={`flex flex-col w-[calc(100vw-1rem)] overflow-hidden ${IS_ORBS ? "sm:max-w-[520px]" : "sm:max-w-[460px]"}`}
+            onCloseAutoFocus={event => { if (previewOrder) event.preventDefault(); }}
+            className="flex flex-col w-[calc(100vw-1rem)] overflow-hidden sm:max-w-[460px]"
           >
-            {IS_ORBS && (status || parsedError) ? (
-              <DialogTitle className="sr-only">{dialogTitle}</DialogTitle>
-            ) : (
-              <DialogHeader><DialogTitle>{dialogTitle}</DialogTitle></DialogHeader>
-            )}
+            <DialogHeader><DialogTitle>{view === "success" ? "Order placed" : orderType}</DialogTitle></DialogHeader>
             <div data-review-scroll className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto overscroll-contain">
-              <SubmitOrderPanel
-                orderTitle={orderTitle}
-                onSubmit={onSubmit}
-                isSubmitting={confirmButtonLoading}
-              />
+              <SubmitOrderPanel execution={execution} onClose={closeReview} onViewOrder={viewOrder} />
             </div>
           </DialogContent>
         </Dialog>
+        <OrderDetailsModal
+          orderId={previewOrder?.historyKey}
+          order={previewOrder}
+          chainId={previewOrder?.chainId ?? chainId ?? 0}
+          hasWallet={Boolean(address)}
+          loading={false}
+          error={null}
+          onClose={() => setPreviewOrder(undefined)}
+          onCloseAutoFocus={event => {
+            event.preventDefault();
+            document.querySelector<HTMLInputElement>('[data-advanced-order-content] [name="source-amount"]')?.focus({ preventScroll: true });
+          }}
+        />
       </div>
     </div>
   );

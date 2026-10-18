@@ -65,6 +65,10 @@ html[data-partner="orbs"] [data-form-container] {
   backdrop-filter: none;
 }
 
+html[data-partner="orbs"] [data-form-container]:has([data-trade-details]) {
+  padding-bottom: 12px;
+}
+
 html[data-partner="orbs"] [data-form-section-header] h2,
 html[data-partner="orbs"] [data-history-page] h1 {
   font-size: 24px;
@@ -150,11 +154,11 @@ html[data-partner="orbs"] :where([data-percentage-button], [data-token-selector-
 html[data-partner="orbs"] [data-nav-pill][data-chain-selector-trigger],
 html[data-partner="orbs"] [data-chain-option] { cursor: pointer; }
 
-html[data-partner="orbs"] [data-slot="select-trigger"][data-chain-selector-trigger]:is(:focus-visible, [data-state="open"]):not(:disabled) {
+html[data-partner="orbs"] [data-slot="select-trigger"][data-selector-trigger]:is(:focus-visible, [data-state="open"]):not(:disabled) {
   background: var(--orbs-accent-tint);
   border-color: transparent;
 }
-html[data-partner="orbs"] [data-chain-option]:focus-visible:not(:disabled) {
+html[data-partner="orbs"] :is([data-chain-option], [data-selector-option]):focus-visible:not(:disabled) {
   background: var(--orbs-accent-tint);
   color: var(--primary);
 }
@@ -224,6 +228,8 @@ html[data-partner="orbs"] [data-trade-review] {
   overflow: hidden;
 }
 
+html[data-partner="orbs"] :is([data-order-submit-review], [data-orbs-swap-review]) { gap: 12px; }
+
 html[data-partner="orbs"] [data-trade-review] > [data-slot="dialog-header"] { flex-shrink: 0; }
 html[data-partner="orbs"] [data-review-scroll] { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 
@@ -235,7 +241,7 @@ html[data-partner="orbs"] [data-trade-review] [data-slot="dialog-header"] {
 }
 
 html[data-partner="orbs"] [data-trade-review] [data-slot="dialog-title"] {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1.4;
   letter-spacing: -0.01em;
   text-transform: none;
@@ -252,6 +258,12 @@ html[data-partner="orbs"] [data-review-asset] {
   gap: 20px;
 }
 html[data-partner="orbs"] [data-review-asset-values] { min-width: 0; }
+html[data-partner="orbs"] [data-review-asset-label] {
+  margin-bottom: 5px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+}
 html[data-partner="orbs"] [data-review-asset-amount] p {
   font-size: 22px;
   line-height: 1.3;
@@ -272,6 +284,10 @@ html[data-partner="orbs"] [data-review-asset-icon] {
   flex-shrink: 0;
   width: 44px;
   height: 44px;
+}
+html[data-partner="orbs"] [data-review-asset-icon] > [data-slot="avatar"] {
+  width: 100%;
+  height: 100%;
 }
 html[data-partner="orbs"] [data-review-direction] {
   display: flex;
@@ -373,29 +389,6 @@ html[data-partner="orbs"] [data-order-progress] > div > div {
   background: var(--primary);
 }
 
-html[data-partner="orbs"] .orbs_MainToken {
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border);
-  align-items: flex-start;
-  gap: 8px;
-  min-width: 0;
-}
-
-html[data-partner="orbs"] .orbs_MainTokenTitle {
-  font-size: 11px;
-  font-weight: 400;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted-foreground);
-}
-
-html[data-partner="orbs"] .orbs_MainTokenAmount {
-  font-size: 20px;
-  font-weight: 500;
-  letter-spacing: -0.025em;
-  overflow-wrap: anywhere;
-}
-
 html[data-partner="orbs"] [data-flow-success-icon] {
   border-radius: 14px;
   border-color: var(--border);
@@ -418,20 +411,10 @@ html[data-partner="orbs"] [data-sonner-toast][data-styled="true"] {
   html[data-partner="orbs"] [data-percentage-button] { padding-inline: 6px; font-size: 10px; }
 }
 
-html[data-partner="orbs"] :is(.orbs_Main, [data-history-token-pair]) {
+html[data-partner="orbs"] [data-history-token-pair] {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
-}
-
-html[data-partner="orbs"] .orbs_MainTokenLeft {
-  min-width: 0;
-}
-
-html[data-partner="orbs"] .orbs_MainToken .token-logo {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
 }
 
 html[data-partner="orbs"] [data-history-token-pair] {
@@ -462,7 +445,7 @@ html[data-partner="orbs"] [data-flow-error-icon] {
 }
 
 /* The shared header keeps product navigation visible at every screen size. */
-html[data-partner="orbs"] .ef-app-shell {
+html[data-partner="orbs"] .app-shell {
   background:
     radial-gradient(ellipse 650px 480px at 35% 190px, var(--orbs-wash-purple), transparent 75%),
     radial-gradient(ellipse 600px 460px at 75% 340px, var(--orbs-wash-blue), transparent 75%),
@@ -525,9 +508,6 @@ html[data-partner="orbs"] [data-trading-modes] :is(a, [data-trading-mode-placeho
   color: var(--primary);
 }
 html[data-partner="orbs"] [data-product-mark] { flex-shrink: 0; }
-html[data-partner="orbs"] [data-product-mark="spot"] { color: #5145ff; }
-html[data-partner="orbs"] [data-product-mark="perps"] { color: #d980df; }
-html.dark[data-partner="orbs"] [data-product-mark="spot"] { color: #b4a4ff; }
 html[data-partner="orbs"] [data-trading-card] { display: block; min-width: 0; }
 html[data-partner="orbs"] [data-spot-order-navigation] {
   display: flex;
@@ -1171,7 +1151,7 @@ html[data-partner="orbs"] [data-mobile-navigation-menu] { display: none; }
   html[data-partner="orbs"] [data-nav-wordmark] { display: inline; font-size: 19px; letter-spacing: .12em; }
   html[data-partner="orbs"] [data-nav-actions] { grid-column: 3; min-width: 0; gap: 0; }
   html[data-partner="orbs"] [data-header-theme-toggle] { display: none; }
-  html[data-partner="orbs"] [data-primary-nav-pill]:has([data-mobile-connect-label]) { height: 40px; min-height: 40px; padding-inline: 16px; border-radius: 14px; font-weight: 600; font-size: 12px; }
+  html[data-partner="orbs"] [data-primary-nav-pill]:has([data-mobile-connect-label]) { width: auto; height: 40px; min-height: 40px; padding-inline: 16px; border-radius: 14px; font-weight: 600; font-size: 12px; white-space: nowrap; }
   html[data-partner="orbs"] [data-trading-navigation] { width: calc(100% + 40px); margin: 8px -20px 0; padding-inline: 22px; min-height: 44px; }
   html[data-partner="orbs"] [data-trading-modes] { gap: 12px; }
   html[data-partner="orbs"] [data-trading-modes] :is(a, [data-trading-mode-placeholder]) { display: inline-flex; align-items: center; justify-content: center; position: relative; font-size: 14px; font-weight: 400; color: var(--orbs-secondary-text); white-space: nowrap; cursor: pointer; }
@@ -1203,6 +1183,7 @@ html[data-partner="orbs"] [data-mobile-navigation-menu] { display: none; }
   html[data-partner="orbs"] [data-app-header] { padding-inline: 14px; }
   html[data-partner="orbs"] [data-nav-layout] { column-gap: 7px; }
   html[data-partner="orbs"] [data-nav-wordmark] { font-size: 16px; }
+  html[data-partner="orbs"] [data-nav-layout]:has([data-developer-navigation]) [data-nav-wordmark] { display: none; }
   html[data-partner="orbs"] [data-primary-nav-pill]:has([data-mobile-connect-label]) { padding-inline: 10px; font-size: 11px; }
   html[data-partner="orbs"] [data-trading-navigation] { width: calc(100% + 28px); margin-inline: -14px; padding-inline: 20px; }
   html[data-partner="orbs"] [data-percentage-button] { min-width: 0; flex: 1; padding-inline: 8px; }
@@ -1318,18 +1299,28 @@ html[data-partner="orbs"] [data-spot-order-navigation] :is(a, [data-order-tab-pl
   }
 }
 html[data-partner="orbs"] [data-form-container] { border-radius: 28px; }
-html[data-partner="orbs"] [data-nav-actions] :is([data-chain-selector-trigger], [data-wallet-account-trigger]) {
+html[data-partner="orbs"] [data-nav-actions] :is([data-selector-trigger], [data-wallet-account-trigger]) {
   height: 40px;
   min-height: 40px;
 }
 @media (max-width: 767px) {
   html[data-partner="orbs"] [data-history-view-tabs] { width: 100%; }
   html[data-partner="orbs"] [data-nav-actions] { max-width: 100%; gap: 6px; }
+  html[data-partner="orbs"] [data-nav-account-actions] { gap: 6px; }
   html[data-partner="orbs"] [data-header-network-selector] { flex-shrink: 0; }
-  html[data-partner="orbs"] [data-header-network-selector] [data-chain-selector-trigger] { padding-inline: 8px; gap: 4px; }
+  html[data-partner="orbs"] [data-header-network-selector] [data-selector-trigger] { padding-inline: 8px; gap: 4px; }
   html[data-partner="orbs"] [data-header-network-selector] [data-network-name] { display: none; }
   html[data-partner="orbs"] [data-wallet-account-trigger] { min-width: 0; max-width: 124px; flex-shrink: 1; }
   html[data-partner="orbs"] [data-wallet-account-label] { flex-shrink: 1; overflow: hidden; }
+}
+
+/* Debug trading controls share a separate mobile header row. */
+@media (max-width: 767px) {
+  html[data-partner="orbs"] [data-nav-layout]:has([data-partner-selector]) [data-nav-actions] { display: contents; }
+  html[data-partner="orbs"] [data-nav-layout]:has([data-partner-selector]) [data-nav-account-actions] { grid-column: 3; grid-row: 1; justify-self: end; }
+  html[data-partner="orbs"] [data-header-network-selector]:has([data-partner-selector]) { grid-column: 1 / -1; grid-row: 2; justify-content: flex-end; padding-top: 8px; }
+  html[data-partner="orbs"] [data-nav-layout]:has([data-partner-selector]) [data-trading-navigation] { grid-row: 3; }
+  html[data-partner="orbs"] body:has([data-app-header] [data-partner-selector]) #main-content { padding-top: 160px; }
 }
 
 /* Keep the mobile Orders controls in two compact rows. */

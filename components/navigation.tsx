@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { ChevronDownIcon, CopyIcon, LogOutIcon, WalletIcon, SunIcon, MoonIcon, ExternalLinkIcon } from "lucide-react";
 import { useConnection, useDisconnect } from "wagmi";
-import { preserveDeveloperModeInHref, useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 import { SUPPORTED_CHAINS } from "@/lib/consts";
 import { cn, makeEllipsisAddress } from "@/lib/utils";
 import { DeveloperNavigation, DeveloperMoreNavigation } from "@developer-tools";
@@ -16,10 +15,11 @@ import type { PartnerBrand } from "@/lib/partners/types";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Spinner } from "./ui/spinner";
 import { useWalletConnectModal } from "@/features/wallet-connection/provider";
-import { IS_ORBS } from "@/lib/partners/client";
 import { TradingNavigation } from "./trading-navigation";
 import { TradeNetworkSelector } from "./trade-network-selector";
 import { MobileNavigationMenu } from "./mobile-navigation-menu";
+import { PartnerSelector } from "@/features/partner-selector/partner-selector";
+import { getTradingPathname } from "@/lib/developer-routes";
 
 function PopoverMenuButton({
   children,
@@ -168,7 +168,7 @@ const NavWalletControls = () => {
             >
               <WalletIcon data-connect-wallet-icon aria-hidden="true" className="size-4 sm:hidden" />
               <span data-connect-wallet-label className="hidden sm:inline">Connect Wallet</span>
-              {IS_ORBS && <span data-mobile-connect-label className="hidden">Connect Wallet</span>}
+              <span data-mobile-connect-label className="hidden">Connect Wallet</span>
             </NavPillButton>
           );
         }
@@ -190,18 +190,17 @@ const NavWalletControls = () => {
 };
 
 export function Navigation({ brand }: { brand: PartnerBrand }) {
-  const { isDeveloperMode } = useDeveloperMode();
-  const pathname = usePathname();
+  const pathname = getTradingPathname(usePathname());
   const isDeveloperGuideRoute = pathname === "/developers" || pathname.startsWith("/developers/");
   const isOrdersRoute = pathname === "/orders" || pathname.startsWith("/orders/");
 
   return (
     <header data-app-header className="fixed left-0 right-0 top-0 z-50 w-full max-w-none rounded-none border-0 px-4 py-3 shadow-none [background:var(--nav-background)] backdrop-blur-xl">
       <div data-nav-layout className="flex w-full flex-nowrap items-center gap-2 sm:gap-3">
-        {IS_ORBS && <MobileNavigationMenu />}
+        <MobileNavigationMenu />
         <AppLink
           data-nav-brand
-          href={preserveDeveloperModeInHref("/", isDeveloperMode)}
+          href="/"
           className="flex min-h-8 min-w-0 shrink items-center gap-2.5 no-underline"
           aria-label={`${brand.name} trading`}
         >
@@ -230,17 +229,20 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
             </span>
           )}
         </AppLink>
-        {IS_ORBS && <TradingNavigation />}
+        <TradingNavigation />
         <div data-nav-actions className="ml-auto flex w-auto shrink-0 items-center justify-end gap-1.5 sm:gap-2">
-          <DeveloperNavigation />
-          {!isDeveloperGuideRoute && (
-            <>
-              {IS_ORBS && !isOrdersRoute && <div data-header-network-selector><TradeNetworkSelector /></div>}
-              <NavWalletControls />
-            </>
+          {!isDeveloperGuideRoute && !isOrdersRoute && (
+            <div data-header-network-selector className="flex min-w-0 items-center gap-2">
+              <PartnerSelector />
+              <TradeNetworkSelector />
+            </div>
           )}
-          <DeveloperMoreNavigation isDeveloperMode={isDeveloperMode} />
-          <div data-header-theme-toggle><ThemeToggle /></div>
+          <div data-nav-account-actions className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <DeveloperNavigation />
+            {!isDeveloperGuideRoute && <NavWalletControls />}
+            <DeveloperMoreNavigation />
+            <div data-header-theme-toggle><ThemeToggle /></div>
+          </div>
         </div>
       </div>
     </header>

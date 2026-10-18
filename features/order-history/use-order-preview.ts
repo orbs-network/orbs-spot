@@ -26,7 +26,8 @@ export function useOrderPreview({ orderId, order, chainId, hasWallet, loading, e
   const linked = useOrderPage(chainId, orderId ?? "", linkedAccount, Boolean(orderId && supportedRequestedChain && !order));
   const currentPreview = {
     orderId,
-    order: order ?? linked.order,
+    // History may have refreshed after a newly created order was supplied here.
+    order: linked.order ?? order,
     chainId,
     loading: linkedAccount || linked.isFetched ? linked.isLoading : loading || linked.isLoading,
     error: error ?? linked.error,

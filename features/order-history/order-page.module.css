@@ -21,20 +21,20 @@
 .sectionHeading h2 { display: flex; align-items: center; gap: 8px; }
 .count { display: grid; min-width: 24px; height: 24px; padding-inline: 6px; place-items: center; border-radius: 8px; background: var(--secondary); font-size: 12px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
 .fills { margin-top: 0; list-style: none; }
-.fill { padding: 6px 0; border-bottom: 1px solid var(--border); }
-.fill:last-child { border-bottom: 0; }
+.fill { padding: 12px 0; border-bottom: 1px solid var(--border); }
+.fill:first-child { padding-top: 6px; }
+.fill:last-child { padding-bottom: 6px; border-bottom: 0; }
 .fillContent { flex: 1; min-width: 0; }
 .fillHeading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 8px; align-items: center; }
-.fillHeading h3 { font-size: 12px; font-weight: 500; }
-.fillHeading > p { font-size: 11px; line-height: 1.4; text-align: right; }
-.fillAmounts { display: flex; flex-wrap: wrap; gap: 2px 16px; margin-top: 4px; }
-.fillAmounts > div { display: flex; align-items: baseline; gap: 5px; min-width: 0; }
+.fillHeading h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; font-size: 12px; font-weight: 500; }
+.fillHeading > p { margin-left: auto; font-size: 11px; line-height: 1.4; text-align: right; }
+.fillAmounts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 6px; }
+.fillAmounts > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .fillAmounts dt { font-size: 11px; color: var(--muted-foreground); }
-.fillAmounts dd { min-width: 0; font-size: 12px; font-weight: 500; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
-.fillAmounts dd span { font: inherit; }
-.fillRate { flex-basis: 100%; }
-.fillTransaction { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; }
-.fillTransaction > span { margin-right: auto; font-size: 11px; }
+.fillAmounts dd { min-width: 0; font-size: 14px; line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.fillAmounts dd span { font-size: 12px; font-weight: 400; color: var(--muted-foreground); }
+.fillRate { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: baseline; gap: 8px 12px; margin-top: 6px; color: var(--muted-foreground); font-size: 11px; line-height: 1.5; }
+.fillRate dd { min-width: 0; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .transactionLink { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; border-radius: 6px; color: var(--primary); }
 .transactionLink:focus-visible, .copyId:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .emptyActivity { display: flex; align-items: center; flex-direction: column; gap: 10px; padding: 40px 24px; text-align: center; background: var(--secondary); border-radius: 18px; margin-top: 20px; }

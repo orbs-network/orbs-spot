@@ -19,8 +19,6 @@ import { useHistoryOrdersQuery } from "@/lib/hooks/use-history-orders-query";
 import { isMockOrder } from "@/lib/spot/mock-orders";
 import { watchCancelledOrder } from "@/lib/spot/cancel-status";
 import { useOrderCancelling } from "@/lib/spot/use-order-cancelling";
-import { SPOT_CHAINS } from "@/lib/consts";
-import { getActiveSpotPartner } from "@/lib/partners/spot";
 import { cancelOrder as cancelSdkOrder } from "@/lib/spot/cancellation";
 import { describeOrder } from "@/lib/spot/history";
 import type { HistoryOrder } from "@/lib/spot/order-tokens";
@@ -32,15 +30,17 @@ import {
 } from "@/lib/tx-rejection";
 import { CANCEL_ORDER_TOAST_ID } from "./constants";
 import { useWalletInteractions } from "./hooks";
+import { useSpotPartner } from "@/lib/hooks/use-spot-partner";
+import { useSpotPartnerChains } from "@/lib/hooks/use-spot-partner-chains";
 
 export function useClient(requestedChainId?: number, enabled = true) {
   const connectedChainId = useDataChainId();
   const chainId = requestedChainId ?? connectedChainId;
-  const partner = getActiveSpotPartner();
+  const { partner, chains } = useSpotPartnerChains(enabled);
   // The host cache owns one client per partner/chain; failed initialization can retry.
   return useQuery({
     ...spotClientQueryOptions(partner, chainId),
-    enabled: enabled && SPOT_CHAINS.some((chain) => chain.id === chainId),
+    enabled: enabled && chains.some((chain) => chain.id === chainId),
   });
 }
 
@@ -58,15 +58,16 @@ export function useOrders(enabled = true) {
 
 /** One observer on the existing form, independent of form-input subscriptions. */
 export function useHistoryNotifications(orders: Order[]) {
+  const { partner } = useSpotPartner();
   const { refetch: refetchBalances } = useBalances();
   const { address } = useConnection();
   const chainId = useDataChainId();
   const previous = useRef<{ key: string; orders: Order[] } | undefined>(
     undefined,
   );
-  const key = `${chainId}:${address}`;
+  const key = `${partner}:${chainId}:${address}`;
   useEffect(() => {
-    // Establish a baseline on first load/account change; notify only on later transitions.
+    // Establish a baseline when the partner, network, or account changes.
     if (previous.current?.key === key) {
       const byKey = new Map(
         previous.current.orders.map((order) => [order.historyKey, order]),
@@ -92,18 +93,19 @@ export function useHistoryNotifications(orders: Order[]) {
 }
 
 export function useCancelOrder(order?: Order) {
+  const { partner } = useSpotPartner();
   const wallet = useWalletInteractions();
   const { address } = useConnection();
   const queryClient = useQueryClient();
   const isOrderCancelling = useOrderCancelling(order);
   // Cancellation is a wallet write: start it only from an explicit user action.
   const mutation = useMutation({
-    mutationKey: spotKeys.cancellation(getActiveSpotPartner(), order?.chainId, address, order?.historyKey),
+    mutationKey: spotKeys.cancellation(partner, order?.chainId, address, order?.historyKey),
     mutationFn: async () => {
       if (isMockOrder(order)) throw new Error("Sample orders are read-only");
       if (!order || !address)
         throw new Error("Connect the order's wallet and network to cancel");
-      const client = await queryClient.fetchQuery(spotClientQueryOptions(getActiveSpotPartner(), order.chainId, true));
+      const client = await queryClient.fetchQuery(spotClientQueryOptions(partner, order.chainId, true));
       const hash = await cancelSdkOrder(client, wallet, order, address);
       return {
         hash,
@@ -157,6 +159,7 @@ export function useHistoryOrder(
   inputToken?: Token,
   outputToken?: Token,
 ) {
+  const { partner } = useSpotPartner();
   return useMemo(
     () =>
       order
@@ -165,10 +168,10 @@ export function useHistoryOrder(
             inputToken,
             outputToken,
             order.version === 1
-              ? getTwapConfig(getActiveSpotPartner(), order.chainId)
+              ? getTwapConfig(partner, order.chainId)
               : undefined,
           )
         : undefined,
-    [order, inputToken, outputToken],
+    [order, inputToken, outputToken, partner],
   );
 }

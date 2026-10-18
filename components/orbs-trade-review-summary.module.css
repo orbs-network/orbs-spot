@@ -1,33 +1,30 @@
-:global(html[data-partner="orbs"]) .orderSummary:global([data-orbs-trade-summary]) {
+:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 8px;
   padding: 8px 0 20px;
   border-bottom: 1px solid var(--border);
 }
-:global(html[data-partner="orbs"]) .orderSummary:global([data-orbs-trade-summary]) :global([data-review-asset]) {
+:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-direction]) {
+  margin: 0;
+}
+:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset]) {
   gap: 16px;
 }
-:global(html[data-partner="orbs"]) .orderSummary:global([data-orbs-trade-summary]) :global([data-review-asset-label]) {
-  margin-bottom: 5px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--muted-foreground);
-}
-:global(html[data-partner="orbs"]) .orderSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) {
+:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) {
   display: block;
 }
-:global(html[data-partner="orbs"]) .orderSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) p {
-  font-size: clamp(22px, 5.6vw, 26px);
+:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) p {
+  font-size: clamp(20px, 5vw, 22px);
   font-weight: 500;
   line-height: 1.2;
 }
-:global(html[data-partner="orbs"]) .orderSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) > span {
+:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) > span {
   display: block;
   margin-top: 4px;
   font-size: 12px;
 }
-:global(html[data-partner="orbs"]) .orderSummary:global([data-orbs-trade-summary]) :global([data-review-asset-icon]) {
-  width: 40px;
-  height: 40px;
+:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-icon]) {
+  width: 36px;
+  height: 36px;
 }

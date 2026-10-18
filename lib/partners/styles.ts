@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import type { PartnerStyles } from "./config";
+import type { PartnerStyles } from "./types";
 
 type PartnerCssVariables = CSSProperties & Record<`--${string}`, string>;
 

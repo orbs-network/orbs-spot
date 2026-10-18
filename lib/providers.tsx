@@ -3,16 +3,13 @@ import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { darkTheme, lightTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { useTheme } from "./theme";
-import { getThemeStyles } from "./partners/themes";
-import { Spinner } from "@/components/ui/spinner";
 import dynamic from "next/dynamic";
 import { WagmiProvider } from "wagmi";
-import type { PartnerBrand, PartnerStyles } from "./partners/types";
+import type { PartnerBrand } from "./partners/types";
 import { QueryProvider } from "./query-provider";
 import { useWagmiConfig } from "./wagmi-config";
 import { WalletReturnReconnect } from "@/features/wallet-connection/return-reconnect";
 import { WalletConnectionProvider } from "@/features/wallet-connection/provider";
-import { IS_ORBS } from "./partners/client";
 import { AppLoading } from "@/components/app-loading";
 import { PendingSwapMonitor } from "@/features/swap/activity";
 import { useIsMobile } from "./hooks/use-is-mobile";
@@ -35,12 +32,7 @@ const createQueryClient = () => new QueryClient({
 });
 
 function Fallback() {
-  if (IS_ORBS) return <AppLoading />;
-  return (
-    <div className="flex h-screen w-screen items-center justify-center bg-background">
-      <Spinner className="size-20" />
-    </div>
-  );
+  return <AppLoading />;
 }
 
 const WagmiWrapper = ({
@@ -62,35 +54,14 @@ const WagmiWrapper = ({
 export function Providers({
   children,
   partnerBrand,
-  partnerStyles,
 }: {
   children: React.ReactNode;
   partnerBrand: PartnerBrand;
-  partnerStyles: PartnerStyles;
 }) {
   const [queryClient] = useState(createQueryClient);
   const { theme } = useTheme();
   const isMobile = useIsMobile("(max-width: 767px)");
-  const walletTheme = useMemo(() => {
-    if (IS_ORBS) return (theme === "dark" ? darkTheme : lightTheme)();
-
-    const themeStyles = getThemeStyles(partnerStyles, theme);
-    const walletTheme = (theme === "dark" ? darkTheme : lightTheme)({
-      accentColor: themeStyles.colors.primary,
-      accentColorForeground: themeStyles.colors.primaryForeground,
-      borderRadius: partnerStyles.radius === "0rem" ? "none" : "small",
-      fontStack: "system",
-      overlayBlur: "small",
-    });
-    if (partnerStyles.radius === "0rem") {
-      walletTheme.fonts.body = themeStyles.fontFamily;
-      walletTheme.colors.modalBackground = themeStyles.formContainerBackground ?? themeStyles.colors.card;
-      walletTheme.colors.modalBorder = themeStyles.colors.border;
-      walletTheme.colors.modalText = themeStyles.colors.foreground;
-      walletTheme.colors.modalTextSecondary = themeStyles.colors.mutedForeground;
-    }
-    return walletTheme;
-  }, [partnerStyles, theme]);
+  const walletTheme = useMemo(() => (theme === "dark" ? darkTheme : lightTheme)(), [theme]);
   useEffect(() => {
     const background = getComputedStyle(document.documentElement).getPropertyValue("--background").trim();
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background);
@@ -104,7 +75,7 @@ export function Providers({
             <PendingSwapMonitor />
             <RainbowKitProvider
               theme={walletTheme}
-              modalSize={isMobile ? "compact" : IS_ORBS || partnerStyles.radius !== "0rem" ? "wide" : "compact"}
+              modalSize={isMobile ? "compact" : "wide"}
             >
               <WalletConnectionProvider>
                 <AppProvider>

@@ -2,10 +2,9 @@ import { validPercent } from "../percent-settings";
 import type { Quote } from "@orbs-network/liquidity-hub-sdk";
 import type { OrderInput } from "@/lib/spot/form";
 import { ExecutionPhase, type ExecutionSnapshot } from "@/lib/spot/execution";
-import { SwapStatus } from "@orbs-network/swap-ui";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { Currency, SwapStep } from "../types";
+import { type Currency, SwapStatus, SwapStep } from "../types";
 import { DEFAULT_PRICE_PROTECTION, DEFAULT_SLIPPAGE } from "../consts";
 import { getTokenKey } from "../utils";
 
@@ -132,7 +131,8 @@ type OrderSubmitFlowStore = {
 
 // Wrapping finishes while the submit dialog is still rendering the original
 // native-token order. Queue the form update so that changing the input token
-// cannot reset or alter the in-progress order flow.
+// cannot reset or alter the in-progress order flow. Apply it when returning to
+// review after failure/rejection or when closing the completed flow.
 export const useOrderSubmitFlowStore = create<OrderSubmitFlowStore>((set) => ({
   isReviewOpen: false,
   setReviewOpen: (isReviewOpen) => set({ isReviewOpen }),
@@ -152,9 +152,12 @@ type BestTradeSwapStore = {
   review?: { inputCurrency: Currency; outputCurrency: Currency; inputAmount: string; outputAmount: string; chainId: number };
   status?: SwapStatus;
   totalSteps?: number;
+  steps?: SwapStep[];
   currentStep?: SwapStep;
   currentStepIndex?: number;
   txHash?: string;
+  wrapTxHash?: string;
+  approvalTxHash?: string;
   updateStore: (data: Partial<BestTradeSwapStore>) => void;
   resetStore: () => void;
 };
@@ -168,9 +171,12 @@ export const useBestTradeSwapStore = create<BestTradeSwapStore>((set) => ({
     set({
       status: undefined,
       totalSteps: undefined,
+      steps: undefined,
       currentStep: undefined,
       currentStepIndex: undefined,
       txHash: undefined,
+      wrapTxHash: undefined,
+      approvalTxHash: undefined,
       isAwaitingWallet: false,
       review: undefined,
       reviewedQuote: undefined,

@@ -1,18 +1,16 @@
 "use client";
 
-import { memo } from "react";
 import { FormActionPanel } from "@/components/form-action-panel";
-import { SettingsModal } from "@/components/settings-modal";
 import { ToggleCurrencies } from "@/components/toggle-currencies";
 import { Module } from "@orbs-network/spot-ui";
-import { DisclaimerPanel, InputErrorPanel } from "./feedback-panels";
+import { InputErrorPanel } from "./feedback-panels";
 import { ModuleInputs, TokenPanel } from "./token-panels";
 import { PricesPanel } from "./price-panels";
+import { AdvancedOrderSummary } from "./summary";
 import { SubmitOrder } from "./submit-order";
-import { IS_ORBS } from "@/lib/partners/client";
 import { useOutputAmount } from "./use-order-form";
 
-export const AdvancedOrderContent = memo(function AdvancedOrderContent({
+export function AdvancedOrderContent({
   orderModule,
 }: {
   orderModule: Module;
@@ -29,10 +27,9 @@ export const AdvancedOrderContent = memo(function AdvancedOrderContent({
       <ModuleInputs orderModule={orderModule} />
       <InputErrorPanel />
       <FormActionPanel>
-        {!IS_ORBS && <SettingsModal triggerVariant="action" />}
         <SubmitOrder orderModule={orderModule} />
       </FormActionPanel>
-      <DisclaimerPanel />
+      <AdvancedOrderSummary />
     </div>
   );
-});
+}

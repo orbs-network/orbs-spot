@@ -1,5 +1,7 @@
 "use client";
 
+import { OrderRate } from "./order-rate";
+
 import BN from "bignumber.js";
 import { OrderStatus, type Order } from "@orbs-network/spot-ui";
 import { ArrowRightIcon, ChevronDownIcon } from "lucide-react";
@@ -8,11 +10,12 @@ import { useTranslations } from "@/lib/use-translations";
 import { formatDisplayAmount } from "@/lib/token-display";
 import { makeEllipsisAddress } from "@/lib/utils";
 import { useOrderDisplay } from "./use-order-display";
-import { formatDetailDate, formatDuration, formatPriceValue, getOrderTypeLabel, isZeroValue } from "./format";
+import { formatDetailDate, formatDuration, getOrderTypeLabel, isZeroValue } from "./format";
 import { OrderStatusLabel } from "./order-status-label";
 import { DirectOrderCancelAction } from "./order-actions";
 import { CopyableIdentifier } from "./order-overview";
 import { TradeActivity } from "./trade-activity";
+import { MarketTokenLink } from "./market-token-link";
 import styles from "./transaction-details.module.css";
 
 export function OrderTransactionDetails({ order }: { order: Order }) {
@@ -23,14 +26,14 @@ export function OrderTransactionDetails({ order }: { order: Order }) {
   const received = closed && BN(order.dstAmountFilled).gt(0);
   const inputSymbol = inputToken?.symbol || makeEllipsisAddress(order.srcTokenAddress);
   const outputSymbol = outputToken?.symbol || makeEllipsisAddress(order.dstTokenAddress);
-  const price = (value: string) => formatPriceValue(value, inputToken?.symbol, outputToken?.symbol);
+  const price = (value: string) => <OrderRate value={value} inputSymbol={inputToken?.symbol} outputSymbol={outputToken?.symbol} />;
   const progress = Number.isFinite(order.progress) ? Math.round(Math.max(0, Math.min(100, order.progress))) : 0;
 
   return <div data-order-transaction className={styles.body}>
     <div className={styles.tokenPair} aria-label={`${inputSymbol} to ${outputSymbol}`}>
-      <span>{inputSymbol}</span>
+      <MarketTokenLink address={order.srcTokenAddress} chainId={order.chainId} symbol={inputSymbol} isLoading={false} className="text-lg font-medium" />
       <ArrowRightIcon aria-hidden="true" className={styles.arrow} />
-      <span>{outputSymbol}</span>
+      <MarketTokenLink address={order.dstTokenAddress} chainId={order.chainId} symbol={outputSymbol} isLoading={false} className="text-lg font-medium" />
     </div>
     <div className={styles.rows}>
       <div className={styles.identity}>

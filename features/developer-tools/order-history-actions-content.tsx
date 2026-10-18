@@ -1,24 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Code2Icon, RefreshCwIcon } from "lucide-react";
 import type { Order } from "@orbs-network/spot-ui";
-import { useConnection } from "wagmi";
-
 import { Button } from "@/components/ui/button";
-import { spotClientQueryOptions } from "@/lib/spot/queries";
-import { getActiveSpotPartner } from "@/lib/partners/spot";
-
 import {
   CANCEL_CODE_SNIPPET,
   FETCH_ORDERS_CODE_SNIPPET,
   getCancelFieldExplanation,
 } from "./snippets/code-examples";
-import { JsonInspectorModal, type JsonContainer } from "./json-inspector";
+import { JsonInspectorModal } from "./json-inspector";
 import { OrdersSinkGuideLink } from "./orders-sink-guide-link";
-
-const ORDER_SINK_URL = "https://order-sink-v2.orbs.network";
+import { useCancelOrderInspectionData, useFetchOrdersInspectionData } from "./order-inspection-data";
 
 export function FetchOrdersDeveloperButtonContent({
   isLoading,
@@ -27,42 +20,7 @@ export function FetchOrdersDeveloperButtonContent({
   isLoading?: boolean;
   orders: Order[];
 }) {
-  const { address } = useConnection();
-  const exchange = getActiveSpotPartner() || "external";
-  const request = useMemo(() => {
-    const query = {
-      swapper: address ?? "<connected-wallet-address>",
-      exchange,
-    };
-    const searchParams = new URLSearchParams({
-      swapper: query.swapper,
-      exchange: query.exchange,
-    });
-
-    return {
-      data: {
-        method: "GET",
-        endpoint: `${ORDER_SINK_URL}/orders`,
-        partner: exchange,
-        query,
-      } satisfies JsonContainer,
-      url: `${ORDER_SINK_URL}/orders?${searchParams.toString()}`,
-    };
-  }, [address, exchange]);
-  const rePermitOrders = useMemo(
-    () =>
-      orders
-        .filter((order) => order.version === 2)
-        .map((order) => order.rawOrder),
-    [orders],
-  );
-  const responseData = useMemo(
-    () =>
-      JSON.parse(
-        JSON.stringify({ orders: rePermitOrders }),
-      ) as JsonContainer,
-    [rePermitOrders],
-  );
+  const { request, responseData, hasOrders } = useFetchOrdersInspectionData(orders);
 
   return (
     <JsonInspectorModal
@@ -81,7 +39,7 @@ export function FetchOrdersDeveloperButtonContent({
       responseInitiallyCollapsed
       responseLabel="Orders JSON response"
       responseNotice={
-        !isLoading && rePermitOrders.length === 0
+        !isLoading && !hasOrders
           ? "Create an order to inspect developer data"
           : undefined
       }
@@ -115,24 +73,8 @@ export function CancelOrderDeveloperButtonContent({
   onCancel: () => void;
   rawOrder: Order;
 }) {
-  const { address } = useConnection();
   const [inspected, setInspected] = useState(false);
-  const client = useQuery({
-    ...spotClientQueryOptions(getActiveSpotPartner(), rawOrder.chainId, true),
-    enabled: inspected,
-  });
-  const data = useMemo<JsonContainer>(() => {
-    const request = client.data?.getCancelOrderRequest(rawOrder);
-    return {
-      partner: client.data?.partner ?? getActiveSpotPartner(),
-      abi: JSON.parse(JSON.stringify(request?.abi ?? [])) as JsonContainer,
-      functionName: "cancel",
-      address: request?.contractAddress ?? "",
-      args: request?.args ?? [],
-      chain: rawOrder.chainId,
-      account: address ?? rawOrder.maker,
-    };
-  }, [address, client.data, rawOrder]);
+  const { client, data } = useCancelOrderInspectionData(rawOrder, inspected);
 
   if (client.isError) {
     return (

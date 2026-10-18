@@ -1,7 +1,6 @@
 "use client";
 
 import { useInputErrors, useDisclaimer } from "./use-order-form";
-
 import { useClient } from "./use-order-client";
 import { InlineMessage } from "@/components/ui/inline-message";
 import { useTranslations } from "@/lib/use-translations";
@@ -50,29 +49,33 @@ export function InputErrorPanel() {
 export function DisclaimerPanel() {
   const t = useTranslations();
   const disclaimer = useDisclaimer();
-  const { isDeveloperToolsAvailable } = useDeveloperMode();
+  const { isDeveloperMode } = useDeveloperMode();
 
   if (!disclaimer) {
     return null;
   }
 
+  const learnMore = isDeveloperMode && <a
+    href={ORBS_TWAP_FAQ_URL}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="font-semibold text-primary"
+  >
+    Learn more
+  </a>;
+
   return (
-    <InlineMessage
-      icon={
-        <InfoIcon aria-hidden="true" className="relative top-0.5 size-4 shrink-0 text-muted-foreground" />
-      }
-    >
-      <p className="flex-1 text-[13px] text-muted-foreground">
-        {t(disclaimer)}{" "}
-        {isDeveloperToolsAvailable && <a
-          href={ORBS_TWAP_FAQ_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-semibold text-primary"
-        >
-          Learn more
-        </a>}
-      </p>
-    </InlineMessage>
+    <div data-order-disclaimer>
+      <InlineMessage
+        icon={
+          <InfoIcon aria-hidden="true" className="relative top-0.5 size-4 shrink-0 text-muted-foreground" />
+        }
+      >
+        <p className="min-w-0 flex-1 text-xs leading-relaxed text-muted-foreground">
+          {t(disclaimer)}{" "}
+          {learnMore}
+        </p>
+      </InlineMessage>
+    </div>
   );
 }

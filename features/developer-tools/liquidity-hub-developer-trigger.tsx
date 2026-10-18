@@ -2,7 +2,6 @@
 
 import { FileJson2Icon, Loader2Icon } from "lucide-react";
 import { lazy, Suspense, useRef } from "react";
-
 import { Button } from "@/components/ui/button";
 import BN from "bignumber.js";
 import { useConnection } from "wagmi";
@@ -92,19 +91,19 @@ function QuoteDeveloperButton({ loading = false }: { loading?: boolean }) {
 }
 
 export function LiquidityHubDeveloperTrigger({ mode }: { mode: DeveloperExecutionMode }) {
-  const { isDeveloperMode } = useDeveloperMode();
+  const { isDeveloperPlayground } = useDeveloperMode();
   const isSwapTab = useIsSwapTab();
 
-  return isDeveloperMode && isSwapTab ? (
+  return isDeveloperPlayground && isSwapTab ? (
     <LiquidityHubDeveloperTriggerContent mode={mode} />
   ) : null;
 }
 
 export function LiquidityHubQuoteDeveloperTrigger() {
-  const { isDeveloperMode } = useDeveloperMode();
+  const { isDeveloperPlayground } = useDeveloperMode();
   const isSwapTab = useIsSwapTab();
 
-  return isDeveloperMode && isSwapTab ? (
+  return isDeveloperPlayground && isSwapTab ? (
     <LiquidityHubQuoteDeveloperTriggerContent />
   ) : null;
 }

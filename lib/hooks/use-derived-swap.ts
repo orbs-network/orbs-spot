@@ -6,6 +6,7 @@ import { useTrade } from "./use-trade";
 import { useMemo } from "react";
 import { displayTokenAmount } from "../token-display";
 import BN from "bignumber.js";
+import { useNativeConversion } from "./use-native-conversion";
 
 export const useDerivedSwap = () => {
   const {
@@ -13,6 +14,7 @@ export const useDerivedSwap = () => {
     outputCurrency: outputCurrencyAddress,
   } = useSwapParams();
   const inputAmount = useSwapStore((state) => state.inputAmount);
+  const nativeConversion = useNativeConversion();
   const inputCurrency = useCurrency(inputCurrencyAddress ?? undefined);
   const outputCurrency = useCurrency(outputCurrencyAddress ?? undefined);
 
@@ -29,10 +31,11 @@ export const useDerivedSwap = () => {
     usesLiquidityHubQuote,
   } = useTrade(inputCurrency, outputCurrency, parsedInputAmount);
 
-  const outputAmount = displayTokenAmount(useToAmountUI(
+  const quotedOutputAmount = displayTokenAmount(useToAmountUI(
     outputCurrency?.decimals,
     trade?.outAmount
   ), outputCurrency?.symbol, outputCurrency?.decimals);
+  const outputAmount = nativeConversion ? inputAmount : quotedOutputAmount;
 
   const noLiquidity = useMemo(
     () =>
@@ -64,6 +67,7 @@ export const useDerivedSwap = () => {
       refetchTrade,
       outputAmount,
       usesLiquidityHubQuote,
+      nativeConversion,
     }),
     [
       inputAmount,
@@ -77,6 +81,7 @@ export const useDerivedSwap = () => {
       refetchTrade,
       trade,
       usesLiquidityHubQuote,
+      nativeConversion,
     ]
   );
 };

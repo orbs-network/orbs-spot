@@ -11,7 +11,7 @@ export type OrderToken = {
   symbol?: string;
   decimals?: number;
 };
-export type HistoryOrder = Order & { inputToken?: OrderToken; outputToken?: OrderToken };
+export type HistoryOrder = Order & { partner?: string; inputToken?: OrderToken; outputToken?: OrderToken };
 
 const METADATA_STALE_TIME = 24 * 60 * 60_000;
 const FAILED_METADATA_STALE_TIME = 60_000;

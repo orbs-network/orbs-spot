@@ -1,4 +1,4 @@
-import { OrderStatus, OrderType, type Order } from "@orbs-network/spot-ui";
+import { OrderStatus, OrderType, Partners, type Order } from "@orbs-network/spot-ui";
 import { parseUnits, zeroAddress } from "viem";
 import type { HistoryOrder, OrderToken } from "./order-tokens";
 const MOCK_ORDER_ACCOUNT = "0x000000000000000000000000000000000000dEaD";
@@ -29,7 +29,7 @@ const samples: Sample[] = [
   { type: OrderType.STOP_LOSS_LIMIT, status: OrderStatus.Expired, input: baseWeth, output: baseUsdc, amount: "1", received: "3200", trades: 1, filled: 0 },
 ];
 
-/** Generated only on an explicit mockorders=true query, with dates relative to now. */
+/** Generated only in /dev with mockorders=true, with dates relative to now. */
 export function createMockOrders(now = Date.now()): HistoryOrder[] {
   return samples.map((sample, index) => {
     const { input, output, type, status, trades, filled } = sample;
@@ -64,7 +64,7 @@ export function createMockOrders(now = Date.now()): HistoryOrder[] {
       },
     };
     return {
-      version: 2, historyKey: `mock:${input.chainId}:${hash}`, id: hash, hash, repermitDigest: hash,
+      version: 2, historyKey: `mock:${input.chainId}:${hash}`, id: hash, hash, repermitDigest: hash, partner: Partners.External,
       type, status, maker: MOCK_ORDER_ACCOUNT, chainId: input.chainId,
       inputToken: input, outputToken: output, srcTokenAddress: input.address, dstTokenAddress: output.address,
       srcAmount: totalInput.toString(), srcAmountPerTrade: inputPerTrade.toString(),

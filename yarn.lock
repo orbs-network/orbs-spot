@@ -934,11 +934,6 @@
   resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-2.1.19.tgz#1fbb5fbb82af1aca52cf57dbc9e2e2fdcc45ef6e"
   integrity sha512-A32XZ8INDSyZYJuPKCt3NtiaIRxbvlG4tyYRX+G8yTLURuqxM9J05u7vDoz5pQft/jpgJmaa7tgC1WfzAnuq/g==
 
-"@orbs-network/swap-ui@^0.0.61":
-  version "0.0.61"
-  resolved "https://registry.yarnpkg.com/@orbs-network/swap-ui/-/swap-ui-0.0.61.tgz#ec82fffbd68274373f965f247e405aa7d17d86b3"
-  integrity sha512-GCPAXf69usNQulQbMNGpGW+cgvoeu/R6T8xKiL7pSMMYs6L2sMP8b2YBeHn53lO8/LRaFrFDf28EB7Gh7xzgiQ==
-
 "@paraswap/core@2.4.3":
   version "2.4.3"
   resolved "https://registry.yarnpkg.com/@paraswap/core/-/core-2.4.3.tgz#22b84da7cf0447cd6bfc4620f1d14d43907eb287"

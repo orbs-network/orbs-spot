@@ -10,7 +10,6 @@ import { Balance } from "./ui/balance";
 import { TokenSelectorTrigger } from "./ui/token-selector-trigger";
 import { FormPanel } from "./ui/form-panel";
 import { useCurrenciesQuery } from "@/lib/hooks/use-currencies-query";
-import { IS_ORBS } from "@/lib/partners/client";
 import { toPresetAmount } from "@/lib/input-amount";
 
 type Props = {
@@ -77,9 +76,9 @@ const PercentageButtons = ({
           key={button.value}
           className="flex cursor-pointer items-center gap-1 rounded-xl border border-border/80 bg-card/80 px-2.5 py-1 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35 sm:text-sm"
           onClick={() => onPercentageClick(button.value)}
-          aria-label={`Use ${IS_ORBS && button.value === 1 ? "Max (100%)" : button.label} of available balance`}
+          aria-label={`Use ${button.value === 1 ? "Max (100%)" : button.label} of available balance`}
         >
-          {IS_ORBS && button.value === 1 ? "Max" : button.label}
+          {button.value === 1 ? "Max" : button.label}
         </button>
       ))}
     </div>
@@ -102,14 +101,13 @@ export function CurrencyCard({
 
   return (
     <>
-      {IS_ORBS && !disabled && onAmountChange && <PercentageButtons onAmountChange={onAmountChange} currency={currency} />}
+      {!disabled && onAmountChange && <PercentageButtons onAmountChange={onAmountChange} currency={currency} />}
       <FormPanel data-currency-card className="group relative flex min-w-0 flex-col gap-2 bg-secondary/55 transition-colors ">
         <div data-currency-card-header className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
             {titleAction}
           </div>
-          {!IS_ORBS && !disabled && onAmountChange && <PercentageButtons onAmountChange={onAmountChange} currency={currency} />}
         </div>
         <div
           data-currency-amount-row

@@ -3,7 +3,7 @@
 import { useOutputAmount, useTrades, useDuration, useFillDelay, useOrderForm } from "./use-order-form";
 
 import { CurrencyCard } from "@/components/currency-card";
-import { FormLabel, InfoTooltip } from "@/components/ui/form-label";
+import { FormLabel } from "@/components/ui/form-label";
 import { FormNumberField } from "@/components/ui/form-number-field";
 import { FormPanel } from "@/components/ui/form-panel";
 import { NumericInput } from "@/components/ui/numeric-input";
@@ -12,7 +12,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { MinusIcon, PlusIcon } from "lucide-react";
 import { StyledSelect } from "@/components/ui/styled-select";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
-import { useFormatNumber } from "@/lib/hooks/common";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useTranslations } from "@/lib/use-translations";
 import { Field } from "@/lib/types";
@@ -20,7 +19,7 @@ import { displayTokenAmount } from "@/lib/token-display";
 import { Module, type InputError } from "@orbs-network/spot-ui";
 import { type ReactNode, useCallback } from "react";
 import { DURATION_OPTIONS } from "./constants";
-import { formatInputError, formatTwapDuration } from "./utils";
+import { formatInputError } from "./utils";
 import styles from "./time-input.module.css";
 
 export function TokenPanel({ isSource }: { isSource: boolean }) {
@@ -234,41 +233,6 @@ function TimeInputPanel({ kind, disabledReason }: { kind: "duration" | "fillDela
   );
 }
 
-function TradeScheduleSummary() {
-  const { schedule, trades, inputAmount } = useOrderForm();
-  const { inputToken } = useTrades();
-  const amount = useFormatNumber({ value: trades.inputAmountPerTrade.ui });
-  const usd = useFormatNumber({ value: trades.inputAmountPerTrade.usd, decimalScale: 2, prefix: "$" });
-  const duration = Math.max(0, schedule.totalTrades - 1) * schedule.fillDelayMillis;
-  const isValid = Number.isFinite(duration) && duration > 0 && !schedule.fillDelayError && !trades.error;
-  const hasAmount = inputToken && !inputAmount.isEmpty && !trades.error;
-
-  return (
-    <div data-trade-schedule-summary className="col-span-full rounded-[14px] bg-secondary/25 px-3 py-2" aria-live="polite" aria-atomic="true">
-      {schedule.totalTrades === 1 ? (
-        <p data-estimated-duration className="text-xs text-muted-foreground">Executes once when order conditions are met.</p>
-      ) : (
-        <dl className="space-y-1">
-          <div data-estimated-duration className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3">
-            <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              Estimated duration
-              <InfoTooltip ariaLabel="Estimated duration information" iconClassName="size-3.5" tooltip="Time from the first fill to the last: (total trades − 1) × time between trades. This does not include waiting for the first fill. Market conditions and execution delays may extend completion; this is separate from the order expiration deadline." />
-            </dt>
-            <dd className="text-right text-sm font-medium tabular-nums text-foreground">{isValid ? `~${formatTwapDuration(duration)}` : "—"}</dd>
-          </div>
-          <div data-per-trade-amount className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-3">
-            <dt className="text-xs text-muted-foreground">Amount per trade</dt>
-            <dd className="flex min-w-0 flex-wrap items-baseline justify-end gap-x-1.5 text-right tabular-nums">
-              <span className="text-sm font-medium wrap-anywhere text-foreground">{hasAmount ? `${amount} ${inputToken.symbol}` : "—"}</span>
-              {hasAmount && trades.inputAmountPerTrade.usd && <span className="text-xs text-muted-foreground">({usd})</span>}
-            </dd>
-          </div>
-        </dl>
-      )}
-    </div>
-  );
-}
-
 export function ModuleInputs({ orderModule }: { orderModule: Module }) {
   const { schedule } = useOrderForm();
 
@@ -280,7 +244,6 @@ export function ModuleInputs({ orderModule }: { orderModule: Module }) {
           kind="fillDelay"
           disabledReason={schedule.totalTrades === 1 ? "Time between trades only applies when there are two or more trades. This order executes once. Increase Total trades to set an interval." : undefined}
         />
-        <TradeScheduleSummary />
       </div>
     );
   }

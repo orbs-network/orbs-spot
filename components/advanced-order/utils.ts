@@ -46,7 +46,7 @@ function formatDurationUnit(value: number, unit: string) {
 
 export function formatPriceInputError(error: InputError | undefined, isInverted: boolean, t: Translate) {
   if (error?.type === InputErrors.TRIGGER_LIMIT_PRICE_GREATER_THAN_TRIGGER_PRICE) {
-    return `Set the limit rate ${isInverted ? "above" : "below"} the trigger rate so the order can execute after activation. A fast price move may still leave the order unfilled.`;
+    return `This limit price may prevent execution after the trigger. Set it ${isInverted ? "above" : "below"} the trigger price. A fast price move may still leave the order unfilled.`;
   }
   if (error?.type === InputErrors.STOP_LOSS_TRIGGER_PRICE_GREATER_THAN_MARKET_PRICE) {
     return `Set the trigger rate ${isInverted ? "above" : "below"} the market rate for a stop-loss order.`;

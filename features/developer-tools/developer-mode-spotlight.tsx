@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { Code2Icon, XIcon } from "lucide-react";
 import {
@@ -13,13 +13,13 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { createPortal } from "react-dom";
-
 import {
-  measureSpotlightLayout,
-  type SpotlightLayout,
-  type SpotlightShape,
+areSpotlightLayoutsEqual,
+measureSpotlightLayout,
+type SpotlightLayout,
+type SpotlightShape,
 } from "./developer-mode-spotlight-layout";
+import * as Dialog from "@radix-ui/react-dialog";
 
 export type DeveloperModeSpotlightVariant =
   | "liquidity-hub"
@@ -114,8 +114,8 @@ const SPOTLIGHT_STEPS = {
 >;
 
 const WALKTHROUGH_SEEN_STORAGE_KEYS = {
-  "orders-sink": "developer-mode-walkthrough-v2",
-  "liquidity-hub": "developer-mode-liquidity-hub-walkthrough-v3",
+  "orders-sink": "developer-mode-walkthrough-v3",
+  "liquidity-hub": "developer-mode-liquidity-hub-walkthrough-v4",
 } satisfies Record<DeveloperModeSpotlightVariant, string>;
 
 const SPOTLIGHT_TARGET_SELECTORS = {
@@ -127,105 +127,65 @@ const subscribeToClientReady = () => () => {};
 const getClientSnapshot = () => true;
 const getServerSnapshot = () => false;
 
-const SCRIM_CLASS_NAME =
-  "pointer-events-none fixed z-[80] bg-black/60 backdrop-blur-[4px] motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-200";
+const OVERLAY_COLOR = "rgba(0, 0, 0, 0.6)";
 
-function SpotlightScrim({
-  layout,
-  onDismiss,
-}: {
-  layout: SpotlightLayout;
-  onDismiss: () => void;
-}) {
-  const { radius, target } = layout;
-  const cornerPatches = [
-    {
-      left: target.left,
-      top: target.top,
-      maskPosition: "100% 100%",
-    },
-    {
-      left: target.right - radius,
-      top: target.top,
-      maskPosition: "0% 100%",
-    },
-    {
-      left: target.left,
-      top: target.bottom - radius,
-      maskPosition: "100% 0%",
-    },
-    {
-      left: target.right - radius,
-      top: target.bottom - radius,
-      maskPosition: "0% 0%",
-    },
+function SpotlightOverlay({ layout }: { layout: SpotlightLayout }) {
+  const className = "pointer-events-none fixed z-[80]";
+
+  const { target, radius } = layout;
+  const corners = [
+    { name: "top-left", left: target.left, top: target.top, center: "bottom right" },
+    { name: "top-right", left: target.right - radius, top: target.top, center: "bottom left" },
+    { name: "bottom-left", left: target.left, top: target.bottom - radius, center: "top right" },
+    { name: "bottom-right", left: target.right - radius, top: target.bottom - radius, center: "top left" },
+  ];
+
+  // Disjoint, plain paint regions retain the rounded cutout without masks,
+  // backdrop filters, large shadows, or changes to the application's DOM.
+  const regions = [
+    { name: "top", left: 0, right: 0, top: 0, height: target.top },
+    { name: "bottom", left: 0, right: 0, top: target.bottom, bottom: 0 },
+    { name: "left", left: 0, top: target.top, width: target.left, height: target.height },
+    { name: "right", left: target.right, right: 0, top: target.top, height: target.height },
   ];
 
   return (
-    <>
-      <button
-        type="button"
-        tabIndex={-1}
-        aria-label="Dismiss developer mode guide"
-        className="fixed inset-0 z-[79] cursor-default bg-transparent"
-        onClick={onDismiss}
-      />
-      <div
-        className={SCRIM_CLASS_NAME}
-        style={{ inset: "0 0 auto 0", height: target.top }}
-      />
-      <div
-        className={SCRIM_CLASS_NAME}
-        style={{
-          left: 0,
-          top: target.top,
-          width: target.left,
-          height: target.height,
-        }}
-      />
-      <div
-        className={SCRIM_CLASS_NAME}
-        style={{
-          left: target.right,
-          right: 0,
-          top: target.top,
-          height: target.height,
-        }}
-      />
-      <div
-        className={SCRIM_CLASS_NAME}
-        style={{ inset: `${target.bottom}px 0 0 0` }}
-      />
-      {cornerPatches.map((corner) => {
-        const maskImage = `radial-gradient(circle at ${corner.maskPosition}, transparent ${radius - 1}px, black ${radius}px)`;
+    <div aria-hidden="true" data-developer-spotlight-overlay className="contents">
+      {regions.map(({ name, ...position }) => (
+        <div key={name} className={className} style={{ ...position, backgroundColor: OVERLAY_COLOR }} />
+      ))}
+      {corners.map(corner => (
+        <div
+          key={corner.name}
+          className={className}
+          style={{
+            left: corner.left,
+            top: corner.top,
+            width: radius,
+            height: radius,
+            background: `radial-gradient(circle ${radius}px at ${corner.center}, transparent ${radius - 0.5}px, ${OVERLAY_COLOR} ${radius}px)`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
-        return (
-          <div
-            key={`${corner.left}-${corner.top}`}
-            className={SCRIM_CLASS_NAME}
-            style={{
-              left: corner.left,
-              top: corner.top,
-              width: radius,
-              height: radius,
-              maskImage,
-              WebkitMaskImage: maskImage,
-            }}
-          />
-        );
-      })}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed z-[81] border-2 border-primary shadow-[0_0_0_4px_color-mix(in_srgb,var(--primary)_22%,transparent),0_0_32px_color-mix(in_srgb,var(--primary)_58%,transparent)] motion-safe:animate-pulse"
-        style={{
-          borderRadius: radius,
-          left: target.left,
-          top: target.top,
-          width: target.width,
-          height: target.height,
-        }}
-      />
-    </>
+function SpotlightHighlight({ layout }: { layout: SpotlightLayout }) {
+  const { radius, target } = layout;
+  return (
+    <div
+      aria-hidden="true"
+      data-developer-spotlight-highlight
+      className="pointer-events-none fixed z-[81] border-2 border-primary shadow-[0_0_0_4px_color-mix(in_srgb,var(--primary)_22%,transparent)]"
+      style={{
+        borderRadius: radius,
+        left: target.left,
+        top: target.top,
+        width: target.width,
+        height: target.height,
+      }}
+    />
   );
 }
 
@@ -233,30 +193,23 @@ function SpotlightCard({
   actionButtonRef,
   activeStepNumber,
   activeStep,
-  cardRef,
-  layout,
+  embedded = false,
   onAction,
   onDismiss,
   totalSteps,
-  embedded = false,
 }: {
   actionButtonRef: RefObject<HTMLButtonElement | null>;
   activeStepNumber: number;
   activeStep: SpotlightStepConfig;
-  cardRef: RefObject<HTMLDivElement | null>;
-  layout?: SpotlightLayout;
   embedded?: boolean;
   onAction: () => void;
   onDismiss: () => void;
   totalSteps: number;
 }) {
-  const Title = embedded ? DrawerTitle : "h2";
+  const Title = embedded ? DrawerTitle : Dialog.Title;
+  const Description = embedded ? DrawerDescription : Dialog.Description;
   return (
-    <div
-      ref={cardRef}
-      className={embedded ? "p-4 text-card-foreground" : "fixed z-[82] rounded-2xl border border-primary/35 bg-card p-4 text-card-foreground shadow-2xl motion-safe:animate-in motion-safe:fade-in-0 motion-safe:zoom-in-95 motion-safe:duration-200"}
-      style={embedded ? undefined : layout?.card}
-    >
+    <div className="p-4 text-card-foreground">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
@@ -283,12 +236,12 @@ function SpotlightCard({
           <XIcon aria-hidden="true" className="size-4" />
         </button>
       </div>
-      <p
+      <Description
         id="developer-spotlight-description"
         className="text-pretty text-sm leading-5 text-muted-foreground"
       >
         {activeStep.description}
-      </p>
+      </Description>
       <Button
         ref={actionButtonRef}
         type="button"
@@ -300,100 +253,6 @@ function SpotlightCard({
       </Button>
     </div>
   );
-}
-
-function useSpotlightDialogBehavior({
-  actionButtonRef,
-  cardRef,
-  isReady,
-  onDismiss,
-  open,
-  rootRef,
-}: {
-  actionButtonRef: RefObject<HTMLButtonElement | null>;
-  cardRef: RefObject<HTMLDivElement | null>;
-  isReady: boolean;
-  onDismiss: () => void;
-  open: boolean;
-  rootRef: RefObject<HTMLDivElement | null>;
-}) {
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!open || !isReady || !root) return;
-
-    const previousFocus =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-    const backgroundElements = Array.from(document.body.children).filter(
-      (element): element is HTMLElement =>
-        element instanceof HTMLElement && element !== root,
-    );
-    const previousInertStates = backgroundElements.map((element) => ({
-      element,
-      inert: element.inert,
-    }));
-
-    for (const element of backgroundElements) {
-      element.inert = true;
-    }
-
-    const focusFrame = window.requestAnimationFrame(() => {
-      actionButtonRef.current?.focus({ preventScroll: true });
-    });
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onDismiss();
-        return;
-      }
-
-      if (event.key !== "Tab") return;
-
-      const card = cardRef.current;
-      const focusableElements = card?.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-      );
-      if (!card || !focusableElements?.length) return;
-
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-      const activeElement = document.activeElement;
-
-      if (!card.contains(activeElement)) {
-        event.preventDefault();
-        (event.shiftKey ? lastElement : firstElement).focus();
-      } else if (event.shiftKey && activeElement === firstElement) {
-        event.preventDefault();
-        lastElement.focus();
-      } else if (!event.shiftKey && activeElement === lastElement) {
-        event.preventDefault();
-        firstElement.focus();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      window.removeEventListener("keydown", handleKeyDown);
-
-      for (const { element, inert } of previousInertStates) {
-        element.inert = inert;
-      }
-
-      if (previousFocus?.isConnected) {
-        previousFocus.focus({ preventScroll: true });
-      }
-    };
-  }, [
-    actionButtonRef,
-    cardRef,
-    isReady,
-    onDismiss,
-    open,
-    rootRef,
-  ]);
 }
 
 function DeveloperModeSpotlightContent({
@@ -417,20 +276,21 @@ function DeveloperModeSpotlightContent({
   const [stepIndex, setStepIndex] = useState(0);
   const [layout, setLayout] = useState<SpotlightLayout | null>(null);
   const actionButtonRef = useRef<HTMLButtonElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const hasPresentedRef = useRef(false);
   const steps = SPOTLIGHT_STEPS[variant];
   const activeStep = steps[stepIndex] ?? steps[0];
+  const isVisible = open && (isMobile || layout !== null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!isVisible) return;
 
     try {
       window.localStorage.setItem(walkthroughSeenStorageKey, "true");
     } catch {
       // Keep the walkthrough usable when browser storage is unavailable.
     }
-  }, [open, walkthroughSeenStorageKey]);
+  }, [isVisible, walkthroughSeenStorageKey]);
 
   const dismiss = useCallback(() => {
     setOpen(false);
@@ -440,7 +300,13 @@ function DeveloperModeSpotlightContent({
   useLayoutEffect(() => {
     if (!open || isMobile) return;
 
-    const target =
+    let target: HTMLElement | null = null;
+    let positionFrame = 0;
+    let disposed = false;
+    let fontsReady = document.fonts.status === "loaded";
+    let initialLayout: SpotlightLayout | null = null;
+
+    const resolveTarget = () =>
       activeStep.target === "demo-action"
         ? targetRef.current
         : activeStep.target === "live-action"
@@ -450,40 +316,65 @@ function DeveloperModeSpotlightContent({
           : document.querySelector<HTMLElement>(
               SPOTLIGHT_TARGET_SELECTORS[activeStep.target],
             );
-    if (!target) {
-      setLayout(null);
-      return;
-    }
 
     const updatePosition = () => {
-      setLayout(
-        measureSpotlightLayout(target, {
-          gap: activeStep.gap,
-          shape: activeStep.shape,
-        }),
-      );
-    };
-    if (activeStep.target !== "developer-guide") {
-      target.scrollIntoView({
-        behavior: "auto",
-        block: "center",
-        inline: "nearest",
+      if (disposed) return;
+      const nextTarget = resolveTarget();
+      // Navigation and developer controls load independently. Wait until the
+      // actual target is mounted and visible instead of opening over a fallback.
+      if (!nextTarget?.isConnected || !nextTarget.getClientRects().length) return;
+      if (target !== nextTarget) {
+        if (target) resizeObserver.unobserve(target);
+        target = nextTarget;
+        resizeObserver.observe(target);
+        if (activeStep.target !== "developer-guide") {
+          target.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
+        }
+      }
+      if (!fontsReady) return;
+      const nextLayout = measureSpotlightLayout(target, {
+        gap: activeStep.gap,
+        shape: activeStep.shape,
       });
-    }
-    updatePosition();
-
-    const resizeObserver = new ResizeObserver(updatePosition);
-    resizeObserver.observe(target);
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, {
-      capture: true,
-      passive: true,
+      // Present the first frame only after the font and target geometry settle.
+      if (!hasPresentedRef.current && !areSpotlightLayoutsEqual(initialLayout, nextLayout)) {
+        initialLayout = nextLayout;
+        schedulePositionUpdate();
+        return;
+      }
+      hasPresentedRef.current = true;
+      setLayout(previous => areSpotlightLayoutsEqual(previous, nextLayout) ? previous : nextLayout);
+    };
+    const schedulePositionUpdate = () => {
+      if (positionFrame || disposed) return;
+      positionFrame = window.requestAnimationFrame(() => {
+        positionFrame = 0;
+        updatePosition();
+      });
+    };
+    const resizeObserver = new ResizeObserver(schedulePositionUpdate);
+    const targetObserver = new MutationObserver(schedulePositionUpdate);
+    targetObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "style"],
     });
+    updatePosition();
+    void document.fonts.ready.then(() => {
+      fontsReady = true;
+      schedulePositionUpdate();
+    });
+    window.addEventListener("resize", schedulePositionUpdate);
+    window.addEventListener("scroll", schedulePositionUpdate, { capture: true, passive: true });
 
     return () => {
+      disposed = true;
+      targetObserver.disconnect();
       resizeObserver.disconnect();
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
+      window.cancelAnimationFrame(positionFrame);
+      window.removeEventListener("resize", schedulePositionUpdate);
+      window.removeEventListener("scroll", schedulePositionUpdate, true);
     };
   }, [
     activeStep.gap,
@@ -495,51 +386,73 @@ function DeveloperModeSpotlightContent({
     variant,
   ]);
 
-  useSpotlightDialogBehavior({
-    actionButtonRef,
-    cardRef,
-    isReady: layout !== null,
-    onDismiss: dismiss,
-    open: open && !isMobile,
-    rootRef,
-  });
-
   const advance = () => {
     if (stepIndex < steps.length - 1) setStepIndex(current => current + 1);
     else dismiss();
   };
 
-  if (isMobile) return <Drawer open={open} onOpenChange={nextOpen => { if (!nextOpen) dismiss(); }}>
-    <DrawerContent data-developer-spotlight-drawer aria-describedby="developer-spotlight-description" onOpenAutoFocus={event => { event.preventDefault(); actionButtonRef.current?.focus({ preventScroll: true }); }}>
-      <SpotlightCard embedded actionButtonRef={actionButtonRef} cardRef={cardRef} activeStep={activeStep} activeStepNumber={stepIndex + 1} totalSteps={steps.length} onAction={advance} onDismiss={dismiss} />
-    </DrawerContent>
-  </Drawer>;
+  const onOpenAutoFocus = (event: Event) => {
+    event.preventDefault();
+    previousFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement : null;
+    actionButtonRef.current?.focus({ preventScroll: true });
+  };
+  const onCloseAutoFocus = (event: Event) => {
+    event.preventDefault();
+    if (previousFocusRef.current?.isConnected) {
+      previousFocusRef.current.focus({ preventScroll: true });
+    }
+  };
+  const onOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) dismiss();
+  };
+  const card = <SpotlightCard
+    actionButtonRef={actionButtonRef}
+    activeStep={activeStep}
+    activeStepNumber={stepIndex + 1}
+    embedded={isMobile}
+    onAction={advance}
+    onDismiss={dismiss}
+    totalSteps={steps.length}
+  />;
 
-  if (!open || !layout || typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      ref={rootRef}
+  if (isMobile) return <Drawer open={open} onOpenChange={onOpenChange}>
+    <DrawerContent
       data-developer-spotlight-root
-      role="dialog"
+      data-developer-spotlight-drawer
       aria-modal="true"
       aria-labelledby="developer-spotlight-title"
       aria-describedby="developer-spotlight-description"
+      onOpenAutoFocus={onOpenAutoFocus}
+      onCloseAutoFocus={onCloseAutoFocus}
     >
-      <SpotlightScrim layout={layout} onDismiss={dismiss} />
-      <SpotlightCard
-        actionButtonRef={actionButtonRef}
-        activeStep={activeStep}
-        activeStepNumber={stepIndex + 1}
-        cardRef={cardRef}
-        layout={layout}
-        onAction={advance}
-        onDismiss={dismiss}
-        totalSteps={steps.length}
-      />
-    </div>,
-    document.body,
-  );
+      {card}
+    </DrawerContent>
+  </Drawer>;
+
+  // Radix owns modal focus, Escape and outside-click dismissal. The backdrop
+  // blocks pointer interaction without making the trading DOM inert.
+  return <Dialog.Root open={isVisible} onOpenChange={onOpenChange}>
+    <Dialog.Portal>
+      <Dialog.Overlay data-developer-spotlight-dismiss className="fixed inset-0 z-[79] bg-transparent" />
+      {layout && <>
+        <SpotlightOverlay layout={layout} />
+        <SpotlightHighlight layout={layout} />
+      </>}
+      <Dialog.Content
+        data-developer-spotlight-root
+        aria-modal="true"
+        aria-labelledby="developer-spotlight-title"
+        aria-describedby="developer-spotlight-description"
+        className="fixed z-[82] max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain rounded-2xl border border-primary/35 bg-card text-card-foreground shadow-xl outline-none"
+        style={layout?.card}
+        onOpenAutoFocus={onOpenAutoFocus}
+        onCloseAutoFocus={onCloseAutoFocus}
+      >
+        {card}
+      </Dialog.Content>
+    </Dialog.Portal>
+  </Dialog.Root>;
 }
 
 export function DeveloperModeSpotlight({

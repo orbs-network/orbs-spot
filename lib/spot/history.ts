@@ -1,5 +1,5 @@
+import { getExchangeRates } from "@/lib/exchange-rates";
 import {
-  getOrderExecutionRate,
   getOrderFillDelayMillis,
   getOrderLimitPriceRate,
   getTriggerPriceRate,
@@ -29,12 +29,12 @@ export function describeOrder(
   });
   const rateFor = (input: string, output: string) =>
     inputToken && outputToken
-      ? getOrderExecutionRate(
-          input,
-          output,
-          inputToken.decimals,
-          outputToken.decimals,
-        )
+      ? getExchangeRates({
+          inAmount: input,
+          outAmount: output,
+          inputDecimals: inputToken.decimals,
+          outputDecimals: outputToken.decimals,
+        })?.forward.toFixed() ?? ""
       : "";
   return {
     original: order,

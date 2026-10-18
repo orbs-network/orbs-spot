@@ -1,7 +1,6 @@
 import type { Currency } from "@/lib/types";
 import { Skeleton } from "./skeleton";
 import { useSpendableBalance } from "@/lib/hooks/use-spendable-balance";
-import { IS_ORBS } from "@/lib/partners/client";
 import { toPresetAmount } from "@/lib/input-amount";
 
 export const Balance = ({
@@ -12,7 +11,7 @@ export const Balance = ({
     onAmountChange?: (amount: string) => void;
   }) => {
     const { formatted, spendable, maxDisabled, maxHint, isLoading } = useSpendableBalance(currency);
-    const label = IS_ORBS ? `Balance: ${formatted}` : `${formatted} ${currency?.symbol ?? ""}`;
+    const label = `Balance: ${formatted}`;
 
     if (!onAmountChange) {
       return isLoading ? (
@@ -44,4 +43,4 @@ export const Balance = ({
       </button>
     );
   };
-  
+

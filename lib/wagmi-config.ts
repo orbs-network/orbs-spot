@@ -17,13 +17,13 @@ import { useMemo } from "react";
 import { http, type Chain } from "viem";
 import { SUPPORTED_CHAINS } from "./consts";
 import type { PartnerBrand } from "./partners/types";
-import { getActiveClientPartnerConfig } from "./partners/client";
 import { hasOrbsConnectModal } from "./partners/features";
+import { orbsPartner } from "@/lib/partners/orbs";
 
 const rpcProxyTransport = (chain: Chain) => http(`/api/rpc?chainId=${chain.id}`);
 const METAMASK_WALLETCONNECT_ID =
   "c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96";
-const WALLETCONNECT_STORAGE_PREFIX = "efficient-frontier-swap";
+const WALLETCONNECT_STORAGE_PREFIX = "orbs-spot";
 
 type WagmiConfigOptions = {
   partnerBrand: PartnerBrand;
@@ -81,7 +81,7 @@ function getAppOrigin() {
 
 export const useWagmiConfig = ({ partnerBrand }: WagmiConfigOptions) => {
   const { iconSrc, metadata, name } = partnerBrand;
-  const customConnectModal = hasOrbsConnectModal(getActiveClientPartnerConfig());
+  const customConnectModal = hasOrbsConnectModal(orbsPartner);
 
   return useMemo(() => {
     const projectId = process.env.NEXT_PUBLIC_PROJECT_ID;

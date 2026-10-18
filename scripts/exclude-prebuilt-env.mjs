@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 // Vercel's Next.js builder adds root env files independently of Next.js tracing.
-// Remove those upload references; runtime variables are supplied by deploy-orbs.
+// Remove those upload references; runtime variables are supplied by the deployment script.
 export function excludePrebuiltEnvFiles(functionsDir) {
   let excluded = 0;
   for (const entry of readdirSync(functionsDir, { withFileTypes: true })) {

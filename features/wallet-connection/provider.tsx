@@ -4,8 +4,8 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import { useConnection, useConnectionEffect } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
 import dynamic from "next/dynamic";
-import { getActiveClientPartnerConfig } from "@/lib/partners/client";
 import { hasOrbsConnectModal } from "@/lib/partners/features";
+import { orbsPartner } from "@/lib/partners/orbs";
 
 const OrbsConnectModal = dynamic(
   () => import("./orbs-connect-modal").then((module) => module.OrbsConnectModal),
@@ -13,7 +13,7 @@ const OrbsConnectModal = dynamic(
   { loading: () => null },
 );
 const WalletConnectionContext = createContext<{ openConnectModal?: () => void }>({});
-const enabled = hasOrbsConnectModal(getActiveClientPartnerConfig());
+const enabled = hasOrbsConnectModal(orbsPartner);
 
 export function WalletConnectionProvider({ children }: { children: ReactNode }) {
   const standard = useConnectModal();

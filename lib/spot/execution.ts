@@ -11,7 +11,7 @@ import {
   type Token,
 } from "@orbs-network/spot-ui";
 
-/** Adapt any wallet to this port. Writes resolve only after successful receipts. */
+/** App-owned wallet adapter. On-chain writes resolve only after successful receipts. */
 export interface SpotWalletPort {
   getAllowance(request: AllowanceRequest): Promise<string>;
   wrapNativeToken(amountRaw: string, onSubmitted?: (hash: `0x${string}`) => void): Promise<`0x${string}`>;
@@ -50,6 +50,7 @@ export interface ExecutionSnapshot {
   phase: ExecutionPhase;
   status?: ExecutionStatus;
   error?: ParsedError;
+  failedPhase?: ExecutionPhase;
   currentStep?: Steps;
   currentStepIndex?: number;
   totalSteps?: number;
@@ -57,6 +58,7 @@ export interface ExecutionSnapshot {
   outputToken?: Token;
   chainId?: number;
   form?: CalculatedOrderForm;
+  steps?: Steps[];
   wrapTxHash?: string;
   approvalTxHash?: string;
   order?: Order;
@@ -79,11 +81,6 @@ export function createOrderExecutor(
   // Keep this lock outside UI state: two clicks can arrive before the next render.
   let busy = false;
   let snapshot: ExecutionSnapshot = { phase: ExecutionPhase.IDLE };
-  // A confirmed deposit survives a later rejection or failure. Retrying should
-  // wrap only the missing amount, rather than depositing the same funds again.
-  let completedWrap:
-    | { key: string; amount: bigint; txHash: string }
-    | undefined;
   const publish = (patch: Partial<ExecutionSnapshot>) => {
     snapshot = { ...snapshot, ...patch };
     onChange(snapshot);
@@ -110,7 +107,6 @@ export function createOrderExecutor(
     const form = structuredClone(input.form);
     const native = isNativeAddress(inputToken.address);
     const token = native ? wrappedNativeToken : inputToken;
-    const wrapKey = `${client.chainId}:${account.toLowerCase()}:${inputToken.address.toLowerCase()}`;
     let submitting = false;
     snapshot = {
       phase: ExecutionPhase.PREPARING,
@@ -125,8 +121,8 @@ export function createOrderExecutor(
       if (!form.canSubmit || !token)
         throw new Error("Resolve the order inputs before submitting");
       await wallet.assertContext(account, client.chainId);
-      // SDK amounts are integer strings in the token's smallest unit, not UI decimals.
-      // BigInt preserves precision for comparisons and wallet transaction amounts.
+      // 1. Check allowance for the ERC-20 the order will sell. Native input
+      // uses its wrapped token. SDK amounts are integer strings in base units.
       const amount = BigInt(form.values.inputAmount);
       const allowanceRequest = {
         tokenAddress: token.address,
@@ -134,24 +130,28 @@ export function createOrderExecutor(
       };
       const allowance = BigInt(await wallet.getAllowance(allowanceRequest));
       const approved = allowance >= amount;
-      const wrapped =
-        completedWrap?.key === wrapKey ? completedWrap.amount : BigInt(0);
-      const wrapAmount =
-        native && amount > wrapped ? amount - wrapped : BigInt(0);
+      // Native input always spends native funds. A retry using an earlier
+      // deposit must explicitly select the wrapped token in the form.
+      const steps: Steps[] = [];
+      if (native) steps.push(Steps.WRAP);
+      if (!approved) steps.push(Steps.APPROVE);
+      steps.push(Steps.CREATE);
       publish({
-        totalSteps: 1 + Number(wrapAmount > BigInt(0)) + Number(!approved),
+        totalSteps: steps.length,
+        steps,
         currentStepIndex: 0,
       });
-      if (wrapAmount > BigInt(0)) {
+      // 2. Wrap only when the user selected native input.
+      if (native) {
         await wallet.assertContext(account, client.chainId);
         publish({ phase: ExecutionPhase.WRAPPING, currentStep: Steps.WRAP });
-        const txHash = await wallet.wrapNativeToken(wrapAmount.toString(), (wrapTxHash) => publish({ wrapTxHash }));
-        completedWrap = { key: wrapKey, amount: wrapped + wrapAmount, txHash };
+        const txHash = await wallet.wrapNativeToken(amount.toString(), (wrapTxHash) => publish({ wrapTxHash }));
         publish({
           wrapTxHash: txHash,
           currentStepIndex: (snapshot.currentStepIndex ?? 0) + 1,
         });
       }
+      // 3. Approve only when allowance is insufficient, then verify it.
       if (!approved) {
         await wallet.assertContext(account, client.chainId);
         publish({
@@ -182,7 +182,8 @@ export function createOrderExecutor(
         publish({ currentStepIndex: (snapshot.currentStepIndex ?? 0) + 1 });
       }
       await wallet.assertContext(account, client.chainId);
-      // Prepare only after confirmed wrapping/approval: nonce and expiry must be fresh.
+      // 4. The SDK prepares both the order and its signing request. Do this
+      // after wallet transactions so the order's nonce and expiry are fresh.
       const prepared = client.prepareOrder({
         form,
         inputTokenAddress: token.address,
@@ -194,10 +195,9 @@ export function createOrderExecutor(
       publish({ phase: ExecutionPhase.SUBMITTING });
       await wallet.assertContext(account, client.chainId);
       submitting = true;
-      // The signature belongs to this exact prepared order. Do not recalculate
-      // the order or replace its nonce, amounts or deadlines after signing.
+      // 5. Submit the same prepared order and signature. Recalculating here
+      // would change the signed values and invalidate the signature.
       const order = await client.submitOrder(prepared.order, signature);
-      completedWrap = undefined;
       publish({
         phase: ExecutionPhase.SUCCESS,
         status: ExecutionStatus.SUCCESS,
@@ -215,6 +215,7 @@ export function createOrderExecutor(
           : message,
       };
       publish({
+        failedPhase: snapshot.phase,
         phase: rejected ? ExecutionPhase.REJECTED : ExecutionPhase.FAILED,
         status: rejected ? undefined : ExecutionStatus.FAILED,
         error: rejected ? undefined : parsed,

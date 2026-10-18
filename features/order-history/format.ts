@@ -151,19 +151,6 @@ export function formatTokenValue(
   return `${formatDisplayNumber(amount, decimalScale)} ${symbol ?? ""}`.trim();
 }
 
-export function formatPriceValue(
-  price?: string,
-  srcSymbol?: string,
-  dstSymbol?: string,
-) {
-  if (!price) return "-";
-  const value = BN(price);
-  if (!value.isFinite()) return "-";
-  return `1 ${srcSymbol ?? ""} = ${formatActivityNumber(price)} ${
-    dstSymbol ?? ""
-  }`.trim();
-}
-
 export function isZeroValue(value?: string | number) {
   if (!value) return true;
   return BN(value).isZero();

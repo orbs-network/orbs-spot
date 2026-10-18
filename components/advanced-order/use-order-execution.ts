@@ -7,7 +7,7 @@ import { CREATE_ORDER_TOAST_ID } from "./constants";
 import { useConnection } from "wagmi";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { invalidateOrderQueries } from "@/lib/spot/queries";
-import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
+import { useOrderSubmitFlowStore, useSwapStore } from "@/lib/hooks/store";
 import { getWrappedNativeCurrency } from "@/lib/utils";
 import {
   createOrderExecutor,
@@ -17,46 +17,51 @@ import {
 import { useOrderModel } from "./use-order-form";
 import { useClient } from "./use-order-client";
 import { useWalletInteractions } from "./hooks";
+import { isUserRejectedError } from "@/lib/tx-rejection";
+import { useCallback } from "react";
+import { isNativeAddress } from "@orbs-network/spot-ui";
+import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
+import { Field } from "@/lib/types";
+import { getOrderDraftKey } from "@/lib/spot/form";
 
 // This playground has one order form. Keep its executor across React renders
-// so the submission lock and confirmed wrapping survive UI updates. A host with
+// so the submission lock survives UI updates. A host with
 // multiple independent forms should create a separate executor for each form.
 const executor = createOrderExecutor((execution) =>
   useOrderSubmitFlowStore.setState({ execution }),
 );
 
-// Preflight errors belong to the review UI; executor errors already have a phase snapshot.
+// Preflight errors occur before the executor publishes a phase snapshot.
 class SubmissionPreflightError extends Error {}
 
-export function useSubmitButton() {
-  const { form, inputToken, outputToken, market } = useOrderModel();
-  const { address } = useConnection();
-  const client = useClient();
-  const isExecuting = useOrderSubmitFlowStore(
-    (state) => state.execution.status === ExecutionStatus.LOADING,
-  );
-  return {
-    disabled:
-      isExecuting ||
-      !address ||
-      !client.data ||
-      !inputToken ||
-      !outputToken ||
-      !form.canSubmit ||
-      market.noLiquidity ||
-      market.isLoading,
-    loading: client.isLoading || market.isLoading,
-  };
-}
+type SubmissionView = "review" | "preparing" | "progress" | "success" | "failed";
 
-// React adapter: gather current inputs here; keep the wallet/SDK sequence in lib/spot.
-export function useExecution() {
+// Call once in SubmitOrder and pass the result to its review/status components.
+// This hook owns app state; lib/spot/execution.ts shows the wallet + SDK sequence.
+export function useOrderExecution() {
   const snapshot = useOrderSubmitFlowStore((state) => state.execution);
-  const { form, inputToken, outputToken, market } = useOrderModel();
+  const { form, inputToken, outputToken, market, input: orderInput } = useOrderModel();
   const { address, chainId } = useConnection();
   const client = useClient();
   const wallet = useWalletInteractions();
   const queryClient = useQueryClient();
+  const { handleCurrencyChange } = useActionHandlers();
+  const returnToReview = useCallback(() => {
+    if (executor.isBusy()) return;
+    const { pendingWrappedInputAddress, pendingWrappedContext, setPendingWrappedInputAddress } = useOrderSubmitFlowStore.getState();
+    if (pendingWrappedInputAddress && chainId && pendingWrappedContext?.chainId === chainId &&
+        pendingWrappedContext.account.toLowerCase() === address?.toLowerCase() &&
+        isNativeAddress(inputToken?.address ?? "")) {
+      // Wrapping is 1:1, so retain the reviewed amount, prices and schedule.
+      useSwapStore.getState().setOrderInput(
+        getOrderDraftKey(chainId, form.module, pendingWrappedInputAddress, outputToken?.address),
+        orderInput,
+      );
+      handleCurrencyChange(pendingWrappedInputAddress, Field.INPUT);
+    }
+    setPendingWrappedInputAddress(undefined);
+    executor.reset();
+  }, [address, chainId, form.module, handleCurrencyChange, inputToken?.address, orderInput, outputToken?.address]);
   // mutate is the button action; the executor publishes detailed progress/errors.
   // isPending tracks this invocation, while the shared snapshot tracks its phases.
   const { mutate: submitOrder, isPending } = useMutation({
@@ -107,11 +112,16 @@ export function useExecution() {
     retry: false,
     onError: (error) => {
       trackFunnel({ name: "submission_failed", product: "advanced" });
-      if (error instanceof SubmissionPreflightError) {
-        toast.error("Order not submitted", {
-          id: CREATE_ORDER_TOAST_ID,
-          description: error.message,
-        });
+      if (isUserRejectedError(error)) return;
+      // Execution errors already have a failed snapshot. Validation can fail
+      // before execution starts, so publish it for the same inline error UI.
+      if (error instanceof SubmissionPreflightError && !executor.isBusy()) {
+        useOrderSubmitFlowStore.setState({ execution: {
+          phase: ExecutionPhase.FAILED,
+          status: ExecutionStatus.FAILED,
+          error: { message: error.message },
+          form, inputToken, outputToken, chainId,
+        } });
       }
     },
     onSuccess: (result) => {
@@ -127,14 +137,29 @@ export function useExecution() {
       void invalidateOrderQueries(queryClient, result);
     },
   });
+  const isSubmitting = isPending || snapshot.status === ExecutionStatus.LOADING;
+  // Keep the executor's actual status intact. The view only decides which UI
+  // to show, including a button loader while allowance is being checked.
+  let view: SubmissionView = "review";
+  if (snapshot.status === ExecutionStatus.SUCCESS) view = "success";
+  else if (snapshot.status === ExecutionStatus.FAILED || snapshot.error) view = "failed";
+  else if (isSubmitting && snapshot.phase !== ExecutionPhase.REJECTED) {
+    view = snapshot.phase === ExecutionPhase.PREPARING || snapshot.phase === ExecutionPhase.IDLE
+      ? "preparing" : "progress";
+  }
+
   return {
     ...snapshot,
+    view,
     submitOrder,
     inputToken: snapshot.inputToken ?? inputToken,
     outputToken: snapshot.outputToken ?? outputToken,
-    isExecuting: isPending || snapshot.status === ExecutionStatus.LOADING,
-    isRejected: snapshot.phase === ExecutionPhase.REJECTED,
-    startNewOrder: executor.reset,
-    returnToOrderForm: executor.reset,
+    isSubmitting,
+    submitDisabled: isSubmitting || !address || !client.data || !inputToken || !outputToken ||
+      !form.canSubmit || market.noLiquidity || market.isLoading,
+    quoteLoading: client.isLoading || market.isLoading,
+    returnToReview,
   };
 }
+
+export type OrderExecution = ReturnType<typeof useOrderExecution>;

@@ -2,12 +2,11 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Providers } from "@/lib/providers";
 import { Navigation } from "@/components/navigation";
-
 import "@rainbow-me/rainbowkit/styles.css";
 import { Toaster } from "@/components/ui/sonner";
-import { getActivePartnerConfig } from "@/lib/partners/server";
 import { getDefaultTheme, getPartnerThemeCss } from "@/lib/partners/themes";
 import type { PartnerBrand } from "@/lib/partners/types";
+import { orbsPartner } from "@/lib/partners/orbs";
 
 function getIconType(url: string) {
   const pathname = url.split("?")[0]?.toLowerCase() ?? "";
@@ -37,7 +36,7 @@ function getPartnerIcons(brand: PartnerBrand): Metadata["icons"] {
 }
 
 export function generateMetadata(): Metadata {
-  const partner = getActivePartnerConfig();
+  const partner = orbsPartner;
   const { metadata, name } = partner.brand;
 
   return {
@@ -61,7 +60,7 @@ export function generateMetadata(): Metadata {
 }
 
 export function generateViewport(): Viewport {
-  const partner = getActivePartnerConfig();
+  const partner = orbsPartner;
 
   return {
     themeColor: partner.styles.colors.background,
@@ -73,24 +72,21 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const partner = getActivePartnerConfig();
+  const partner = orbsPartner;
 
   return (
     <html lang="en" data-partner={partner.id} className={getDefaultTheme(partner.styles)} suppressHydrationWarning>
       <head>
-        {partner.id === "orbs" && (
-          <link rel="preload" href="/fonts/orbs-montserrat-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
-        )}
+        <link rel="preload" href="/fonts/orbs-montserrat-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
         <style dangerouslySetInnerHTML={{ __html: getPartnerThemeCss(partner.styles) }} />
         <script dangerouslySetInnerHTML={{ __html: `try{const t=localStorage.getItem("orbs-color-theme");if(t==="light"||t==="dark")document.documentElement.className=t;}catch{}` }} />
       </head>
       <body className="antialiased">
         <Providers
           partnerBrand={partner.brand}
-          partnerStyles={partner.styles}
         >
           <Toaster />
-          <div className="ef-app-shell flex min-h-screen flex-col font-sans text-foreground">
+          <div className="app-shell flex min-h-screen flex-col font-sans text-foreground">
             <a
               href="#main-content"
               className="fixed left-4 top-4 z-[100] -translate-y-20 rounded-lg bg-card px-4 py-2 text-sm font-semibold text-foreground shadow-lg transition-transform focus-visible:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
