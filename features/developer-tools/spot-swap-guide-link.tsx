@@ -1,18 +1,16 @@
 import { DeveloperGuideLink } from "./developer-guide-link";
-import { getSpotDocsHref } from "@/features/developer-tools/docs";
 
-export function LiquidityHubGuideLink({
+export function SpotSwapGuideLink({
   className,
-  section,
 }: {
   className?: string;
   section?: string;
 }) {
   return (
     <DeveloperGuideLink
-      baseHref={getSpotDocsHref("/liquidity-hub")}
+      baseHref="https://github.com/orbs-network/spot-ui/blob/master/skills/spot-integration/references/07-swap-and-migration.md"
       className={className}
-      section={section}
+      section={undefined}
     />
   );
 }

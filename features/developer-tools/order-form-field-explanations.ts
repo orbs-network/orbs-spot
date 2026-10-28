@@ -1,7 +1,7 @@
 import type { JsonValuePath } from "./json-inspector";
 
 const FIELD_EXPLANATIONS: Record<string, string> = {
-  formParams: "Inputs passed to calculateOrderForm. The SDK derives validated amounts, prices, and a schedule from these values. Saving rebuilds the live order’s RePermit data.",
+  formParams: "Inputs passed to calculateOrder. The SDK derives validated amounts, prices, and a schedule from these values. Saving rebuilds the live order’s RePermit data.",
   "formParams.module": "Order strategy: TWAP, LIMIT, STOP_LOSS, or TAKE_PROFIT. This follows the selected order type and is read-only here.",
   "formParams.inputTokenDecimals": "Decimal precision of the input token. For example, an 18-decimal token uses 10^18 base units per whole token. This comes from the selected token and is read-only.",
   "formParams.outputTokenDecimals": "Decimal precision of the output token, used to convert quoted and minimum output amounts between base units and display values. This is read-only.",

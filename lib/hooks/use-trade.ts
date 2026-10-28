@@ -1,141 +1,60 @@
+import { QuoteError } from "@orbs-network/spot-ui";
 import { useQuery } from "@tanstack/react-query";
-import { useLiquidityHub } from "./liquidity-hub";
-import { BestTradeQuote, Currency } from "../types";
+import type { Currency } from "../types";
 import { useSettings } from "./use-settings";
 import BN from "bignumber.js";
-import {
-  getWrappedNativeCurrency,
-  isNativeAddress,
-} from "../utils";
+import { getWrappedNativeCurrency } from "../utils";
 import { useDataChainId } from "./use-data-chain-id";
 import { QUOTE_PREVIEW_ACCOUNT } from "@/lib/swap/quote-preview";
+import { spotSwapQuoteQueryOptions } from "@/lib/swap/quotes";
 import { useConnection } from "wagmi";
 import { useSwapStore } from "./store";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useIsSwapTab } from "./use-form-tab";
+import { useSpotSwapClient } from "./use-spot-swap-client";
 import { getNativeConversion } from "../native-conversion";
-
-const stopQuoteLiquidityHub = (_error?: string) => {
-  if (!_error) return false;
-  const error = _error.toLowerCase();
-  if (error.includes("not supported")) {
-    return true;
-  }
-  if (error.includes("ldv")) {
-    return true;
-  }
-  return false;
-};
-
-const useQuoteLiquidityHub = (
-  inputCurrency?: Currency,
-  outputCurrency?: Currency,
-  parsedInputAmount = "",
-  enabled = true
-) => {
-  const liquidityHub = useLiquidityHub();
-  const { slippage } = useSettings();
-  const pauseQuote = useSwapStore((state) => state.pauseQuote);
-  const { address } = useConnection();
-  const chainId = useDataChainId();
-  // Wallet identity remains part of the key, so connecting requests a fresh quote.
-  const account = address ?? QUOTE_PREVIEW_ACCOUNT;
-  const inputCurrencyAddress = inputCurrency?.address ?? "";
-  const outputCurrencyAddress = outputCurrency?.address ?? "";
-  return useQuery<BestTradeQuote>({
-    queryKey: [
-      "quote-liquidity-hub",
-      chainId,
-      account,
-      inputCurrencyAddress,
-      outputCurrencyAddress,
-      parsedInputAmount,
-      slippage,
-    ],
-    queryFn: async ({ signal }) => {
-      if (!chainId || !account || !inputCurrency || !outputCurrency || !BN(parsedInputAmount).gt(0)) {
-        throw new Error("Select a token pair and enter an amount before requesting a quote");
-      }
-      const quote = await liquidityHub.getQuote({
-        fromToken: isNativeAddress(inputCurrencyAddress)
-          ? getWrappedNativeCurrency(chainId!)?.address ?? ""
-          : inputCurrencyAddress!,
-        toToken: outputCurrencyAddress!,
-        inAmount: parsedInputAmount,
-        // No DEX router quote exists in this reference app. Production DEXes
-        // should pass their router's slippage-adjusted minimum output here.
-        dexMinAmountOut: "-1",
-        slippage: slippage,
-        signal,
-        account: account,
-      });
-      return {
-        outAmount: quote.outAmount,
-        minAmountOut: quote.minAmountOut,
-        inToken: inputCurrency!.address,
-        outToken: outputCurrency!.address,
-        inAmount: quote.inAmount,
-        gas: quote.gasAmountOut as string,
-        originalQuote: quote,
-      };
-    },
-    // Several controls observe this query. Reuse the quote between polling ticks
-    // instead of refetching whenever another consumer mounts.
-    staleTime: 10_000,
-    refetchInterval: (it) => {
-      if (stopQuoteLiquidityHub(it.state.error?.message)) {
-        return false;
-      }
-      return pauseQuote ? false : 10_000;
-    },
-    retry: (failureCount, error) => {
-      if (stopQuoteLiquidityHub(error?.message)) {
-        return false;
-      }
-      return failureCount < 2;
-    },
-    enabled:
-      enabled &&
-      !pauseQuote &&
-      !!account &&
-      !!inputCurrencyAddress &&
-      !!outputCurrencyAddress &&
-      BN(parsedInputAmount).gt(0) &&
-      !!chainId,
-  });
-};
 
 export const useTrade = (
   inputCurrency?: Currency,
   outputCurrency?: Currency,
-  parsedInputAmount = ""
+  parsedInputAmount = "",
 ) => {
   const isSwapTab = useIsSwapTab();
   const chainId = useDataChainId();
-  const usesLiquidityHubQuote = isSwapTab && !getNativeConversion(
-    inputCurrency?.address, outputCurrency?.address, getWrappedNativeCurrency(chainId)?.address,
+  const { address } = useConnection();
+  const { slippage } = useSettings();
+  const pauseQuote = useSwapStore(state => state.pauseQuote);
+  const wrappedNative = getWrappedNativeCurrency(chainId)?.address;
+  // Every advanced order uses the same full-input quote as swaps. Only the
+  // swap tab's direct wrap/unwrap operation bypasses market quoting.
+  const usesSpotQuote = !isSwapTab || !getNativeConversion(
+    inputCurrency?.address, outputCurrency?.address, wrappedNative,
   );
-  const liquidityHubQuote = useQuoteLiquidityHub(
-    inputCurrency,
-    outputCurrency,
-    parsedInputAmount,
-    usesLiquidityHubQuote
-  );
+  const quoteEnabled = usesSpotQuote && !pauseQuote && Boolean(inputCurrency && outputCurrency) && BN(parsedInputAmount).gt(0);
+  const client = useSpotSwapClient(quoteEnabled);
+  const query = useQuery({
+    ...spotSwapQuoteQueryOptions(client.data, address ?? QUOTE_PREVIEW_ACCOUNT,
+      inputCurrency, outputCurrency, parsedInputAmount, slippage, wrappedNative),
+    enabled: quoteEnabled && Boolean(client.data),
+    refetchInterval: state => pauseQuote || (state.state.error instanceof QuoteError && !state.state.error.retryable) ? false : 10_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: !pauseQuote,
+  });
+  const refetchQuote = query.refetch;
+  const refetchClient = client.refetch;
+  const configuredClient = client.data;
+  // TanStack's enabled flag does not prevent imperative refetches.
+  const refetch = useCallback(() => {
+    if (useSwapStore.getState().pauseQuote) return Promise.resolve(undefined);
+    if (!configuredClient) return refetchClient().then(() => undefined);
+    return refetchQuote();
+  }, [configuredClient, refetchClient, refetchQuote]);
 
-  return useMemo(
-    () => ({
-      error: usesLiquidityHubQuote ? liquidityHubQuote.error : null,
-      isLoading: usesLiquidityHubQuote ? liquidityHubQuote.isLoading : false,
-      refetch: liquidityHubQuote.refetch,
-      data: usesLiquidityHubQuote ? liquidityHubQuote.data : undefined,
-      usesLiquidityHubQuote,
-    }),
-    [
-      usesLiquidityHubQuote,
-      liquidityHubQuote.data,
-      liquidityHubQuote.error,
-      liquidityHubQuote.isLoading,
-      liquidityHubQuote.refetch,
-    ]
-  );
+  return useMemo(() => ({
+    error: usesSpotQuote ? (quoteEnabled ? client.error : null) ?? query.error : null,
+    isLoading: quoteEnabled && (client.isLoading || query.isLoading),
+    refetch,
+    data: usesSpotQuote ? query.data : undefined,
+    usesSpotQuote,
+  }), [usesSpotQuote, quoteEnabled, client.error, client.isLoading, query.data, query.error, query.isLoading, refetch]);
 };

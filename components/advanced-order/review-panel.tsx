@@ -179,7 +179,7 @@ function OrderSubmissionActions({
 }) {
   const [accepted, setAccepted] = useState(true);
   const t = useTranslations();
-  const { view, phase, error, inputToken, chainId, steps, currentStepIndex, wrapTxHash, approvalTxHash, submitDisabled, submitOrder, returnToReview } = execution;
+  const { view, phase, error, inputToken, chainId, steps, currentStepIndex, wrapTxHash, approvalTxHash, submitDisabled, submitOrder, returnToReview, walletBusy } = execution;
   const network = SUPPORTED_CHAINS.find(chain => chain.id === chainId);
   const symbol = isNativeAddress(inputToken?.address ?? "") ? network?.nativeCurrency.symbol ?? inputToken?.symbol ?? "" : inputToken?.symbol ?? "";
   const stepTitles = {
@@ -223,6 +223,7 @@ function OrderSubmissionActions({
       </div>
       <Button type="button" data-submit-button className="h-12 w-full rounded-[14px] text-base" disabled={!accepted || submitDisabled} isLoading={preparing} aria-busy={preparing} onClick={() => submitOrder()}>Submit</Button>
       {preparing && <span role="status" className="sr-only">Checking token allowance…</span>}
+      {walletBusy && !preparing && <p role="status" className="text-xs text-muted-foreground">Confirm the pending wallet request to submit this order.</p>}
     </>}
   </div>;
 }

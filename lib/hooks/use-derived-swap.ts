@@ -28,18 +28,18 @@ export const useDerivedSwap = () => {
     error: quoteError,
     isLoading: isLoadingTrade,
     refetch: refetchTrade,
-    usesLiquidityHubQuote,
+    usesSpotQuote,
   } = useTrade(inputCurrency, outputCurrency, parsedInputAmount);
 
   const quotedOutputAmount = displayTokenAmount(useToAmountUI(
     outputCurrency?.decimals,
     trade?.outAmount
   ), outputCurrency?.symbol, outputCurrency?.decimals);
-  const outputAmount = nativeConversion ? inputAmount : quotedOutputAmount;
+  const outputAmount = nativeConversion && !usesSpotQuote ? inputAmount : quotedOutputAmount;
 
   const noLiquidity = useMemo(
     () =>
-      usesLiquidityHubQuote &&
+      usesSpotQuote &&
       Boolean(inputCurrency && outputCurrency) &&
       !isLoadingTrade &&
       BN(parsedInputAmount ?? "0").gt(0) &&
@@ -50,7 +50,7 @@ export const useDerivedSwap = () => {
       outputCurrency,
       parsedInputAmount,
       trade,
-      usesLiquidityHubQuote,
+      usesSpotQuote,
     ]
   );
 
@@ -66,7 +66,7 @@ export const useDerivedSwap = () => {
       quoteError,
       refetchTrade,
       outputAmount,
-      usesLiquidityHubQuote,
+      usesSpotQuote,
       nativeConversion,
     }),
     [
@@ -80,7 +80,7 @@ export const useDerivedSwap = () => {
       parsedInputAmount,
       refetchTrade,
       trade,
-      usesLiquidityHubQuote,
+      usesSpotQuote,
       nativeConversion,
     ]
   );

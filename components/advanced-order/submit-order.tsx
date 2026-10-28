@@ -22,19 +22,19 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
   const t = useTranslations();
   const execution = useOrderExecution();
   const [previewOrder, setPreviewOrder] = useState<Order>();
-  const { phase, view, isSubmitting, submitDisabled, quoteLoading, returnToReview } = execution;
+  const { phase, view, isSubmitting, submitDisabled, reviewDisabled, quoteLoading, returnToReview, detachSubmission } = execution;
   const isFetchingQuote = quoteLoading && !isSubmitting;
   const { setInputAmount } = useActionHandlers();
-  const pendingWrappedInputAddress = useOrderSubmitFlowStore(
-    (state) => state.pendingWrappedInputAddress,
-  );
   const { chainId, address } = useConnection();
   const open = useOrderSubmitFlowStore(state => state.isReviewOpen);
   const setOpen = useOrderSubmitFlowStore(state => state.setReviewOpen);
   useEffect(() => {
     if (isDeveloperPlayground) setOpen(false);
-    return () => setOpen(false);
-  }, [isDeveloperPlayground, setOpen]);
+    return () => {
+      setOpen(false);
+      detachSubmission();
+    };
+  }, [isDeveloperPlayground, setOpen, detachSubmission]);
   const orderTitle = getOrderTitle(orderModule, t);
   const order = useOrderReview();
   const orderType = order.form.module === Module.LIMIT
@@ -45,15 +45,6 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
     if (phase === ExecutionPhase.REJECTED) returnToReview();
   }, [phase, returnToReview]);
 
-  useEffect(() => {
-    if (open || isSubmitting || (view === "review" && !pendingWrappedInputAddress)) return;
-
-    // Reset after the close animation. If a wallet action finishes while the
-    // dialog is closed, wait for it before applying a confirmed wrapped input.
-    const timer = window.setTimeout(returnToReview, 400);
-    return () => window.clearTimeout(timer);
-  }, [open, isSubmitting, view, pendingWrappedInputAddress, returnToReview]);
-
   function openReview() {
     trackFunnel({ name: "review_opened", product: "advanced" });
     if (!isSubmitting) returnToReview();
@@ -62,7 +53,12 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
 
   function closeReview() {
     setOpen(false);
-    if (view === "success") setInputAmount("");
+    if (isSubmitting || view === "success") {
+      detachSubmission();
+      setInputAmount("");
+    } else {
+      returnToReview();
+    }
   }
 
   function viewOrder() {
@@ -90,7 +86,7 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
         >
           <SubmitSwapButton
             onClick={openReview}
-            disabled={submitDisabled}
+            disabled={reviewDisabled}
             isLoading={isFetchingQuote}
             text={isFetchingQuote ? t("fetchingQuote") : "Review"}
             validateSwap={false}

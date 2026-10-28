@@ -7,6 +7,9 @@ export const DURATION_OPTIONS = [
 ] as const;
 
 export const MODULE_META = {
+  [Module.SWAP]: {
+    titleKey: "swap",
+  },
   [Module.TWAP]: {
     titleKey: "twap",
   },

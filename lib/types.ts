@@ -1,4 +1,4 @@
-import type { Quote } from "@orbs-network/liquidity-hub-sdk";
+import type { SwapQuote } from "@orbs-network/spot-ui";
 
 
 export type Currency = {
@@ -53,7 +53,7 @@ export enum FormTab {
     inToken: string;
     outToken: string;
     inAmount: string;
-    gas: string;
-    originalQuote: Quote;
+    slippage: number;
+    originalQuote: SwapQuote;
   }
   

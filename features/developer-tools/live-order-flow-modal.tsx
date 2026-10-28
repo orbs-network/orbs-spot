@@ -879,7 +879,7 @@ function LiveOrderFlowModalContent({
         data: calculationInput ?? calculationDefaults,
         editable: !isRunning && step !== "success",
         explanation:
-          "Edit the inline calculation inputs and save to rebuild the live RePermit data before checking allowance and signing. Examples target @orbs-network/spot-ui 2.1.2 or later.",
+          "Edit the inline calculation inputs and save to rebuild the live RePermit data before checking allowance and signing. Examples target @orbs-network/spot-ui 2.1.21 or later.",
         title: "Advanced Orders Typescript SDK flow",
       };
     }

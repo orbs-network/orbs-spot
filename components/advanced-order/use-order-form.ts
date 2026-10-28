@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, useCallback } from "react";
 import {
-  calculateOrderForm,
+  calculateOrder,
   invertPriceInput,
   Module,
   type CalculateOrderFormParams,
@@ -80,8 +80,8 @@ export function useCalculatedOrder(module: Module) {
             usesMarketPrice(module, limitPriceEnabled),
         },
       };
-      const form = calculateOrderForm(params);
-      const defaults = calculateOrderForm({
+      const form = calculateOrder(params);
+      const defaults = calculateOrder({
         ...params,
         userInput: {
           ...params.userInput,

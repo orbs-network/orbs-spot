@@ -6,7 +6,7 @@ import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { Field } from "@/lib/types";
 import { useTranslations } from "@/lib/use-translations";
 import { FormActionPanel } from "@/components/form-action-panel";
-import { LiquidityHubQuoteDeveloperTrigger } from "@developer-tools";
+import { SpotSwapQuoteDeveloperTrigger } from "@developer-tools";
 import { SubmitSwap } from "@/features/swap/review";
 import { SwapQuoteSummary } from "@/features/swap/quote-summary";
 import { SubmitNativeConversion } from "@/features/swap/native-conversion";
@@ -38,7 +38,7 @@ export function SwapBestTradeForm() {
           disabled={true}
           amount={outputAmount}
           title={t("to")}
-          titleAction={!nativeConversion ? <LiquidityHubQuoteDeveloperTrigger /> : undefined}
+          titleAction={!nativeConversion ? <SpotSwapQuoteDeveloperTrigger /> : undefined}
           isLoading={isLoadingTrade}
           statusText={noLiquidity ? t("noLiquidity") : undefined}
         />

@@ -8,7 +8,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { compactSelectorTriggerClass, SelectorTrigger } from "@/components/ui/selector-trigger";
 import styles from "@/components/network-selector.module.css";
 import { cn } from "@/lib/utils";
-import { useIsSpotTab } from "@/lib/hooks/use-form-tab";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { useSpotPartner } from "@/lib/hooks/use-spot-partner";
 import { useSpotPartners } from "@/lib/hooks/use-spot-partners";
@@ -100,6 +99,5 @@ function PartnerSelectorContent() {
 
 export function PartnerSelector() {
   const { isDebugMode } = useSpotPartner();
-  const isSpotTab = useIsSpotTab();
-  return isDebugMode && isSpotTab ? <PartnerSelectorContent /> : null;
+  return isDebugMode ? <PartnerSelectorContent /> : null;
 }

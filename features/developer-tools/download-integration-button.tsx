@@ -4,12 +4,12 @@ import { DownloadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function DownloadIntegrationButton({ flow, getCode }: {
-  flow: "liquidity-hub" | "advanced-orders";
+  flow: "spot-swap" | "advanced-orders";
   getCode: () => string;
 }) {
   function download() {
-    const setup = flow === "liquidity-hub"
-      ? "Install: npm install @orbs-network/liquidity-hub-sdk viem\nConfigure: chainId, partner, and your connected wallet provider.\nCall swapFlow with your reviewed quote and refetchQuote callback."
+    const setup = flow === "spot-swap"
+      ? "Install: npm install @orbs-network/spot-ui viem\nConfigure: chain, partner, and your connected wallet provider.\nCall swapFlow with your reviewed quote and minimum, quote polling controls, and cancellation signal."
       : "Install: npm install @orbs-network/spot-ui viem\nConfigure: chain, partner, and your connected wallet provider.\nThe calculation parameters below reflect the current saved form.\nCall createAdvancedOrderFlow with the wallet account and token addresses.";
     const blob = new Blob([`/*\n${setup}\nBrowser integration: import this module only on the client.\n*/\n\n`, getCode()], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);

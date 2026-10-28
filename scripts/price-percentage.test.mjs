@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import BN from "bignumber.js";
-import { calculateOrderForm, Module, InputErrors } from "@orbs-network/spot-ui";
+import { calculateOrder, Module, InputErrors } from "@orbs-network/spot-ui";
 import { invertPricePercentage } from "../lib/exchange-rates.ts";
 
 const Precise = BN.clone({ DECIMAL_PLACES: 512 });
 
-const calculate = userInput => calculateOrderForm({
+const calculate = userInput => calculateOrder({
   module: Module.STOP_LOSS,
   inputTokenDecimals: 18,
   outputTokenDecimals: 18,

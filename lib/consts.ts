@@ -95,20 +95,15 @@ export const robinhoodChain = defineChain({
   },
 });
 
-// https://docs.orbs.com/liquidity-hub/shared#supported-chains
-export const MAIN_CHAINS = [
-  mainnet, arbitrum, bsc, linea, base, sonic, polygon, blast,
-] as const;
-
 // https://docs.orbs.com/advanced-orders/shared#supported-chains
-// Each chain has a validated external-partner configuration in Order Sink v2.
+// Swaps and advanced orders share the same external-partner configurations.
 export const SPOT_CHAINS = [
   bsc, linea, sei, base, sonic, polygon, berachain, flare, avalanche, monad,
   arbitrum, mainnet, katana, optimism, mantle, hyperEvmChain, unichain, xLayer,
   megaethChain, rootstock, robinhoodChain, plasma, ink,
 ] as const;
 
-// Wallets and public clients must include swap-only chains as well as Spot.
+// Keep public clients for legacy Blast swap activity; all trade forms use SPOT_CHAINS.
 export const SUPPORTED_CHAINS = [...SPOT_CHAINS, blast] as const;
 
 export type SupportedChainId = (typeof SUPPORTED_CHAINS)[number]["id"];

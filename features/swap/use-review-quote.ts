@@ -7,7 +7,7 @@ import { toAmountUI } from "@/lib/utils";
 export function useReviewQuote() {
   const current = useDerivedSwap();
   const reviewed = useBestTradeSwapStore(state => state.reviewedQuote);
-  const quote = reviewed ?? current.trade?.originalQuote;
+  const quote = reviewed ?? current.trade;
   return { ...current, quote,
     outputAmount: quote ? toAmountUI(quote.outAmount, current.outputCurrency?.decimals) : current.outputAmount,
   };

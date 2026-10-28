@@ -1,10 +1,10 @@
 import { validPercent } from "../percent-settings";
-import type { Quote } from "@orbs-network/liquidity-hub-sdk";
+import type { Order } from "@orbs-network/spot-ui";
 import type { OrderInput } from "@/lib/spot/form";
 import { ExecutionPhase, type ExecutionSnapshot } from "@/lib/spot/execution";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { type Currency, SwapStatus, SwapStep } from "../types";
+import { type BestTradeQuote, type Currency, SwapStatus, SwapStep } from "../types";
 import { DEFAULT_PRICE_PROTECTION, DEFAULT_SLIPPAGE } from "../consts";
 import { getTokenKey } from "../utils";
 
@@ -88,7 +88,10 @@ type SwapStore = {
   inputAmount: string;
   setInputAmount: (inputAmount: string) => void;
   pauseQuote: boolean;
+  quotePauseOwner?: string;
   setPauseQuote: (pauseQuote: boolean) => void;
+  pauseQuotesFor: (owner: string) => void;
+  resumeQuotesFor: (owner: string) => void;
 };
 
 export const useSwapStore = create<SwapStore>((set) => ({
@@ -107,7 +110,10 @@ export const useSwapStore = create<SwapStore>((set) => ({
   inputAmount: "",
   setInputAmount: (inputAmount: string) => set({ inputAmount }),
   pauseQuote: false,
-  setPauseQuote: (pauseQuote: boolean) => set({ pauseQuote }),
+  setPauseQuote: (pauseQuote: boolean) => set({ pauseQuote, quotePauseOwner: undefined }),
+  pauseQuotesFor: quotePauseOwner => set({ pauseQuote: true, quotePauseOwner }),
+  resumeQuotesFor: owner => set(state => state.quotePauseOwner === owner
+    ? { pauseQuote: false, quotePauseOwner: undefined } : state),
 }));
 
 type FormTabStore = {
@@ -143,20 +149,23 @@ export const useOrderSubmitFlowStore = create<OrderSubmitFlowStore>((set) => ({
 }));
 
 type BestTradeSwapStore = {
-  reviewedQuote?: Quote;
-  quoteUpdate?: { previous: Quote; next: Quote };
-  error?: { message: string };
+  reviewedQuote?: BestTradeQuote;
+  quoteUpdate?: { previous: BestTradeQuote; next: BestTradeQuote };
+  error?: { message: string; submissionUncertain?: boolean };
   isReviewOpen: boolean;
   setReviewOpen: (open: boolean) => void;
   isAwaitingWallet?: boolean;
-  review?: { inputCurrency: Currency; outputCurrency: Currency; inputAmount: string; outputAmount: string; chainId: number };
+  review?: { inputCurrency: Currency; outputCurrency: Currency; inputAmount: string; outputAmount: string; chainId: number; account: string };
   status?: SwapStatus;
   totalSteps?: number;
   steps?: SwapStep[];
   currentStep?: SwapStep;
   currentStepIndex?: number;
   txHash?: string;
+  orderId?: string;
+  order?: Order;
   wrapTxHash?: string;
+  confirmedWrappedInputAddress?: string;
   approvalTxHash?: string;
   updateStore: (data: Partial<BestTradeSwapStore>) => void;
   resetStore: () => void;
@@ -175,7 +184,10 @@ export const useBestTradeSwapStore = create<BestTradeSwapStore>((set) => ({
       currentStep: undefined,
       currentStepIndex: undefined,
       txHash: undefined,
+      orderId: undefined,
+      order: undefined,
       wrapTxHash: undefined,
+      confirmedWrappedInputAddress: undefined,
       approvalTxHash: undefined,
       isAwaitingWallet: false,
       review: undefined,

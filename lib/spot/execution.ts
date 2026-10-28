@@ -205,7 +205,7 @@ export function createOrderExecutor(
       });
       return order;
     } catch (error) {
-      const rejected = isTxRejected(error);
+      const rejected = !submitting && isTxRejected(error);
       const message = error instanceof Error ? error.message : String(error);
       // A lost HTTP response does not prove that submission failed on the server.
       // Surface that ambiguity so the caller checks history before resubmitting.

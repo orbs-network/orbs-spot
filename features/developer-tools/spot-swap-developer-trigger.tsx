@@ -12,23 +12,22 @@ import { useIsSwapTab } from "@/lib/hooks/use-form-tab";
 import { DeveloperModeSpotlight } from "./developer-mode-spotlight";
 import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 
-const LiquidityHubDeveloperContent = lazy(async () => ({
-  default: (await import("./liquidity-hub-developer-content"))
-    .LiquidityHubDeveloperContent,
+const SpotSwapDeveloperContent = lazy(async () => ({
+  default: (await import("./spot-swap-developer-content"))
+    .SpotSwapDeveloperContent,
 }));
 
-const LiquidityHubQuoteDeveloperContent = lazy(async () => ({
-  default: (await import("./liquidity-hub-quote-developer-content"))
-    .LiquidityHubQuoteDeveloperContent,
+const SpotSwapQuoteDeveloperContent = lazy(async () => ({
+  default: (await import("./spot-swap-quote-developer-content"))
+    .SpotSwapQuoteDeveloperContent,
 }));
 
-function LiquidityHubDeveloperTriggerContent({ mode }: { mode: DeveloperExecutionMode }) {
+function SpotSwapDeveloperTriggerContent({ mode }: { mode: DeveloperExecutionMode }) {
   const targetRef = useRef<HTMLDivElement>(null);
   const { isLoadingTrade, trade, inputCurrency, parsedInputAmount } = useDerivedSwap();
   const { address } = useConnection();
   const balance = useBalance(inputCurrency).wei;
-  const quote = trade?.originalQuote as { error?: string } | undefined;
-  const hasQuote = Boolean(quote && !quote.error && BN(parsedInputAmount).gt(0));
+  const hasQuote = Boolean(trade?.originalQuote && BN(parsedInputAmount).gt(0));
   const label = mode === "demo" ? "Demo" : "Swap";
   const variant = mode === "demo" ? "demo" : "default";
   const disabled = !hasQuote || (mode === "live" && (!address || !BN(balance ?? "0").gte(parsedInputAmount)));
@@ -40,24 +39,24 @@ function LiquidityHubDeveloperTriggerContent({ mode }: { mode: DeveloperExecutio
   );
   return (
     <>
-      <div ref={targetRef} className={mode === "demo" ? "w-24 shrink-0" : "min-w-0 flex-1"} data-dev-submit-target data-dev-flow="liquidity-hub" data-dev-execution-mode={mode}>
+      <div ref={targetRef} className={mode === "demo" ? "w-24 shrink-0" : "min-w-0 flex-1"} data-dev-submit-target data-dev-flow="spot-swap" data-dev-execution-mode={mode}>
         {hasQuote ? (
           <Suspense fallback={<Button data-submit-button variant={variant} className="h-12 w-full rounded-[14px] px-3 text-sm" disabled isLoading>{label}</Button>}>
-            <LiquidityHubDeveloperContent mode={mode} trigger={trigger} />
+            <SpotSwapDeveloperContent mode={mode} trigger={trigger} />
           </Suspense>
         ) : (
           <Button data-submit-button variant={variant} className="h-12 w-full rounded-[14px] px-3 text-sm" disabled isLoading={isLoadingTrade}>{label}</Button>
         )}
       </div>
-      {mode === "demo" && <DeveloperModeSpotlight targetRef={targetRef} variant="liquidity-hub" />}
+      {mode === "demo" && <DeveloperModeSpotlight targetRef={targetRef} variant="spot-swap" />}
     </>
   );
 }
 
-function LiquidityHubQuoteDeveloperTriggerContent() {
+function SpotSwapQuoteDeveloperTriggerContent() {
   return (
     <Suspense fallback={<QuoteDeveloperButton loading />}>
-      <LiquidityHubQuoteDeveloperContent />
+      <SpotSwapQuoteDeveloperContent />
     </Suspense>
   );
 }
@@ -66,15 +65,15 @@ function QuoteDeveloperButton({ loading = false }: { loading?: boolean }) {
   return (
     <Button
       data-developer-trigger
-      data-developer-liquidity-hub-quote
+      data-developer-spot-swap-quote
       type="button"
       variant="outline"
       size="icon-sm"
       aria-busy={loading}
       aria-label={
         loading
-          ? "Loading Liquidity Hub quote developer tools"
-          : "Inspect the Liquidity Hub quote request and response"
+          ? "Loading Spot quote developer tools"
+          : "Inspect the Spot quote request and response"
       }
       className="relative size-8 rounded-[10px] border-primary/35 bg-primary/[0.08] text-primary after:absolute after:-inset-1.5 after:content-['']"
     >
@@ -90,20 +89,20 @@ function QuoteDeveloperButton({ loading = false }: { loading?: boolean }) {
   );
 }
 
-export function LiquidityHubDeveloperTrigger({ mode }: { mode: DeveloperExecutionMode }) {
+export function SpotSwapDeveloperTrigger({ mode }: { mode: DeveloperExecutionMode }) {
   const { isDeveloperPlayground } = useDeveloperMode();
   const isSwapTab = useIsSwapTab();
 
   return isDeveloperPlayground && isSwapTab ? (
-    <LiquidityHubDeveloperTriggerContent mode={mode} />
+    <SpotSwapDeveloperTriggerContent mode={mode} />
   ) : null;
 }
 
-export function LiquidityHubQuoteDeveloperTrigger() {
+export function SpotSwapQuoteDeveloperTrigger() {
   const { isDeveloperPlayground } = useDeveloperMode();
   const isSwapTab = useIsSwapTab();
 
   return isDeveloperPlayground && isSwapTab ? (
-    <LiquidityHubQuoteDeveloperTriggerContent />
+    <SpotSwapQuoteDeveloperTriggerContent />
   ) : null;
 }

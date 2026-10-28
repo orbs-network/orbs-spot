@@ -8,6 +8,7 @@
   "tradeIntervalTooltip": "The minimum time between consecutive fills. Market conditions, bidding and settlement may delay execution. This interval is not a wait before the first fill.",
   "triggerPriceTooltip": "The price threshold that activates the order when its trigger condition is met. The execution price may differ; limit orders still require the limit price or better.",
   "placeOrder": "Place order",
+  "swap": "Swap",
   "enterAmount": "Enter an amount",
   "emptyLimitPrice": "Limit price is required",
   "insufficientFunds": "Insufficient Balance",

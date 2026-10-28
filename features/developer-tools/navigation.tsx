@@ -78,9 +78,9 @@ export function DeveloperNavigation() {
         tooltip: "Open Advanced Order Docs",
       }
     : {
-        href: getSpotDocsHref("/liquidity-hub"),
-        linkLabel: "Liquidity Hub Docs",
-        tooltip: "Open Liquidity Hub integration guide",
+        href: "https://github.com/orbs-network/spot-ui/blob/master/skills/spot-integration/references/07-swap-and-migration.md",
+        linkLabel: "Spot Docs",
+        tooltip: "Open Spot integration guide",
       };
 
   if (!isDeveloperPlayground || !isDeveloperMode || isDeveloperGuideRoute) return null;

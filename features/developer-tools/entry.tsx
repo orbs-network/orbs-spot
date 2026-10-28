@@ -12,13 +12,13 @@ function withDeveloperMode<Props extends object>(Component: ComponentType<Props>
     return isDeveloperPlayground ? <Component {...props} /> : null;
   };
 }
-const PlaygroundQuoteTrigger = dynamic(() => import("./liquidity-hub-developer-trigger").then(m => m.LiquidityHubQuoteDeveloperTrigger), { ssr: false });
-export function LiquidityHubQuoteDeveloperTrigger() {
+const PlaygroundQuoteTrigger = dynamic(() => import("./spot-swap-developer-trigger").then(m => m.SpotSwapQuoteDeveloperTrigger), { ssr: false });
+export function SpotSwapQuoteDeveloperTrigger() {
   const { isDeveloperPlayground } = useDeveloperMode();
   const isSwapTab = useIsSwapTab();
   return isDeveloperPlayground && isSwapTab ? <PlaygroundQuoteTrigger /> : null;
 }
-export const LiquidityHubDeveloperTrigger = withDeveloperMode(dynamic(() => import("./liquidity-hub-developer-trigger").then(m => m.LiquidityHubDeveloperTrigger), { ssr: false }));
+export const SpotSwapDeveloperTrigger = withDeveloperMode(dynamic(() => import("./spot-swap-developer-trigger").then(m => m.SpotSwapDeveloperTrigger), { ssr: false }));
 export const LiveOrderFlowTrigger = withDeveloperMode(dynamic(() => import("./live-order-flow-trigger").then(m => m.LiveOrderFlowTrigger), { ssr: false }));
 export const FetchOrdersDeveloperButton = withDeveloperMode(dynamic(() => import("./order-history-actions").then(m => m.FetchOrdersDeveloperButton), { ssr: false }));
 export const CancelOrderDeveloperButton = withDeveloperMode(dynamic(() => import("./order-history-actions").then(m => m.CancelOrderDeveloperButton), { ssr: false }));

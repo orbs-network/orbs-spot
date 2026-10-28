@@ -8,7 +8,7 @@ export function usesMarketPrice(module: Module, limitPriceEnabled: boolean) {
   return module !== Module.LIMIT && !limitPriceEnabled;
 }
 
-/** Editable values only. Amounts, defaults, validation and schedules come from calculateOrderForm. */
+/** Editable values only. Amounts, defaults, validation and schedules come from calculateOrder. */
 export type OrderInput = Partial<
   Omit<CalculateOrderFormParams["userInput"], "inputAmountUi">
 >;

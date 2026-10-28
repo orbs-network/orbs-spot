@@ -22,14 +22,14 @@ type SpotlightShape,
 import * as Dialog from "@radix-ui/react-dialog";
 
 export type DeveloperModeSpotlightVariant =
-  | "liquidity-hub"
+  | "spot-swap"
   | "orders-sink";
 
 type SpotlightTarget =
   | "demo-action"
   | "live-action"
   | "developer-guide"
-  | "liquidity-hub-quote";
+  | "spot-swap-quote";
 
 type SpotlightStepConfig = {
   actionLabel: string;
@@ -70,23 +70,23 @@ const SPOTLIGHT_STEPS = {
       title: "Place order · Real execution",
     },
   ],
-  "liquidity-hub": [
+  "spot-swap": [
     {
       actionLabel: "Next: Inspect Quote",
       description:
-        "Open Liquidity Hub Docs for SDK setup, quote freshness, Permit2 approval, EIP-712 signing, swap execution, and confirmation.",
+        "Open Spot Docs for client setup, quote freshness, configured token approval, order signing, submission, and settlement.",
       gap: 2,
       shape: "pill",
       target: "developer-guide",
-      title: "Open Liquidity Hub Docs",
+      title: "Open Spot Docs",
     },
     {
       actionLabel: "Next: Demo",
       description:
-        "Use the quote button beside the To token title to inspect the exact Liquidity Hub request and its complete response. You can open it before entering an amount.",
+        "Use the quote button beside the To token title to inspect the exact Spot request and its complete response. You can open it before entering an amount.",
       gap: 6,
       shape: "rounded-rectangle",
-      target: "liquidity-hub-quote",
+      target: "spot-swap-quote",
       title: "Inspect the Live Quote",
     },
     {
@@ -115,12 +115,12 @@ const SPOTLIGHT_STEPS = {
 
 const WALKTHROUGH_SEEN_STORAGE_KEYS = {
   "orders-sink": "developer-mode-walkthrough-v3",
-  "liquidity-hub": "developer-mode-liquidity-hub-walkthrough-v4",
+  "spot-swap": "developer-mode-spot-swap-walkthrough-v4",
 } satisfies Record<DeveloperModeSpotlightVariant, string>;
 
 const SPOTLIGHT_TARGET_SELECTORS = {
   "developer-guide": "[data-developer-guide-link]",
-  "liquidity-hub-quote": "[data-developer-liquidity-hub-quote]",
+  "spot-swap-quote": "[data-developer-spot-swap-quote]",
 } satisfies Record<Exclude<SpotlightTarget, "demo-action" | "live-action">, string>;
 
 const subscribeToClientReady = () => () => {};

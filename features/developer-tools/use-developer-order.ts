@@ -6,14 +6,14 @@ import { useClient, useOrders } from "@/components/advanced-order/use-order-clie
 import { getWrappedNativeCurrency, isNativeAddress } from "@/lib/utils";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { getDemoOrderForm, DEMO_ACCOUNT, type DeveloperExecutionMode } from "./demo-order";
-import { useSpotMarketReferencePrice } from "@/components/advanced-order/hooks";
 import { useOrderReview } from "@/components/advanced-order/use-order-review";
+import { useOrderModel } from "@/components/advanced-order/use-order-form";
 
 /** Prepare the developer preview through the same client used for submission. */
 export function useDeveloperOrder(mode: DeveloperExecutionMode = "demo") {
   const review = useOrderReview();
   const client = useClient();
-  const market = useSpotMarketReferencePrice();
+  const { market } = useOrderModel();
   const history = useOrders();
   const { address: connectedAddress } = useConnection();
   const chainId = useDataChainId();
@@ -30,9 +30,14 @@ export function useDeveloperOrder(mode: DeveloperExecutionMode = "demo") {
   }, [address, chainId, client.data, form, review.srcToken, review.dstToken]);
   return {
     client: client.data,
-    canDemoExecute: form.canSubmit && !market.isLoading && !market.noLiquidity,
+    canDemoExecute: form.canSubmit && Boolean(market.value) && !market.isLoading && !market.noLiquidity && !market.error,
     module: review.form.module,
-    derivedFormData: { ...review, form, rePermitData: permit },
+    derivedFormData: {
+      ...review,
+      form,
+      rePermitData: permit,
+      quotedOutputAmountRaw: market.isLoading || market.noLiquidity || market.error ? undefined : market.value || undefined,
+    },
     fillDelayPanel: { fillDelay: review.form.schedule.fillDelay },
     durationPanel: { duration: review.form.schedule.duration },
     configuration: { error: client.error, loading: client.isLoading, retry: client.refetch },

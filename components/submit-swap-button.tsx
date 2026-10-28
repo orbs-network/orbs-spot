@@ -2,7 +2,7 @@ import { trackFunnel } from "@/lib/funnel-analytics";
 import { useConnection, useSwitchChain } from "wagmi";
 import { Button } from "./ui/button";
 import { useWalletConnectModal } from "@/features/wallet-connection/provider";
-import { DEFAULT_CHAIN_ID, MAIN_CHAINS } from "@/lib/consts";
+import { DEFAULT_CHAIN_ID } from "@/lib/consts";
 import { toast } from "sonner";
 import { getNetworkLabel } from "./network-label";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
@@ -11,6 +11,8 @@ import BN from "bignumber.js";
 import { useMemo } from "react";
 import { useTranslations } from "@/lib/use-translations";
 import { useSpotPartnerChains } from "@/lib/hooks/use-spot-partner-chains";
+import { useUSDPrice } from "@/lib/hooks/use-usd-price";
+import { MIN_SWAP_VALUE_USD } from "@/lib/swap/quotes";
 
 type SubmitSwapButtonProps = {
   onClick: () => void;
@@ -19,11 +21,10 @@ type SubmitSwapButtonProps = {
   chainId?: number;
   disabled?: boolean;
   validateSwap?: boolean;
-  supportedChains?: readonly { id: number }[];
 };
 
 type SubmitButtonBaseProps = Omit<SubmitSwapButtonProps, "validateSwap"> & {
-  networkUnavailableMessage?: string;
+  product?: "swap" | "advanced";
 };
 
 export const SubmitButtonBase = ({
@@ -32,9 +33,10 @@ export const SubmitButtonBase = ({
   text,
   chainId,
   disabled,
-  supportedChains = MAIN_CHAINS,
-  networkUnavailableMessage = "No supported networks",
+  product = "swap",
 }: SubmitButtonBaseProps) => {
+  const { chains: supportedChains, isLoading: networksLoading, isError: networksError } = useSpotPartnerChains();
+  const networkUnavailableMessage = networksLoading ? "Loading networks…" : networksError ? "Networks unavailable" : "No supported networks";
   const {
     address,
     chainId: currentChainId,
@@ -53,7 +55,7 @@ export const SubmitButtonBase = ({
         isLoading={isWalletLoading}
         aria-busy={isWalletLoading}
         onClick={() => {
-          trackFunnel({ name: "wallet_connect_requested", product: supportedChains === MAIN_CHAINS ? "swap" : "advanced" });
+          trackFunnel({ name: "wallet_connect_requested", product });
           openConnectModal?.();
         }}
       >
@@ -110,6 +112,7 @@ const ValidatedSubmitSwapButton = ({
   const t = useTranslations();
   const {
     inputCurrency,
+    inputAmount,
     outputCurrency,
     parsedInputAmount,
     isLoadingTrade,
@@ -118,6 +121,9 @@ const ValidatedSubmitSwapButton = ({
     trade,
   } = useDerivedSwap();
   const inputTokenBalance = useBalance(inputCurrency).wei;
+  const inputUsd = useUSDPrice({ token: inputCurrency?.address, amount: inputAmount });
+  const priceUnavailable = inputUsd.data === undefined || inputUsd.isError;
+  const belowMinimum = inputUsd.data !== undefined && inputUsd.data < MIN_SWAP_VALUE_USD;
 
 
 
@@ -135,6 +141,8 @@ const ValidatedSubmitSwapButton = ({
     isLoadingTrade ||
     !!quoteError ||
     !trade ||
+    priceUnavailable ||
+    belowMinimum ||
     enterAmount ||
     noLiquidity;
 
@@ -149,6 +157,8 @@ const ValidatedSubmitSwapButton = ({
       return t("insufficientFunds");
     }
     if (quoteError) return "Quote unavailable";
+    if (priceUnavailable) return inputUsd.isLoading ? "Loading price…" : "Price unavailable";
+    if (belowMinimum) return `Minimum swap is $${MIN_SWAP_VALUE_USD}`;
     if(noLiquidity) {
       return t("noLiquidity");
     }
@@ -161,6 +171,9 @@ const ValidatedSubmitSwapButton = ({
     isLoadingTrade,
     noLiquidity,
     quoteError,
+    priceUnavailable,
+    belowMinimum,
+    inputUsd.isLoading,
   ]);
 
   return (
@@ -179,14 +192,8 @@ export const SubmitSwapButton = ({
   ...props
 }: SubmitSwapButtonProps) => {
   if (!validateSwap) {
-    return <AdvancedOrderSubmitButton {...props} />;
+    return <SubmitButtonBase {...props} product="advanced" />;
   }
 
   return <ValidatedSubmitSwapButton {...props} />;
 };
-
-function AdvancedOrderSubmitButton(props: SubmitButtonBaseProps) {
-  const { chains, isLoading, isError } = useSpotPartnerChains();
-  return <SubmitButtonBase {...props} supportedChains={chains}
-    networkUnavailableMessage={isLoading ? "Loading networks…" : isError ? "Networks unavailable" : "No supported networks"} />;
-}

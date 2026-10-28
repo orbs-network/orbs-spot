@@ -1,20 +1,15 @@
 "use client";
 
 import { useBalances } from "@/lib/hooks/use-balances";
-import { useToAmountWei } from "@/lib/hooks/common";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { Currency } from "@/lib/types";
-import { getWrappedNativeCurrency } from "@/lib/utils";
 import { useGetTransactionReceipt } from "@/lib/hooks/use-get-transaction-receipt";
 import { useSignTypedDataPayload } from "@/lib/hooks/use-sign-typed-data";
 import { useApproveToken } from "@/lib/hooks/use-token-approval";
 import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
-import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
-import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
-import { type Token } from "@orbs-network/spot-ui";
+import { QuoteError, type Token } from "@orbs-network/spot-ui";
 import type { SpotWalletPort } from "@/lib/spot/execution";
-import BN from "bignumber.js";
 import { useMemo } from "react";
 import { type Abi } from "viem";
 import { useWalletClient } from "wagmi";
@@ -36,54 +31,21 @@ export function useSpotMarketReferencePrice() {
     trade,
     isLoadingTrade,
     noLiquidity,
-    inputCurrency,
-    outputCurrency,
-    inputAmount,
+    quoteError,
+    refetchTrade,
   } = useDerivedSwap();
-  const inputUsd = useUSDPrice({
-    token: inputCurrency?.address,
-    amount: inputAmount || "0",
-  });
-  const outputUsd = useUSDPrice({ token: outputCurrency?.address });
-
-  const defaultOutputAmount = useMemo(() => {
-    const inputUsdValue = BN(inputUsd.data ?? 0);
-    const outputTokenUsd = BN(outputUsd.data ?? 0);
-
-    if (
-      !outputCurrency ||
-      !inputUsdValue.isFinite() ||
-      !outputTokenUsd.isFinite() ||
-      inputUsdValue.lte(0) ||
-      outputTokenUsd.lte(0)
-    ) {
-      return "";
-    }
-
-    return inputUsdValue
-      .div(outputTokenUsd)
-      .decimalPlaces(outputCurrency.decimals, BN.ROUND_DOWN)
-      .toFixed();
-  }, [inputUsd.data, outputCurrency, outputUsd.data]);
-  const defaultOutputAmountWei = useToAmountWei(
-    outputCurrency?.decimals,
-    defaultOutputAmount,
-  );
-  const defaultPriceLoading = inputUsd.isLoading || outputUsd.isLoading;
 
   return useMemo(
     () => ({
-      value: trade?.outAmount ?? defaultOutputAmountWei,
-      isLoading: trade?.outAmount ? isLoadingTrade : defaultPriceLoading,
-      noLiquidity,
+      // USD prices are valuation inputs only. A missing or failed quote must
+      // leave the SDK form unready rather than inventing an execution rate.
+      value: !isLoadingTrade && !quoteError ? trade?.outAmount : undefined,
+      isLoading: isLoadingTrade,
+      noLiquidity: noLiquidity || (quoteError instanceof QuoteError && quoteError.kind === "no-quote"),
+      error: quoteError,
+      refetch: refetchTrade,
     }),
-    [
-      defaultOutputAmountWei,
-      defaultPriceLoading,
-      isLoadingTrade,
-      noLiquidity,
-      trade?.outAmount,
-    ],
+    [isLoadingTrade, noLiquidity, quoteError, refetchTrade, trade?.outAmount],
   );
 }
 
@@ -100,9 +62,6 @@ export function useWalletInteractions() {
   const { mutateAsync: wrapNativeToken } = useWrapNativeToken();
 
   const { refetch: refetchBalances } = useBalances();
-  const setPendingWrappedInputAddress = useOrderSubmitFlowStore(
-    (state) => state.setPendingWrappedInputAddress,
-  );
 
   return useMemo(
     (): SpotWalletPort => ({
@@ -125,17 +84,6 @@ export function useWalletInteractions() {
       },
       wrapNativeToken: async (amount, onSubmitted) => {
         const { hash } = await wrapNativeToken({ amount, onSubmitted });
-        // Keep the active submission unchanged; use the wrapped input when the
-        // user returns to review or closes the dialog after confirmation.
-        const wrappedAddress = getWrappedNativeCurrency(
-          walletClient?.chain.id,
-        )?.address;
-        if (wrappedAddress && walletClient) {
-          setPendingWrappedInputAddress(wrappedAddress, {
-            chainId: walletClient.chain.id,
-            account: walletClient.account.address,
-          });
-        }
         void refetchBalances().catch(() => undefined);
         return hash;
       },
@@ -175,7 +123,6 @@ export function useWalletInteractions() {
       walletClient,
       wrapNativeToken,
       refetchBalances,
-      setPendingWrappedInputAddress,
     ],
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useInputErrors, useDisclaimer } from "./use-order-form";
+import { useInputErrors, useDisclaimer, useOrderModel } from "./use-order-form";
 import { useClient } from "./use-order-client";
 import { InlineMessage } from "@/components/ui/inline-message";
 import { useTranslations } from "@/lib/use-translations";
@@ -16,6 +16,7 @@ export function InputErrorPanel() {
   const t = useTranslations();
   const error = useInputErrors();
   const client = useClient();
+  const { market } = useOrderModel();
   const message = formatInputError(error, t);
 
   if (client.error) {
@@ -30,19 +31,51 @@ export function InputErrorPanel() {
     InputErrors.TAKE_PROFIT_TRIGGER_PRICE_LESS_THAN_MARKET_PRICE,
     InputErrors.TRIGGER_LIMIT_PRICE_GREATER_THAN_TRIGGER_PRICE,
   ].includes(error.type);
-  if (!message || isPriceError) {
+  const quoteMessage = !market.isLoading
+    ? market.noLiquidity
+      ? "No quote is available for this amount and token pair."
+      : market.error
+        ? "Could not load a quote."
+        : null
+    : null;
+  const showInputError = Boolean(message && !isPriceError);
+  if (!quoteMessage && !showInputError) {
     return null;
   }
 
   return (
-    <InlineMessage
-      variant="error"
-      icon={
-        <AlertTriangleIcon aria-hidden="true" className="relative top-0.5 size-4 shrink-0 text-destructive" />
-      }
-    >
-      <p className="flex-1">{message}</p>
-    </InlineMessage>
+    <>
+      {quoteMessage && (
+        <InlineMessage
+          variant="error"
+          icon={
+            <AlertTriangleIcon aria-hidden="true" className="relative top-0.5 size-4 shrink-0 text-destructive" />
+          }
+        >
+          <div role="alert" className="flex-1">
+            {quoteMessage}{" "}
+            <button
+              data-hover="text"
+              type="button"
+              className="underline"
+              onClick={() => void market.refetch()}
+            >
+              Retry
+            </button>
+          </div>
+        </InlineMessage>
+      )}
+      {showInputError && (
+        <InlineMessage
+          variant="error"
+          icon={
+            <AlertTriangleIcon aria-hidden="true" className="relative top-0.5 size-4 shrink-0 text-destructive" />
+          }
+        >
+          <p className="flex-1">{message}</p>
+        </InlineMessage>
+      )}
+    </>
   );
 }
 

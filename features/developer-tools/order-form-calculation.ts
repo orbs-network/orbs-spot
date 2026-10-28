@@ -1,4 +1,4 @@
-import { calculateOrderForm, Module, type CalculatedOrderForm, type CalculateOrderFormParams, type SpotClient, type RePermitData } from "@orbs-network/spot-ui";
+import { calculateOrder, Module, type CalculatedOrderForm, type CalculateOrderFormParams, type SpotClient, type RePermitData } from "@orbs-network/spot-ui";
 import type { useDeveloperOrder } from "./use-developer-order";
 import BN from "bignumber.js";
 import type { JsonContainer, JsonValidationIssue } from "./json-inspector";
@@ -15,7 +15,7 @@ export function getLiveOrderFormInput(spot: SpotData): JsonContainer {
     module: spot.module,
     inputTokenDecimals: data.srcToken?.decimals ?? 18,
     outputTokenDecimals: data.dstToken?.decimals ?? 18,
-    quotedOutputAmountRaw: new BN(data.form.marketPrice.raw || "0").times(data.srcAmountUI || "0").toFixed(0),
+    quotedOutputAmountRaw: data.quotedOutputAmountRaw,
     inputTokenUsdPrice: unitPrice(data.srcAmountUsd, data.srcAmountUI),
     outputTokenUsdPrice: unitPrice(data.dstAmountUsd, data.dstAmountUI),
     minTradeSizeUsd: 5,
@@ -56,7 +56,7 @@ function readParams(data: JsonContainer): CalculateOrderFormParams {
 }
 
 export function calculateEditedOrderForm(data: JsonContainer): CalculatedOrderForm {
-  const form = calculateOrderForm(readParams(data));
+  const form = calculateOrder(readParams(data));
   if (!form.canSubmit) {
     const errors = form.errors.all.map((error) => error.type).join(", ");
     throw new Error(`Resolve the calculation inputs before saving: ${errors || "form is not ready"}.`);

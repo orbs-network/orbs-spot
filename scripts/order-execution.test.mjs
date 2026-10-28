@@ -61,6 +61,18 @@ test("submission failure retains the reviewed details until returning to review"
   assert.deepEqual(snapshots.at(-1), { phase: ExecutionPhase.IDLE });
 });
 
+test("a rejected server response after signing remains an uncertain submission", async () => {
+  const { executor, input, snapshots, finishSigning } = fixture();
+  input.client.submitOrder = async () => { throw Object.assign(new Error("Request rejected"), { code: 4001 }); };
+  const pending = executor.submit(input);
+  const rejected = assert.rejects(pending, /Request rejected/);
+  await new Promise(resolve => setImmediate(resolve));
+  finishSigning("0xfixture");
+  await rejected;
+  assert.equal(snapshots.at(-1).phase, ExecutionPhase.FAILED);
+  assert.match(snapshots.at(-1).error.message, /Check order history before retrying/);
+});
+
 test("native input exposes wrapping and approval only when they are required", async () => {
   const { executor, input, snapshots, finishSigning } = fixture();
   input.wrappedNativeToken = input.inputToken;
@@ -133,4 +145,29 @@ test("a late wrap confirmation cannot waive wrapping for another native-input or
   };
   await assert.rejects(executor.submit(input), /Signing interrupted/);
   assert.deepEqual(actions, [["wrap", "10"], ["wrap", "10"]]);
+});
+
+test("a wrap is confirmed only after its receipt and remains visible after signature rejection", async () => {
+  const { executor, input, snapshots } = fixture();
+  input.wrappedNativeToken = input.inputToken;
+  input.inputToken = { address: "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee" };
+  let confirmWrap;
+  input.wallet.wrapNativeToken = (_amount, onSubmitted) => {
+    onSubmitted("0xwrap");
+    return new Promise(resolve => { confirmWrap = resolve; });
+  };
+  input.wallet.signOrder = async () => { throw Object.assign(new Error("User rejected the request"), { code: 4001 }); };
+  const pending = executor.submit(input);
+  const rejected = assert.rejects(pending, /User rejected/);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(snapshots.at(-1).phase, ExecutionPhase.WRAPPING);
+  assert.equal(snapshots.at(-1).wrapTxHash, "0xwrap");
+  assert.equal(snapshots.at(-1).currentStepIndex, 0);
+  confirmWrap("0xwrap");
+  await rejected;
+  const confirmed = snapshots.find(snapshot => snapshot.phase === ExecutionPhase.WRAPPING && snapshot.currentStepIndex === 1);
+  assert.equal(confirmed.wrapTxHash, "0xwrap");
+  assert.equal(snapshots.at(-1).phase, ExecutionPhase.REJECTED);
+  assert.equal(snapshots.at(-1).wrapTxHash, "0xwrap");
+  assert.equal(snapshots.at(-1).currentStepIndex, 1);
 });

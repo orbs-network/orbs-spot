@@ -1,32 +1,32 @@
 "use client";
 
-import type { Quote } from "@orbs-network/liquidity-hub-sdk";
+import type { SwapQuote } from "@orbs-network/spot-ui";
 import { FileJson2Icon } from "lucide-react";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
-  getLiquidityHubFieldExplanation,
-  LIQUIDITY_HUB_LIVE_QUOTE_CODE_SNIPPET,
-} from "./snippets/liquidity-hub-code-examples";
-import { LiquidityHubGuideLink } from "./liquidity-hub-guide-link";
+  getSpotSwapFieldExplanation,
+  SPOT_SWAP_LIVE_QUOTE_CODE_SNIPPET,
+} from "./snippets/spot-swap-code-examples";
+import { SpotSwapGuideLink } from "./spot-swap-guide-link";
 import {
   JsonInspectorModal,
   type JsonContainer,
 } from "./json-inspector";
 import { useQuoteInspectionData } from "./quote-inspection-data";
 
-function serializeQuote(quote: Quote): JsonContainer {
+function serializeQuote(quote: SwapQuote): JsonContainer {
   return JSON.parse(JSON.stringify(quote)) as JsonContainer;
 }
 
-export function LiquidityHubQuoteDeveloperModal({
+export function SpotSwapQuoteDeveloperModal({
   isLoadingQuote,
   quote,
   requestData,
   responseNotice,
 }: {
   isLoadingQuote: boolean;
-  quote?: Quote;
+  quote?: SwapQuote;
   requestData: JsonContainer;
   responseNotice?: string;
 }) {
@@ -37,31 +37,31 @@ export function LiquidityHubQuoteDeveloperModal({
 
   return (
     <JsonInspectorModal
-      codeSnippet={LIQUIDITY_HUB_LIVE_QUOTE_CODE_SNIPPET}
+      codeSnippet={SPOT_SWAP_LIVE_QUOTE_CODE_SNIPPET}
       data={requestData}
       description=""
-      explanation="The Request tab shows the exact Liquidity Hub quote input for the current swap. The Response tab shows the complete live, wallet-bound quote returned for that request."
-      getFieldExplanation={getLiquidityHubFieldExplanation}
-      getResponseFieldExplanation={getLiquidityHubFieldExplanation}
+      explanation="The Request tab shows the exact Spot quote input for the current swap. The Response tab shows the complete live quote and its frozen request identity returned for that request."
+      getFieldExplanation={getSpotSwapFieldExplanation}
+      getResponseFieldExplanation={getSpotSwapFieldExplanation}
       requestResponseTabs
       requiresDeveloperMode={false}
       responseData={quoteData}
-      responseLabel="Liquidity Hub quote response"
+      responseLabel="Spot quote response"
       responseNotice={responseNotice}
       tabsInSectionHeader
-      title="Live Liquidity Hub quote"
+      title="Live Spot quote"
       triggerTooltip="Inspect the live quote request and response"
-      viewModeAction={<LiquidityHubGuideLink section="fetch-quote" />}
+      viewModeAction={<SpotSwapGuideLink section="fetch-quote" />}
       trigger={
         <Button
           data-developer-trigger
-          data-developer-liquidity-hub-quote
+          data-developer-spot-swap-quote
           type="button"
           variant="outline"
           size="icon-sm"
           aria-busy={isLoadingQuote}
           className="relative size-8 rounded-[10px] border-primary/35 bg-primary/[0.08] text-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.06),0_4px_12px_hsl(var(--primary)/0.12)] after:absolute after:-inset-1.5 after:content-[''] hover:bg-primary/[0.13] "
-          aria-label="Inspect the live Liquidity Hub quote request and response"
+          aria-label="Inspect the live Spot quote request and response"
         >
           <FileJson2Icon aria-hidden="true" className="size-4" />
         </Button>
@@ -70,11 +70,11 @@ export function LiquidityHubQuoteDeveloperModal({
   );
 }
 
-export function LiquidityHubQuoteDeveloperContent() {
+export function SpotSwapQuoteDeveloperContent() {
   const { requestData, liveQuote, responseNotice, isLoadingQuote } = useQuoteInspectionData();
 
   return (
-    <LiquidityHubQuoteDeveloperModal
+    <SpotSwapQuoteDeveloperModal
       isLoadingQuote={isLoadingQuote}
       quote={liveQuote}
       requestData={requestData}

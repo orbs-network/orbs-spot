@@ -1,31 +1,31 @@
 const FLOW_STEPS = [
   {
     detail:
-      "Liquidity Hub does not support native inToken. When the selected input is native, wrap quote.inAmount into quote.inToken and wait for the transaction receipt.",
+      "Spot quotes use an ERC-20 input. When the selected input is native, wrap quote.request.inAmount into quote.request.inToken and wait for the transaction receipt.",
     meta: "Wallet · if native",
     title: "Wrap native input",
   },
   {
     detail:
-      "When Permit2 allowance is below quote.inAmount, approve the exact quoted input amount and wait for a successful receipt.",
+      "When allowance for client.spenderAddress is below quote.request.inAmount, approve the exact input amount, confirm the receipt, and verify allowance.",
     meta: "Wallet · if required",
-    title: "Approve Permit2",
+    title: "Approve configured spender",
   },
   {
     detail:
-      "Refresh the Liquidity Hub quote immediately before signing. If its minAmountOut is lower, ask the user to review the updated quote and confirm again; otherwise sign its unchanged EIP-712 data.",
+      "Refresh a stale Spot quote before signing. If output or minimum worsens, ask for review. Prepare with the reviewed minimum, then sign the original signingRequest unchanged.",
     meta: "SDK request · wallet signature",
     title: "Refresh and sign",
   },
   {
     detail:
-      "Submit the same fresh quote and signature, then wait for a successful on-chain receipt before reporting completion.",
-    meta: "Liquidity Hub · on-chain receipt",
+      "Submit the exact prepared order and original signature. submitOrder returns an accepted order; waitForOrder confirms its completed fill.",
+    meta: "Spot · completed order",
     title: "Submit and confirm",
   },
 ] as const;
 
-export function LiquidityHubFlow() {
+export function SpotSwapFlow() {
   return (
     <section
       id="end-to-end-flow"
@@ -40,8 +40,8 @@ export function LiquidityHubFlow() {
           Integration flow
         </h3>
         <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-          Start after the host selects Liquidity Hub. Prepare the input, sign
-          the refreshed quote, submit it, and confirm the receipt.
+          Start after the host selects Spot. Prepare the input, sign
+          the prepared order, submit it, and confirm its completed fill.
         </p>
       </div>
 

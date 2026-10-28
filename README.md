@@ -1,6 +1,6 @@
 # Orbs Spot — TypeScript SDK Example
 
-A working reference integration for `@orbs-network/spot-ui` and `@orbs-network/liquidity-hub-sdk`.
+A working reference integration for swap quotes, swaps, and advanced orders using `@orbs-network/spot-ui`.
 The playground uses Next.js/React for its UI, wagmi/viem for its wallet, Zustand for editable state,
 and TanStack Query for reads and async actions. Spot calculation and execution use the framework-neutral SDK directly;
 there is no `@orbs-network/spot-react` dependency or Spot provider.
@@ -13,11 +13,14 @@ there is no `@orbs-network/spot-react` dependency or Spot provider.
 
 | Responsibility | Source |
 | --- | --- |
-| Wallet port and submission sequence | [`lib/spot/execution.ts`](lib/spot/execution.ts) |
+| Shared Spot quote identity and display units | [`lib/hooks/use-trade.ts`](lib/hooks/use-trade.ts) |
+| Swap signing, submission and settlement | [`lib/swap/execution.ts`](lib/swap/execution.ts) |
+| Accepted swap activity and reload recovery | [`lib/swap/activity.ts`](lib/swap/activity.ts), [`features/swap/activity.tsx`](features/swap/activity.tsx) |
+| Advanced-order wallet port and submission sequence | [`lib/spot/execution.ts`](lib/spot/execution.ts) |
 | Confirmed cancellation through the SDK | [`lib/spot/cancellation.ts`](lib/spot/cancellation.ts) |
 | History display mapping and token units | [`lib/spot/history.ts`](lib/spot/history.ts) |
 | Editable form input type | [`lib/spot/form.ts`](lib/spot/form.ts) |
-| Host inputs → `calculateOrderForm` | [`components/advanced-order/use-order-form.ts`](components/advanced-order/use-order-form.ts) |
+| Host inputs → `calculateOrder` | [`components/advanced-order/use-order-form.ts`](components/advanced-order/use-order-form.ts) |
 | Cached SDK client, history polling, cancellation | [`components/advanced-order/use-order-client.ts`](components/advanced-order/use-order-client.ts) |
 | Host wallet adapter | [`components/advanced-order/hooks.tsx`](components/advanced-order/hooks.tsx) |
 | Submission action and review/progress state | [`components/advanced-order/use-order-execution.ts`](components/advanced-order/use-order-execution.ts) |
@@ -39,9 +42,10 @@ receipts are cached by chain and transaction hash. Successful writes invalidate 
 1. Reuse `createClient(partner, chainId)` through your host cache. Include both partner and chain in its key;
    leave configuration failures retryable. An enabled Orbs partner is required.
 2. Map editable inputs, balances, token decimals, USD prices and the current raw output quote into
-   `calculateOrderForm`. Its result owns defaults, validation, trade counts, prices and schedules.
-   This playground uses token USD prices for its advanced-order market reference; a DEX should supply
-   its current router quote for the complete input amount. Omit obsolete quotes while loading.
+   `calculateOrder`. Its result owns defaults, validation, trade counts, prices and schedules.
+   Every form uses the cached `client.getQuote` for the complete input amount and passes its raw `quote.netAmountOut`
+   unchanged as `quotedOutputAmountRaw`. USD prices supply dollar estimates and minimum-trade validation.
+   Missing or failed quotes leave the market reference unavailable. Input changes request a fresh quote.
 3. Adapt your wallet to `SpotWalletPort`. Transaction writes must resolve after successful receipts,
    and `assertContext` must verify the connected account and chain before wallet actions.
 4. Create one `createOrderExecutor(onChange)` per form. Submit its reviewed snapshot with the SDK client,
@@ -52,7 +56,7 @@ receipts are cached by chain and transaction hash. Successful writes invalidate 
 6. Cancel using `client.getCancelOrderRequest(order)` and a confirmed wallet write, then refetch history.
    The app refreshes while history is open and pauses polling in background tabs.
    Fill notifications and post-fill balance updates follow those reads or explicit refreshes;
-   this example does not run a continuous background order monitor.
+   advanced orders are refreshed through history. Accepted swaps also have a bounded background tracker.
 
 Submission is never automatically retried. After a network failure during submission, check history
 before attempting another order. After a confirmed wrap, returning to review selects the wrapped token
@@ -71,6 +75,39 @@ const prepared = client.prepareOrder({
 const signature = await wallet.signOrder(prepared.signingRequest);
 const order = await client.submitOrder(prepared.order, signature);
 ```
+
+### Swap quotes, minimum output and settlement
+
+Swap, TWAP, limit, stop-loss and take-profit forms share an exact-input `client.getQuote` for their
+market reference. Advanced-order limit and trigger settings continue to determine their target output.
+The swap form confirms wrapping and approval to `client.spenderAddress`, then uses
+`client.prepareSwap`, the wallet's EIP-712 signature and `client.submitOrder`.
+Quotes retain their account, chain, token, raw amount and slippage identity. Swap execution pauses
+quote refreshes, and a changed or stale quote requires review before signing.
+
+Closing a loading review clears the form for the next swap or order. The original submission
+continues with its own progress toast and captured amounts; its result cannot replace a newer review.
+Wallet requests are serialized through signing. Signed requests and swap settlement can finish
+in the background while another order or swap is prepared and submitted.
+
+`quote.netAmountOut` and `minimumOutputAmountRaw` are integer output-token base units.
+`getMinimumOutputAmount(quote.netAmountOut, slippage)` floors the protected minimum with the same
+rounded basis-point conversion as quoting; `0.5` means 0.5%. For example, a net quote of `1000000`
+base units produces a `995000` minimum at 0.5%. The UI minimum is distinct from the swap order's
+fixed 5% signed oracle protection. The quote's net output and raw fee do not provide a USD gas cost.
+
+Submission returns an accepted signed order. Its `order.id` identifies an intent and must never be
+used as a transaction hash. The swap remains in progress until the SDK reports `OrderStatus.Completed`.
+`waitForOrder`/`watchOrder` track the accepted order serially through its signed deadline plus
+60 seconds for indexing. Cancellation and expiration are terminal outcomes; aborted or unconfirmed
+tracking does not prove the order failed. Check history before submitting another swap after an
+uncertain outcome. Never automatically retry submission or execute a fallback.
+
+Accepted swap snapshots persist in browser activity so tracking can resume after the active flow
+stops or the page reloads. Only actual fill transaction hashes produce explorer links. Existing
+transaction-based activity remains readable and uses receipt checks, bounded to 24 hours from
+submission before an unresolved result becomes unconfirmed. Completed activity is retained for
+90 days. Storage failures do not change an accepted order's result.
 
 ### Demo mode
 
@@ -113,7 +150,7 @@ Orbs uses the standard RainbowKit wallet picker. The custom chooser is disabled
 by `features.customConnectModal` in `lib/partners/orbs.ts`. The picker uses the
 configured wallet connectors; email, passkey, and social account sign-in are not configured.
 Orbs includes light and dark themes based on the Orbs website. The frontend uses the
-`external` partner for both Liquidity Hub and Spot.
+`external` partner for Spot swaps and advanced orders.
 Developer tools are available only inside `/dev`. The main trading UI
 keeps its normal review and execution flow, including with `debug=true`.
 The debug flag enables partner testing without exposing developer controls,
@@ -134,24 +171,24 @@ while preserving debug and partner context. Existing
 `/developers/eip712?debug=true` links redirect to `/dev/eip712`, preserving drafts.
 
 Open `/?tab=twap&debug=true` to show the searchable Spot partner selector beside
-the chain selector for advanced orders. It loads the available integration partners from the Spot
+the chain selector for every trading form. It loads the available integration partners from the Spot
 configuration used by `projects/spot-ui`. Selection is saved as `partner=<name>`
 in the URL and applies to order configuration, creation, history, and cancellation.
 Internal navigation preserves the debug selection. Without exactly `debug=true`,
 the URL override is ignored and the `external` integration partner is used.
 Orders also show a Partner column in debug mode, using the partner retained
 with each fetched order.
-This selector keeps the frontend branding and swap integration unchanged;
+The selected Spot partner also applies to swaps;
 developer tools stay inside `/dev`, even when `debug=true` is passed.
 In debug mode, the network picker lists only chains supported by the selected
 partner. An incompatible connected network shows **Wrong network**, and the
 order action offers a switch to a compatible network.
 
-Chain selectors use the [Swap](https://docs.orbs.com/liquidity-hub/shared#supported-chains)
-and [Advanced Orders](https://docs.orbs.com/advanced-orders/shared#supported-chains)
-network lists, excluding Fantom and Polygon zkEVM: 8 swap networks and 23 order
-networks. Wallet configuration covers their 24-network union. Order creation requires
-a valid partner/chain configuration returned by the Spot SDK.
+Swap and advanced-order forms share the same 23 supported networks and partner filtering,
+excluding Fantom and Polygon zkEVM. Wallets and public clients also retain Blast for legacy swap activity.
+See the [Spot integration guide](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)
+for quoting and capability checks. Swap and advanced-order creation require a valid partner/chain
+configuration returned by the Spot SDK.
 
 ## Build
 
