@@ -1,12 +1,12 @@
 "use client";
 
 import { memo, useMemo, type ReactNode } from "react";
-import { ArrowRightIcon } from "lucide-react";
 import { OrderStatus, type Order } from "@orbs-network/spot-ui";
 import { describeOrder } from "@/lib/spot/history";
 import { OrderRateText } from "./order-rate";
 import { NetworkLabel } from "@/components/network-label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { TokenFlow } from "./token-flow";
 import type { ActivityRow } from "./use-activity-rows";
 import type { ActivityColumn } from "./activity-columns";
@@ -30,6 +30,7 @@ export const OrderActivityRow = memo(function OrderActivityRow({ metadata, index
   const history = view === "history";
   const inputLoading = row.inputLoading && !row.inputToken;
   const outputLoading = row.outputLoading && !row.outputToken;
+  const inProgress = isPending || order.status === OrderStatus.Open;
   const isEligible = order.status === OrderStatus.Open && order.maker.toLowerCase() === address?.toLowerCase() && !isPending;
   const open = () => { if (!isPending) onSelect(order.historyKey, order.chainId); };
   const renderField = (column: ActivityColumn) => {
@@ -48,7 +49,10 @@ export const OrderActivityRow = memo(function OrderActivityRow({ metadata, index
           break;
         }
         case "type": content = <button type="button" data-variant="link" className={styles.typeLink} title={`${getOrderTypeLabel(order.type)} · Order ${order.id}`} disabled={isPending} onClick={open} aria-label={`View order ${order.id}`}>{getOrderTypeLabel(order.type)}</button>; break;
-        case "status": content = <>{isPending ? "Pending" : <OrderStatusLabel order={order} />}{isRecent && <small className="text-primary">Just placed</small>}</>; break;
+        case "status": content = <>
+          {isPending ? "Pending" : <OrderStatusLabel order={order} />}
+          {isRecent && <small className="text-primary">Just placed</small>}
+        </>; break;
         case "tokens": content = <TokenFlow input={{ symbol: order.inputToken?.symbol, address: order.srcTokenAddress, loading: inputLoading }} output={{ symbol: order.outputToken?.symbol, address: order.dstTokenAddress, loading: outputLoading }} />; break;
         case "sell": content = value(row.inputAmount.ui, row.inputToken?.symbol); break;
         case "filled": content = <OrderProgress order={order} />; break;
@@ -56,12 +60,16 @@ export const OrderActivityRow = memo(function OrderActivityRow({ metadata, index
       }
       const label = column.label;
       return <div className={column.key === "placed" ? `${styles.field} ${styles.frozenCell}` : styles.field} key={column.key} data-column={column.key} data-label={label} aria-busy={loading || undefined}>
-        {column.key === "type" && !history && <div data-column="cancel">{isEligible && <OrderCancelButton order={order} onCancel={onCancel} />}</div>}
         <span className="sr-only">{label}: </span>{content}
       </div>;
   };
   return <article role="listitem" aria-posinset={index + 1} aria-setsize={total} className={styles.row} data-activity-row data-view={view} data-pending={isPending} data-recent={isRecent} onClick={event => { if (!(event.target as Element).closest("button, a, input, label")) open(); }}>
+    {inProgress && <span className={styles.rowProgress} data-activity-progress aria-hidden="true">
+      <Spinner data-order-progress-spinner aria-hidden="true" role="presentation" className="size-4 shrink-0 motion-reduce:animate-none" />
+    </span>}
     {columns.map(renderField)}
-    <div data-column="actions">{!isPending && <button data-icon-button type="button" className={styles.rowArrow} onClick={open} aria-label={`Open details for order ${order.id}`}><ArrowRightIcon aria-hidden="true" /></button>}</div>
+    <div data-column="actions">
+      {!history && isEligible && <OrderCancelButton order={order} onCancel={onCancel} />}
+    </div>
   </article>;
 });

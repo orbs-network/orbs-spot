@@ -1,4 +1,4 @@
-import { getMinimumOutputAmount, isNativeAddress, QuoteError, type SpotClient } from "@orbs-network/spot-ui";
+import { isNativeAddress, QuoteError, type SpotClient } from "@orbs-network/spot-ui";
 import { queryOptions } from "@tanstack/react-query";
 import type { BestTradeQuote, Currency } from "../types";
 
@@ -29,7 +29,7 @@ export function spotSwapQuoteQueryOptions(
         user: account, slippage, dexMinAmountOut: "-1", signal });
       return {
         outAmount: quote.netAmountOut,
-        minAmountOut: getMinimumOutputAmount(quote.netAmountOut, slippage),
+        minAmountOut: quote.minimumAmountOut,
         inToken: source,
         outToken,
         inAmount: rawAmount,

@@ -1,0 +1,4 @@
+/* Vaul's background extension must not become scrollable content in the preview. */
+.preview[data-vaul-drawer]::after {
+  display: none;
+}

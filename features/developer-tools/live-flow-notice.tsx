@@ -1,3 +1,5 @@
+import { ToastCloseButton } from "@/components/ui/toast-close-button";
+
 export type LiveFlowPhase<Step extends string> = {
   effect: string;
   label: string;
@@ -18,6 +20,7 @@ export function LiveFlowNotice<Step extends string>({
   flowStep,
   flowSummary,
   flowTitle,
+  onDismiss,
   onSelectPhase,
   phases,
   progressLabel,
@@ -30,6 +33,7 @@ export function LiveFlowNotice<Step extends string>({
   flowStep: Step;
   flowSummary: string;
   flowTitle: string;
+  onDismiss: () => void;
   onSelectPhase: (phaseIndex: number) => void;
   phases: readonly LiveFlowPhase<Step>[];
   progressLabel: string;
@@ -54,8 +58,9 @@ export function LiveFlowNotice<Step extends string>({
       : undefined;
 
   return (
-    <div className="pointer-events-auto w-[360px] max-w-[calc(100vw-2rem)] rounded-[14px] border border-border/80 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+    <div className="pointer-events-auto relative w-full max-w-full rounded-[14px] border border-border/80 bg-card/95 px-3 py-2.5 shadow-2xl backdrop-blur-xl">
+      <ToastCloseButton onClose={onDismiss} />
+      <div className="flex flex-wrap items-center justify-between gap-2 pr-7 text-[10px] font-semibold uppercase tracking-[0.12em]">
         <span className="text-foreground">
           {viewedStep === flowStep
             ? flowTitle

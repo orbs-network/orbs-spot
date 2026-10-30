@@ -23,7 +23,7 @@ async function request(query, signal = new AbortController().signal) {
   return query.queryFn({ signal, queryKey: query.queryKey });
 }
 
-test("the configured client quotes the full raw input and displays the exact net output and minimum", async t => {
+test("the configured client quotes the full raw input and preserves the service minimum", async t => {
   const client = configuredClient();
   let payload;
   const getQuote = client.getQuote;
@@ -39,7 +39,10 @@ test("the configured client quotes the full raw input and displays the exact net
   assert.equal(quote.originalQuote.request.partner, client.partner);
   assert.equal(quote.originalQuote.request.chainId, client.chainId);
   assert.equal(quote.outAmount, "9999999");
-  assert.equal(quote.minAmountOut, "9949999");
+  // The returned minimum can differ from a local slippage calculation. Review
+  // and signing must retain the quote service's exact amount.
+  assert.equal(quote.minAmountOut, "9800000");
+  assert.equal(quote.minAmountOut, quote.originalQuote.minimumAmountOut);
   assert.equal(quote.originalQuote.amountOut, "10000003");
   assert.equal(quote.slippage, 0.5);
   assert.equal("gas" in quote, false);

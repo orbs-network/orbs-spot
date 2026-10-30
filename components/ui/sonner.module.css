@@ -1,0 +1,113 @@
+.viewport[data-sonner-toaster] {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(420px, calc(100vw - 16px));
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  padding: 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+/* Natural flow keeps every card separate and makes long lists scrollable. */
+.viewport[data-sonner-toaster] [data-sonner-toast] {
+  position: relative;
+  inset: auto;
+  flex-shrink: 0;
+  width: 100%;
+  height: auto !important;
+  transform: none !important;
+  touch-action: pan-y;
+  overflow: visible;
+}
+
+.viewport[data-sonner-toaster] [data-sonner-toast]::before,
+.viewport[data-sonner-toaster] [data-sonner-toast]::after {
+  display: none;
+}
+
+.viewport [data-sonner-toast][data-styled="true"] {
+  align-items: flex-start;
+  padding: 14px;
+}
+
+.viewport[data-sonner-toaster] [data-sonner-toast] button {
+  --orbs-hover-background: transparent !important;
+}
+
+.viewport[data-sonner-toaster] [data-sonner-toast] button:not([data-close-button], [data-toast-close]):hover {
+  background: transparent !important;
+}
+
+.viewport[data-sonner-toaster] [data-sonner-toast] a:hover {
+  text-decoration: none;
+}
+
+.viewport[data-sonner-toaster] [data-sonner-toast] button:is([data-close-button], [data-toast-close]) {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  left: auto;
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--muted-foreground);
+  background: var(--popover);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 8%);
+  transform: none;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.viewport[data-sonner-toaster] [data-sonner-toast] button:is([data-close-button], [data-toast-close]):hover {
+  background: var(--popover) !important;
+  border-color: var(--border);
+}
+
+.viewport[data-sonner-toaster] [data-sonner-toast] button:is([data-close-button], [data-toast-close]) > svg {
+  width: 14px;
+  height: 14px;
+  transform: none !important;
+  transition: none;
+}
+
+.viewport[data-sonner-toaster] [data-sonner-toast] button:is([data-close-button], [data-toast-close]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.viewport [data-sonner-toast] [data-title] {
+  padding-right: 8px;
+}
+
+/* Sonner can retain a loading description when a terminal update omits one. */
+.viewport [data-sonner-toast]:not([data-type="loading"]) [data-loading-toast-close] {
+  display: none;
+}
+
+.viewport [data-sonner-toast] [data-icon] {
+  margin-top: 2px;
+}
+
+.viewport [data-sonner-toast] [data-content] {
+  min-width: 0;
+  flex: 1;
+}
+
+.viewport [data-sonner-toast] :is([data-title], [data-description]) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 600px) {
+  .viewport[data-sonner-toaster][data-x-position] {
+    left: 8px;
+    right: 8px;
+  }
+}

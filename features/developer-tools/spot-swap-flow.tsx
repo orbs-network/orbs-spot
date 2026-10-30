@@ -13,7 +13,7 @@ const FLOW_STEPS = [
   },
   {
     detail:
-      "Refresh a stale Spot quote before signing. If output or minimum worsens, ask for review. Prepare with the reviewed minimum, then sign the original signingRequest unchanged.",
+      "Refresh a stale Spot quote before signing. If output or minimum worsens, ask for review. Pass the quote and connected account to prepareSwap; the SDK signs its minimum unchanged and sets a three-minute expiration.",
     meta: "SDK request · wallet signature",
     title: "Refresh and sign",
   },

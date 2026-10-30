@@ -27,7 +27,7 @@ html[data-partner="orbs"] [data-order-row] {
   --orbs-hover-background: var(--orbs-row-hover);
 }
 html[data-partner="orbs"] :is(
-  [data-wallet-action="destructive"], [data-order-cancel-trigger], [data-hover="danger"]
+  [data-wallet-action="destructive"], [data-hover="danger"]
 ) {
   --orbs-hover-background: var(--orbs-danger-hover);
 }

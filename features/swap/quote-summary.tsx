@@ -23,7 +23,7 @@ export function SwapQuoteSummary({ trade, inputCurrency, outputCurrency }: {
   return <TradeDetails data-swap-quote-summary label="Swap quote details" rate={
     <TokenExchangeRate rates={rates} inputCurrency={inputCurrency} outputCurrency={outputCurrency} />
   } summary={<span className={styles.cost}>{formatDisplayAmount(trade.slippage)}% slippage</span>}>
-    <DetailRow label="Max slippage" tooltip="The minimum received is calculated from the net quote using this tolerance." value={
+    <DetailRow label="Max slippage" tooltip="The quote service returns the minimum received for this tolerance." value={
       <span className="inline-flex items-center gap-2">
         {slippageMode === "auto" && <span className={styles.badge}>Auto</span>}
         {formatDisplayAmount(trade.slippage)}%

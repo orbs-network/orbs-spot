@@ -22,6 +22,7 @@ import {
 } from "react";
 import { CheckIcon, RefreshCwIcon } from "lucide-react";
 import { toast } from "sonner";
+import { createLoadingToast } from "@/lib/loading-toast";
 import { maxUint256, type Hex } from "viem";
 import { useConnection } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
@@ -317,7 +318,12 @@ function LiveOrderFlowModalContent({
   const isDemo = mode === "demo";
   const spot = useDeveloperOrder(mode);
   const flowToastId = useId();
+  const flowToastDismissed = useRef(false);
   const actionToastId = useId();
+  const dismissFlowToast = useCallback(() => {
+    flowToastDismissed.current = true;
+    toast.dismiss(flowToastId);
+  }, [flowToastId]);
   const { address: connectedAccount } = useConnection();
   const { openConnectModal } = useConnectModal();
   const { partner } = useSpotPartner();
@@ -444,10 +450,10 @@ function LiveOrderFlowModalContent({
       if (executionInFlight.current || step === "success") return;
 
       executionInFlight.current = true;
-      toast.loading(
+      const loadingToast = createLoadingToast(actionToastId);
+      loadingToast.show(
         isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step],
         {
-          id: actionToastId,
           position: "bottom-right",
         },
       );
@@ -775,6 +781,7 @@ function LiveOrderFlowModalContent({
       }
 
       if (nextOpen) {
+        flowToastDismissed.current = false;
         const nextPermitData = clonePermitData(currentPermitData);
         setCalculationInput(undefined);
         setCalculatedForm(undefined);
@@ -879,7 +886,7 @@ function LiveOrderFlowModalContent({
         data: calculationInput ?? calculationDefaults,
         editable: !isRunning && step !== "success",
         explanation:
-          "Edit the inline calculation inputs and save to rebuild the live RePermit data before checking allowance and signing. Examples target @orbs-network/spot-ui 2.1.21 or later.",
+          "Edit the inline calculation inputs and save to rebuild the live RePermit data before checking allowance and signing. Examples target @orbs-network/spot-ui 2.1.23 or later.",
         title: "Advanced Orders Typescript SDK flow",
       };
     }
@@ -1073,7 +1080,7 @@ function LiveOrderFlowModalContent({
   );
 
   useEffect(() => {
-    if (!open || viewedStep === "flow") {
+    if (!open || viewedStep === "flow" || flowToastDismissed.current) {
       toast.dismiss(flowToastId);
       return;
     }
@@ -1085,6 +1092,7 @@ function LiveOrderFlowModalContent({
           flowStep="flow"
           flowSummary="Wrap / Approve appear only if needed"
           flowTitle={isDemo ? "Demo order flow" : "Real order flow"}
+          onDismiss={dismissFlowToast}
           onSelectPhase={handleSelectPhase}
           phases={liveFlowPhases}
           progressLabel="Order creation progress"
@@ -1106,6 +1114,7 @@ function LiveOrderFlowModalContent({
       },
     );
   }, [
+    dismissFlowToast,
     isDemo,
     flowToastId,
     handleSelectPhase,

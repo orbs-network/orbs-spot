@@ -1,4 +1,5 @@
 import BN from "bignumber.js";
+import { formatAmount } from "./token-display";
 
 // Keep both quote directions precise; round only their display labels.
 const RateNumber = BN.clone({ DECIMAL_PLACES: 512 });
@@ -40,11 +41,8 @@ export function getExchangeRatesFromPrice(price?: string): ExchangeRates | undef
   return { forward, reverse: new RateNumber(1).div(forward) };
 }
 
-/** Round display labels only, retaining more decimals for small rates. */
+/** Use the same display precision as amounts without rounding the underlying rate. */
 export function formatExchangeRate(value: BN): string {
   if (!value.isFinite() || !value.gt(0)) return "—";
-  const significantDigits = value.lt(1) ? 5 : 6;
-  const decimals = Math.max(0, significantDigits - 1 - (value.e ?? 0));
-  const rounded = value.decimalPlaces(decimals, BN.ROUND_HALF_UP);
-  return BN(rounded.toFixed()).toFormat();
+  return BN(formatAmount(value.toFixed(), 4, 512)).toFormat();
 }

@@ -3,12 +3,13 @@ import { useRecentOrder } from "@/lib/spot/recent-order";
 import { trackFunnel } from "@/lib/funnel-analytics";
 
 import { toast } from "sonner";
+import { TradeToastDetails } from "@/components/ui/trade-toast-details";
 import { CREATE_ORDER_TOAST_ID } from "./constants";
 import { useConnection } from "wagmi";
 import { useQueryClient } from "@tanstack/react-query";
 import { invalidateOrderQueries } from "@/lib/spot/queries";
 import { useOrderSubmitFlowStore, useSwapStore } from "@/lib/hooks/store";
-import { getWrappedNativeCurrency } from "@/lib/utils";
+import { getWrappedNativeCurrency, toAmountUI } from "@/lib/utils";
 import {
   createOrderExecutor,
   ExecutionPhase,
@@ -18,13 +19,19 @@ import { useOrderModel } from "./use-order-form";
 import { useClient } from "./use-order-client";
 import { useWalletInteractions } from "./hooks";
 import { isUserRejectedError } from "@/lib/tx-rejection";
-import { useCallback, useSyncExternalStore } from "react";
-import { isNativeAddress } from "@orbs-network/spot-ui";
+import { createElement, useCallback, useRef, useSyncExternalStore } from "react";
+import { isNativeAddress, type Order } from "@orbs-network/spot-ui";
+import { useSubmissionPreview } from "@/lib/submission-preview";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { Field } from "@/lib/types";
 import { getOrderDraftKey } from "@/lib/spot/form";
 import { createOrderSubmissionManager } from "@/lib/spot/order-submissions";
 import { acquireSubmissionLock, isSubmissionBusy, subscribeSubmissionLock } from "@/lib/spot/submission-lock";
+import { formatDuration } from "./utils";
+import { getFillTransactionHash } from "@/lib/swap/activity";
+import { createSubmissionToast } from "@/lib/spot/submission-toast";
+import { createLoadingToast } from "@/lib/loading-toast";
+import { formatDisplayAmount } from "@/lib/token-display";
 
 // Every invocation owns its executor. Only the current review can publish into
 // the form; closing it leaves the captured submission and its toast running.
@@ -40,6 +47,7 @@ type SubmissionView = "review" | "preparing" | "progress" | "success" | "failed"
 // Call once in SubmitOrder and pass the result to its review/status components.
 // This hook owns app state; lib/spot/execution.ts shows the wallet + SDK sequence.
 export function useOrderExecution() {
+  const deferredToast = useRef<ReturnType<typeof createSubmissionToast> | undefined>(undefined);
   const snapshot = useOrderSubmitFlowStore((state) => state.execution);
   const { form, inputToken, outputToken, market, input: orderInput } = useOrderModel();
   const { address, chainId } = useConnection();
@@ -70,12 +78,52 @@ export function useOrderExecution() {
   }, []);
 
   const submitOrder = useCallback(() => {
+    const submissionToast = deferredToast.current?.isDeferred()
+      ? deferredToast.current
+      : createSubmissionToast({
+        isModalOpen: () => useOrderSubmitFlowStore.getState().isReviewOpen,
+        subscribe: listener => useOrderSubmitFlowStore.subscribe(listener),
+      });
+    deferredToast.current = submissionToast;
     const submit = async () => {
       let releaseWallet: (() => void) | undefined;
       let submission: ReturnType<typeof submissions.start> | undefined;
       let toastId: string | undefined;
       let executionError: string | undefined;
       let confirmedWrappedSymbol: string | undefined;
+      let wrapTxHash: string | undefined;
+      let approvalTxHash: string | undefined;
+      let fillTxHash: string | undefined;
+      let acceptedOrder: Order | undefined;
+      const toastInput = inputToken && { token: { ...inputToken }, amount: form.inputAmount.ui };
+      const toastOutput = outputToken && { token: { ...outputToken }, amount: form.outputAmount.ui };
+      const transactions = () => [
+        ...(wrapTxHash ? [{ label: "Wrap transaction", hash: wrapTxHash }] : []),
+        ...(approvalTxHash ? [{ label: "Approval transaction", hash: approvalTxHash }] : []),
+        ...(fillTxHash ? [{ label: "Order fill transaction", hash: fillTxHash }] : []),
+      ];
+      const publishPreview = (title: string, status: "pending" | "success" | "error", message?: string) => {
+        if (!toastId || !chainId) return;
+        useSubmissionPreview.getState().upsert({ id: toastId, kind: "order", title, status, message,
+          input: toastInput, output: toastOutput, chainId, account: address, partner: client.data?.partner,
+          order: acceptedOrder, transactions: transactions(), details: [
+            { label: "Order type", value: form.module.replaceAll("_", " ") },
+            { label: "Trades", value: String(form.trades.totalTrades) },
+            { label: "Order duration", value: formatDuration(form.schedule.durationMillis) },
+            ...(form.trades.totalTrades > 1 ? [{ label: "Trade interval", value: formatDuration(form.schedule.fillDelayMillis) }] : []),
+            { label: "Minimum per trade", value: `${formatDisplayAmount(form.trades.minOutputAmountPerTrade.ui)} ${outputToken?.symbol ?? ""}` },
+            ...(!form.values.isMarketOrder ? [{ label: "Limit price", value: `${formatDisplayAmount(toAmountUI(form.values.limitPrice, outputToken?.decimals))} ${outputToken?.symbol ?? ""} per ${inputToken?.symbol ?? "token"}` }] : []),
+            ...(form.values.triggerPrice && form.values.triggerPrice !== "0" ? [{ label: "Trigger price", value: `${formatDisplayAmount(toAmountUI(form.values.triggerPrice, outputToken?.decimals))} ${outputToken?.symbol ?? ""} per ${inputToken?.symbol ?? "token"}` }] : []),
+          ],
+        });
+      };
+      const toastDetails = (message?: string) => createElement(TradeToastDetails, {
+        input: toastInput,
+        output: toastOutput,
+        message,
+        chainId,
+        transactions: transactions(),
+      }, toastOutput ? "Output amount is estimated." : undefined);
       try {
         if (submissions.isBusy())
           throw new SubmissionPreflightError(
@@ -115,8 +163,8 @@ export function useOrderExecution() {
         const currentSubmission = submission;
         toastId = `${CREATE_ORDER_TOAST_ID}-${submission.id}`;
         const currentToastId = toastId;
+        const loadingToast = createLoadingToast(currentToastId);
         const wrappedNativeToken = getWrappedNativeCurrency(chainId);
-        const amountSummary = `${form.inputAmount.ui} ${inputToken.symbol ?? "token"} → ${outputToken.symbol ?? "token"}`;
         const executor = createOrderExecutor((execution) => {
           // No wallet prompt remains once signing finishes. The next order may
           // start while this request is being accepted by the server.
@@ -125,6 +173,8 @@ export function useOrderExecution() {
             releaseWallet = undefined;
           }
           currentSubmission.publish(execution);
+          wrapTxHash = execution.wrapTxHash ?? wrapTxHash;
+          approvalTxHash = execution.approvalTxHash ?? approvalTxHash;
           if (execution.phase === ExecutionPhase.WRAPPING && execution.currentStepIndex === 1 &&
               execution.wrapTxHash && wrappedNativeToken) {
             // Retain confirmed funds for this operation even after its review
@@ -139,13 +189,15 @@ export function useOrderExecution() {
           }
           if (execution.status === ExecutionStatus.LOADING) {
             const instruction = execution.phase === ExecutionPhase.SIGNING ? "Confirm the signature in your wallet."
-              : execution.phase === ExecutionPhase.WRAPPING ? execution.wrapTxHash ? "Confirming wrapping…" : "Confirm wrapping in your wallet."
-              : execution.phase === ExecutionPhase.APPROVING ? execution.approvalTxHash ? "Confirming approval…" : "Confirm approval in your wallet."
-              : execution.phase === ExecutionPhase.SUBMITTING ? "Placing your order…"
-              : "Checking token allowance…";
-            toast.loading("Creating order…", { id: currentToastId, description: `${amountSummary}. ${instruction}` });
+              : execution.phase === ExecutionPhase.WRAPPING ? execution.wrapTxHash ? "Confirming wrapping" : "Confirm wrapping in your wallet."
+              : execution.phase === ExecutionPhase.APPROVING ? execution.approvalTxHash ? "Confirming approval" : "Confirm approval in your wallet."
+              : execution.phase === ExecutionPhase.SUBMITTING ? "Placing your order"
+              : "Checking token allowance";
+            publishPreview("Creating order", "pending", instruction);
+            submissionToast.publish(() => loadingToast.show("Creating order", { description: toastDetails(instruction) }));
           } else if (execution.phase === ExecutionPhase.REJECTED) {
-            if (!confirmedWrappedSymbol) toast.dismiss(currentToastId);
+            publishPreview("Order not placed", "error", "Request declined in your wallet.");
+            if (!confirmedWrappedSymbol && !wrapTxHash && !approvalTxHash) submissionToast.publish(() => toast.dismiss(currentToastId));
           } else if (execution.error) {
             executionError = execution.error.message;
           }
@@ -163,7 +215,10 @@ export function useOrderExecution() {
         });
         trackFunnel({ name: "submission_succeeded", product: "advanced" });
         useRecentOrder.getState().add(order);
-        toast.success("Order placed", { id: currentToastId, description: amountSummary, duration: 8_000, closeButton: true });
+        fillTxHash = getFillTransactionHash(order);
+        acceptedOrder = order;
+        publishPreview("Order placed", "success");
+        submissionToast.publishSuccess(() => toast.success("Order placed", { id: currentToastId, description: toastDetails(), duration: 8_000, closeButton: true }));
         // A refresh failure must not turn an accepted order into a failed submission.
         void invalidateOrderQueries(queryClient, { partner: client.data.partner, chainId, account: address }).catch(() => undefined);
       } catch (error) {
@@ -172,20 +227,27 @@ export function useOrderExecution() {
           ? `Your input was wrapped to ${confirmedWrappedSymbol}. Select ${confirmedWrappedSymbol} for your next order.`
           : undefined;
         if (isUserRejectedError(error) && !executionError) {
-          if (wrappedGuidance) {
-            toast.info("Order not placed", { id: toastId, description: wrappedGuidance, duration: 20_000, closeButton: true });
+          publishPreview("Order not placed", "error", wrappedGuidance ?? "Request declined in your wallet.");
+          if (wrappedGuidance || wrapTxHash || approvalTxHash) {
+            submissionToast.publish(() => toast.info("Order not placed", {
+              id: toastId,
+              description: toastDetails(wrappedGuidance ?? "Request declined in your wallet."),
+              duration: 20_000,
+              closeButton: true,
+            }));
           } else if (toastId) {
-            toast.dismiss(toastId);
+            submissionToast.publish(() => toast.dismiss(toastId));
           }
           return;
         }
         const message = executionError ?? (error instanceof Error ? error.message : String(error));
-        toast.error("Order submission failed", {
+        publishPreview("Order submission failed", "error", wrappedGuidance ? `${message} ${wrappedGuidance}` : message);
+        submissionToast.publish(() => toast.error("Order submission failed", {
           id: toastId,
-          description: wrappedGuidance ? `${message} ${wrappedGuidance}` : message,
+          description: toastDetails(wrappedGuidance ? `${message} ${wrappedGuidance}` : message),
           duration: wrappedGuidance ? 20_000 : 8_000,
           closeButton: true,
-        });
+        }));
         // Execution errors already have a failed snapshot. Validation can fail
         // before execution starts, so publish it for the same inline error UI.
         if (error instanceof SubmissionPreflightError && !submissions.isBusy()) {

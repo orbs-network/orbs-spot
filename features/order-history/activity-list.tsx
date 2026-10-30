@@ -2,7 +2,7 @@
 
 import { useCallback, useState, type ReactNode } from "react";
 import { useConnection } from "wagmi";
-import type { Order } from "@orbs-network/spot-ui";
+import { OrderStatus, type Order } from "@orbs-network/spot-ui";
 import { useOrderActivity } from "./use-order-activity";
 import type { ActivityRow } from "./use-activity-rows";
 import { getActivityColumns } from "./activity-columns";
@@ -38,7 +38,7 @@ export function OrderActivityList({ orders, allOrders, search = "", onClearSearc
   ), [total, view, columns, partner, address, pendingKeys, recentKey, recentAccount, onSelect]);
   // Search updates the existing virtual list; remount only when its scope changes.
   const filterScope = `${scope}:${network}:${address}:${view}:${activePair}`;
-  return <div className={styles.root} data-activity-list data-view={view} data-debug={isDebugMode}>
+  return <div className={styles.root} data-activity-list data-view={view} data-debug={isDebugMode} data-has-progress={orders.some(order => order.status === OrderStatus.Open)}>
     {query && symbolsLoading && <p role="status" className={styles.searchStatus}>Loading token symbols…</p>}
     {query && symbolErrors && <p role="status" className={styles.searchStatus}>Some token symbols couldn’t load. You can still search by token address.</p>}
     <ActivityTable>
@@ -46,10 +46,10 @@ export function OrderActivityList({ orders, allOrders, search = "", onClearSearc
         {columns.map(column => <div className={column.key === "placed" ? `${styles.field} ${styles.frozenCell}` : styles.field} key={column.key} data-column={column.key}>{column.label}</div>)}
         <div data-column="actions" />
       </div>
-      {filtered.length > 0 && <ActivityFeed key={filterScope} items={filtered} itemKey={activityKey} label="Order activity" contained={contained} renderItem={renderItem} />}
+      {filtered.length > 0 && <ActivityFeed key={filterScope} items={filtered} itemKey={activityKey} label="Trading activity" contained={contained} renderItem={renderItem} />}
     </ActivityTable>
     {!filtered.length && <div className={styles.empty}>{query && hasOrders ? <>
-      <p role="status">{symbolsLoading ? "Searching orders…" : "No matching orders"}</p>
+      <p role="status">{symbolsLoading ? "Searching activity…" : "No matching activity"}</p>
       {onClearSearch && <button data-hover="text" type="button" onClick={onClearSearch}>Clear search</button>}
     </> : children ?? <p>No open orders for this pair.</p>}</div>}
 

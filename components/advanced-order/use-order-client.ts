@@ -5,13 +5,14 @@ import {
   OrderStatus,
   type Order,
   type Token,
+  type Partners,
 } from "@orbs-network/spot-ui";
 import {
   useQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef } from "react";
+import { createElement, useEffect, useMemo, useRef, useState } from "react";
 import { useConnection } from "wagmi";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { spotClientQueryOptions, spotKeys } from "@/lib/spot/queries";
@@ -32,6 +33,10 @@ import { CANCEL_ORDER_TOAST_ID } from "./constants";
 import { useWalletInteractions } from "./hooks";
 import { useSpotPartner } from "@/lib/hooks/use-spot-partner";
 import { useSpotPartnerChains } from "@/lib/hooks/use-spot-partner-chains";
+import { TradeToastDetails } from "@/components/ui/trade-toast-details";
+import type { SpotWalletPort } from "@/lib/spot/execution";
+import { useSubmissionPreview, type SubmissionPreview } from "@/lib/submission-preview";
+import { createLoadingToast } from "@/lib/loading-toast";
 
 export function useClient(requestedChainId?: number, enabled = true) {
   const connectedChainId = useDataChainId();
@@ -92,65 +97,126 @@ export function useHistoryNotifications(orders: Order[]) {
   }, [orders, refetchBalances, key]);
 }
 
-export function useCancelOrder(order?: Order) {
-  const { partner } = useSpotPartner();
+interface CancellationInput {
+  order?: Order;
+  address?: string;
+  partner: Partners;
+  wallet: SpotWalletPort;
+  toastId: string;
+}
+
+function cancellationPreviews(order?: Pick<Order, "chainId" | "historyKey" | "maker">) {
+  if (!order) return [];
+  return Object.values(useSubmissionPreview.getState().entries).filter(entry =>
+    entry.order?.chainId === order.chainId && entry.order.historyKey === order.historyKey &&
+    entry.order.maker.toLowerCase() === order.maker.toLowerCase());
+}
+
+function cancellationNotification(title: string, preview: SubmissionPreview | undefined, chainId?: number, message?: string) {
+  return {
+    title,
+    description: createElement(TradeToastDetails, {
+      input: preview?.input,
+      output: preview?.output,
+      chainId,
+      message,
+      transactions: preview?.transactions,
+    }),
+  };
+}
+
+export function useCancelOrder(order?: Order, partnerOverride?: Partners) {
+  const { partner: selectedPartner } = useSpotPartner();
+  const partner = partnerOverride ?? selectedPartner;
   const wallet = useWalletInteractions();
   const { address } = useConnection();
   const queryClient = useQueryClient();
-  const isOrderCancelling = useOrderCancelling(order);
+  const isOrderCancelling = useOrderCancelling(order, partner);
+  const toastId = `${CANCEL_ORDER_TOAST_ID}:${partner}:${order?.chainId}:${order?.maker.toLowerCase()}:${order?.historyKey}`;
+  const [confirmed, setConfirmed] = useState<{ toastId: string; hash: `0x${string}` }>();
   // Cancellation is a wallet write: start it only from an explicit user action.
   const mutation = useMutation({
-    mutationKey: spotKeys.cancellation(partner, order?.chainId, address, order?.historyKey),
-    mutationFn: async () => {
+    mutationKey: spotKeys.cancellation(partner, order?.chainId, order?.maker, order?.historyKey),
+    mutationFn: async ({ order, address, partner, wallet, toastId }: CancellationInput) => {
       if (isMockOrder(order)) throw new Error("Sample orders are read-only");
       if (!order || !address)
         throw new Error("Connect the order's wallet and network to cancel");
-      const client = await queryClient.fetchQuery(spotClientQueryOptions(partner, order.chainId, true));
-      const hash = await cancelSdkOrder(client, wallet, order, address);
+      // Keep the submission's scope if the selector or wallet changes while the
+      // client loads, the wallet confirms, or history catches up.
+      const scope = { partner, chainId: order.chainId, account: address, historyKey: order.historyKey, toastId };
+      const client = await queryClient.fetchQuery(spotClientQueryOptions(scope.partner, scope.chainId, true));
+      const cached = queryClient.getQueryData<Order[]>(spotKeys.orders(scope.partner, "all", scope.account));
+      const latest = cached?.find(item => item.chainId === scope.chainId && item.historyKey === scope.historyKey) ?? order;
+      const hash = await cancelSdkOrder(client, wallet, latest, scope.account);
+      // Retain receipt links with the captured submission details even after
+      // its form closes, so later notifications include confirmed transactions.
+      for (const preview of cancellationPreviews(latest)) {
+        useSubmissionPreview.getState().upsert({
+          ...preview,
+          transactions: [{ label: "Cancellation transaction", hash }],
+        });
+      }
+      setConfirmed({ toastId: scope.toastId, hash });
       return {
+        ...scope,
         hash,
-        partner: client.partner,
-        chainId: client.chainId,
-        account: address,
-        historyKey: order.historyKey,
       };
     },
     retry: false,
-    onMutate: () => {
-      toast.loading("Cancelling order…", { id: CANCEL_ORDER_TOAST_ID });
+    onMutate: ({ toastId, order }) => {
+      setConfirmed(undefined);
+      const loadingToast = createLoadingToast(toastId);
+      const notification = cancellationNotification("Cancelling order…", cancellationPreviews(order)[0], order?.chainId);
+      loadingToast.show(notification.title, { description: notification.description });
+      return { toastId, loadingToast };
     },
-    onSuccess: async (result) => {
-      toast.loading("Confirming order cancellation…", { id: CANCEL_ORDER_TOAST_ID });
+    onSuccess: async (result, _variables, context) => {
+      const preview = cancellationPreviews({ chainId: result.chainId, historyKey: result.historyKey, maker: result.account })[0];
+      const details = cancellationNotification("Confirming order cancellation…", preview, result.chainId);
+      const notification = {
+        id: result.toastId,
+        description: preview ? details.description : createElement(TradeToastDetails, {
+          chainId: result.chainId,
+          transactions: [{ label: "Cancellation transaction", hash: result.hash }],
+        }),
+      };
+      const loadingToast = context?.loadingToast ?? createLoadingToast(result.toastId);
+      loadingToast.show(details.title, { description: notification.description });
       const refresh = watchCancelledOrder(queryClient, result);
       void queryClient.invalidateQueries({
         queryKey: ["balances", result.chainId, result.account.toLowerCase()],
       }).catch(() => { /* A balance refresh cannot undo a confirmed cancellation. */ });
       const status = await refresh.finished;
       if (status === OrderStatus.Cancelled) {
-        toast.success("Order cancelled", { id: CANCEL_ORDER_TOAST_ID });
+        toast.success("Order cancelled", notification);
       } else if (status === OrderStatus.Completed) {
-        toast.info("Order already filled", { id: CANCEL_ORDER_TOAST_ID });
+        toast.info("Order already filled", notification);
       } else if (status === OrderStatus.Expired) {
-        toast.info("Order expired", { id: CANCEL_ORDER_TOAST_ID });
+        toast.info("Order expired", notification);
       } else {
-        toast.dismiss(CANCEL_ORDER_TOAST_ID);
+        toast.dismiss(result.toastId);
       }
     },
-    onError: (error) => {
+    onError: (error, variables, context) => {
+      const id = context?.toastId;
       if (isUserRejectedError(error)) {
-        dismissTransactionRejectedToast({ id: CANCEL_ORDER_TOAST_ID });
+        dismissTransactionRejectedToast({ id });
       } else {
-        toast.error("Cancel failed", {
-          id: CANCEL_ORDER_TOAST_ID,
-          description: error.message,
+        const preview = cancellationPreviews(variables.order)[0];
+        const notification = cancellationNotification("Cancel failed", preview, variables.order?.chainId, error.message);
+        toast.error(notification.title, {
+          id,
+          description: preview ? notification.description : error.message,
         });
       }
     },
   });
   return {
-    cancelOrder: mutation.mutate,
+    cancelOrder: (_variables?: void, options?: Parameters<typeof mutation.mutate>[1]) =>
+      mutation.mutate({ order, address, partner, wallet, toastId }, options),
     isLoading: mutation.isPending || isOrderCancelling,
     isSuccess: mutation.isSuccess,
+    transactionHash: confirmed?.toastId === toastId ? confirmed.hash : undefined,
   };
 }
 

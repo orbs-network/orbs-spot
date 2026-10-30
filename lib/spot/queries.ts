@@ -33,7 +33,7 @@ export function spotOrdersQueryOptions(partner: Partner, account: string | undef
   return queryOptions({
     queryKey: spotKeys.orders(partner, "all", account),
     queryFn: async ({ signal }) => {
-      if (!account) throw new Error("Connect a wallet to load order history");
+      if (!account) throw new Error("Connect a wallet to view activity");
       const orders = (await getOrders({
         swapper: account,
         exchange: partner,

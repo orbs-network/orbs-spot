@@ -24,7 +24,7 @@ export function OrderDetailPage({ chainId, orderId, account }: {
   return (
     <article data-order-page className={styles.page}>
       <AppLink href="/orders" className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg text-sm text-muted-foreground focus-visible:outline-2 focus-visible:outline-primary">
-        <ArrowLeftIcon aria-hidden="true" className="size-4" />Back to orders
+        <ArrowLeftIcon aria-hidden="true" className="size-4" />Back to activity
       </AppLink>
       <div className={styles.card}>
         <header className={styles.header}>

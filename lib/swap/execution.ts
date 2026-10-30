@@ -1,5 +1,4 @@
 import {
-  getMinimumOutputAmount,
   isNativeAddress,
   isQuoteFresh,
   OrderSettlementError,
@@ -54,7 +53,7 @@ function assertSwapQuoteIdentity(quote: BestTradeQuote, intent: SwapIntent): voi
       request.inAmount !== intent.amount || request.chainId !== intent.chainId ||
       request.slippage !== quote.slippage || !positiveInteger(quote.minAmountOut) ||
       !positiveInteger(quote.outAmount) || quote.outAmount !== original.netAmountOut ||
-      quote.minAmountOut !== getMinimumOutputAmount(original.netAmountOut, quote.slippage)) {
+      quote.minAmountOut !== original.minimumAmountOut || BigInt(quote.minAmountOut) > BigInt(quote.outAmount)) {
     throw new Error("Quote does not match the reviewed swap. Request a new quote.");
   }
 }
@@ -229,12 +228,7 @@ export function createSwapExecutor({
       await assertWallet();
       input.onStep("SWAP", index);
       checkActive();
-      const prepared = client.prepareSwap({
-        quote: quote.originalQuote,
-        minimumOutputAmountRaw: reviewedMinimum,
-        swapperAddress: intent.account,
-        maxQuoteAgeMillis: MAX_QUOTE_AGE_MILLIS,
-      });
+      const prepared = client.prepareSwap(quote.originalQuote, intent.account);
       checkActive();
       const signature = await input.sign(prepared.signingRequest);
       await assertWallet();

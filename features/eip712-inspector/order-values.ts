@@ -1,15 +1,13 @@
 import BigNumber from "bignumber.js";
 import { formatUnits } from "viem";
 import { record, type Payload, type TokenInfo } from "./inspect";
+import { formatAmount } from "@/lib/token-display";
 
 const Amount = BigNumber.clone({ DECIMAL_PLACES: 360 });
 
 function formatValue(value: BigNumber): string {
-  // Keep small amounts visible while shortening ordinary decimal values.
-  const rounded = value.abs().lt("0.0001")
-    ? value.precision(4, BigNumber.ROUND_HALF_UP)
-    : value.decimalPlaces(6, BigNumber.ROUND_HALF_UP);
-  return `${value.eq(rounded) ? "" : "≈ "}${rounded.toFormat()}`;
+  const formatted = formatAmount(value.toFixed(), 4, 512);
+  return `${value.eq(formatted) ? "" : "≈ "}${new Amount(formatted).toFormat()}`;
 }
 
 export function orderValues(payload: Payload, tokens: TokenInfo[]) {

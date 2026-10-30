@@ -80,7 +80,7 @@ const Details = () => {
     <div data-review-details className="mt-3 flex w-full flex-col gap-2 rounded-[14px] border border-primary/25 bg-primary/10 p-3">
       <MinimumAmountOut />
       <Rate />
-      <DetailRow label="Slippage" value={quote ? `${quote.slippage}%` : "—"} />
+      <DetailRow label="Slippage" value={quote ? `${formatDisplayAmount(quote.slippage)}%` : "—"} />
       <SpotRoute />
     </div>
   );
@@ -154,10 +154,11 @@ function SwapSubmissionStatus({ onClose }: { onClose: () => void }) {
   };
   const failed = status === SwapStatus.FAILED;
   const symbol = review?.inputCurrency.symbol ?? "token";
+  const swapInProgress = currentStep === SwapStep.SWAP && !isAwaitingWallet;
   const titles = {
     [SwapStep.WRAP]: `Wrap ${symbol}`,
     [SwapStep.APPROVE]: `Approve ${symbol}`,
-    [SwapStep.SWAP]: "Sign and submit swap",
+    [SwapStep.SWAP]: swapInProgress ? "Swap in progress" : "Sign swap",
   };
   const hashes = { [SwapStep.WRAP]: wrapTxHash, [SwapStep.APPROVE]: approvalTxHash, [SwapStep.SWAP]: txHash };
   const walletSteps = steps.map((id): SubmissionStep => ({
@@ -170,7 +171,7 @@ function SwapSubmissionStatus({ onClose }: { onClose: () => void }) {
   const instruction = isAwaitingWallet
     ? currentStep === SwapStep.WRAP ? "Confirm wrapping in your wallet."
       : currentStep === SwapStep.APPROVE ? "Confirm approval in your wallet." : "Confirm the signature in your wallet."
-    : orderId ? "Swapping…" : "Submitting swap…";
+    : currentStep === SwapStep.SWAP ? undefined : "Waiting for confirmation.";
 
   if (status === SwapStatus.SUCCESS) return <SwapSuccess onClose={onClose} />;
 

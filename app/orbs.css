@@ -1095,13 +1095,16 @@ html[data-partner="orbs"] [data-slot="drawer-content"][data-vaul-drawer-directio
 html[data-partner="orbs"] [data-orders-nav-count] { color: var(--primary); }
 html[data-partner="orbs"] [data-history-view-tabs] { width: 192px; flex-shrink: 0; }
 html[data-partner="orbs"] [data-history-view-tabs] [role="tab"] { font-size: 13px; }
-html[data-partner="orbs"] [data-order-cancel-trigger] { min-height: 32px; border-radius: 8px; background: transparent; white-space: nowrap; }
-html[data-partner="orbs"] [data-activity-row] button[data-order-cancel-trigger] { border-radius: 8px; cursor: pointer; }
+html[data-partner="orbs"] [data-order-cancel-trigger] { min-height: 36px; padding-inline: 12px; border-radius: 999px; border-color: color-mix(in srgb, var(--primary) 16%, var(--border)); background: var(--orbs-tab-background); color: var(--foreground); font-size: 12px; font-weight: 600; white-space: nowrap; }
+html[data-partner="orbs"] [data-activity-row] button[data-order-cancel-trigger]:not(:disabled) { cursor: pointer; }
 html[data-partner="orbs"] [data-history-fill-progress] { min-width: 0; }
 html[data-partner="orbs"] [data-history-table] [data-history-fill-progress] > span { white-space: nowrap; }
 html[data-partner="orbs"] [data-history-table] thead { position: sticky; top: 0; z-index: 10; }
 html[data-partner="orbs"] [data-history-scope] { max-width: 480px; line-height: 1.5; }
 html[data-partner="orbs"] [data-mobile-order-card] [data-order-cancel-trigger] { min-height: 44px; }
+@media (max-width: 767px) {
+  html[data-partner="orbs"] [data-activity-row] [data-order-cancel-trigger] { min-height: 44px; }
+}
 @media (max-width: 639px) {
   html[data-partner="orbs"] [data-history-view-tabs] { width: 160px; }
   html[data-partner="orbs"] [data-history-view-tabs] [role="tab"] { padding-inline: 8px; font-size: 12px; }

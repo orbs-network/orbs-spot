@@ -80,7 +80,7 @@ export function formatAdvancedOrdersSdkFlow(data: JsonContainer = {}): string {
   const params = Array.isArray(data) ? {} : data.formParams ?? {};
   const calculationInput = JSON.stringify(params, null, 2)
     .replace(/"module": "(TWAP|LIMIT|STOP_LOSS|TAKE_PROFIT)"/, '"module": Module.$1');
-  return `// advanced-orders.ts — requires @orbs-network/spot-ui 2.1.21 or later.
+  return `// advanced-orders.ts — requires @orbs-network/spot-ui 2.1.23 or later.
 import { calculateOrder, createClient, isNativeAddress, Module, Partners } from "@orbs-network/spot-ui";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import { polygon } from "viem/chains";
@@ -216,13 +216,9 @@ const SWAP_APPROVAL_CODE = `async function approveTokenIfNeeded(token: Address, 
   throw new Error("Approval is not available. Check allowance before retrying.");
 }`;
 
-const SWAP_SIGN_CODE = `// Refresh stale quotes after wallet transactions. Keep the originally reviewed minimum.
-const prepared = client.prepareSwap({
-  quote,
-  minimumOutputAmountRaw: reviewedMinimum,
-  swapperAddress: account,
-  maxQuoteAgeMillis: 60_000,
-});
+const SWAP_SIGN_CODE = `// Refresh stale quotes after wallet transactions and review any worse output or minimum.
+// The SDK signs quote.minimumAmountOut unchanged and sets a three-minute expiration.
+const prepared = client.prepareSwap(quote, account);
 const { signerAddress, typedData } = prepared.signingRequest;
 const signature = await walletClient.signTypedData({
   ...typedData,
@@ -241,8 +237,8 @@ export function formatSpotSwapSdkFlow(data: JsonContainer = {}): string {
   const root = Array.isArray(data) ? {} : data;
   const chainId = typeof root.chainId === "number" ? root.chainId : 137;
   const partner = typeof root.partner === "string" && root.partner ? root.partner : "external";
-  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.1.21 or later.
-import { createClient, getMinimumOutputAmount, isNativeAddress, isQuoteFresh, Partners, waitForOrder, type SpotClient, type SwapQuote } from "@orbs-network/spot-ui";
+  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.1.23 or later.
+import { createClient, isNativeAddress, isQuoteFresh, Partners, waitForOrder, type SpotClient, type SwapQuote } from "@orbs-network/spot-ui";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import * as chains from "viem/chains";
 
@@ -266,8 +262,7 @@ function getClient() {
 let busy = false;
 
 export type SwapInput = {
-  quote: SwapQuote;
-  minimumOutputAmountRaw: string; // The exact minimum shown in host review.
+  quote: SwapQuote; // Display quote.minimumAmountOut unchanged in host review.
   sourceToken: Address;
   wrappedNativeTokenAddress: Address; // Chain configuration, never taken from an untrusted quote.
   inputValueUsd: number; // Host product validation requires at least $10.
@@ -275,8 +270,8 @@ export type SwapInput = {
   pauseQuotes(): Promise<void>; // Pause polling and cancel in-flight quote requests.
   resumeQuotes(): void;
   // Hosts must ask for explicit review when a refreshed quote is worse.
-  // Return the newly accepted minimum in raw units, or undefined to stop.
-  reviewChangedQuote(previous: SwapQuote, next: SwapQuote): Promise<string | undefined>;
+  // Return true only after the user accepts the next quote and its minimum.
+  reviewChangedQuote(previous: SwapQuote, next: SwapQuote): Promise<boolean>;
 };
 
 export async function swapFlow(account: Address, input: SwapInput) {
@@ -286,7 +281,6 @@ export async function swapFlow(account: Address, input: SwapInput) {
     await input.pauseQuotes();
     const client = await getClient();
     let quote = input.quote;
-    let reviewedMinimum = input.minimumOutputAmountRaw;
     const request = quote.request;
     async function assertContext() {
       input.signal?.throwIfAborted();
@@ -297,8 +291,9 @@ export async function swapFlow(account: Address, input: SwapInput) {
       }
     }
     await assertContext();
-    // Validate the signer, chain, partner, token pair, and reviewed minimum before wallet actions.
-    client.prepareSwap({ quote, minimumOutputAmountRaw: reviewedMinimum, swapperAddress: account });
+    // The connected signer is explicit, including for a disconnected preview quote.
+    // Validate the signer, chain, partner, token pair, and quote minimum before wallet actions.
+    client.prepareSwap(quote, account);
     const token = request.inToken as Address;
     const amount = BigInt(request.inAmount);
     const nativeInput = isNativeAddress(input.sourceToken);
@@ -323,19 +318,17 @@ export async function swapFlow(account: Address, input: SwapInput) {
     await assertSpendBalance();
     await assertContext();
     if (!isQuoteFresh(quote, 60_000)) {
-      const next = await client.getQuote({ ...request, signal: input.signal });
+      const next = await client.getQuote({ ...request, user: account, signal: input.signal });
       await assertContext();
       const worse = BigInt(next.netAmountOut) < BigInt(quote.netAmountOut)
-        || BigInt(getMinimumOutputAmount(next.netAmountOut, request.slippage)) < BigInt(reviewedMinimum);
+        || BigInt(next.minimumAmountOut) < BigInt(quote.minimumAmountOut);
       if (worse) {
-        const acceptedMinimum = await input.reviewChangedQuote(quote, next);
-        if (!acceptedMinimum) throw new Error("Updated quote was not accepted");
-        reviewedMinimum = acceptedMinimum;
+        const accepted = await input.reviewChangedQuote(quote, next);
+        if (!accepted) throw new Error("Updated quote was not accepted");
       }
       await assertContext();
       quote = next;
-      // A better quote preserves the original reviewed minimum.
-      if (BigInt(quote.netAmountOut) < BigInt(reviewedMinimum)) throw new Error("Review the new minimum before retrying");
+      // Keep the refreshed service minimum unchanged, including when it improves.
     }
     await assertSpendBalance();
     await assertContext();
@@ -379,5 +372,5 @@ export function formatSpotSwapSdkStep(step: "check" | "wrap" | "approve" | "sign
     sign: SWAP_SIGN_CODE,
     swap: `import { waitForOrder } from "@orbs-network/spot-ui";\n\n${root.demo ? "// Demo only: no wallet signature or order is submitted.\n" : ""}${SWAP_SUBMIT_CODE}`,
   };
-  return `// From spot-swap.ts; uses the same client, reviewed quote, minimum, and wallet.\n${sections[step]}\n`;
+  return `// From spot-swap.ts; uses the same client, reviewed quote, and connected wallet.\n${sections[step]}\n`;
 }

@@ -39,11 +39,11 @@ export function ActivityTable({ children }: { children: ReactNode }) {
 
   return <div className={styles.tableFrame}>
     <div ref={scrollRef} id={id} className={styles.tableScroll} data-activity-scroll
-      role="region" aria-label="Order table, scroll horizontally for more details" tabIndex={0} onScroll={updateHint}>
+      role="region" aria-label="Activity table, scroll horizontally for more details" tabIndex={0} onScroll={updateHint}>
       <div className={styles.table}>{children}</div>
     </div>
     {showHint && <div className={styles.scrollControls} data-activity-scroll-controls>
-      <button data-icon-button type="button" aria-label="Scroll order columns right" aria-controls={id}
+      <button data-icon-button type="button" aria-label="Scroll activity columns right" aria-controls={id}
         onClick={scrollRight}><ArrowRightIcon aria-hidden="true" /></button>
     </div>}
   </div>;

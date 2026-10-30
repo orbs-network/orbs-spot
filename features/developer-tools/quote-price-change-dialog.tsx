@@ -3,6 +3,7 @@
 import { formatUnits } from "viem";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { formatDisplayAmount } from "@/lib/token-display";
 
 export function QuotePriceChangeDialog({
   previousMinimum,
@@ -21,7 +22,9 @@ export function QuotePriceChangeDialog({
 }) {
   const formatAmount = (amount: string) => outputDecimals === undefined
     ? `${amount} base units`
-    : `${formatUnits(BigInt(amount), outputDecimals)} ${outputSymbol ?? ""}`.trim();
+    : `${formatDisplayAmount(formatUnits(BigInt(amount), outputDecimals))} ${outputSymbol ?? ""}`.trim();
+  const exactAmount = (amount: string) => outputDecimals === undefined
+    ? `${amount} base units` : `${formatUnits(BigInt(amount), outputDecimals)} ${outputSymbol ?? ""}`.trim();
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -33,11 +36,11 @@ export function QuotePriceChangeDialog({
         <dl className="grid gap-4 rounded-lg border p-4">
           <div className="grid gap-1">
             <dt className="text-sm text-muted-foreground">Old price · minimum received</dt>
-            <dd className="break-all font-medium tabular-nums">{formatAmount(previousMinimum)}</dd>
+            <dd title={exactAmount(previousMinimum)} className="break-all font-medium tabular-nums">{formatAmount(previousMinimum)}</dd>
           </div>
           <div className="grid gap-1">
             <dt className="text-sm text-muted-foreground">New price · minimum received</dt>
-            <dd className="break-all font-medium tabular-nums">{formatAmount(newMinimum)}</dd>
+            <dd title={exactAmount(newMinimum)} className="break-all font-medium tabular-nums">{formatAmount(newMinimum)}</dd>
           </div>
         </dl>
         <div className="flex justify-end gap-2">

@@ -11,11 +11,12 @@ import { useTranslations } from "@/lib/use-translations";
 import { cn } from "@/lib/utils";
 import { Module, type Token } from "@orbs-network/spot-ui";
 import { ArrowLeftRightIcon, RotateCcwIcon } from "lucide-react";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { numericFormatter } from "react-number-format";
 import styles from "./price-panels.module.css";
 import { formatPriceInputError } from "./utils";
 import BN from "bignumber.js";
+import { formatAmount } from "@/lib/token-display";
 
 function SpotPriceInput({
   descriptionId,
@@ -39,6 +40,7 @@ function SpotPriceInput({
   onPercentageChange: (value: string) => void;
 }) {
   const errorId = useId();
+  const [priceFocused, setPriceFocused] = useState(false);
   const unitId = `${errorId}-unit`;
   const percentageHelpId = `${errorId}-percentage-help`;
   const { marketRate } = usePriceDisplay();
@@ -48,7 +50,7 @@ function SpotPriceInput({
   const percentageHelp = hasMarketRate
     ? "Edit the percentage relative to the current market price. Positive values are above market; negative values are below. The comparison follows the displayed token pair."
     : "Current market price unavailable.";
-  const measuredAmount = numericFormatter(value || "0", {
+  const measuredAmount = numericFormatter((priceFocused ? value : formatAmount(value, 4, 18)) || "0", {
     thousandSeparator: ",", decimalSeparator: ".", decimalScale: 18,
   });
   return (
@@ -65,6 +67,8 @@ function SpotPriceInput({
                 name={inputName}
                 value={value}
                 onChange={onChange}
+                onFocus={() => setPriceFocused(true)}
+                onBlur={() => setPriceFocused(false)}
                 placeholder="0"
                 className="text-base font-semibold text-foreground"
               />

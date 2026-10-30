@@ -88,7 +88,7 @@ export function AppLoading() {
   const isOrders = getTradingPathname(usePathname()).startsWith("/orders");
   return (
     <div data-app-loading role="status" aria-busy="true" className="app-shell min-h-screen text-foreground">
-      <span className="sr-only">{isOrders ? "Loading orders…" : "Loading trading interface…"}</span>
+      <span className="sr-only">{isOrders ? "Loading activity…" : "Loading trading interface…"}</span>
       <div aria-hidden="true">
         <div data-app-header className="fixed inset-x-0 top-0 border-b border-border [background:var(--nav-background)] px-4 py-3">
           <div data-nav-layout className="flex items-center justify-between gap-4">

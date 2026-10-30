@@ -1,4 +1,4 @@
-import { OrderSettlementError, type Order, type Partners } from "@orbs-network/spot-ui";
+import { OrderSettlementError, OrderStatus, type Order, type Partners } from "@orbs-network/spot-ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { erc20Abi } from "viem";
 import { useSignTypedDataPayload } from "./use-sign-typed-data";
@@ -11,10 +11,10 @@ import { createSwapExecutor, QuoteUpdatedError, SwapSubmissionUncertainError } f
 import { createSwapToasts } from "@/lib/swap/use-swap-toasts";
 import { useBestTradeSwapStore, useSwapStore } from "./store";
 import { SwapStatus, SwapStep, type BestTradeQuote, type Currency } from "../types";
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 import { isUserRejectedError } from "../tx-rejection";
-import { getFillTransactionHash, useSwapActivity } from "@/lib/swap/activity";
+import { getFillTransactionHash, resolveSwapSettlementOrder, useSwapActivity } from "@/lib/swap/activity";
 import { spotSwapQuoteQueryOptions, SPOT_SWAP_QUOTE_KEY, MIN_SWAP_VALUE_USD } from "@/lib/swap/quotes";
 import { spotClientQueryOptions, invalidateOrderQueries } from "@/lib/spot/queries";
 import { useSpotPartner } from "./use-spot-partner";
@@ -24,6 +24,7 @@ import { trackFunnel } from "@/lib/funnel-analytics";
 import { swapSubmissions } from "@/lib/swap/submissions";
 import { acquireSubmissionLock, isSubmissionBusy, subscribeSubmissionLock } from "@/lib/spot/submission-lock";
 import { toast } from "sonner";
+import { createSubmissionToast } from "@/lib/spot/submission-toast";
 
 const executor = createSwapExecutor();
 
@@ -48,7 +49,18 @@ function publishAttempt(attempt: SwapAttempt, progress: SwapAttempt["progress"])
   if (swapSubmissions.isCurrent(attempt.id)) useBestTradeSwapStore.getState().updateStore(progress);
 }
 
+function completeSwap(attempt: SwapAttempt, order: Order) {
+  useSwapActivity.getState().settle(attempt.chainId, order.id, "confirmed", order);
+  const txHash = getFillTransactionHash(order);
+  const review = attempt.progress.review;
+  trackFunnel({ name: "submission_succeeded", product: "swap" });
+  publishAttempt(attempt, { status: SwapStatus.SUCCESS, order, txHash,
+    review: review ? { ...review, outputAmount: toAmountUI(order.dstAmountFilled, attempt.outputCurrency.decimals) } : review });
+  attempt.toasts.onSwapSuccess(txHash, order);
+}
+
 export const useSwapBestTrade = () => {
+  const reviewToast = useRef<ReturnType<typeof createSubmissionToast> | undefined>(undefined);
   const status = useBestTradeSwapStore(state => state.status);
   const currentStep = useBestTradeSwapStore(state => state.currentStep);
   const isPreparing = status === SwapStatus.LOADING && currentStep === undefined;
@@ -115,12 +127,12 @@ export const useSwapBestTrade = () => {
           : (await readTokenBalance()) >= BigInt(amount),
         wrap: async amount => wrapNative({ amount, onSubmitted: wrapTxHash => {
           updateStore({ isAwaitingWallet: false, wrapTxHash });
-          toasts.onWrapConfirming();
+          toasts.onWrapConfirming(wrapTxHash);
         } }),
         approve: async () => approveToken({ tokenAddress: inputToken, spenderAddress: client.spenderAddress, amount,
           onSubmitted: approvalTxHash => {
             updateStore({ isAwaitingWallet: false, approvalTxHash });
-            toasts.onApproveConfirming();
+            toasts.onApproveConfirming(approvalTxHash);
           } }),
         refreshQuote: () => {
           const options = spotSwapQuoteQueryOptions(client, account, inputCurrency, outputCurrency, amount, quote.slippage, wrappedToken);
@@ -155,21 +167,18 @@ export const useSwapBestTrade = () => {
         onSubmitted: (order: Order) => {
           swapSubmissions.track(attempt.id, chainId, order.id);
           useSwapActivity.getState().add({ kind: "spot", orderId: order.id, order, account, chainId, inputAmount,
+            inputToken: { address: inputCurrency.address, symbol: inputCurrency.symbol, decimals: inputCurrency.decimals, logoUrl: inputCurrency.logoUrl },
+            outputToken: { address: outputCurrency.address, symbol: outputCurrency.symbol, decimals: outputCurrency.decimals, logoUrl: outputCurrency.logoUrl },
+            outputAmount: toAmountUI(quote.outAmount, outputCurrency.decimals), partner,
             inputSymbol: inputCurrency.symbol, outputSymbol: outputCurrency.symbol, createdAt: Date.now(), status: "pending" });
           updateStore({ orderId: order.id, order, isAwaitingWallet: false });
           void invalidateOrderQueries(queryClient, { partner, chainId, account });
-          toasts.onSwapConfirming();
+          toasts.onSwapConfirming(order);
         },
       });
     },
     onSuccess: ({ order }, attempt) => {
-      useSwapActivity.getState().settle(attempt.chainId, order.id, "confirmed", order);
-      const txHash = getFillTransactionHash(order);
-      trackFunnel({ name: "submission_succeeded", product: "swap" });
-      attempt.toasts.onSwapSuccess(txHash, order);
-      const review = attempt.progress.review;
-      publishAttempt(attempt, { status: SwapStatus.SUCCESS, order, txHash,
-        review: review ? { ...review, outputAmount: toAmountUI(order.dstAmountFilled, attempt.outputCurrency.decimals) } : review });
+      completeSwap(attempt, order);
     },
     onError: (error, attempt) => {
       const toasts = attempt.toasts;
@@ -188,10 +197,16 @@ export const useSwapBestTrade = () => {
               quoteUpdate: { previous: error.previous, next: error.next } });
         return;
       }
-      if (error instanceof OrderSettlementError && error.reason !== "aborted") {
-        useSwapActivity.getState().settle(attempt.chainId, error.orderId, error.reason);
+      const settledOrder = resolveSwapSettlementOrder(attempt.progress.order, error);
+      if (settledOrder?.status === OrderStatus.Completed) {
+        completeSwap(attempt, settledOrder);
+        return;
       }
       const accepted = attempt.progress.orderId;
+      if (error instanceof OrderSettlementError && error.reason !== "aborted" && accepted &&
+          accepted.toLowerCase() === error.orderId.toLowerCase()) {
+        useSwapActivity.getState().settle(attempt.chainId, accepted, error.reason, settledOrder);
+      }
       const message = accepted && !(error instanceof OrderSettlementError)
         ? "Swap status is uncertain. Check order history before retrying; the order may still fill."
         : error.message;
@@ -205,11 +220,11 @@ export const useSwapBestTrade = () => {
         const failureMessage = recoverWrapped
           ? `${message} Your input was wrapped to ${wrappedSymbol}. Select ${wrappedSymbol} for your next swap.`
           : message;
-        updateStore({ status: SwapStatus.FAILED,
+        updateStore({ status: SwapStatus.FAILED, order: settledOrder,
           confirmedWrappedInputAddress: recoverWrapped ? confirmedWrappedInputAddress : undefined,
           error: { message: failureMessage,
             submissionUncertain: error instanceof SwapSubmissionUncertainError || (error instanceof OrderSettlementError && (error.reason === "unconfirmed" || error.reason === "aborted")) || Boolean(accepted && !(error instanceof OrderSettlementError)) } });
-        toasts.onSwapFailed(new Error(failureMessage));
+        toasts.onSwapFailed(error instanceof OrderSettlementError ? error : new Error(failureMessage), settledOrder);
       }
     },
     onSettled: (_result, _error, attempt) => {
@@ -234,8 +249,16 @@ export const useSwapBestTrade = () => {
     const id = crypto.randomUUID();
     swapSubmissions.begin(id);
     useSwapStore.getState().pauseQuotesFor(id);
+    const notifications = reviewToast.current?.isDeferred() ? reviewToast.current : createSubmissionToast({
+      isModalOpen: () => useBestTradeSwapStore.getState().isReviewOpen,
+      subscribe: listener => useBestTradeSwapStore.subscribe(listener),
+    });
+    reviewToast.current = notifications;
     const toasts = createSwapToasts({ id: `swap-${id}`, inputSymbol: inputCurrency.symbol,
-      outputSymbol: outputCurrency.symbol, inputAmount, chainId });
+      outputSymbol: outputCurrency.symbol, inputAmount, outputAmount: toAmountUI(quote.outAmount, outputCurrency.decimals),
+      inputCurrency, outputCurrency, chainId, account, partner,
+      minimumOutputAmount: toAmountUI(quote.minAmountOut, outputCurrency.decimals),
+      publishToast: notifications.publish, publishSuccessToast: notifications.publishSuccess });
     const review = { inputCurrency: { ...inputCurrency }, outputCurrency: { ...outputCurrency }, inputAmount,
       outputAmount: toAmountUI(quote.outAmount, outputCurrency.decimals), chainId, account };
     toasts.onPreparing();

@@ -46,7 +46,7 @@ export function OpenOrdersNotification() {
       >
         <span role="status" aria-atomic="true" className="font-medium tabular-nums">{count} open {count === 1 ? "order" : "orders"}</span>
         <span aria-hidden="true" className="text-muted-foreground">·</span>
-        <span className="inline-flex items-center gap-1.5 text-primary">View orders <ArrowRightIcon aria-hidden="true" className="size-4" /></span>
+        <span className="inline-flex items-center gap-1.5 text-primary">View activity <ArrowRightIcon aria-hidden="true" className="size-4" /></span>
       </AppLink>
       <button
         type="button"

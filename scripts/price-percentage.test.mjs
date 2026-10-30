@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import BN from "bignumber.js";
 import { calculateOrder, Module, InputErrors } from "@orbs-network/spot-ui";
-import { invertPricePercentage } from "../lib/exchange-rates.ts";
+import { registerHooks } from "node:module";
+
+registerHooks({ resolve(specifier, context, nextResolve) {
+  return nextResolve(specifier === "./token-display" && context.parentURL?.endsWith("/lib/exchange-rates.ts")
+    ? "./token-display.ts" : specifier, context);
+} });
+const { invertPricePercentage } = await import("../lib/exchange-rates.ts");
 
 const Precise = BN.clone({ DECIMAL_PLACES: 512 });
 

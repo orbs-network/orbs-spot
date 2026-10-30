@@ -1,6 +1,6 @@
 "use client";
 
-import { OrderStatus, type Order } from "@orbs-network/spot-ui";
+import { OrderSettlementError, OrderStatus, Partners, type Order, type Token } from "@orbs-network/spot-ui";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -10,6 +10,10 @@ type ActivityDetails = {
   inputSymbol: string;
   outputSymbol: string;
   inputAmount: string;
+  inputToken?: Token;
+  outputToken?: Token;
+  outputAmount?: string;
+  partner?: Partners;
   createdAt: number;
 };
 
@@ -37,6 +41,23 @@ export type SwapActivity = TransactionSwapActivity | SpotSwapActivity;
 const validHash = (value: unknown): value is `0x${string}` =>
   typeof value === "string" && /^0x[\da-f]{64}$/i.test(value);
 
+/** A typed terminal result can arrive after the last open polling snapshot. */
+export function resolveSwapSettlementOrder(order: Order | undefined, error: unknown): Order | undefined {
+  if (!order || order.status !== OrderStatus.Open || !(error instanceof OrderSettlementError)
+    || error.orderId.toLowerCase() !== order.id.toLowerCase()) return order;
+  if (error.reason === "expired") return { ...order, status: OrderStatus.Expired };
+  if (error.reason === "cancelled") return { ...order, status: OrderStatus.Cancelled };
+  return order;
+}
+
+function validToken(value: unknown): value is Token {
+  if (!value || typeof value !== "object") return false;
+  const token = value as Partial<Token>;
+  return typeof token.address === "string" && typeof token.symbol === "string"
+    && Number.isInteger(token.decimals) && Number(token.decimals) >= 0 && Number(token.decimals) <= 255
+    && (token.logoUrl === undefined || typeof token.logoUrl === "string");
+}
+
 export function getFillTransactionHash(order: Order): `0x${string}` | undefined {
   for (let index = order.fills.length - 1; index >= 0; index -= 1) {
     const hash = order.fills[index].txHash;
@@ -57,6 +78,10 @@ export function validSwapActivity(value: unknown): value is SwapActivity {
     && typeof item.createdAt === "number" && Number.isFinite(item.createdAt)
     && typeof item.inputSymbol === "string" && typeof item.outputSymbol === "string"
     && typeof item.inputAmount === "string")) return false;
+  if ((item.inputToken !== undefined && !validToken(item.inputToken))
+    || (item.outputToken !== undefined && !validToken(item.outputToken))
+    || (item.outputAmount !== undefined && typeof item.outputAmount !== "string")
+    || (item.partner !== undefined && !Object.values(Partners).includes(item.partner as Partners))) return false;
   if (item.kind !== "spot") {
     return (item.kind === undefined || item.kind === "transaction") && validHash(item.hash)
       && ["pending", "confirmed", "reverted", "unconfirmed"].includes(String(item.status));

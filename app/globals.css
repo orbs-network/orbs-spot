@@ -305,16 +305,6 @@ body:has([data-developer-spotlight-root]) [data-developer-trigger] {
   height: 60px;
 }
 
-[data-sonner-toast][data-styled=true] [data-close-button] {
-  color: var(--foreground) !important;
-  border: 1px solid var(--border) !important;
-}
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) {
-  [data-sonner-toast][data-styled=true] [data-close-button]:hover {
-   background: var(--orbs-icon-background, var(--accent)) !important;
-  }
-}
-
 [data-vaul-drawer] {
   animation-duration: 0.36s;
   animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);

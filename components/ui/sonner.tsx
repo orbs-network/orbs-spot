@@ -8,8 +8,10 @@ import {
   Loader2Icon,
   OctagonXIcon,
   TriangleAlertIcon,
+  XIcon,
 } from "lucide-react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
+import styles from "./sonner.module.css"
 
 const TOAST_Z_INDEX = 100
 
@@ -18,26 +20,28 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme}
-      className="toaster group"
+      className={`toaster group ${styles.viewport}`}
       position="top-right"
       closeButton
-      expand={false}
+      expand
       richColors
-      visibleToasts={3}
+      visibleToasts={Infinity}
+      swipeDirections={["left", "right"]}
       icons={{
         success: <CircleCheckIcon aria-hidden="true" className="size-4" />,
         info: <InfoIcon aria-hidden="true" className="size-4" />,
         warning: <TriangleAlertIcon aria-hidden="true" className="size-4" />,
         error: <OctagonXIcon aria-hidden="true" className="size-4" />,
         loading: <Loader2Icon aria-hidden="true" className="size-4 animate-spin" />,
+        close: <XIcon aria-hidden="true" className="size-3.5" />,
       }}
       style={
         {
           "--normal-bg": "var(--popover)",
-          "--normal-bg-hover": "var(--secondary)",
+          "--normal-bg-hover": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
-          "--normal-border-hover": "color-mix(in srgb, var(--foreground) 18%, var(--border))",
+          "--normal-border-hover": "var(--border)",
           "--success-bg": "var(--popover)",
           "--success-border": "color-mix(in srgb, var(--primary) 30%, var(--border))",
           "--success-text": "var(--primary)",
@@ -69,7 +73,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           cancelButton:
             "rounded-xl border border-border bg-secondary px-3 py-1.5 text-foreground",
           closeButton:
-            "border-border bg-popover text-muted-foreground hover:bg-secondary/40 ",
+            "text-muted-foreground",
         },
       }}
       {...props}

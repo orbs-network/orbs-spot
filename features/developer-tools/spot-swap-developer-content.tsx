@@ -7,6 +7,7 @@ import BN from "bignumber.js";
 import { CheckIcon } from "lucide-react";
 import { type ReactElement, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { createLoadingToast } from "@/lib/loading-toast";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 import { erc20Abi } from "viem";
 import { Button } from "@/components/ui/button";
@@ -62,7 +63,7 @@ const DEMO_SWAP_EXPLANATIONS: Record<SpotSwapFlowStep, string> = {
   check: "Simulated allowance: zero, so you can explore approval. Your wallet allowance is not read or changed.",
   wrap: "Simulated wrapping. No native tokens are deposited and no gas is spent.",
   approve: "Simulated token approval. No spending permission is granted and no transaction is sent.",
-  sign: "The SDK prepares this swap locally from the live quote and reviewed minimum. The demo uses example signature bytes and does not open a wallet.",
+  sign: "The SDK prepares this swap locally from the live quote and its service minimum. The demo uses example signature bytes and does not open a wallet.",
   swap: "The prepared order and demo signature are shown below. No order is submitted and no settlement is requested.",
   success: "Local demo result. No swap was executed, no funds moved, and no order was created.",
 };
@@ -102,11 +103,11 @@ function getPresentation({ data, step }: { data: JsonContainer; step: SpotSwapFl
     approve: "Approve the configured spender", sign: "Sign the prepared order", swap: "Submit and confirm the fill", success: "Swap completed",
   };
   const explanations = {
-    flow: "Quote, wrap and approve when needed, prepare a swap from the reviewed minimum, sign the original request, submit the order, and wait for a completed fill.",
+    flow: "Quote, wrap and approve when needed, prepare a swap from the reviewed quote and connected account, sign the original request, submit the order, and wait for a completed fill.",
     check: "Read the input token allowance for client.spenderAddress. Native input uses its wrapped ERC-20 token.",
     wrap: "Deposit the exact native input into its wrapped ERC-20 contract and wait for a successful receipt before continuing.",
     approve: "Approve the exact input amount for client.spenderAddress, confirm the transaction, and verify allowance with bounded retries.",
-    sign: "client.prepareSwap creates the order from the quote and reviewed minimum. The wallet signs this original signingRequest unchanged. The quote itself contains no signing payload.",
+    sign: "client.prepareSwap(quote, userAddress) uses the quote's minimumAmountOut unchanged and sets a three-minute expiration. The connected account signs this original signingRequest unchanged. The quote itself contains no signing payload.",
     swap: "Submit the exact prepared order and original signature once. submitOrder returns an accepted order; waitForOrder confirms the completed fill.",
     success: "waitForOrder returned a completed order. Its fills contain the actual settlement transaction hashes and amounts.",
   };
@@ -128,7 +129,12 @@ function waitBeforeAllowanceRetry(signal: AbortSignal): Promise<void> {
 export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExecutionMode; trigger: ReactElement }) {
   const isDemo = mode === "demo";
   const flowToastId = useId();
+  const flowToastDismissed = useRef(false);
   const actionToastId = useId();
+  const dismissFlowToast = useCallback(() => {
+    flowToastDismissed.current = true;
+    toast.dismiss(flowToastId);
+  }, [flowToastId]);
   const { address: account, isConnecting, isReconnecting } = useConnection();
   const { data: walletClient } = useWalletClient();
   const publicClient = usePublicClient();
@@ -196,10 +202,10 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
   const quoteData = useMemo(() => toJsonContainer(executionQuote?.originalQuote ?? liveQuote?.originalQuote) ?? {}, [executionQuote, liveQuote]);
   const integrationData = useMemo<JsonContainer>(() => ({
     ...asRecord(requestData), quote: asRecord(quoteData), demo: isDemo,
-    minimumOutputAmountRaw: reviewedQuote?.minAmountOut ?? executionQuote?.minAmountOut ?? liveQuote?.minAmountOut ?? "0",
+    userAddress: account ?? "<connected-account>",
     prepared: toJsonContainer(prepared) ?? {},
     execution: { signature: signature ?? "<wallet-signature>", order: toJsonContainer(completedOrder ?? acceptedOrder) ?? {} },
-  }), [acceptedOrder, completedOrder, executionQuote, isDemo, liveQuote, prepared, quoteData, requestData, reviewedQuote, signature]);
+  }), [acceptedOrder, account, completedOrder, isDemo, prepared, quoteData, requestData, signature]);
   const liveFlowPhases = useMemo(() => {
     const visitedSteps = new Set(navigation.history);
     const phases: SpotSwapFlowPhase[] = [ALLOWANCE_PHASE];
@@ -225,7 +231,8 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
     mutationFn: async () => {
       if (executionInFlight.current || step === "success") return;
       executionInFlight.current = true;
-      toast.loading(isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step], { id: actionToastId, position: "bottom-right" });
+      const loadingToast = createLoadingToast(actionToastId);
+      loadingToast.show(isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step], { position: "bottom-right" });
       try {
         const selected = executionQuote ?? liveQuote;
         if (!selected || !BN(selected.inAmount).gt(0) || !BN(selected.outAmount).gt(0) || !client) {
@@ -236,7 +243,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           else if (step === "check") { setApprovalRequired(true); advanceToStep(sourceIsNative ? "wrap" : "approve"); }
           else if (step === "wrap") advanceToStep("approve");
           else if (step === "approve") {
-            setPrepared(client.prepareSwap({ quote: selected.originalQuote, minimumOutputAmountRaw: selected.minAmountOut, swapperAddress: selected.originalQuote.request.user }));
+            setPrepared(client.prepareSwap(selected.originalQuote, account ?? selected.originalQuote.request.user));
             advanceToStep("sign");
           } else if (step === "sign") { setSignature(DEMO_SIGNATURE); advanceToStep("swap"); }
           else if (step === "swap") advanceToStep("success");
@@ -264,12 +271,12 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           if (sessionRef.current !== session || session.contextKey !== contextKey) throw new Error("Swap changed. Review the swap again.");
           const [addresses, connectedChain] = await Promise.all([walletClient.getAddresses(), walletClient.getChainId()]);
           signal.throwIfAborted();
-          if (connectedChain !== chainId || addresses[0]?.toLowerCase() !== account.toLowerCase() || request.user.toLowerCase() !== account.toLowerCase()) {
+          if (connectedChain !== chainId || addresses[0]?.toLowerCase() !== account.toLowerCase()) {
             throw new Error("Wallet account or network changed. Reopen the flow for a fresh quote.");
           }
         };
         await assertContext();
-        client.prepareSwap({ quote: selected.originalQuote, minimumOutputAmountRaw: reviewedQuote?.minAmountOut ?? selected.minAmountOut, swapperAddress: account });
+        client.prepareSwap(selected.originalQuote, account);
         const wrapKey = [chainId, account.toLowerCase(), request.inToken.toLowerCase(), request.inAmount].join(":");
         const getWrappedAmount = () => wrappedCreditRef.current?.key === wrapKey ? wrappedCreditRef.current.amount : BigInt(0);
         const readSpendBalance = () => publicClient.readContract({
@@ -295,10 +302,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           signal.throwIfAborted();
           return BigInt(value) >= BigInt(request.inAmount);
         };
-        const prepareForSigning = (quote: BestTradeQuote) => client.prepareSwap({
-          quote: quote.originalQuote, minimumOutputAmountRaw: reviewedQuote?.minAmountOut ?? quote.minAmountOut,
-          swapperAddress: account, maxQuoteAgeMillis: 60_000,
-        });
+        const prepareForSigning = (quote: BestTradeQuote) => client.prepareSwap(quote.originalQuote, account);
         const refreshIfNeeded = async (): Promise<BestTradeQuote | undefined> => {
           if (isQuoteFresh(selected.originalQuote, 60_000)) return selected;
           if (!inputCurrency || !outputCurrency) throw new Error("Select both swap tokens.");
@@ -313,9 +317,8 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
             toast.dismiss(actionToastId);
             return;
           }
-          const next = { ...fresh, minAmountOut: reviewed.minAmountOut };
-          setExecutionQuote(next);
-          return next;
+          setExecutionQuote(fresh);
+          return fresh;
         };
         if (step === "flow") {
           setReviewedQuote((current) => current ?? structuredClone(selected));
@@ -460,6 +463,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
     (nextOpen: boolean) => {
       setTriggerTooltipOpen(false);
       setPriceChange(undefined);
+      if (nextOpen) flowToastDismissed.current = false;
       if (!nextOpen) {
         suppressTriggerTooltipRef.current = true;
         stopSession();
@@ -597,7 +601,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
   );
 
   useEffect(() => {
-    if (!open || viewedStep === "flow") {
+    if (!open || viewedStep === "flow" || flowToastDismissed.current) {
       toast.dismiss(flowToastId);
       return;
     }
@@ -609,6 +613,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           flowStep="flow"
           flowSummary="Wrap / Approve appear only if needed"
           flowTitle={isDemo ? "Demo swap flow" : "Live swap flow"}
+          onDismiss={dismissFlowToast}
           onSelectPhase={handleSelectPhase}
           phases={liveFlowPhases}
           progressLabel="Spot swap progress"
@@ -630,6 +635,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
       },
     );
   }, [
+    dismissFlowToast,
     isDemo,
     flowToastId,
     handleSelectPhase,

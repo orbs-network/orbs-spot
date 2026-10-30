@@ -22,6 +22,7 @@ import { Button } from "./ui/button";
 import { Virtuoso } from "react-virtuoso";
 import type { Currency } from "@/lib/types";
 import { useFormatNumber } from "@/lib/hooks/common";
+import { formatBalanceAmount } from "@/lib/token-display";
 import BN from "bignumber.js";
 import { useConnection } from "wagmi";
 import {
@@ -288,7 +289,7 @@ const CurrencyItem = memo(function CurrencyItem({
     () => toAmountUI(balanceWei, currency.decimals),
     [balanceWei, currency.decimals],
   );
-  const displayBalance = useFormatNumber({ value: balance });
+  const displayBalance = formatBalanceAmount(balance);
   const usdValue = useMemo(
     () =>
      BN(balance || 0)

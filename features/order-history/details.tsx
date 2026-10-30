@@ -355,7 +355,7 @@ export function SelectedOrderDetails({
     <div data-order-details-content className="px-5 pb-5 pt-5">
       <div data-order-details-scroll>
         {presentation === "modal" && <div className="mb-6 flex items-center gap-4 pr-8">
-          <HistoryBackButton label="Back to orders" onClick={onBack} />
+          <HistoryBackButton label="Back to activity" onClick={onBack} />
           <HistoryTitle className="truncate text-[16px] font-semibold leading-none">
             {t("orderDetails")}
           </HistoryTitle>

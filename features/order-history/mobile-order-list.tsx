@@ -33,7 +33,7 @@ export function MobileOrderList({ orders, onSelect, onCancel, children }: {
             data={orders}
             computeItemKey={orderKey}
             increaseViewportBy={300}
-            aria-label="Order history"
+            aria-label="Trading activity"
             itemContent={itemContent}
           />
         </>

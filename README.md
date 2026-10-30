@@ -87,14 +87,17 @@ quote refreshes, and a changed or stale quote requires review before signing.
 
 Closing a loading review clears the form for the next swap or order. The original submission
 continues with its own progress toast and captured amounts; its result cannot replace a newer review.
+Click a submission toast to reopen its captured preview without changing the current draft.
+Accepted open orders include cancellation with wallet confirmation; completed orders cannot be cancelled.
 Wallet requests are serialized through signing. Signed requests and swap settlement can finish
 in the background while another order or swap is prepared and submitted.
 
-`quote.netAmountOut` and `minimumOutputAmountRaw` are integer output-token base units.
-`getMinimumOutputAmount(quote.netAmountOut, slippage)` floors the protected minimum with the same
-rounded basis-point conversion as quoting; `0.5` means 0.5%. For example, a net quote of `1000000`
-base units produces a `995000` minimum at 0.5%. The UI minimum is distinct from the swap order's
-fixed 5% signed oracle protection. The quote's net output and raw fee do not provide a USD gas cost.
+`quote.netAmountOut` and `quote.minimumAmountOut` are integer output-token base units.
+The UI displays the service-provided `minimumAmountOut` unchanged, and
+`client.prepareSwap(quote, account)` uses that same minimum in the signed order.
+Quote slippage remains a percentage; `0.5` means 0.5%. This minimum is distinct from the swap order's
+fixed 5% signed oracle protection. Prepared swaps expire after three minutes.
+The quote's net output and raw fee do not provide a USD gas cost.
 
 Submission returns an accepted signed order. Its `order.id` identifies an intent and must never be
 used as a transaction hash. The swap remains in progress until the SDK reports `OrderStatus.Completed`.

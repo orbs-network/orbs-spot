@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getMinimumOutputAmount, OrderSettlementError, OrderStatus } from "@orbs-network/spot-ui";
+import { OrderSettlementError, OrderStatus } from "@orbs-network/spot-ui";
 import {
   acquireSwapExecutionLock,
   assertSwapQuote,
@@ -22,9 +22,9 @@ function fixture({ native = false, approved = true } = {}) {
     originalInputToken: native ? nativeAddress : "0x2222" };
   const originalQuote = { request: { user: intent.account, chainId: 56, partner: "quickswap", inToken: intent.inputToken,
     outToken: intent.outputToken, inAmount: "10", slippage: 5 }, receivedAt: Date.now(),
-    amountOut: "21", netAmountOut: "20", minimumAmountOut: "1", feeAmount: "1" };
+    amountOut: "21", netAmountOut: "20", minimumAmountOut: "18", feeAmount: "1" };
   const quote = { inToken: intent.originalInputToken, outToken: intent.outputToken,
-    inAmount: "10", outAmount: "20", minAmountOut: "19", slippage: 5, originalQuote };
+    inAmount: "10", outAmount: "20", minAmountOut: "18", slippage: 5, originalQuote };
   const signingRequest = { signerAddress: intent.account, typedData: { message: { order: "exact prepared order" } } };
   const preparedOrder = signingRequest.typedData.message;
   const acceptedOrder = { id: "full-signed-order-id", chainId: 56, deadline: Date.now() + 900_000, status: OrderStatus.Open };
@@ -37,9 +37,9 @@ function fixture({ native = false, approved = true } = {}) {
     intent, quote,
     client: {
       chainId: intent.chainId, partner: originalQuote.request.partner, spenderAddress: "0xspender",
-      prepareSwap: params => {
+      prepareSwap: (quote, userAddress) => {
         actions.push(["prepare"]);
-        preparations.push(params);
+        preparations.push({ quote, userAddress });
         return { order: preparedOrder, signingRequest };
       },
       submitOrder: async (order, signature) => {
@@ -75,10 +75,10 @@ function fixture({ native = false, approved = true } = {}) {
     submitted, signingRequest, preparedOrder, acceptedOrder, completedOrder };
 }
 
-function refreshedQuote(quote, outAmount = quote.outAmount) {
+function refreshedQuote(quote, outAmount = quote.outAmount, minAmountOut = quote.minAmountOut) {
   return { ...structuredClone(quote), outAmount,
-    minAmountOut: getMinimumOutputAmount(outAmount, quote.slippage),
-    originalQuote: { ...structuredClone(quote.originalQuote), receivedAt: Date.now(), netAmountOut: outAmount } };
+    minAmountOut,
+    originalQuote: { ...structuredClone(quote.originalQuote), receivedAt: Date.now(), netAmountOut: outAmount, minimumAmountOut: minAmountOut } };
 }
 
 test("swap progress exposes the complete wrap, approve and sign plan", async () => {
@@ -88,7 +88,8 @@ test("swap progress exposes the complete wrap, approve and sign plan", async () 
   assert.deepEqual(steps, [["WRAP", 0], ["APPROVE", 1], ["SWAP", 2]]);
   assert.deepEqual(actions, [["wrap", "10"], ["approve"], ["prepare"], ["sign"], ["submit"], ["settle"]]);
   assert.equal(preparations[0].quote.request.inToken, input.intent.inputToken);
-  assert.equal(preparations[0].minimumOutputAmountRaw, "19");
+  assert.equal(preparations[0].quote.minimumAmountOut, "18");
+  assert.equal(preparations[0].userAddress, input.intent.account);
   assert.equal(submissions.length, 1);
   assert.equal(submissions[0][0], preparedOrder);
   assert.equal(submissions[0][1], "0xoriginal-signature");
@@ -118,6 +119,8 @@ test("quote identity rejects stale form, signer, chain, partner, token and slipp
     input => { input.quote.inToken = "0xother"; },
     input => { input.quote.outAmount = "999"; },
     input => { input.quote.minAmountOut = "1"; },
+    input => { input.quote.originalQuote.minimumAmountOut = "1"; },
+    input => { input.quote.minAmountOut = input.quote.originalQuote.minimumAmountOut = "21"; },
     input => { input.client.chainId = 1; },
   ];
   for (const change of changes) {
@@ -137,13 +140,13 @@ test("native form addresses are distinct from the quoted wrapped ERC-20", () => 
   assert.throws(() => assertSwapQuote(input.quote, input.intent), /does not match/);
 });
 
-test("a refreshed better quote preserves the original reviewed minimum", async () => {
+test("a refreshed better quote signs its service minimum without weakening the reviewed minimum", async () => {
   const { input, executor, preparations } = fixture();
   input.quote.originalQuote.receivedAt -= 60_001;
-  input.refreshQuote = async () => refreshedQuote(input.quote, "30");
+  input.refreshQuote = async () => refreshedQuote(input.quote, "30", "27");
   await executor.execute(input);
   assert.equal(preparations[0].quote.netAmountOut, "30");
-  assert.equal(preparations[0].minimumOutputAmountRaw, "19");
+  assert.equal(preparations[0].quote.minimumAmountOut, "27");
 });
 
 test("refresh cannot repair an expired quote that was reviewed for another signer", async () => {
@@ -165,6 +168,19 @@ test("a refreshed worse quote requires review before wrapping, approval or signi
     assert.ok(error instanceof QuoteUpdatedError);
     assert.equal(error.previous.outAmount, "20");
     assert.equal(error.next.outAmount, "19");
+    return true;
+  });
+  assert.deepEqual(actions, []);
+});
+
+test("a refreshed lower service minimum requires review even when net output improves", async () => {
+  const { input, executor, actions } = fixture({ native: true, approved: false });
+  input.quote.originalQuote.receivedAt -= 60_001;
+  input.refreshQuote = async () => refreshedQuote(input.quote, "30", "17");
+  await assert.rejects(executor.execute(input), error => {
+    assert.ok(error instanceof QuoteUpdatedError);
+    assert.equal(error.previous.minAmountOut, "18");
+    assert.equal(error.next.minAmountOut, "17");
     return true;
   });
   assert.deepEqual(actions, []);
@@ -193,7 +209,7 @@ test("the reviewed quote, intent, client and callbacks remain fixed while wallet
   input.sign = async () => { throw new Error("wrong callback"); };
   resume();
   await pending;
-  assert.equal(preparations[0].minimumOutputAmountRaw, "19");
+  assert.equal(preparations[0].quote.minimumAmountOut, "18");
   assert.equal(preparations[0].quote.request.inAmount, "10");
   assert.equal(submissions.length, 1);
 });

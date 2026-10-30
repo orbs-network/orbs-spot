@@ -122,7 +122,6 @@ export function CurrencyCard({
             placeholder="0"
             disabled={disabled}
             decimalScale={currency?.decimals ?? 18}
-            displayDecimals={disabled ? 4 : undefined}
             value={amount}
             onChange={onAmountChange ?? (() => {})}
             isLoading={isLoading && Boolean(amount) && !BN(amount).isZero()}

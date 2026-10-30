@@ -104,10 +104,10 @@ export function OrderHistoryTable({ orders, onSelect, children, pageIndex, pageS
           data-history-table
           role="table"
           className="text-left"
-          aria-label="Order history"
+          aria-label="Trading activity"
           containerProps={{
             role: "region",
-            "aria-label": "Order history rows",
+            "aria-label": "Activity rows",
             tabIndex: 0,
             className: cn("min-h-0 overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary", orders.length ? "flex-1" : "shrink-0"),
           }}
@@ -138,7 +138,7 @@ export function OrderHistoryTable({ orders, onSelect, children, pageIndex, pageS
             {[10, 25, 50].map((size) => <option key={size} value={size}>{size}</option>)}
           </select>
         </div>
-        <nav aria-label="Order history pagination" className="flex items-center gap-2 max-sm:w-full">
+        <nav aria-label="Activity pagination" className="flex items-center gap-2 max-sm:w-full">
           <span className="mr-2 whitespace-nowrap tabular-nums max-sm:mr-auto">Page {pageIndex + 1} of {pageCount}</span>
           <Button variant="outline" size="icon" className="hidden sm:inline-flex" aria-label="First page" disabled={pageIndex === 0} onClick={() => onPageChange(0)}><ChevronsLeftIcon aria-hidden="true" /></Button>
           <Button variant="outline" size="icon" aria-label="Previous page" disabled={pageIndex === 0} onClick={() => onPageChange(pageIndex - 1)}><ChevronLeftIcon aria-hidden="true" /></Button>

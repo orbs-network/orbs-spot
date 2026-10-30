@@ -1,13 +1,11 @@
 "use client";
 
 import { useId, useRef } from "react";
-import { Trash2Icon } from "lucide-react";
 import { OrderStatus, type Order } from "@orbs-network/spot-ui";
 import { useConnection, useSwitchChain } from "wagmi";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { getNetworkLabel, NetworkLabel } from "@/components/network-label";
 import { useCancelOrder } from "@/components/advanced-order/use-order-client";
@@ -18,14 +16,10 @@ import { CopyableIdentifier } from "./order-overview";
 export function OrderCancelButton({ order, onCancel }: { order: Order; onCancel: (order: Order) => void }) {
   const pending = useOrderCancelling(order);
   if (order.status !== OrderStatus.Open) return null;
-  return <Tooltip action>
-    <TooltipTrigger asChild>
-      <button data-icon-button type="button" data-order-cancel-trigger disabled={pending} aria-busy={pending} onClick={() => onCancel(order)} aria-label={pending ? `Cancelling order ${order.id}` : `Cancel ${getOrderTypeLabel(order.type)} order ${order.id}`} className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-destructive disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-primary">
-        {pending ? <Spinner aria-hidden="true" className="size-4" /> : <Trash2Icon aria-hidden="true" className="size-4" />}
-      </button>
-    </TooltipTrigger>
-    <TooltipContent>{pending ? "Cancelling…" : "Cancel order"}</TooltipContent>
-  </Tooltip>;
+  return <button type="button" data-order-cancel-trigger disabled={pending} aria-busy={pending} onClick={() => onCancel(order)} aria-label={pending ? `Cancelling order ${order.id}` : `Cancel ${getOrderTypeLabel(order.type)} order ${order.id}`} className="inline-flex min-h-9 min-w-20 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-border/60 bg-secondary px-3 text-xs font-semibold text-foreground disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-primary">
+    {pending && <Spinner aria-hidden="true" className="size-3 shrink-0 motion-reduce:animate-none" />}
+    Cancel
+  </button>;
 }
 
 /** The row action only opens this confirmation; writes require the second click. */

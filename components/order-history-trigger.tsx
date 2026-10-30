@@ -15,8 +15,8 @@ export function OrderHistoryLink() {
   return (
     <AppLink href={preserveFormTabInHref("/orders", selectedTab.value)}
       aria-current={pathname === "/orders" || pathname.startsWith("/orders/") ? "page" : undefined}
-      aria-label={count ? `Orders, ${count} open advanced orders` : "Orders"}>
-      Orders{count > 0 && <span data-orders-nav-count className="tabular-nums"> · {count}</span>}
+      aria-label={count ? `Activity, ${count} open advanced orders` : "Activity"}>
+      Activity{count > 0 && <span data-orders-nav-count className="tabular-nums"> · {count}</span>}
     </AppLink>
   );
 }
@@ -26,12 +26,12 @@ export function OrderHistoryTrigger({ onOpen }: { onOpen: () => void }) {
     <Button
       type="button"
       variant="outline"
-      aria-label="Open order history"
+      aria-label="Open activity"
       onClick={onOpen}
       className="h-10 shrink-0 gap-2 rounded-[12px] border-border/70 bg-secondary/35 px-3 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/40 "
     >
       <HistoryIcon aria-hidden="true" className="size-4" />
-      <span>Orders</span>
+      <span>Activity</span>
     </Button>
   );
 }

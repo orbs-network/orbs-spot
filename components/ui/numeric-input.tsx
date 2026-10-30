@@ -1,9 +1,9 @@
 import { NumericFormat } from "react-number-format";
 import BN from "bignumber.js";
 import { maxUint256 } from "viem";
-import { useId, type Ref } from "react";
+import { useId, useState, type Ref } from "react";
 
-import { formatAmount, getSmallAmountThreshold } from "@/lib/token-display";
+import { formatAmount } from "@/lib/token-display";
 import { cn } from "@/lib/utils";
 import { Input } from "./input";
 
@@ -41,7 +41,7 @@ export function NumericInput({
   disabled = false,
   readOnly = false,
   decimalScale = 18,
-  displayDecimals,
+  displayDecimals = 4,
   onBlur,
   onFocus,
   placeholder,
@@ -57,11 +57,11 @@ export function NumericInput({
   isLoading = false,
 }: NumericInputProps) {
   const errorId = useId();
+  const [focused, setFocused] = useState(false);
   const rawValue = value || minAmount || "";
-  const showDisplayValue = displayDecimals !== undefined && disabled;
-  const threshold = showDisplayValue ? getSmallAmountThreshold(rawValue) : undefined;
-  const inputValue = threshold ?? (showDisplayValue
-    ? formatAmount(rawValue, displayDecimals, decimalScale) : rawValue);
+  const showDisplayValue = !focused || disabled || readOnly;
+  const inputValue = showDisplayValue
+    ? formatAmount(rawValue, displayDecimals, decimalScale) : rawValue;
 
   return (
     <>
@@ -83,9 +83,15 @@ export function NumericInput({
         readOnly={readOnly}
         decimalScale={decimalScale}
         inputMode="decimal"
-        onBlur={onBlur}
+        onBlur={() => {
+          setFocused(false);
+          onBlur?.();
+        }}
         name={name}
-        onFocus={onFocus}
+        onFocus={() => {
+          setFocused(true);
+          onFocus?.();
+        }}
         onFocusCapture={(event) => {
           const input = event.currentTarget;
           if (!suffix) return;
@@ -111,7 +117,7 @@ export function NumericInput({
           const numericValue = BN(values.value || "0");
           return numericValue.isFinite() && numericValue.lte(maxValue ?? maxUint256.toString());
         }}
-        prefix={`${threshold ? "<" : ""}${showPositiveSign && !String(rawValue).startsWith("-") && BN(rawValue).gte(0) ? "+" : ""}${prefix ? `${prefix} ` : ""}`}
+        prefix={`${showPositiveSign && !String(rawValue).startsWith("-") && BN(rawValue).gte(0) ? "+" : ""}${prefix ? `${prefix} ` : ""}`}
         suffix={suffix ? `${suffix} ` : ""}
         value={disabled && value === "0" ? "" : inputValue}
         thousandSeparator={","}
@@ -120,7 +126,8 @@ export function NumericInput({
         valueIsNumericString
         min={minAmount}
         onValueChange={(values, sourceInfo) => {
-          if (sourceInfo.source !== "event") return;
+          // Restoring or compacting a value must never change its stored precision.
+          if (sourceInfo.source !== "event" || sourceInfo.event?.type === "blur") return;
           onChange(values.value === "." ? "0." : values.value);
         }}
       />

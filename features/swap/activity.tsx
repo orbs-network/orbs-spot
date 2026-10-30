@@ -7,7 +7,7 @@ import { useConnection } from "wagmi";
 import { SUPPORTED_CHAINS } from "@/lib/consts";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
 import { SwapStatus } from "@/lib/types";
-import { getFillTransactionHash, getSwapActivityId, useSwapActivity, type SwapActivity, type SpotSwapActivity } from "@/lib/swap/activity";
+import { getFillTransactionHash, getSwapActivityId, resolveSwapSettlementOrder, useSwapActivity, type SwapActivity, type SpotSwapActivity } from "@/lib/swap/activity";
 import { swapOrderKey, swapSubmissions } from "@/lib/swap/submissions";
 import { createSwapToasts } from "@/lib/swap/use-swap-toasts";
 
@@ -19,10 +19,15 @@ const completedResults = (results: UseQueryResult<SwapActivity>[]) =>
 async function trackSpotSwap(item: SpotSwapActivity, signal: AbortSignal): Promise<SpotSwapActivity> {
   let order = item.order;
   const toasts = createSwapToasts({ id: `recovered-swap-${swapOrderKey(item.chainId, item.orderId)}`,
-    inputSymbol: item.inputSymbol, outputSymbol: item.outputSymbol, inputAmount: item.inputAmount, chainId: item.chainId });
-  toasts.onSwapConfirming();
+    inputSymbol: item.inputSymbol, outputSymbol: item.outputSymbol, inputAmount: item.inputAmount,
+    inputCurrency: item.inputToken, outputCurrency: item.outputToken, outputAmount: item.outputAmount, chainId: item.chainId,
+    account: item.account, partner: item.partner });
+  toasts.onSwapConfirming(order);
   try {
-    for await (const current of watchOrder({ order, signal })) order = current;
+    for await (const current of watchOrder({ order, signal })) {
+      order = current;
+      if (order.status === OrderStatus.Open) toasts.onSwapConfirming(order);
+    }
     if (order.status !== OrderStatus.Completed) throw new Error("Swap fill has not been confirmed");
     const txHash = getFillTransactionHash(order);
     toasts.onSwapSuccess(txHash, order);
@@ -33,7 +38,8 @@ async function trackSpotSwap(item: SpotSwapActivity, signal: AbortSignal): Promi
       toasts.dismissPendingToasts();
       throw error;
     }
-    toasts.onSwapFailed(error);
+    order = resolveSwapSettlementOrder(order, error) ?? order;
+    toasts.onSwapFailed(error, order);
     return { ...item, order, txHash: getFillTransactionHash(order), status: error.reason };
   }
 }

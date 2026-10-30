@@ -42,12 +42,12 @@ function OrderHistoryEmpty({
       title={
         hasWallet
           ? getNoOrdersTitle(selectedFilter)
-          : "Your orders, in one place"
+          : "Your activity, in one place"
       }
       description={
         hasWallet
-          ? selectedFilter === OrderFilter.Open ? "New orders will appear here while they’re active." : "Completed, cancelled and expired orders will appear here."
-          : "Connect your wallet to follow active orders and review past trades."
+          ? selectedFilter === OrderFilter.Open ? "Your active swaps and orders will appear here." : "Completed swaps and closed orders will appear here."
+          : "Connect your wallet to view your swaps and orders."
       }
       action={!hasWallet && <Button onClick={() => openConnectModal?.()}>Connect Wallet</Button>}
     />
@@ -73,7 +73,7 @@ function OrderHistoryView({
 
   const filterControl = (
     <StyledSelect
-      aria-label="Filter orders"
+      aria-label="Filter activity by status"
       value={selectedFilter === "history" ? OrderFilter.All : selectedFilter}
       onValueChange={setSelectedFilter}
       options={FILTER_OPTIONS}
@@ -94,13 +94,13 @@ function OrderHistoryView({
               <div data-history-heading className="min-w-0">
               <div className="flex min-w-0 items-center gap-2">
                 <HistoryTitle className="min-w-0 text-[16px] font-semibold leading-none [overflow-wrap:anywhere]">
-                  {presentation === "page" ? "Orders" : `${chainName} order history`}
+                  {presentation === "page" ? "Activity" : `${chainName} activity`}
                 </HistoryTitle>
                 {presentation === "page" && (
                   <span data-history-refresh role="status" className="inline-flex size-4 shrink-0 items-center justify-center text-muted-foreground">
                     {networks.isFetching && filteredOrders.length > 0 && <>
                       <Spinner aria-hidden="true" />
-                      <span className="sr-only">Refreshing orders…</span>
+                      <span className="sr-only">Refreshing activity…</span>
                     </>}
                   </span>
                 )}
@@ -109,7 +109,7 @@ function OrderHistoryView({
                   orders={orders}
                 />
               </div>
-              {presentation === "page" && <p data-history-scope className="mt-2 text-xs text-muted-foreground">Track active orders and review your completed trades.</p>}
+              {presentation === "page" && <p data-history-scope className="mt-2 text-xs text-muted-foreground">Track swaps and manage orders across networks.</p>}
               </div>
               {presentation === "page" && (
                 <div data-history-filters className="flex min-w-0 items-center gap-2">
@@ -128,8 +128,8 @@ function OrderHistoryView({
             <div data-history-body id={presentation === "page" ? "history-order-results" : undefined} role={presentation === "page" ? "tabpanel" : undefined} aria-labelledby={presentation === "page" ? `history-view-${selectedFilter === OrderFilter.Open ? "open" : "history"}` : undefined} className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 pb-5">
               {error && orders.length > 0 && (
                 <div role="alert" className="flex flex-wrap items-center gap-2 border border-border p-3 text-xs text-muted-foreground">
-                  <p className="min-w-0 flex-1">Could not refresh order history. Showing the last available orders.</p>
-                  <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={networks.isFetching}>Retry history</Button>
+                  <p className="min-w-0 flex-1">Could not refresh activity. Showing the last available results.</p>
+                  <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={networks.isFetching}>Retry</Button>
                 </div>
               )}
               {presentation === "modal" && <div className="flex flex-wrap items-center justify-between gap-3">
@@ -155,11 +155,11 @@ function OrderHistoryView({
               >
                 {error ? (
                   <div role="alert" className="flex min-h-60 flex-col items-center justify-center gap-3 p-5 text-sm">
-                    <p>Could not load order history.</p>
-                    <Button variant="outline" onClick={() => void refetch()}>Retry history</Button>
+                    <p>Could not load activity.</p>
+                    <Button variant="outline" onClick={() => void refetch()}>Retry</Button>
                   </div>
                 ) : loading ? (
-                  <div role="status" className="flex min-h-60 items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner className="size-5" />Loading orders…</div>
+                  <div role="status" className="flex min-h-60 items-center justify-center gap-3 text-sm text-muted-foreground"><Spinner className="size-5" />Loading activity…</div>
                 ) : <OrderHistoryEmpty hasWallet={Boolean(address)} selectedFilter={selectedFilter} />}
               </OrderActivityList>
             </div>

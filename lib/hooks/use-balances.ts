@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { useMemo } from "react";
-import { useFormatNumber, useToAmountUI } from "./common";
+import { useToAmountUI } from "./common";
+import { formatBalanceAmount } from "../token-display";
 import type { Currency } from "../types";
 import {
   getDefaultTokensForChain,
@@ -118,7 +119,7 @@ export const useBalance = (currency?: Currency) => {
 
   const ui = useToAmountUI(currency?.decimals, balance);
 
-  const formatted = useFormatNumber({ value: ui });
+  const formatted = formatBalanceAmount(ui);
 
   return useMemo(
     () => ({

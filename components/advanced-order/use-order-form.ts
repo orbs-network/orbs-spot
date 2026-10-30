@@ -192,7 +192,7 @@ export function useTriggerPrice() {
     canReset: !market.isLoading && BN(defaultPrices.trigger).gt(0) && !BN(form.triggerPrice.raw).eq(defaultPrices.trigger),
     percentage: input.triggerPricePercent ?? (form.isInverted ? invertPricePercentage(form.triggerPrice.percentage) ?? "" : form.triggerPrice.percentage),
     price: form.triggerPrice.display,
-    inputValue: input.triggerPriceUi ?? formatAmount(form.triggerPrice.display.ui),
+    inputValue: input.triggerPriceUi ?? form.triggerPrice.display.ui,
     displayOutputToken,
     onInputChange: (triggerPriceUi: string) =>
       updateInput({ triggerPriceUi, triggerPricePercent: null }),
@@ -214,7 +214,7 @@ export function useLimitPrice() {
     canReset: !market.isLoading && BN(defaultPrices.limit).gt(0) && !BN(form.limitPrice.raw).eq(defaultPrices.limit),
     percentage: input.limitPricePercent ?? (form.isInverted ? invertPricePercentage(form.limitPrice.percentage) ?? "" : form.limitPrice.percentage),
     price: form.limitPrice.display,
-    inputValue: input.limitPriceUi ?? formatAmount(form.limitPrice.display.ui),
+    inputValue: input.limitPriceUi ?? form.limitPrice.display.ui,
     displayOutputToken,
     isEnabled: !form.values.isMarketOrder,
     toggle: () => setLimitPriceEnabled(form.values.isMarketOrder),

@@ -38,7 +38,7 @@ export function OrderDetailsModal({
   } else if (error) {
     content = <><p role="alert">Could not load this order.</p><Button variant="outline" onClick={() => { onRetry?.(); void refetch(); }}>Retry</Button></>;
   } else {
-    content = <><p>Order not found for this wallet on {chainName}.</p><p className="text-muted-foreground">Check that you’ve connected the wallet that placed the order.</p><Button variant="outline" onClick={onClose}>Back to order history</Button></>;
+    content = <><p>Order not found for this wallet on {chainName}.</p><p className="text-muted-foreground">Check that you’ve connected the wallet that placed the order.</p><Button variant="outline" onClick={onClose}>Back to activity</Button></>;
   }
 
   return (

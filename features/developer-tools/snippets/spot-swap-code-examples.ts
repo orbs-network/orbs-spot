@@ -39,7 +39,8 @@ const quoteArgs = ${JSON.stringify(quoteArgs, null, 2)} satisfies ClientGetQuote
 
 export async function getSpotSwapQuote(signal?: AbortSignal): Promise<SwapQuote> {
   // Use the wrapped ERC-20 input address for native input. This is a read only request.
-  // Refetch for the connected signer after connecting or switching accounts.
+  // A disconnected preview can use the host's preview address. Pass the actual
+  // connected account separately to client.prepareSwap(quote, userAddress).
   return client.getQuote({ ...quoteArgs, signal });
 }
 `;
@@ -96,15 +97,17 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   inToken: "ERC-20 input address. Pass the wrapped native token address for native input.",
   outToken: "The token received by the signer when this exact input swap fills.",
   inAmount: "Exact input amount as an integer in input token base units.",
-  user: "The account that will sign and receive the output. Preview accounts must be requoted after connection.",
+  user: "The account sent to the quote service, including a preview address before connection. It does not determine the signer.",
+  userAddress: "The connected account passed separately to client.prepareSwap(quote, userAddress). It signs the order and receives the output.",
   slippage: "UI slippage percentage: 0.5 means 0.5%. It is separate from the signed order's fixed SWAP protection.",
   dexMinAmountOut: "DEX minimum in output token base units, or -1 when no DEX quote is available.",
   receivedAt: "Local quote receipt time in Unix milliseconds. Use isQuoteFresh(quote, 60_000) before signing and submission.",
   amountOut: "Raw output amount returned by the quote service.",
-  netAmountOut: "Net output amount used for display and deriving the host's reviewed minimum.",
-  minimumAmountOut: "Service minimum. The host uses getMinimumOutputAmount(netAmountOut, UI slippage) for its review.",
+  netAmountOut: "Net output amount used for display.",
+  minimumAmountOut: "Service-provided minimum shown unchanged in review and signed by client.prepareSwap.",
   feeAmount: "Service fee amount in output token base units.",
-  minimumOutputAmountRaw: "The exact host reviewed minimum passed unchanged to client.prepareSwap.",
+  minimumOutputAmountRaw: "The prepared minimum copied unchanged from quote.minimumAmountOut.",
+  deadlineMillis: "Swap expiration as a Unix timestamp in milliseconds, three minutes after preparation.",
   prepared: "Locally prepared swap order, approval request, and original wallet signing payload.",
   signingRequest: "Original SDK signer and typed data. Sign unchanged and keep its order paired with the original signature.",
   approvalRequest: "Input token, raw input amount, and configured RePermit spender requiring allowance.",

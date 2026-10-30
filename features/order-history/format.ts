@@ -70,9 +70,9 @@ export function getOrderFilterLabel(filter: OrderFilter) {
 }
 
 export function getNoOrdersTitle(filter: HistoryFilter) {
-  if (filter === "history") return "No past orders";
+  if (filter === "history") return "No past activity";
   if (filter === OrderFilter.All) {
-    return "No orders";
+    return "No activity yet";
   }
 
   return `No ${getOrderFilterLabel(filter).toLowerCase()} orders`;
