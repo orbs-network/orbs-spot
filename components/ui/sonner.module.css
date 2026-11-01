@@ -40,10 +40,6 @@
   background: transparent !important;
 }
 
-.viewport[data-sonner-toaster] [data-sonner-toast] a:hover {
-  text-decoration: none;
-}
-
 .viewport[data-sonner-toaster] [data-sonner-toast] button:is([data-close-button], [data-toast-close]) {
   position: absolute;
   top: -10px;

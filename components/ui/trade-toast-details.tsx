@@ -55,7 +55,7 @@ export function TradeToastDetails({ input, output, message, chainId, transaction
         aria-label={`View ${label.toLowerCase()} on explorer`} title={label}
         className={styles.explorer} data-toast-transaction>
         {explorerTransactions.length === 1 ? "View on explorer" : `${label.replace(/\s+transaction$/i, "")} explorer`}
-        <ExternalLink aria-hidden="true" className="size-3 shrink-0" />
+        <ExternalLink aria-hidden="true" className="size-3.5 shrink-0" />
       </a>)}
     </div>}
     {children}

@@ -2,9 +2,8 @@
 import { useDeveloperMode } from "@/lib/hooks/use-developer-mode";
 import { useSwapBestTrade } from "@/lib/hooks/use-swap-best-trade";
 import { SubmitSwapButton } from "@/components/submit-swap-button";
-import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useFormatNumber, useToAmountUI } from "@/lib/hooks/common";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
 import { Field, SwapStatus, SwapStep } from "@/lib/types";
@@ -17,7 +16,7 @@ import { DetailRow } from "@/components/ui/detail-row";
 import { OrbsTradeReviewSummary } from "@/components/orbs-trade-review-summary";
 import { SpotSwapDeveloperTrigger } from "@developer-tools";
 import { trackFunnel } from "@/lib/funnel-analytics";
-import { useReviewQuote } from "./use-review-quote";
+import { SwapReviewSnapshotContext, useReviewQuote, useSwapReviewState, type SwapReviewSnapshot } from "./use-review-quote";
 import { Button } from "@/components/ui/button";
 import { tokenDisplayDecimals, displayTokenAmount, formatDisplayAmount } from "@/lib/token-display";
 import { getExchangeRates } from "@/lib/exchange-rates";
@@ -87,9 +86,8 @@ const Details = () => {
 };
 
 function UpdatedQuoteNotice() {
-  const update = useBestTradeSwapStore(state => state.quoteUpdate);
-  const updateStore = useBestTradeSwapStore(state => state.updateStore);
-  const { outputCurrency } = useDerivedSwap();
+  const { quoteUpdate: update, updateStore } = useSwapReviewState();
+  const { outputCurrency } = useReviewQuote();
   if (!update) return null;
   const amount = (raw: string) => displayTokenAmount(toAmountUI(raw, outputCurrency?.decimals), outputCurrency?.symbol, outputCurrency?.decimals);
   return <div role="status" className="rounded-2xl bg-secondary p-4 text-sm">
@@ -101,8 +99,7 @@ function UpdatedQuoteNotice() {
 
 function SwapAmountSummary({ layout = "review" }: { layout?: TradeReviewLayout }) {
   const current = useReviewQuote();
-  const status = useBestTradeSwapStore(state => state.status);
-  const reviewed = useBestTradeSwapStore(state => state.review);
+  const { status, review: reviewed } = useSwapReviewState();
   // Keep the reviewed amounts and pair visible while wallet actions are pending.
   const { inputCurrency, outputCurrency, inputAmount, outputAmount } = status && reviewed ? reviewed : current;
   const inputUsd = useUSDPrice({ token: inputCurrency?.address, amount: inputAmount });
@@ -118,10 +115,8 @@ function SwapAmountSummary({ layout = "review" }: { layout?: TradeReviewLayout }
 }
 
 function SwapSuccess({ onClose }: { onClose: () => void }) {
-  const review = useBestTradeSwapStore(state => state.review);
-  const txHash = useBestTradeSwapStore(state => state.txHash);
+  const { review, txHash, order } = useSwapReviewState();
   const explorerUrl = getExplorerUrl(review?.chainId, txHash);
-  const order = useBestTradeSwapStore(state => state.order);
 
   // Use the submitted trade snapshot so later quote refreshes cannot change the pair.
   return <div data-swap-execution="success"><SubmissionSuccess
@@ -141,9 +136,9 @@ function SwapSuccess({ onClose }: { onClose: () => void }) {
 
 function SwapSubmissionStatus({ onClose }: { onClose: () => void }) {
   const { status, steps = [], currentStep, currentStepIndex = 0, isAwaitingWallet,
-    wrapTxHash, confirmedWrappedInputAddress, approvalTxHash, txHash, orderId, error, review, resetStore } = useBestTradeSwapStore();
+    wrapTxHash, confirmedWrappedInputAddress, approvalTxHash, txHash, orderId, error, review, resetStore } = useSwapReviewState();
   const { address, chainId } = useConnection();
-  const current = useDerivedSwap();
+  const current = useReviewQuote();
   const { handleCurrencyChange } = useActionHandlers();
   const backToReview = () => {
     if (!orderId && confirmedWrappedInputAddress && review && review.chainId === chainId && review.account.toLowerCase() === address?.toLowerCase()
@@ -154,11 +149,10 @@ function SwapSubmissionStatus({ onClose }: { onClose: () => void }) {
   };
   const failed = status === SwapStatus.FAILED;
   const symbol = review?.inputCurrency.symbol ?? "token";
-  const swapInProgress = currentStep === SwapStep.SWAP && !isAwaitingWallet;
   const titles = {
     [SwapStep.WRAP]: `Wrap ${symbol}`,
     [SwapStep.APPROVE]: `Approve ${symbol}`,
-    [SwapStep.SWAP]: swapInProgress ? "Swap in progress" : "Sign swap",
+    [SwapStep.SWAP]: "Sign swap",
   };
   const hashes = { [SwapStep.WRAP]: wrapTxHash, [SwapStep.APPROVE]: approvalTxHash, [SwapStep.SWAP]: txHash };
   const walletSteps = steps.map((id): SubmissionStep => ({
@@ -171,7 +165,7 @@ function SwapSubmissionStatus({ onClose }: { onClose: () => void }) {
   const instruction = isAwaitingWallet
     ? currentStep === SwapStep.WRAP ? "Confirm wrapping in your wallet."
       : currentStep === SwapStep.APPROVE ? "Confirm approval in your wallet." : "Confirm the signature in your wallet."
-    : currentStep === SwapStep.SWAP ? undefined : "Waiting for confirmation.";
+    : currentStep === SwapStep.SWAP ? "Swap in progress" : "Waiting for confirmation.";
 
   if (status === SwapStatus.SUCCESS) return <SwapSuccess onClose={onClose} />;
 
@@ -207,22 +201,36 @@ export const SubmitSwap = () => {
     if (isDeveloperPlayground) setOpen(false);
     return () => setOpen(false);
   }, [isDeveloperPlayground, setOpen]);
-  const current = useDerivedSwap();
+  const current = useReviewQuote();
   const { setInputAmount, } = useActionHandlers();
   const { status, isPreparing, isWalletBusy, reset, onSwapBestTrade } = useSwapBestTrade();
   const { isLoadingTrade } = current;
+  const [closingSnapshot, setClosingSnapshot] = useState<SwapReviewSnapshot | null>(null);
+  const snapshot = open ? null : closingSnapshot;
+  const reviewStatus = snapshot ? snapshot.state.status : status;
+  const reviewIsPreparing = snapshot?.isPreparing ?? isPreparing;
 
   const closeReview = useCallback(() => {
+    const state = useBestTradeSwapStore.getState();
+    if (!state.isReviewOpen) return;
+    // Freeze only the outgoing presentation; detach and reset the live draft immediately.
+    setClosingSnapshot({
+      state,
+      quote: current,
+      isPreparing: state.status === SwapStatus.LOADING && state.currentStep === undefined,
+      walletBusy: isWalletBusy && state.status !== SwapStatus.LOADING,
+    });
     setOpen(false);
-    if(status === SwapStatus.LOADING || status === SwapStatus.SUCCESS) {
+    if (state.status === SwapStatus.LOADING || state.status === SwapStatus.SUCCESS) {
       reset();
       setInputAmount('');
     }
-  }, [reset, setInputAmount, setOpen, status]);
+  }, [current, isWalletBusy, reset, setInputAmount, setOpen]);
 
   const onOpenChange = useCallback(
     (nextOpen: boolean) => {
       if (nextOpen) {
+        setClosingSnapshot(null);
         setOpen(true);
         return;
       }
@@ -233,6 +241,7 @@ export const SubmitSwap = () => {
 
   const onOpen = useCallback(() => {
     trackFunnel({ name: "review_opened", product: "swap" });
+    setClosingSnapshot(null);
     setOpen(true);
    if(status !== SwapStatus.LOADING) {
     reset();
@@ -256,7 +265,15 @@ export const SubmitSwap = () => {
             isLoading={isLoadingTrade}
             text={isLoadingTrade ? t("fetchingQuote") : "Review"}
           />
-          <SwapReviewContent status={isPreparing ? undefined : status} isPreparing={isPreparing} walletBusy={isWalletBusy && status !== SwapStatus.LOADING} onSwap={onSwapBestTrade} onClose={closeReview} />
+          <SwapReviewSnapshotContext.Provider value={snapshot}>
+            <SwapReviewContent
+              status={reviewIsPreparing ? undefined : reviewStatus}
+              isPreparing={reviewIsPreparing}
+              walletBusy={snapshot?.walletBusy ?? (isWalletBusy && status !== SwapStatus.LOADING)}
+              onSwap={onSwapBestTrade}
+              onClose={closeReview}
+            />
+          </SwapReviewSnapshotContext.Provider>
         </Dialog>
       </div>
     </div>
@@ -264,7 +281,7 @@ export const SubmitSwap = () => {
 };
 
 const Main = ({ isPreparing, walletBusy, onSwap }: { isPreparing: boolean; walletBusy: boolean; onSwap: () => void }) => {
-  const quoteUpdate = useBestTradeSwapStore(state => state.quoteUpdate);
+  const { quoteUpdate } = useSwapReviewState();
   return (
     <>
         <SwapAmountSummary />
@@ -272,12 +289,14 @@ const Main = ({ isPreparing, walletBusy, onSwap }: { isPreparing: boolean; walle
           <Details />
           <UpdatedQuoteNotice />
           {walletBusy && <p role="status" className="text-sm text-muted-foreground">Confirm the pending wallet request to submit this swap.</p>}
-          <SubmitSwapButton
+          {isPreparing ? <Button data-submit-button className="h-12 w-full rounded-[14px] text-base" isLoading aria-busy>
+            Swap
+          </Button> : <SubmitSwapButton
             disabled={Boolean(quoteUpdate) || walletBusy}
             onClick={onSwap}
-            isLoading={isPreparing}
+            isLoading={false}
             text="Swap"
-          />
+          />}
         </div>
     </>
   );

@@ -39,6 +39,12 @@
   font-size: 12px;
   font-weight: 500;
   line-height: 1.5;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.explorer:is(:hover, :focus-visible) {
+  text-decoration: underline;
 }
 
 .explorer:focus-visible {

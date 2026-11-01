@@ -43,6 +43,7 @@ export const STATUS_CLASS_NAMES: Record<OrderStatus, string> = {
 };
 
 export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
+  [OrderType.SWAP]: "Swap",
   [OrderType.LIMIT]: "Limit",
   [OrderType.TWAP_LIMIT]: "TWAP Limit",
   [OrderType.TWAP_MARKET]: "TWAP Market",
