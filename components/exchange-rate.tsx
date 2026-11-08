@@ -1,7 +1,7 @@
 "use client";
 
-import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { formatExchangeRate, type ExchangeRates } from "@/lib/exchange-rates";
+import { formatDisplayAmount } from "@/lib/token-display";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 
@@ -15,20 +15,21 @@ type ExchangeRateProps = {
   className?: string;
 };
 
-export function TokenExchangeRate({ rates, inputCurrency, outputCurrency, className }: {
+export function TokenExchangeRate({ rates, inputCurrency, outputCurrency, inputTokenUsdPrice, outputTokenUsdPrice, className }: {
   rates?: ExchangeRates;
   inputCurrency?: RateToken;
   outputCurrency?: RateToken;
+  inputTokenUsdPrice?: string;
+  outputTokenUsdPrice?: string;
   className?: string;
 }) {
-  const forwardUsd = useUSDPrice({
-    token: outputCurrency?.address, amount: rates?.forward.toFixed() ?? "0", disabled: !rates,
-  });
-  const reverseUsd = useUSDPrice({
-    token: inputCurrency?.address, amount: rates?.reverse.toFixed() ?? "0", disabled: !rates,
-  });
-  const usdLabel = (usd: typeof forwardUsd) => usd.data !== undefined && Number.isFinite(usd.data) && !usd.isLoading && !usd.isError ? usd.formatted : undefined;
-  return <ExchangeRate key={`${inputCurrency?.address}:${outputCurrency?.address}`} rates={rates} inputSymbol={inputCurrency?.symbol} outputSymbol={outputCurrency?.symbol} forwardUsd={usdLabel(forwardUsd)} reverseUsd={usdLabel(reverseUsd)} className={className} />;
+  const forwardUsd = rates && outputTokenUsdPrice
+    ? formatDisplayAmount(rates.forward.times(outputTokenUsdPrice).toFixed(), { decimalScale: 2, prefix: "$" })
+    : undefined;
+  const reverseUsd = rates && inputTokenUsdPrice
+    ? formatDisplayAmount(rates.reverse.times(inputTokenUsdPrice).toFixed(), { decimalScale: 2, prefix: "$" })
+    : undefined;
+  return <ExchangeRate key={`${inputCurrency?.address}:${outputCurrency?.address}`} rates={rates} inputSymbol={inputCurrency?.symbol} outputSymbol={outputCurrency?.symbol} forwardUsd={forwardUsd} reverseUsd={reverseUsd} className={className} />;
 }
 
 export function ExchangeRate({ rates, inputSymbol, outputSymbol, forwardUsd, reverseUsd, className }: ExchangeRateProps) {

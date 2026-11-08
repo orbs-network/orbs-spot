@@ -13,7 +13,7 @@ import { SubmitNativeConversion } from "@/features/swap/native-conversion";
 
 export function SwapBestTradeForm() {
   const t = useTranslations();
-  const { inputCurrency, outputCurrency, inputAmount, outputAmount, trade, isLoadingTrade, noLiquidity, quoteError, refetchTrade, nativeConversion } =
+  const { inputCurrency, outputCurrency, inputAmount, outputAmount, trade, quoteUsd, isLoadingTrade, noLiquidity, quoteError, refetchTrade, nativeConversion } =
     useDerivedSwap();
   const { setInputAmount, handleCurrencyChange } = useActionHandlers();
 
@@ -27,6 +27,8 @@ export function SwapBestTradeForm() {
           }
           onAmountChange={setInputAmount}
           amount={inputAmount}
+          usdValue={quoteUsd.inputAmountUsd}
+          usdLoading={isLoadingTrade}
           title={t("from")}
         />
         <ToggleCurrencies outputAmount={outputAmount} />
@@ -37,6 +39,7 @@ export function SwapBestTradeForm() {
           }
           disabled={true}
           amount={outputAmount}
+          usdValue={quoteUsd.outputAmountUsd}
           title={t("to")}
           titleAction={!nativeConversion ? <SpotSwapQuoteDeveloperTrigger /> : undefined}
           isLoading={isLoadingTrade}

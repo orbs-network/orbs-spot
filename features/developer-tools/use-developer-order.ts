@@ -13,7 +13,7 @@ import { useOrderModel } from "@/components/advanced-order/use-order-form";
 export function useDeveloperOrder(mode: DeveloperExecutionMode = "demo") {
   const review = useOrderReview();
   const client = useClient();
-  const { market } = useOrderModel();
+  const { market, form: currentForm, quoteUsd } = useOrderModel();
   const history = useOrders();
   const { address: connectedAddress } = useConnection();
   const chainId = useDataChainId();
@@ -35,6 +35,9 @@ export function useDeveloperOrder(mode: DeveloperExecutionMode = "demo") {
     derivedFormData: {
       ...review,
       form,
+      // An executing review may retain an older form. Its USD snapshot must
+      // not be combined with valuations from the current, editable pair.
+      quoteUsd: review.form === currentForm ? quoteUsd : undefined,
       rePermitData: permit,
       quotedOutputAmountRaw: market.isLoading || market.noLiquidity || market.error ? undefined : market.value || undefined,
     },

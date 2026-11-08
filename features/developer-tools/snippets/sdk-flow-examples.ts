@@ -80,7 +80,7 @@ export function formatAdvancedOrdersSdkFlow(data: JsonContainer = {}): string {
   const params = Array.isArray(data) ? {} : data.formParams ?? {};
   const calculationInput = JSON.stringify(params, null, 2)
     .replace(/"module": "(TWAP|LIMIT|STOP_LOSS|TAKE_PROFIT)"/, '"module": Module.$1');
-  return `// advanced-orders.ts — requires @orbs-network/spot-ui 2.1.23 or later.
+  return `// advanced-orders.ts — requires @orbs-network/spot-ui 2.1.28 or later.
 import { calculateOrder, createClient, isNativeAddress, Module, Partners } from "@orbs-network/spot-ui";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import { polygon } from "viem/chains";
@@ -237,8 +237,9 @@ export function formatSpotSwapSdkFlow(data: JsonContainer = {}): string {
   const root = Array.isArray(data) ? {} : data;
   const chainId = typeof root.chainId === "number" ? root.chainId : 137;
   const partner = typeof root.partner === "string" && root.partner ? root.partner : "external";
-  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.1.23 or later.
+  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.1.28 or later.
 import { createClient, isNativeAddress, isQuoteFresh, Partners, waitForOrder, type SpotClient, type SwapQuote } from "@orbs-network/spot-ui";
+import BN from "bignumber.js";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import * as chains from "viem/chains";
 
@@ -265,7 +266,6 @@ export type SwapInput = {
   quote: SwapQuote; // Display quote.minimumAmountOut unchanged in host review.
   sourceToken: Address;
   wrappedNativeTokenAddress: Address; // Chain configuration, never taken from an untrusted quote.
-  inputValueUsd: number; // Host product validation requires at least $10.
   signal?: AbortSignal; // Abort on unmount, account/chain change, or cancellation.
   pauseQuotes(): Promise<void>; // Pause polling and cancel in-flight quote requests.
   resumeQuotes(): void;
@@ -300,7 +300,12 @@ export async function swapFlow(account: Address, input: SwapInput) {
     if ((nativeInput ? input.wrappedNativeTokenAddress : input.sourceToken).toLowerCase() !== token.toLowerCase()) {
       throw new Error("Quote input does not match the selected token or configured wrapped native token");
     }
-    if (!Number.isFinite(input.inputValueUsd) || input.inputValueUsd < 10) throw new Error("Swap value must be at least $10");
+    function assertQuoteValue(quote: SwapQuote) {
+      // Product minimum uses the service's quoted input value, without a separate price request.
+      const valueUsd = BN(quote.inputAmountUsd ?? "");
+      if (!valueUsd.isFinite() || valueUsd.lt(10)) throw new Error("A quote worth at least $10 with a USD value is required");
+    }
+    assertQuoteValue(quote);
     async function assertSpendBalance() {
       const balance = await publicClient.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [account] });
       await assertContext();
@@ -330,6 +335,7 @@ export async function swapFlow(account: Address, input: SwapInput) {
       quote = next;
       // Keep the refreshed service minimum unchanged, including when it improves.
     }
+    assertQuoteValue(quote);
     await assertSpendBalance();
     await assertContext();
 ${SWAP_SIGN_CODE.split("\n").map((line) => "    " + line).join("\n")}

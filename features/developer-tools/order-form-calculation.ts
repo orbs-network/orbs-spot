@@ -9,16 +9,19 @@ export function getLiveOrderFormInput(spot: SpotData): JsonContainer {
   const data = spot.derivedFormData;
   const unitPrice = (usd: string, amount: string) => {
     const value = new BN(usd).div(amount);
-    return value.isFinite() && value.gt(0) ? value.toFixed() : "0";
+    return value.isFinite() && value.gt(0) ? value.toFixed() : undefined;
   };
   const params: CalculateOrderFormParams = {
     module: spot.module,
     inputTokenDecimals: data.srcToken?.decimals ?? 18,
     outputTokenDecimals: data.dstToken?.decimals ?? 18,
     quotedOutputAmountRaw: data.quotedOutputAmountRaw,
-    inputTokenUsdPrice: unitPrice(data.srcAmountUsd, data.srcAmountUI),
-    outputTokenUsdPrice: unitPrice(data.dstAmountUsd, data.dstAmountUI),
-    minTradeSizeUsd: 5,
+    inputAmountUsd: data.srcAmountUsd || undefined,
+    quotedOutputAmountUsd: data.quoteUsd?.outputAmountUsd,
+    minimumOutputAmountUsd: data.quoteUsd?.minimumAmountOutUsd,
+    inputTokenUsdPrice: data.quoteUsd?.inputTokenUsdPrice ?? unitPrice(data.srcAmountUsd, data.srcAmountUI),
+    outputTokenUsdPrice: data.quoteUsd?.outputTokenUsdPrice ?? unitPrice(data.dstAmountUsd, data.dstAmountUI),
+    minTradeSizeUsd: 10,
     priceProtectionPercent: data.form.values.slippageBps / 100,
     displayFeePercent: data.feesPercentage,
     userInput: {

@@ -8,7 +8,7 @@ import { useFormatNumber, useToAmountUI } from "@/lib/hooks/common";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
 import { Field, SwapStatus, SwapStep } from "@/lib/types";
 import { useConnection } from "wagmi";
-import { useUSDPrice } from "@/lib/hooks/use-usd-price";
+import { getQuoteValuation } from "@/lib/swap/quote-valuation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn, getExplorerUrl, toAmountUI } from "@/lib/utils";
 import { useTranslations } from "@/lib/use-translations";
@@ -36,12 +36,13 @@ const Rate = () => {
     inAmount: quote?.inAmount, outAmount: quote?.outAmount,
     inputDecimals: inputCurrency?.decimals, outputDecimals: outputCurrency?.decimals,
   });
+  const quoteUsd = getQuoteValuation(quote, inputCurrency?.decimals, outputCurrency?.decimals);
 
   return (
     <DetailRow
       label="Rate"
       value={
-        <TokenExchangeRate rates={rates} inputCurrency={inputCurrency} outputCurrency={outputCurrency} />
+        <TokenExchangeRate rates={rates} inputCurrency={inputCurrency} outputCurrency={outputCurrency} inputTokenUsdPrice={quoteUsd.inputTokenUsdPrice} outputTokenUsdPrice={quoteUsd.outputTokenUsdPrice} />
       }
       labelClassName="font-medium text-foreground"
       valueClassName="ml-auto max-w-full font-normal text-foreground"
@@ -50,12 +51,10 @@ const Rate = () => {
 };
 
 const MinimumAmountOut = () => {
-  const { quote, outputCurrency } = useReviewQuote();
+  const { quote, inputCurrency, outputCurrency } = useReviewQuote();
   const amount = useToAmountUI(outputCurrency?.decimals, quote?.minAmountOut);
-  const usd = useUSDPrice({
-    token: outputCurrency?.address,
-    amount,
-  });
+  const quoteUsd = getQuoteValuation(quote, inputCurrency?.decimals, outputCurrency?.decimals);
+  const usd = useFormatNumber({ value: quoteUsd.minimumAmountOutUsd, decimalScale: 2, prefix: "$" });
   const formatted = useFormatNumber({ value: amount, decimalScale: tokenDisplayDecimals(outputCurrency?.symbol, outputCurrency?.decimals) });
   return (
     <DetailRow
@@ -65,7 +64,7 @@ const MinimumAmountOut = () => {
           <span>
             {formatted ?? "0"} {outputCurrency?.symbol}
           </span>
-          {usd.data !== undefined && <span className="text-muted-foreground">({usd.formatted})</span>}
+          {usd && <span className="text-muted-foreground">({usd})</span>}
         </span>
       }
       labelClassName="font-medium text-foreground"
@@ -102,15 +101,14 @@ function SwapAmountSummary({ layout = "review" }: { layout?: TradeReviewLayout }
   const { status, review: reviewed } = useSwapReviewState();
   // Keep the reviewed amounts and pair visible while wallet actions are pending.
   const { inputCurrency, outputCurrency, inputAmount, outputAmount } = status && reviewed ? reviewed : current;
-  const inputUsd = useUSDPrice({ token: inputCurrency?.address, amount: inputAmount });
-  const outputUsd = useUSDPrice({ token: outputCurrency?.address, amount: outputAmount });
-  const inputUsdFormatted = useFormatNumber({ value: inputUsd.data, decimalScale: 2, prefix: "$" });
-  const outputUsdFormatted = useFormatNumber({ value: outputUsd.data, decimalScale: 2, prefix: "$" });
+  const quoteUsd = status && reviewed ? reviewed : getQuoteValuation(current.quote, inputCurrency?.decimals, outputCurrency?.decimals);
+  const inputUsdFormatted = useFormatNumber({ value: quoteUsd.inputAmountUsd, decimalScale: 2, prefix: "$" });
+  const outputUsdFormatted = useFormatNumber({ value: quoteUsd.outputAmountUsd, decimalScale: 2, prefix: "$" });
   const inputAmountFormatted = useFormatNumber({ value: inputAmount, decimalScale: tokenDisplayDecimals(inputCurrency?.symbol, inputCurrency?.decimals) });
   const outputAmountFormatted = useFormatNumber({ value: outputAmount, decimalScale: tokenDisplayDecimals(outputCurrency?.symbol, outputCurrency?.decimals) });
   return <OrbsTradeReviewSummary layout={layout}
-    pay={{ currency: inputCurrency, amount: inputAmountFormatted, usd: inputUsd.isLoading || inputUsd.isError ? undefined : inputUsdFormatted }}
-    receive={{ currency: outputCurrency, amount: outputAmountFormatted, usd: outputUsd.isLoading || outputUsd.isError ? undefined : outputUsdFormatted }}
+    pay={{ currency: inputCurrency, amount: inputAmountFormatted, usd: inputUsdFormatted }}
+    receive={{ currency: outputCurrency, amount: outputAmountFormatted, usd: outputUsdFormatted ? `≈ ${outputUsdFormatted}` : undefined, label: "Estimated receive" }}
   />;
 }
 
@@ -182,7 +180,7 @@ function SwapSubmissionStatus({ onClose }: { onClose: () => void }) {
 
 function SwapReviewContent({ status, isPreparing, walletBusy, onSwap, onClose }: { status?: SwapStatus; isPreparing: boolean; walletBusy: boolean; onSwap: () => void; onClose: () => void }) {
   return <DialogContent className="flex max-w-[480px] flex-col overflow-hidden border-0 outline-none" data-trade-review data-orbs-swap-review presentation="center">
-    <DialogHeader><DialogTitle>{status === SwapStatus.SUCCESS ? "Swap completed" : "Review swap"}</DialogTitle></DialogHeader>
+    <DialogHeader><DialogTitle>{status === SwapStatus.SUCCESS ? "Swap completed" : status === SwapStatus.LOADING ? "Swapping" : "Review swap"}</DialogTitle></DialogHeader>
     <div data-review-scroll className="min-h-0 overflow-y-auto overscroll-contain">
       {!status ? <Main isPreparing={isPreparing} walletBusy={walletBusy} onSwap={onSwap} /> : <>
         {status === SwapStatus.LOADING && <SwapAmountSummary layout="submission" />}
@@ -270,7 +268,7 @@ export const SubmitSwap = () => {
               status={reviewIsPreparing ? undefined : reviewStatus}
               isPreparing={reviewIsPreparing}
               walletBusy={snapshot?.walletBusy ?? (isWalletBusy && status !== SwapStatus.LOADING)}
-              onSwap={onSwapBestTrade}
+              onSwap={() => onSwapBestTrade(closeReview)}
               onClose={closeReview}
             />
           </SwapReviewSnapshotContext.Provider>

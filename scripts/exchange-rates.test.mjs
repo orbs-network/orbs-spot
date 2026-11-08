@@ -19,8 +19,9 @@ test("rates show both directions from raw quote amounts and token decimals", () 
 
 test("precision adapts to magnitude without hiding small rates", () => {
   for (const [value, expected] of [
-    ["13614.56789", "13,614.5678"], ["1361.45678", "1,361.4567"],
-    ["2369.1691", "2,369.1691"], ["236916.91", "236,916.91"],
+    ["13614.56789", "13,614.56"], ["1361.45678", "1,361.45"],
+    ["2369.1691", "2,369.16"], ["236916.91", "236,916.91"],
+    ["2236.4455", "2,236.44"], ["1000.1299", "1,000.12"], ["999.99999", "999.9999"],
     ["13.6145678", "13.6145"], ["1.36145678", "1.3614"],
     ["0.000424813", "0.000424"], ["0.00007345123456", "0.0000734"],
     ["0.000000000000000000123456789", "0.000000000000000000123"],
@@ -33,7 +34,7 @@ test("precision adapts to magnitude without hiding small rates", () => {
 test("direct order prices use the same formatting and retain reciprocal precision", () => {
   const rates = getExchangeRatesFromPrice("2369.1691");
   assert.ok(rates);
-  assert.equal(formatExchangeRate(rates.forward), "2,369.1691");
+  assert.equal(formatExchangeRate(rates.forward), "2,369.16");
   assert.equal(formatExchangeRate(rates.reverse), "0.000422");
   assert.ok(rates.forward.times(rates.reverse).minus(1).abs().lt("1e-500"));
   assert.equal(formatExchangeRate(getExchangeRatesFromPrice("1e-30").reverse), "1,000,000,000,000,000,000,000,000,000,000");

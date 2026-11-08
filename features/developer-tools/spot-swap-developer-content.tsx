@@ -22,13 +22,12 @@ import { useSignTypedDataPayload } from "@/lib/hooks/use-sign-typed-data";
 import { useSpotSwapClient } from "@/lib/hooks/use-spot-swap-client";
 import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
 import { useApproveToken } from "@/lib/hooks/use-token-approval";
-import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { useWrapNativeToken } from "@/lib/hooks/use-wrap";
 import { useBestTradeSwapStore, useSwapStore } from "@/lib/hooks/store";
 import { acquireSwapExecutionLock } from "@/lib/swap/execution";
 import { useSwapActivity } from "@/lib/swap/activity";
 import { invalidateOrderQueries } from "@/lib/spot/queries";
-import { spotSwapQuoteQueryOptions } from "@/lib/swap/quotes";
+import { MIN_SWAP_VALUE_USD, spotSwapQuoteQueryOptions } from "@/lib/swap/quotes";
 import { SwapStatus, SwapStep, type BestTradeQuote } from "@/lib/types";
 import { dismissTransactionRejectedToast, isUserRejectedError } from "@/lib/tx-rejection";
 import { getWrappedNativeCurrency, isNativeAddress } from "@/lib/utils";
@@ -91,6 +90,11 @@ function asRecord(value: JsonValue | undefined): Record<string, JsonValue> {
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "The Spot swap step could not be completed.";
 }
+function getQuoteValueError(quote?: BestTradeQuote): string | undefined {
+  const value = BN(quote?.originalQuote.inputAmountUsd ?? "");
+  if (!value.isFinite() || !value.gt(0)) return "Quote USD value unavailable. Refresh the quote before continuing.";
+  if (value.lt(MIN_SWAP_VALUE_USD)) return `Minimum swap is $${MIN_SWAP_VALUE_USD}.`;
+}
 function getPresentation({ data, step }: { data: JsonContainer; step: SpotSwapFlowStep }): StepPresentation {
   const snippets = {
     flow: SPOT_SWAP_FULL_FLOW_CODE_SNIPPET, check: SPOT_SWAP_ALLOWANCE_CODE_SNIPPET,
@@ -143,7 +147,6 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
   const { openConnectModal } = useConnectModal();
   const { slippage } = useSettings();
   const { inputCurrency, inputAmount, isLoadingTrade, outputCurrency, parsedInputAmount, trade } = useDerivedSwap();
-  const inputUsd = useUSDPrice({ token: inputCurrency?.address, amount: inputAmount });
   const inputBalance = useBalance(inputCurrency).wei;
   const hasBalance = Boolean(account && BN(inputBalance ?? "0").gte(parsedInputAmount));
   const { data: client } = useSpotSwapClient();
@@ -199,7 +202,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
   }, [contextKey, stopSession]);
   useEffect(() => () => { stopSession(); toast.dismiss(flowToastId); }, [flowToastId, stopSession]);
 
-  const quoteData = useMemo(() => toJsonContainer(executionQuote?.originalQuote ?? liveQuote?.originalQuote) ?? {}, [executionQuote, liveQuote]);
+  const quoteData = useMemo(() => toJsonContainer(executionQuote?.originalQuote ?? reviewedQuote?.originalQuote ?? liveQuote?.originalQuote) ?? {}, [executionQuote, reviewedQuote, liveQuote]);
   const integrationData = useMemo<JsonContainer>(() => ({
     ...asRecord(requestData), quote: asRecord(quoteData), demo: isDemo,
     userAddress: account ?? "<connected-account>",
@@ -234,7 +237,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
       const loadingToast = createLoadingToast(actionToastId);
       loadingToast.show(isDemo ? "Simulating this step…" : STEP_LOADING_MESSAGES[step], { position: "bottom-right" });
       try {
-        const selected = executionQuote ?? liveQuote;
+        const selected = executionQuote ?? reviewedQuote ?? liveQuote;
         if (!selected || !BN(selected.inAmount).gt(0) || !BN(selected.outAmount).gt(0) || !client) {
           throw new Error("Enter a valid amount and wait for a live Spot quote and configuration.");
         }
@@ -252,7 +255,8 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
         }
         if (!account || !walletClient || !publicClient || publicClient.chain.id !== chainId) throw new Error("Connect a wallet to execute a real swap.");
         if (reviewedContextKey !== contextKey) throw new Error("Wallet or swap inputs changed. Close and reopen the flow to review a fresh quote.");
-        if (inputUsd.data === undefined || inputUsd.isError || inputUsd.data < 10) throw new Error("Enter a swap worth at least $10 and wait for its USD price.");
+        const valueError = getQuoteValueError(selected);
+        if (valueError) throw new Error(valueError);
         if (submissionUncertain && !acceptedOrder) throw new Error("Submission status is uncertain. Check order history before starting another swap.");
         if (step === "flow" && !hasBalance) throw new Error("Insufficient balance for this swap.");
         let session = sessionRef.current;
@@ -302,7 +306,11 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           signal.throwIfAborted();
           return BigInt(value) >= BigInt(request.inAmount);
         };
-        const prepareForSigning = (quote: BestTradeQuote) => client.prepareSwap(quote.originalQuote, account);
+        const prepareForSigning = (quote: BestTradeQuote) => {
+          const valueError = getQuoteValueError(quote);
+          if (valueError) throw new Error(valueError);
+          return client.prepareSwap(quote.originalQuote, account);
+        };
         const refreshIfNeeded = async (): Promise<BestTradeQuote | undefined> => {
           if (isQuoteFresh(selected.originalQuote, 60_000)) return selected;
           if (!inputCurrency || !outputCurrency) throw new Error("Select both swap tokens.");
@@ -525,7 +533,10 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
     if (submissionUncertain && !acceptedOrder) return "Submission status is uncertain. Check order history before starting another swap.";
     if (!client) return "Wait for the Spot client configuration.";
     if (!isDemo && reviewedContextKey !== contextKey) return "Wallet or swap inputs changed. Close and reopen this flow for a fresh review.";
-    if (!isDemo && (inputUsd.data === undefined || inputUsd.isError || inputUsd.data < 10)) return "Enter a swap worth at least $10 and wait for its USD price.";
+    if (!isDemo) {
+      const valueError = getQuoteValueError(executionQuote ?? reviewedQuote ?? liveQuote);
+      if (valueError) return valueError;
+    }
     if (!isDemo && step === "flow" && !hasBalance)
       return "Insufficient balance for a real swap.";
     if (!parsedInputAmount || parsedInputAmount === "0") {
@@ -542,8 +553,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
     acceptedOrder,
     client,
     contextKey,
-    inputUsd.data,
-    inputUsd.isError,
+    reviewedQuote,
     reviewedContextKey,
     submissionUncertain,
     isDemo,

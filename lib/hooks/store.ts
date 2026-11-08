@@ -155,7 +155,7 @@ type BestTradeSwapStore = {
   isReviewOpen: boolean;
   setReviewOpen: (open: boolean) => void;
   isAwaitingWallet?: boolean;
-  review?: { inputCurrency: Currency; outputCurrency: Currency; inputAmount: string; outputAmount: string; chainId: number; account: string };
+  review?: { inputCurrency: Currency; outputCurrency: Currency; inputAmount: string; outputAmount: string; inputAmountUsd?: string; outputAmountUsd?: string; chainId: number; account: string };
   status?: SwapStatus;
   totalSteps?: number;
   steps?: SwapStep[];

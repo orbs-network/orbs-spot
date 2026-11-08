@@ -150,7 +150,7 @@ function PreviewContent({ preview }: { preview: SubmissionPreview }) {
     {(preview.input || preview.output) && <section aria-label="Trade amounts" className="grid min-w-0 gap-3 rounded-2xl bg-secondary/60 p-4">
       {preview.input && <AssetAmount asset={preview.input} label="From" />}
       {preview.input && preview.output && <ArrowDownIcon aria-hidden="true" className="ml-3 size-4 text-muted-foreground" />}
-      {preview.output && <AssetAmount asset={actualOutput ?? preview.output} label={actualOutput ? "Received" : "To"} />}
+      {preview.output && <AssetAmount asset={actualOutput ?? preview.output} label={actualOutput ? "Received" : preview.kind === "swap" ? "Estimated receive" : "To"} />}
     </section>}
     <div role="status" aria-live="polite" aria-atomic="true" className="flex items-start gap-3 rounded-xl border border-border/70 px-4 py-3" data-submission-preview-status={status.state}>
       <span aria-hidden="true" className={status.state === "error" ? "mt-0.5 text-destructive" : "mt-0.5 text-primary"}>

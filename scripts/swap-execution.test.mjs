@@ -10,8 +10,26 @@ import {
   SwapSubmissionUncertainError,
 } from "../lib/swap/execution.ts";
 import { isUserRejectedError } from "../lib/tx-rejection.ts";
+import { assertMinimumQuoteValue } from "../lib/swap/quote-valuation.ts";
+import { createSubmissionToast } from "../lib/spot/submission-toast.ts";
 
 const nativeAddress = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+
+function gate() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+function reviewModal() {
+  let open = true;
+  const listeners = new Set();
+  return {
+    isModalOpen: () => open,
+    subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
+    close() { open = false; for (const listener of listeners) listener(); },
+  };
+}
 
 function fixture({ native = false, approved = true } = {}) {
   const plans = [];
@@ -106,6 +124,103 @@ test("an approved ERC-20 swap resolves only with a completed order, without requ
   assert.equal(result.order.fills.length, 0);
 });
 
+test("review hands off only after signing and final wallet, quote and balance validation, before POST", async () => {
+  const { input, executor, acceptedOrder, completedOrder } = fixture();
+  const review = reviewModal();
+  const signingStarted = gate();
+  const signature = gate();
+  const walletCheckStarted = gate();
+  const walletCheck = gate();
+  const balanceCheckStarted = gate();
+  const balanceCheck = gate();
+  const postStarted = gate();
+  const post = gate();
+  let signed = false;
+  let walletValidated = false;
+  let balanceValidated = false;
+  let quoteValidated = false;
+  let handoffs = 0;
+  input.sign = async () => {
+    signingStarted.resolve();
+    await signature.promise;
+    signed = true;
+    return "0xoriginal-signature";
+  };
+  input.assertWallet = async () => {
+    if (!signed) return;
+    walletCheckStarted.resolve();
+    await walletCheck.promise;
+    walletValidated = true;
+  };
+  input.hasInputBalance = async () => {
+    if (!signed) return true;
+    balanceCheckStarted.resolve();
+    await balanceCheck.promise;
+    balanceValidated = true;
+    return true;
+  };
+  input.validateQuote = () => { if (signed) quoteValidated = true; };
+  input.onSubmitting = () => {
+    assert.equal(signed && walletValidated && balanceValidated && quoteValidated, true);
+    handoffs++;
+    review.close();
+  };
+  input.client.submitOrder = async () => {
+    assert.equal(handoffs, 1);
+    assert.equal(review.isModalOpen(), false);
+    postStarted.resolve();
+    return post.promise;
+  };
+  const pending = executor.execute(input);
+  await signingStarted.promise;
+  assert.equal(review.isModalOpen(), true);
+  assert.equal(handoffs, 0);
+  signature.resolve();
+  await walletCheckStarted.promise;
+  assert.equal(review.isModalOpen(), true);
+  assert.equal(handoffs, 0);
+  walletCheck.resolve();
+  await balanceCheckStarted.promise;
+  assert.equal(review.isModalOpen(), true);
+  assert.equal(handoffs, 0);
+  balanceCheck.resolve();
+  await postStarted.promise;
+  assert.equal(handoffs, 1);
+  post.resolve(acceptedOrder);
+  assert.equal((await pending).order, completedOrder);
+});
+
+test("synchronous review close releases progress and fast settlement success notifications", async () => {
+  const { input, executor, completedOrder } = fixture();
+  const review = reviewModal();
+  const notifications = createSubmissionToast(review);
+  const shown = [];
+  const signingStarted = gate();
+  const signature = gate();
+  notifications.publish(() => shown.push("preparing"));
+  input.sign = async () => {
+    signingStarted.resolve();
+    return signature.promise;
+  };
+  input.onSubmitting = () => {
+    notifications.publish(() => shown.push("swap in progress"));
+    assert.deepEqual(shown, []);
+    review.close();
+  };
+  const pending = executor.execute(input).then(result => {
+    notifications.publishSuccess(() => shown.push("completed"));
+    return result;
+  });
+  await signingStarted.promise;
+  assert.equal(review.isModalOpen(), true);
+  assert.deepEqual(shown, []);
+  signature.resolve("0xoriginal-signature");
+  assert.equal((await pending).order, completedOrder);
+  assert.equal(review.isModalOpen(), false);
+  assert.equal(notifications.isDeferred(), false);
+  assert.deepEqual(shown, ["swap in progress", "completed"]);
+});
+
 test("quote identity rejects stale form, signer, chain, partner, token and slippage inputs before wallet writes", async () => {
   const changes = [
     input => { input.quote.inAmount = "11"; },
@@ -149,6 +264,23 @@ test("a refreshed better quote signs its service minimum without weakening the r
   assert.equal(preparations[0].quote.minimumAmountOut, "27");
 });
 
+test("quote USD validation uses the captured review and rechecks refreshed metadata before wallet writes", async () => {
+  for (const inputAmountUsd of [undefined, "9.999999999999999999"]) {
+    const { input, executor, actions } = fixture({ native: true, approved: false });
+    input.quote.originalQuote.inputAmountUsd = "10";
+    input.quote.originalQuote.netAmountOutUsd = "20";
+    input.quote.originalQuote.receivedAt -= 60_001;
+    input.validateQuote = quote => assertMinimumQuoteValue(quote, 10);
+    input.refreshQuote = async () => {
+      const fresh = refreshedQuote(input.quote, "30", "27");
+      fresh.originalQuote.inputAmountUsd = inputAmountUsd;
+      return fresh;
+    };
+    await assert.rejects(executor.execute(input), /at least \$10/);
+    assert.deepEqual(actions, []);
+  }
+});
+
 test("refresh cannot repair an expired quote that was reviewed for another signer", async () => {
   const { input, executor, actions } = fixture();
   input.quote.originalQuote.receivedAt -= 60_001;
@@ -190,10 +322,13 @@ test("expiration while the wallet signs requires another review and never posts 
   let now = Date.now();
   t.mock.method(Date, "now", () => now);
   const { input, executor, submissions } = fixture();
+  let handoffs = 0;
+  input.onSubmitting = () => { handoffs++; };
   input.sign = async () => { now += 60_001; return "0xoriginal-signature"; };
   input.refreshQuote = async () => refreshedQuote(input.quote, "30");
   await assert.rejects(executor.execute(input), QuoteUpdatedError);
   assert.equal(submissions.length, 0);
+  assert.equal(handoffs, 0);
 });
 
 test("the reviewed quote, intent, client and callbacks remain fixed while wallet checks wait", async () => {
@@ -372,6 +507,8 @@ test("an abort after a confirmed wrap stops approval and retains the wrapped fun
 
 test("an account change after signing prevents submission", async () => {
   const { input, executor, submissions } = fixture();
+  let handoffs = 0;
+  input.onSubmitting = () => { handoffs++; };
   let signed = false;
   input.sign = async () => { signed = true; return "0xsignature"; };
   input.assertWallet = async () => {
@@ -379,6 +516,7 @@ test("an account change after signing prevents submission", async () => {
   };
   await assert.rejects(executor.execute(input), /account or network changed/);
   assert.equal(submissions.length, 0);
+  assert.equal(handoffs, 0);
 });
 
 test("an abort during submission preserves the accepted order before stopping tracking", async () => {
@@ -424,6 +562,8 @@ test("a POST rejection remains typed submission uncertainty even when its cause 
 
 test("a wallet signature rejection before POST retains its safe cancellation identity", async () => {
   const { input, executor, submissions } = fixture();
+  let handoffs = 0;
+  input.onSubmitting = () => { handoffs++; };
   const rejection = Object.assign(new Error("User rejected signature"), { code: 4001 });
   input.sign = async () => { throw rejection; };
   await assert.rejects(executor.execute(input), error => {
@@ -433,6 +573,7 @@ test("a wallet signature rejection before POST retains its safe cancellation ide
     return true;
   });
   assert.deepEqual(submissions, []);
+  assert.equal(handoffs, 0);
 });
 
 test("settlement receives the lifecycle signal and preserves typed terminal and uncertain failures", async () => {
@@ -497,12 +638,15 @@ test("a balance spent during wrapping is detected before preparing the signature
 test("an input balance spent while signing prevents submission", async () => {
   for (const native of [true, false]) {
     const { input, executor, submissions } = fixture({ native });
+    let handoffs = 0;
+    input.onSubmitting = () => { handoffs++; };
     let signed = false;
     input.sign = async () => { signed = true; return "0xsignature"; };
     input.getWrappedBalance = async () => signed ? "9" : "10";
     input.hasInputBalance = async () => !signed;
     await assert.rejects(executor.execute(input), /Insufficient input balance/);
     assert.deepEqual(submissions, []);
+    assert.equal(handoffs, 0);
   }
 });
 

@@ -78,6 +78,7 @@ export interface SwapExecution {
   hasAllowance(): Promise<boolean>;
   getWrappedBalance?(): Promise<string>;
   hasInputBalance?(amount: string): Promise<boolean>;
+  validateQuote?(quote: BestTradeQuote): void;
   wrap(amount: string): Promise<unknown>;
   approve(): Promise<unknown>;
   refreshQuote(): Promise<BestTradeQuote | undefined>;
@@ -136,6 +137,7 @@ export function createSwapExecutor({
             candidate.slippage !== reviewedQuote.slippage) {
           throw new Error("Quote does not match the reviewed swap. Request a new quote.");
         }
+        input.validateQuote?.(candidate);
       };
       // A fresh response cannot make a quote reviewed for another signer or
       // form eligible for this attempt.

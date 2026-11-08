@@ -1,0 +1,89 @@
+/* The native toast stays in the shared viewport; these overrides apply to swap success only. */
+:global([data-sonner-toaster]) .toast:global([data-sonner-toast][data-type="success"]) {
+  --toast-title-color: var(--foreground);
+  --toast-description-color: var(--muted-foreground);
+  display: block;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--primary) 24%, var(--border));
+  border-radius: 18px;
+  background: var(--popover);
+  color: var(--foreground);
+  box-shadow: var(--orbs-card-shadow, 0 8px 28px rgb(0 0 0 / 12%));
+}
+
+:global([data-sonner-toaster]) .toast:global([data-sonner-toast][data-type="success"]) .title {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 32px 0 40px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.015em;
+}
+
+:global([data-sonner-toaster]) .toast:global([data-sonner-toast][data-type="success"]) .icon {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+  color: var(--primary);
+}
+
+:global([data-sonner-toaster]) .toast:global([data-sonner-toast][data-type="success"]) .description {
+  width: 100%;
+  margin-top: 12px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+:global([data-sonner-toaster]) .toast:global([data-sonner-toast][data-type="success"]) button.closeButton:global([data-close-button]) {
+  top: 13px;
+  right: 10px;
+  left: auto;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-foreground);
+  box-shadow: none;
+  transform: none;
+}
+
+:global([data-sonner-toaster]) .toast:global([data-sonner-toast][data-type="success"]) button.closeButton:global([data-close-button]):hover {
+  color: var(--foreground);
+}
+
+:global([data-sonner-toaster]) .toast:global([data-sonner-toast][data-type="success"]) button.closeButton:global([data-close-button]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.details { display: grid; min-width: 0; gap: 10px; }
+.assets { display: grid; gap: 10px; min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--primary) 3%, var(--card)); }
+.asset { display: grid; grid-template-columns: 24px minmax(40px, 1fr) minmax(0, 2.3fr); align-items: center; gap: 8px; min-width: 0; }
+.label { color: var(--muted-foreground); font-size: 12px; line-height: 1.4; }
+.amount { min-width: 0; color: var(--foreground); font-size: 14px; font-weight: 500; line-height: 1.5; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.symbol { font-size: 12px; font-weight: 500; }
+.message { min-width: 0; color: var(--muted-foreground); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.transactions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-width: 0; padding-top: 8px; border-top: 1px solid var(--border); }
+.explorer { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; min-width: 0; border-radius: 4px; color: var(--primary); font-size: 11px; font-weight: 500; line-height: 1.5; text-decoration: none; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.explorer:is(:hover, :focus-visible) { text-decoration: underline; }
+.explorer:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+
+@media (max-width: 380px) {
+  .assets { padding: 10px; }
+  .asset { gap: 6px; grid-template-columns: 24px minmax(36px, 1fr) minmax(0, 2.3fr); }
+  .amount { font-size: 13px; }
+}

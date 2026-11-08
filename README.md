@@ -33,7 +33,7 @@ state and controls. `SubmitOrder` calls `useOrderExecution` once and passes that
 its `view` field controls presentation without changing the SDK form or executor status.
 
 The host uses `useMutation` for submission, cancellation, wallet writes and developer actions.
-`useQuery` owns configuration, history, balances, allowances, quotes and prices. Reads needed during
+`useQuery` owns configuration, history, balances, allowances and quotes. Reads needed during
 execution use `queryClient.fetchQuery`; allowance checks always reread chain state, and confirmed
 receipts are cached by chain and transaction hash. Successful writes invalidate the affected wallet's queries.
 
@@ -44,7 +44,13 @@ receipts are cached by chain and transaction hash. Successful writes invalidate 
 2. Map editable inputs, balances, token decimals, USD prices and the current raw output quote into
    `calculateOrder`. Its result owns defaults, validation, trade counts, prices and schedules.
    Every form uses the cached `client.getQuote` for the complete input amount and passes its raw `quote.netAmountOut`
-   unchanged as `quotedOutputAmountRaw`. USD prices supply dollar estimates and minimum-trade validation.
+   unchanged as `quotedOutputAmountRaw`. Dollar estimates use the quote's `inputAmountUsd`,
+   `netAmountOutUsd`, and `minimumAmountOutUsd` independently. Pass these totals directly into
+   `calculateOrder` as `inputAmountUsd`, `quotedOutputAmountUsd`, and `minimumOutputAmountUsd`.
+   Input USD determines minimum-trade validation; quote-derived unit prices value edited limit/trigger
+   output amounts. Missing input USD leaves submission disabled without substituting output USD.
+   Token lists and direct
+   wrap/unwrap flows display token amounts without separate USD-price requests.
    Missing or failed quotes leave the market reference unavailable. Input changes request a fresh quote.
 3. Adapt your wallet to `SpotWalletPort`. Transaction writes must resolve after successful receipts,
    and `assertContext` must verify the connected account and chain before wallet actions.

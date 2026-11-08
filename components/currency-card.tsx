@@ -17,10 +17,12 @@ type Props = {
   onCurrencyChange: (currency: string) => void;
   onAmountChange?: (amount: string) => void;
   amount: string;
+  usdValue?: string;
   disabled?: boolean;
   title?: string;
   titleAction?: ReactNode;
   isLoading?: boolean;
+  usdLoading?: boolean;
   statusText?: string;
   error?: string;
 };
@@ -91,9 +93,11 @@ export function CurrencyCard({
   onAmountChange,
   disabled,
   amount,
+  usdValue,
   title,
   titleAction,
   isLoading = false,
+  usdLoading = isLoading,
   statusText,
   error,
 }: Props) {
@@ -150,7 +154,7 @@ export function CurrencyCard({
               {statusText}
             </p>
           ) : (
-            <USD address={currency?.address} amount={amount} />
+            <USD value={usdValue} amount={amount} isLoading={usdLoading} />
           )}
           <Balance currency={currency} onAmountChange={onAmountChange} />
         </div>

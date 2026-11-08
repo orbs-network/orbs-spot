@@ -14,7 +14,7 @@ import { formatTwapDuration } from "./utils";
 import { useOrderExpiry } from "./use-order-expiry";
 
 export function AdvancedOrderSummary() {
-  const { form, inputToken, outputToken, market } = useOrderModel();
+  const { form, inputToken, outputToken, market, quoteUsd } = useOrderModel();
   const { schedule, trades, inputAmount } = form;
   const duration = Math.max(0, schedule.totalTrades - 1) * schedule.fillDelayMillis;
   const validDuration = Number.isFinite(duration) && duration > 0 && !schedule.fillDelayError && !trades.error;
@@ -27,7 +27,7 @@ export function AdvancedOrderSummary() {
   const rate = market.isLoading && !inputAmount.isEmpty
     ? <Skeleton role="status" aria-label="Loading market rate…" className="h-4 w-36 max-w-full" />
     : rates && inputToken?.symbol && outputToken?.symbol
-      ? <TokenExchangeRate rates={rates} inputCurrency={inputToken} outputCurrency={outputToken} />
+      ? <TokenExchangeRate rates={rates} inputCurrency={inputToken} outputCurrency={outputToken} inputTokenUsdPrice={quoteUsd.inputTokenUsdPrice} outputTokenUsdPrice={quoteUsd.outputTokenUsdPrice} />
       : "N/A";
 
   return (

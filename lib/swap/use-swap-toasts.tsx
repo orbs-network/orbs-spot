@@ -2,13 +2,14 @@
 
 import { toast } from "sonner";
 import { OrderSettlementError, OrderStatus, type Order, type Partners, type Token } from "@orbs-network/spot-ui";
-import { toAmountUI } from "@/lib/utils";
 import { dismissTransactionRejectedToast } from "@/lib/tx-rejection";
 import { TradeToastDetails, type ToastTransaction } from "@/components/ui/trade-toast-details";
+import { showSwapSuccessToast } from "@/components/ui/swap-success-toast";
 import { getFillTransactionHash, resolveSwapSettlementOrder } from "./activity";
 import { useSubmissionPreview } from "@/lib/submission-preview";
 import { formatDisplayAmount } from "@/lib/token-display";
 import { createLoadingToast } from "@/lib/loading-toast";
+import { getSwapReceipt } from "./receipt";
 
 const getReadableSwapError = (error: unknown) => {
   if (!(error instanceof Error)) return "The swap could not be completed. Please try again.";
@@ -22,12 +23,13 @@ const getReadableSwapError = (error: unknown) => {
 };
 
 /** Each submission owns a toast and immutable labels, independent of the next draft. */
-export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, outputAmount, inputCurrency, outputCurrency, chainId, account, partner, minimumOutputAmount, publishToast = show => show(), publishSuccessToast = publishToast }: {
+export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, outputAmount, outputAmountUsd, inputCurrency, outputCurrency, chainId, account, partner, minimumOutputAmount, publishToast = show => show(), publishSuccessToast = publishToast }: {
   id: string;
   inputSymbol: string;
   outputSymbol: string;
   inputAmount: string;
   outputAmount?: string;
+  outputAmountUsd?: string;
   inputCurrency?: Token;
   outputCurrency?: Token;
   chainId: number;
@@ -39,15 +41,21 @@ export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, o
 }) {
   const input = { token: inputCurrency ? { ...inputCurrency } : { symbol: inputSymbol }, amount: inputAmount };
   const output = { token: outputCurrency ? { ...outputCurrency } : { symbol: outputSymbol }, amount: outputAmount };
+  const swapQuote = outputAmount !== undefined ? { outputAmount, outputAmountUsd } : undefined;
   const outputDecimals = outputCurrency?.decimals;
+  const receivedAmount = (order?: Order) => outputDecimals !== undefined ? getSwapReceipt({
+    quotedOutputAmount: outputAmount ?? "",
+    quotedOutputAmountUsd: outputAmountUsd,
+    receivedAmountRaw: order?.dstAmountFilled,
+    outputDecimals,
+  }).receivedAmount : undefined;
   const transactions = new Map<string, string>();
   const loadingToast = createLoadingToast(id);
   let acceptedOrder: Order | undefined;
   const publishPreview = (title: string, status: "pending" | "success" | "error", message?: string, order?: Order) => {
     acceptedOrder = order ?? acceptedOrder;
     useSubmissionPreview.getState().upsert({ id, kind: "swap", title, status, message, input,
-      output: status === "success" && order?.dstAmountFilled && outputDecimals !== undefined
-        ? { ...output, amount: toAmountUI(order.dstAmountFilled, outputDecimals) } : output,
+      output, swapQuote,
       chainId, account: account ?? acceptedOrder?.maker, partner, order: acceptedOrder,
       transactions: Array.from(transactions, ([label, hash]) => ({ label, hash })),
       details: minimumOutputAmount ? [{ label: "Minimum received", value: `${formatDisplayAmount(minimumOutputAmount)} ${outputSymbol}` }] : undefined,
@@ -56,28 +64,31 @@ export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, o
   const rememberTransaction = (label: string, hash?: string) => {
     if (hash) transactions.set(label, hash);
   };
-  const details = (message?: string, order?: Order) => <TradeToastDetails
-    input={input}
-    output={order?.dstAmountFilled && outputDecimals !== undefined
-      ? { ...output, amount: toAmountUI(order.dstAmountFilled, outputDecimals) }
-      : output}
-    message={message}
-    chainId={chainId}
-    transactions={Array.from(transactions, ([label, hash]): ToastTransaction => ({ label, hash }))}
-  />;
+  const details = (message?: string) => {
+    return <TradeToastDetails
+      input={input}
+      output={output}
+      message={message}
+      chainId={chainId}
+      transactions={Array.from(transactions, ([label, hash]): ToastTransaction => ({ label, hash }))}
+    />;
+  };
   const loading = (title: string, message?: string) => {
     publishPreview(title, "pending", message);
     publishToast(() => loadingToast.show(title, { description: details(message) }));
   };
   const success = (txHash?: string, order?: Order) => {
     rememberTransaction("Swap transaction", txHash ?? (order && getFillTransactionHash(order)));
-    const hasActualOutput = Boolean(order?.dstAmountFilled) && outputDecimals !== undefined;
-    publishPreview("Swap completed", "success", hasActualOutput || !outputAmount ? undefined : "Output amount is estimated.", order);
-    publishSuccessToast(() => toast.success("Swap completed", {
+    const actualOutput = receivedAmount(order);
+    const message = actualOutput === undefined ? "Received amount unavailable." : undefined;
+    publishPreview("Swap completed", "success", message, order);
+    publishSuccessToast(() => showSwapSuccessToast({
       id,
-      description: details(hasActualOutput || !outputAmount ? undefined : "Output amount is estimated.", order),
-      duration: 20_000,
-      closeButton: true,
+      input,
+      output: actualOutput !== undefined ? { ...output, amount: actualOutput } : undefined,
+      message,
+      chainId,
+      transactions: Array.from(transactions, ([label, hash]): ToastTransaction => ({ label, hash })),
     }));
   };
   return {

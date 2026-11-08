@@ -27,7 +27,7 @@ export function TokenPanel({ isSource }: { isSource: boolean }) {
   const { inputCurrency, outputCurrency, inputAmount } = useDerivedSwap();
   const { amount: { ui: dstAmount }, isLoading } = useOutputAmount();
   const { handleCurrencyChange, setInputAmount } = useActionHandlers();
-  const { errors, values } = useOrderForm();
+  const { errors, values, inputAmount: formInputAmount, outputAmount: formOutputAmount } = useOrderForm();
 
   const onTokenChange = useCallback(
     (currency: string) => {
@@ -43,6 +43,8 @@ export function TokenPanel({ isSource }: { isSource: boolean }) {
       onCurrencyChange={onTokenChange}
       onAmountChange={isSource ? setInputAmount : undefined}
       amount={isSource ? inputAmount : displayTokenAmount(dstAmount, outputCurrency?.symbol, outputCurrency?.decimals)}
+      usdValue={isSource ? formInputAmount.usd : formOutputAmount.usd}
+      usdLoading={isLoading}
       title={isSource ? t("from") : values.isMarketOrder ? "Estimated receive" : "To (est.)"}
       disabled={!isSource}
       isLoading={!isSource && Boolean(isLoading)}

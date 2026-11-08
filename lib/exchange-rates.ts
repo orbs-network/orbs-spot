@@ -41,8 +41,9 @@ export function getExchangeRatesFromPrice(price?: string): ExchangeRates | undef
   return { forward, reverse: new RateNumber(1).div(forward) };
 }
 
-/** Use the same display precision as amounts without rounding the underlying rate. */
+/** Keep large rate labels compact while retaining precision for smaller rates. */
 export function formatExchangeRate(value: BN): string {
   if (!value.isFinite() || !value.gt(0)) return "—";
-  return BN(formatAmount(value.toFixed(), 4, 512)).toFormat();
+  const decimals = value.gte(1000) ? 2 : 4;
+  return BN(formatAmount(value.toFixed(), decimals, 512)).toFormat();
 }

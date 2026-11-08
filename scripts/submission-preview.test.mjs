@@ -10,6 +10,7 @@ const preview = (id = "first") => ({ id, kind: "swap", title: "Swap in progress"
   chainId: 56, account, partner: Partners.External,
   input: { token: { symbol: "BNB", logoUrl: "/bnb.svg", decimals: 18 }, amount: "1.123456789012345678" },
   output: { token: { symbol: "USDC", decimals: 6 }, amount: "1234.567891" },
+  swapQuote: { outputAmount: "1234.567891", outputAmountUsd: "1234.56" },
   details: [{ label: "Minimum received", value: "1200 USDC" }],
   transactions: [{ label: "Wrap transaction", hash: "0xabc" }],
 });
@@ -21,12 +22,15 @@ test("preview captures trade labels, order, and transaction data independently o
   useSubmissionPreview.getState().upsert(input);
   input.input.token.symbol = "EDITED";
   input.input.amount = "99";
+  input.swapQuote.outputAmount = "9999";
+  input.swapQuote.outputAmountUsd = "9999";
   input.details[0].value = "0";
   input.transactions[0].hash = "changed";
   input.order.status = OrderStatus.Completed;
   const captured = useSubmissionPreview.getState().entries.first;
   assert.equal(captured.input.token.symbol, "BNB");
   assert.equal(captured.input.amount, "1.123456789012345678");
+  assert.deepEqual(captured.swapQuote, { outputAmount: "1234.567891", outputAmountUsd: "1234.56" });
   assert.equal(captured.details[0].value, "1200 USDC");
   assert.equal(captured.transactions[0].hash, "0xabc");
   assert.equal(captured.order.status, OrderStatus.Open);

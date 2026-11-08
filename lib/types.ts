@@ -13,10 +13,6 @@ export type Currency = {
     imported?: boolean;
 }
 
-export type USDPrices = {
-    [key: string]: number;
-}
-
 export type Balances = {
     [key: string]: string;
 }

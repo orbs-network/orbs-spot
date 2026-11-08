@@ -17,6 +17,8 @@ export type SubmissionPreview = {
   message?: string;
   input?: PreviewAsset;
   output?: PreviewAsset;
+  /** Reviewed output in UI units, retained independently of the eventual fill. */
+  swapQuote?: { outputAmount: string; outputAmountUsd?: string };
   chainId: number;
   account?: string;
   partner?: Partners;
@@ -53,6 +55,7 @@ export const useSubmissionPreview = create<{
       ...preview,
       input: preview.input && { ...preview.input, token: { ...preview.input.token } },
       output: preview.output && { ...preview.output, token: { ...preview.output.token } },
+      swapQuote: preview.swapQuote && { ...preview.swapQuote },
       transactions: Array.from(new Map([...(state.entries[preview.id]?.transactions ?? []), ...(preview.transactions ?? [])]
         .map(transaction => [transaction.hash.toLowerCase(), { ...transaction }])).values()),
       details: preview.details?.map(detail => ({ ...detail })),

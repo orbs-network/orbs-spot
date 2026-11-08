@@ -11,7 +11,6 @@ import BN from "bignumber.js";
 import { useMemo } from "react";
 import { useTranslations } from "@/lib/use-translations";
 import { useSpotPartnerChains } from "@/lib/hooks/use-spot-partner-chains";
-import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { MIN_SWAP_VALUE_USD } from "@/lib/swap/quotes";
 
 type SubmitSwapButtonProps = {
@@ -112,18 +111,17 @@ const ValidatedSubmitSwapButton = ({
   const t = useTranslations();
   const {
     inputCurrency,
-    inputAmount,
     outputCurrency,
     parsedInputAmount,
     isLoadingTrade,
     noLiquidity,
     quoteError,
     trade,
+    quoteUsd,
   } = useDerivedSwap();
   const inputTokenBalance = useBalance(inputCurrency).wei;
-  const inputUsd = useUSDPrice({ token: inputCurrency?.address, amount: inputAmount });
-  const priceUnavailable = inputUsd.data === undefined || inputUsd.isError;
-  const belowMinimum = inputUsd.data !== undefined && inputUsd.data < MIN_SWAP_VALUE_USD;
+  const priceUnavailable = quoteUsd.inputAmountUsd === undefined;
+  const belowMinimum = quoteUsd.inputAmountUsd !== undefined && BN(quoteUsd.inputAmountUsd).lt(MIN_SWAP_VALUE_USD);
 
 
 
@@ -157,7 +155,7 @@ const ValidatedSubmitSwapButton = ({
       return t("insufficientFunds");
     }
     if (quoteError) return "Quote unavailable";
-    if (priceUnavailable) return inputUsd.isLoading ? "Loading price…" : "Price unavailable";
+    if (priceUnavailable) return "USD value unavailable";
     if (belowMinimum) return `Minimum swap is $${MIN_SWAP_VALUE_USD}`;
     if(noLiquidity) {
       return t("noLiquidity");
@@ -173,7 +171,6 @@ const ValidatedSubmitSwapButton = ({
     quoteError,
     priceUnavailable,
     belowMinimum,
-    inputUsd.isLoading,
   ]);
 
   return (

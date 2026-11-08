@@ -21,7 +21,6 @@ import { PlusIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { Virtuoso } from "react-virtuoso";
 import type { Currency } from "@/lib/types";
-import { useFormatNumber } from "@/lib/hooks/common";
 import { formatBalanceAmount } from "@/lib/token-display";
 import BN from "bignumber.js";
 import { useConnection } from "wagmi";
@@ -212,7 +211,6 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
     isError,
     isLoading,
     refetch,
-    usdPrices,
   } = useCurrencies(search);
   const isEmptyList = !isLoading && currencies.length === 0;
   const itemContent = useCallback(
@@ -223,11 +221,10 @@ const CurrencySelectorList = memo(function CurrencySelectorList({
           currency={currency}
           onCurrencyChange={onCurrencyChange}
           balanceWei={balances?.[tokenKey] ?? "0"}
-          usdPrice={usdPrices?.[tokenKey] ?? usdPrices?.[currency.address] ?? 0}
         />
       );
     },
-    [balances, onCurrencyChange, usdPrices],
+    [balances, onCurrencyChange],
   );
   const computeItemKey = useCallback(
     (_: number, currency: Currency) => getTokenKey(currency.address),
@@ -275,12 +272,10 @@ const CurrencyItem = memo(function CurrencyItem({
   currency,
   onCurrencyChange,
   balanceWei,
-  usdPrice,
 }: {
   currency: Currency;
   onCurrencyChange: (currency: Currency) => void;
   balanceWei: string;
-  usdPrice: number;
 }) {
   const displayName = formatTokenName(currency.name);
   const displaySymbol = formatTokenSymbol(currency.symbol);
@@ -290,18 +285,6 @@ const CurrencyItem = memo(function CurrencyItem({
     [balanceWei, currency.decimals],
   );
   const displayBalance = formatBalanceAmount(balance);
-  const usdValue = useMemo(
-    () =>
-     BN(balance || 0)
-        .times(usdPrice || 0)
-        .toFixed(),
-    [balance, usdPrice],
-  );
-  const formattedUsdValue = useFormatNumber({
-    value: usdValue,
-    decimalScale: 2,
-    prefix: "$",
-  });
   const hasBalance = BN(balanceWei ?? "0").gt(0);
 
   return (
@@ -334,15 +317,7 @@ const CurrencyItem = memo(function CurrencyItem({
           </div>
         </div>
         {hasBalance && (
-          <div className="flex flex-col items-end gap-0">
-            <p className="text-base font-semibold">
-              {formattedUsdValue || "$0"}
-            </p>
-
-            <p className="text-sm text-muted-foreground">
-              {displayBalance}
-            </p>
-          </div>
+          <p className="text-base font-semibold">{displayBalance}</p>
         )}
       </button>
     </DialogClose>

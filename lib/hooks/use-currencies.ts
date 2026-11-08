@@ -3,7 +3,6 @@ import { filterCurrencies, getTokenKey, isNativeAddress, sortTokens } from "../u
 import { erc20Abi, getAddress, isAddress } from "viem";
 import { useConnection, useReadContracts } from "wagmi";
 import { useBalances } from "./use-balances";
-import { useUSDPrices } from "./use-usd-price";
 import type { Currency } from "../types";
 import { MAX_DEFAULT_TOKENS } from "../token-list";
 import { useCurrenciesQuery } from "./use-currencies-query";
@@ -68,25 +67,21 @@ const useAllCurrencies = () => {
 
   const { data: balances } = useBalances();
 
-  const tokensWithBalance = useMemo(() => {
-    if (!currencies?.length || !balances) return [];
+  const hasTokenBalance = useMemo(() => {
+    if (!currencies?.length || !balances) return false;
 
-    return currencies
-      .filter((it) => {
-        const raw = balances[getTokenKey(it.address)]?.toString();
-        return raw !== undefined && raw !== "" && raw !== "0";
-      })
-      .map((it) => it.address);
+    return currencies.some((currency) => {
+      const raw = balances[getTokenKey(currency.address)]?.toString();
+      return raw !== undefined && raw !== "" && raw !== "0";
+    });
   }, [currencies, balances]);
-
-  const { data: usdPrices } = useUSDPrices(tokensWithBalance);
 
   const result = useMemo(() => {
     if (!currencies) return [];
-    if (!balances || tokensWithBalance.length === 0) return currencies;
+    if (!balances || !hasTokenBalance) return currencies;
 
-    return sortTokens(currencies, usdPrices, balances, chainId);
-  }, [currencies, balances, usdPrices, chainId, tokensWithBalance.length]);
+    return sortTokens(currencies, balances, chainId);
+  }, [currencies, balances, chainId, hasTokenBalance]);
 
   return {
     balances,
@@ -94,13 +89,12 @@ const useAllCurrencies = () => {
     isError,
     isLoading,
     refetch,
-    usdPrices,
   };
 };
 
 export const useCurrencies = (query?: string) => {
   const search = query?.trim() ?? "";
-  const { balances, currencies, isError, isLoading, refetch, usdPrices } =
+  const { balances, currencies, isError, isLoading, refetch } =
     useAllCurrencies();
   const internalCurrencies = useMemo(() => {
     if (search) return filterCurrencies(currencies, [search]);
@@ -126,7 +120,6 @@ export const useCurrencies = (query?: string) => {
     isError,
     isLoading: isLoading || isLoadingExternal,
     refetch,
-    usdPrices,
   };
 };
 

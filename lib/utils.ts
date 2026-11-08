@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { Currency, USDPrices } from "./types";
+import type { Currency } from "./types";
 import { Balances } from "./types";
 import { formatUnits, getAddress, isAddress, parseUnits, zeroAddress } from "viem";
 import { wCurrencies } from "./wrapped-currencies";
@@ -210,11 +210,9 @@ export const sortByBaseAssets = (currencies: Currency[], chainId?: number) => {
 
 export const sortTokens = (
   currencies: Currency[],
-  usdPrices?: USDPrices,
   balances?: Balances,
   chainId?: number
 ) => {
-  const valueMap = new Map<string, number>();
   const hasBalanceMap = new Map<string, boolean>();
   const baseRankMap = getBaseAssetRankMap(chainId);
   const symbolRankMap = new Map<string, number>();
@@ -225,20 +223,6 @@ export const sortTokens = (
     const hasBalance = raw !== "0" && raw !== "";
     hasBalanceMap.set(key, hasBalance);
     symbolRankMap.set(key, getBaseAssetRank(currency, chainId, baseRankMap));
-
-    if (!hasBalance) {
-      valueMap.set(key, 0);
-      continue;
-    }
-
-    const usdPrice = usdPrices?.[key] ?? usdPrices?.[currency.address] ?? 0;
-    if (!usdPrice) {
-      valueMap.set(key, 0);
-      continue;
-    }
-
-    const balance = Number(formatUnits(BigInt(raw), currency.decimals));
-    valueMap.set(key, balance * usdPrice);
   }
 
   const res = [...currencies].sort((a, b) => {
@@ -247,10 +231,6 @@ export const sortTokens = (
     const hasBalanceA = hasBalanceMap.get(tokenA) ?? false;
     const hasBalanceB = hasBalanceMap.get(tokenB) ?? false;
     if (hasBalanceA !== hasBalanceB) return hasBalanceA ? -1 : 1;
-
-    const valueA = valueMap.get(tokenA) ?? 0;
-    const valueB = valueMap.get(tokenB) ?? 0;
-    if (valueA !== valueB) return valueB - valueA;
 
     const baseRankA = symbolRankMap.get(tokenA) ?? Number.POSITIVE_INFINITY;
     const baseRankB = symbolRankMap.get(tokenB) ?? Number.POSITIVE_INFINITY;

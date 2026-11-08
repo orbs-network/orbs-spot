@@ -11,7 +11,6 @@ import {
 import { useConnection } from "wagmi";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useBalance } from "@/lib/hooks/use-balances";
-import { useUSDPrice } from "@/lib/hooks/use-usd-price";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useSwapStore } from "@/lib/hooks/store";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
@@ -28,7 +27,7 @@ const EMPTY_INPUT: OrderInput = {};
 
 /** Called once by AdvancedOrderForm. All consumers share this calculated snapshot. */
 export function useCalculatedOrder(module: Module) {
-  const { inputCurrency, outputCurrency, inputAmount } = useDerivedSwap();
+  const { inputCurrency, outputCurrency, inputAmount, quoteUsd } = useDerivedSwap();
   const chainId = useDataChainId();
   const { address } = useConnection();
   // Draft prices and schedules belong to a specific chain, module and token pair.
@@ -46,8 +45,8 @@ export function useCalculatedOrder(module: Module) {
   const inputToken = useSpotToken(inputCurrency);
   const outputToken = useSpotToken(outputCurrency);
   const balance = useBalance(inputCurrency).wei;
-  const inputUsd = useUSDPrice({ token: inputCurrency?.address }).data;
-  const outputUsd = useUSDPrice({ token: outputCurrency?.address }).data;
+  const inputUsd = quoteUsd.inputTokenUsdPrice;
+  const outputUsd = quoteUsd.outputTokenUsdPrice;
   const { priceProtection } = useSettings();
   const market = useSpotMarketReferencePrice();
   // Do not validate a new input against a quote that is still being refreshed.
@@ -64,8 +63,11 @@ export function useCalculatedOrder(module: Module) {
         inputTokenDecimals: inputToken?.decimals ?? 18,
         outputTokenDecimals: outputToken?.decimals ?? 18,
         quotedOutputAmountRaw: quote,
-        inputTokenUsdPrice: inputUsd?.toString(),
-        outputTokenUsdPrice: outputUsd?.toString(),
+        inputAmountUsd: quoteUsd.inputAmountUsd,
+        quotedOutputAmountUsd: quoteUsd.outputAmountUsd,
+        minimumOutputAmountUsd: quoteUsd.minimumAmountOutUsd,
+        inputTokenUsdPrice: inputUsd,
+        outputTokenUsdPrice: outputUsd,
         inputBalanceRaw: address ? balance : undefined,
         minTradeSizeUsd: 10,
         priceProtectionPercent: priceProtection,
@@ -100,6 +102,9 @@ export function useCalculatedOrder(module: Module) {
       quote,
       inputUsd,
       outputUsd,
+      quoteUsd.inputAmountUsd,
+      quoteUsd.outputAmountUsd,
+      quoteUsd.minimumAmountOutUsd,
       address,
       balance,
       priceProtection,
@@ -109,8 +114,8 @@ export function useCalculatedOrder(module: Module) {
     ],
   );
   return useMemo(
-    () => ({ form, defaultPrices, inputToken, outputToken, input, updateInput, market }),
-    [form, defaultPrices, inputToken, outputToken, input, updateInput, market],
+    () => ({ form, defaultPrices, inputToken, outputToken, input, updateInput, market, quoteUsd }),
+    [form, defaultPrices, inputToken, outputToken, input, updateInput, market, quoteUsd],
   );
 }
 

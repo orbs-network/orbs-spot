@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import { displayTokenAmount } from "../token-display";
 import BN from "bignumber.js";
 import { useNativeConversion } from "./use-native-conversion";
+import { getQuoteValuation } from "../swap/quote-valuation";
 
 export const useDerivedSwap = () => {
   const {
@@ -36,6 +37,11 @@ export const useDerivedSwap = () => {
     trade?.outAmount
   ), outputCurrency?.symbol, outputCurrency?.decimals);
   const outputAmount = nativeConversion && !usesSpotQuote ? inputAmount : quotedOutputAmount;
+  const quoteUsd = useMemo(() => getQuoteValuation(
+    isLoadingTrade || quoteError ? undefined : trade,
+    inputCurrency?.decimals,
+    outputCurrency?.decimals,
+  ), [isLoadingTrade, quoteError, trade, inputCurrency?.decimals, outputCurrency?.decimals]);
 
   const noLiquidity = useMemo(
     () =>
@@ -61,6 +67,7 @@ export const useDerivedSwap = () => {
       inputAmount,
       parsedInputAmount,
       trade,
+      quoteUsd,
       isLoadingTrade,
       noLiquidity,
       quoteError,
@@ -80,6 +87,7 @@ export const useDerivedSwap = () => {
       parsedInputAmount,
       refetchTrade,
       trade,
+      quoteUsd,
       usesSpotQuote,
       nativeConversion,
     ]
