@@ -1,3 +1,4 @@
+import { confirmAllowance } from "./allowance.ts";
 import { isNativeAddress } from "./token-utils.ts";
 import { isUserRejectedError } from "./wallet-errors.ts";
 import {
@@ -165,22 +166,10 @@ export function createOrderExecutor(
           amount: amount.toString(),
         }, (approvalTxHash) => publish({ approvalTxHash }));
         publish({ approvalTxHash: txHash });
-        // Confirmation and RPC reads can briefly disagree. Reread a bounded
-        // number of times; do not send another approval just because a read lags.
-        let sufficient = false;
-        for (let attempt = 0; attempt < 4; attempt++) {
+        await confirmAllowance(async () => {
           await wallet.assertContext(account, client.chainId);
-          if (BigInt(await wallet.getAllowance(allowanceRequest)) >= amount) {
-            sufficient = true;
-            break;
-          }
-          if (attempt < 3)
-            await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-        if (!sufficient)
-          throw new Error(
-            "Confirmed allowance is still below the order amount",
-          );
+          return BigInt(await wallet.getAllowance(allowanceRequest)) >= amount;
+        }, { message: "Confirmed allowance is still below the order amount" });
         publish({ currentStepIndex: (snapshot.currentStepIndex ?? 0) + 1 });
       }
       await wallet.assertContext(account, client.chainId);

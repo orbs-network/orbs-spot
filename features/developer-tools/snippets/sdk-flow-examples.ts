@@ -1,5 +1,5 @@
 import type { CodeSnippetOptions, JsonContainer } from "@/features/developer-tools/json-inspector";
-import { getOrderFormFieldExplanation } from "@/features/developer-tools/order-form-field-explanations";
+import { getOrderFormFieldExplanation } from "../order-form-field-explanations.ts";
 
 const NATIVE_ADDRESS_HELPER = `const isNativeAddress = (address: string) =>
   address.toLowerCase() === "0x0000000000000000000000000000000000000000"
@@ -121,7 +121,11 @@ export function formatAdvancedOrdersSdkFlow(data: JsonContainer = {}): string {
   const calculationInput = JSON.stringify(params, null, 2)
     .replace(/"orderType": "(TWAP|LIMIT|STOP_LOSS|TAKE_PROFIT)"/, '"orderType": OrderType.$1');
   return `// advanced-orders.ts — requires @orbs-network/spot-ui 2.2.0 or later.
-import { calculateOrder, createClient, OrderType, Partners } from "@orbs-network/spot-ui";
+// Adapt chain, partner, wallet provider, token addresses, and calculation inputs to your app.
+// The embedded calculation is a saved snapshot; request a current quote when inputs change.
+// Call createAdvancedOrderFlow only from an explicit user action. Submission returns acceptance.
+// For host guards and recovery, follow lib/spot/execution.ts in the reference app.
+import { calculateOrder, createClient, OrderType, Partners, type CalculateOrderFormParams } from "@orbs-network/spot-ui";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import { polygon } from "viem/chains";
 
@@ -141,8 +145,11 @@ export type OrderInput = {
   wrappedNativeToken: Address;
 };
 
-export async function createAdvancedOrderFlow(account: Address, input: OrderInput) {
-  const form = calculateOrder(${calculationInput.split("\n").join("\n  ")});
+// Inspector snapshot for reference. Supply current inputs and quote when submitting.
+export const savedFormParams: CalculateOrderFormParams = ${calculationInput};
+
+export async function createAdvancedOrderFlow(account: Address, input: OrderInput, formParams: CalculateOrderFormParams) {
+  const form = calculateOrder(formParams);
   if (!form.canSubmit) throw new Error("Resolve the order form errors first");
 
   const client = await getClient();
@@ -160,7 +167,7 @@ ${ADVANCED_SUBMIT_CODE.split("\n").map((line) => "  " + line).join("\n")}
 }
 ${WALLET_CONFIRMATION_HELPERS}
 
-// Host usage: const order = await createAdvancedOrderFlow(account, currentOrderInput);
+// Host usage: const order = await createAdvancedOrderFlow(account, currentOrderInput, currentFormParams);
 // If submission is ambiguous, reconcile history before creating another order.
 
 
@@ -288,6 +295,11 @@ export function formatSpotSwapSdkFlow(data: JsonContainer = {}): string {
   const chainId = typeof root.chainId === "number" ? root.chainId : 137;
   const partner = typeof root.partner === "string" && root.partner ? root.partner : "external";
   return `// spot-swap.ts — requires @orbs-network/spot-ui 2.2.0 or later.
+// Adapt chain, partner, and wallet provider to your app; reuse existing wallet services.
+// Get a current client.getQuote for the selected pair and show its minimum before calling swapFlow.
+// Implement pauseQuotes/resumeQuotes and reviewChangedQuote using your host UI.
+// Call swapFlow only from an explicit user action; it waits for a completed fill.
+// For persisted recovery, follow lib/swap/activity.ts in the reference app.
 import { createClient, isQuoteFresh, OrderStatus, Partners, type Order, type SpotClient, type SwapQuote } from "@orbs-network/spot-ui";
 import BN from "bignumber.js";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
@@ -347,7 +359,7 @@ export async function swapFlow(account: Address, input: SwapInput) {
     // Validate the signer, chain, partner, token pair, and quote minimum before wallet actions.
     if (request.chainId !== client.chainId || request.partner !== client.partner
         || !/^\\d+$/.test(quote.netAmountOut) || !/^\\d+$/.test(quote.minimumAmountOut)
-        || BigInt(quote.minimumAmountOut) <= 0n || BigInt(quote.minimumAmountOut) > BigInt(quote.netAmountOut)) {
+        || BigInt(quote.minimumAmountOut) <= BigInt(0) || BigInt(quote.minimumAmountOut) > BigInt(quote.netAmountOut)) {
       throw new Error("Quote does not match the selected Spot configuration");
     }
     const token = request.inToken as Address;

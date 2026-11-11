@@ -16,6 +16,7 @@ test("host token conversions preserve precise amounts and native placeholder sup
 
 test("host rejection detection handles nested wallet errors and cyclic causes", () => {
   assert.equal(isUserRejectedError({ error: { code: 4001 } }), true);
+  assert.equal(isUserRejectedError({ code: "USER_REJECTED_REQUEST" }), true);
   assert.equal(isUserRejectedError({ cause: { code: "ACTION_REJECTED" } }), true);
   const error = new Error("RPC unavailable");
   error.cause = error;

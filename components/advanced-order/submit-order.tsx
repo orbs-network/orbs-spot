@@ -14,10 +14,12 @@ import { useEffect, useState } from "react";
 import { useConnection } from "wagmi";
 import { getOrderTitle } from "./utils";
 import { SubmitOrderPanel } from "./review-panel";
+import { useOrderForm } from "./use-order-form";
 import { useOrderReview } from "./use-order-review";
 import { OrderDetailsModal } from "@/features/order-history/details-modal";
 
-export function SubmitOrder({ orderModule }: { orderModule: OrderType }) {
+export function SubmitOrder() {
+  const { orderType: strategy } = useOrderForm();
   const { isDeveloperPlayground } = useDeveloperMode();
   const t = useTranslations();
   const execution = useOrderExecution();
@@ -35,7 +37,7 @@ export function SubmitOrder({ orderModule }: { orderModule: OrderType }) {
       detachSubmission();
     };
   }, [isDeveloperPlayground, setOpen, detachSubmission]);
-  const orderTitle = getOrderTitle(orderModule, t);
+  const orderTitle = getOrderTitle(strategy, t);
   const order = useOrderReview();
   const orderType = order.form.orderType === OrderType.LIMIT
     ? orderTitle

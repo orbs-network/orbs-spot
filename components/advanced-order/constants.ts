@@ -6,7 +6,7 @@ export const DURATION_OPTIONS = [
   { text: "Days", value: TimeUnit.Days },
 ] as const;
 
-export const MODULE_META = {
+export const ORDER_META = {
   [OrderType.TWAP]: {
     titleKey: "twap",
   },

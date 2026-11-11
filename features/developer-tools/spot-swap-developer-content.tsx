@@ -1,5 +1,8 @@
 "use client";
 
+import { confirmAllowance } from "@/lib/spot/allowance";
+import { isQuoteWorse, MAX_QUOTE_AGE_MILLIS, toBestTradeQuote } from "@/lib/swap/quote-review";
+
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { isQuoteFresh, type Order, type PreparedSwap } from "@orbs-network/spot-ui";
 import { OrderSettlementError, waitForOrder } from "@/lib/swap/settlement";
@@ -122,15 +125,6 @@ function getPresentation({ data, step }: { data: JsonContainer; step: SpotSwapFl
     explanation: explanations[step], title: titles[step],
   };
 }
-function waitBeforeAllowanceRetry(signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    signal.throwIfAborted();
-    const abort = () => { clearTimeout(timer); reject(signal.reason); };
-    const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, 1_000);
-    signal.addEventListener("abort", abort, { once: true });
-  });
-}
-
 export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExecutionMode; trigger: ReactElement }) {
   const isDemo = mode === "demo";
   const flowToastId = useId();
@@ -249,7 +243,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           else if (step === "approve") {
             const preview = await client.prepareSwap({ quote: selected.originalQuote, account: account ?? selected.originalQuote.request.user });
             setPrepared(preview);
-            setExecutionQuote({ ...selected, originalQuote: preview.quote, outAmount: preview.quote.netAmountOut, minAmountOut: preview.quote.minimumAmountOut });
+            setExecutionQuote(toBestTradeQuote(preview.quote, selected.inToken));
             advanceToStep("sign");
           } else if (step === "sign") { setSignature(DEMO_SIGNATURE); advanceToStep("swap"); }
           else if (step === "swap") advanceToStep("success");
@@ -313,41 +307,42 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           signal.throwIfAborted();
           return BigInt(value) >= BigInt(request.inAmount);
         };
-        const prepareForSigning = async (quote: BestTradeQuote) => {
-          const valueError = getQuoteValueError(quote);
+        const reviewQuote = (next: BestTradeQuote): boolean => {
+          const valueError = getQuoteValueError(next);
           if (valueError) throw new Error(valueError);
-          const nextPrepared = await client.prepareSwap({ quote: quote.originalQuote, account, signal });
-          await assertContext();
-          const next = { ...quote, originalQuote: nextPrepared.quote,
-            outAmount: nextPrepared.quote.netAmountOut, minAmountOut: nextPrepared.quote.minimumAmountOut };
-          const nextError = getQuoteValueError(next);
-          if (nextError) throw new Error(nextError);
           const reviewed = reviewedQuote ?? selected;
-          if (BigInt(next.minAmountOut) < BigInt(reviewed.minAmountOut) || BigInt(next.outAmount) < BigInt(reviewed.outAmount)) {
+          if (isQuoteWorse(reviewed, next)) {
             returnToSigning();
             setPriceChange({ previous: reviewed, next });
             toast.dismiss(actionToastId);
-            return;
+            return false;
           }
           setExecutionQuote(next);
-          return nextPrepared;
+          return true;
+        };
+        const prepareForSigning = async (quote: BestTradeQuote) => {
+          const valueError = getQuoteValueError(quote);
+          if (valueError) throw new Error(valueError);
+          const prepared = await client.prepareSwap({ quote: quote.originalQuote, account, signal });
+          await assertContext();
+          return reviewQuote(toBestTradeQuote(prepared.quote, quote.inToken)) ? prepared : undefined;
         };
         const refreshIfNeeded = async (): Promise<BestTradeQuote | undefined> => {
-          if (isQuoteFresh(selected.originalQuote, 20_000)) return selected;
+          if (isQuoteFresh(selected.originalQuote, MAX_QUOTE_AGE_MILLIS)) return selected;
           if (!inputCurrency || !outputCurrency) throw new Error("Select both swap tokens.");
           const options = spotSwapQuoteQueryOptions(client, account, inputCurrency, outputCurrency, request.inAmount, request.slippage, getWrappedNativeCurrency(chainId)?.address);
           const fresh = await queryClient.fetchQuery({ ...options, queryKey: ["spot-swap-execution-quote", ...options.queryKey], staleTime: 0, retry: false });
           await assertContext();
           if (!fresh) throw new Error("A fresh Spot quote is unavailable.");
-          const reviewed = reviewedQuote ?? selected;
-          if (BigInt(fresh.minAmountOut) < BigInt(reviewed.minAmountOut) || BigInt(fresh.outAmount) < BigInt(reviewed.outAmount)) {
-            returnToSigning();
-            setPriceChange({ previous: reviewed, next: fresh });
-            toast.dismiss(actionToastId);
-            return;
-          }
-          setExecutionQuote(fresh);
-          return fresh;
+          return reviewQuote(fresh) ? fresh : undefined;
+        };
+        const advanceToSigning = async () => {
+          const quote = await refreshIfNeeded();
+          if (!quote) return;
+          const prepared = await prepareForSigning(quote);
+          if (!prepared) return;
+          setPrepared(prepared);
+          advanceToStep("sign");
         };
         if (step === "flow") {
           setReviewedQuote((current) => current ?? structuredClone(selected));
@@ -359,11 +354,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           if (needsWrap) advanceToStep("wrap");
           else if (!approved) advanceToStep("approve");
           else {
-            const quote = await refreshIfNeeded();
-            if (!quote) return;
-            const nextPrepared = await prepareForSigning(quote);
-            if (!nextPrepared) return;
-            setPrepared(nextPrepared); advanceToStep("sign");
+            await advanceToSigning();
           }
         } else if (step === "wrap") {
           const amount = remainingWrapAmount(BigInt(request.inAmount), getWrappedAmount());
@@ -377,30 +368,20 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           }
           if (approvalRequired) advanceToStep("approve");
           else {
-            const quote = await refreshIfNeeded();
-            if (!quote) return;
-            const nextPrepared = await prepareForSigning(quote);
-            if (!nextPrepared) return;
-            setPrepared(nextPrepared); advanceToStep("sign");
+            await advanceToSigning();
           }
         } else if (step === "approve") {
           if (!(await hasAllowance())) {
             await assertContext();
             const { receipt } = await approveToken({ tokenAddress: request.inToken, spenderAddress: client.spenderAddress, amount: request.inAmount });
             if (receipt.status !== "success") throw new Error("Token approval reverted");
-            let approved = false;
-            for (let attempt = 0; attempt < 3; attempt += 1) {
-              if (await hasAllowance()) { approved = true; break; }
-              if (attempt < 2) await waitBeforeAllowanceRetry(signal);
-            }
-            if (!approved) throw new Error("Approval is not available. Check allowance before retrying.");
+            await confirmAllowance(hasAllowance, {
+              message: "Approval is not available. Check allowance before retrying.",
+              attempts: 3, delayMillis: 1_000, signal,
+            });
           }
           setApprovalRequired(false);
-          const quote = await refreshIfNeeded();
-          if (!quote) return;
-          const nextPrepared = await prepareForSigning(quote);
-          if (!nextPrepared) return;
-          setPrepared(nextPrepared); advanceToStep("sign");
+          await advanceToSigning();
         } else if (step === "sign") {
           const quote = await refreshIfNeeded();
           if (!quote) return;
@@ -414,7 +395,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           const { signerAddress, typedData } = nextPrepared.signingRequest;
           const originalSignature = await signTypedData({ ...typedData, message: { ...typedData.message }, account: signerAddress });
           await assertContext();
-          if (!isQuoteFresh(nextPrepared.quote, 20_000)) {
+          if (!isQuoteFresh(nextPrepared.quote, MAX_QUOTE_AGE_MILLIS)) {
             returnToSigning();
             toast.info("Quote expired during signing. Review and sign again.", { id: actionToastId, duration: 3_000, position: "bottom-right" });
             return;
@@ -424,7 +405,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           let order = acceptedOrder;
           if (!order) {
             if (!prepared || !signature || submittedRef.current) throw new Error("Sign the prepared order before submitting. Reconcile any previous submission in order history.");
-            if (!isQuoteFresh(prepared.quote, 20_000)) {
+            if (!isQuoteFresh(prepared.quote, MAX_QUOTE_AGE_MILLIS)) {
               returnToSigning();
               const quote = await refreshIfNeeded();
               if (quote) toast.info("Quote refreshed. Sign the prepared order again.", { id: actionToastId, duration: 3_000, position: "bottom-right" });
@@ -434,7 +415,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
             await assertContext();
             await assertBalance(true);
             signal.throwIfAborted();
-            if (!isQuoteFresh(prepared.quote, 20_000)) {
+            if (!isQuoteFresh(prepared.quote, MAX_QUOTE_AGE_MILLIS)) {
               returnToSigning();
               await refreshIfNeeded();
               toast.dismiss(actionToastId);

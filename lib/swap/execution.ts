@@ -1,3 +1,5 @@
+import { confirmAllowance } from "../spot/allowance.ts";
+import { isQuoteWorse, MAX_QUOTE_AGE_MILLIS, toBestTradeQuote } from "./quote-review.ts";
 import {
   isQuoteFresh,
   type Order,
@@ -21,7 +23,6 @@ export interface SwapIntent {
   native: boolean;
 }
 
-const MAX_QUOTE_AGE_MILLIS = 20_000;
 const sameAddress = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const positiveInteger = (value: string) => /^\d+$/.test(value) && BigInt(value) > BigInt(0);
 
@@ -107,7 +108,7 @@ export function createSwapExecutor({
   settle = waitForOrder,
   allowanceRetryDelayMillis = 500,
 }: SwapExecutorOptions = {}) {
-  let wrapped: { key: string; amount: bigint } | undefined;
+  let wrappedKey: string | undefined;
   async function execute(source: SwapExecution): Promise<{ order: Order }> {
     const release = source.releaseWalletLock ?? acquireSwapExecutionLock({});
     // Capture the client, callbacks and reviewed data before the first await.
@@ -128,7 +129,6 @@ export function createSwapExecutor({
       };
       checkActive();
       if (!positiveInteger(intent.amount)) throw new Error("Enter a valid swap amount");
-      const reviewedMinimum = reviewedQuote.minAmountOut;
       const assertIdentity = (candidate: BestTradeQuote, requireFresh = true) => {
         if (requireFresh) assertSwapQuote(candidate, intent);
         else assertSwapQuoteIdentity(candidate, intent);
@@ -141,18 +141,20 @@ export function createSwapExecutor({
       // A fresh response cannot make a quote reviewed for another signer or
       // form eligible for this attempt.
       assertIdentity(reviewedQuote, false);
+      const acceptQuote = (candidate: BestTradeQuote) => {
+        assertIdentity(candidate);
+        if (isQuoteWorse(reviewedQuote, candidate)) {
+          throw new QuoteUpdatedError(reviewedQuote, structuredClone(candidate));
+        }
+        quote = structuredClone(candidate);
+      };
       const freshQuote = async () => {
         checkActive();
         if (!isQuoteFresh(quote.originalQuote, MAX_QUOTE_AGE_MILLIS)) {
           const fresh = await input.refreshQuote();
           checkActive();
           if (!fresh) throw new Error("Quote is unavailable. Request a new quote.");
-          assertIdentity(fresh);
-          if (BigInt(fresh.minAmountOut) < BigInt(reviewedMinimum) ||
-              BigInt(fresh.outAmount) < BigInt(reviewedQuote.outAmount)) {
-            throw new QuoteUpdatedError(reviewedQuote, structuredClone(fresh));
-          }
-          quote = structuredClone(fresh);
+          acceptQuote(fresh);
         }
         assertIdentity(quote);
       };
@@ -162,13 +164,12 @@ export function createSwapExecutor({
       const approved = await input.hasAllowance();
       checkActive();
       const amount = BigInt(intent.amount);
-      let alreadyWrapped = BigInt(0);
-      if (intent.native && wrapped?.key === key && input.getWrappedBalance) {
+      let wrapAmount = intent.native ? amount : BigInt(0);
+      if (intent.native && wrappedKey === key && input.getWrappedBalance) {
         const wrappedBalance = await input.getWrappedBalance();
         checkActive();
-        if (BigInt(wrappedBalance) >= amount) alreadyWrapped = amount;
+        if (BigInt(wrappedBalance) >= amount) wrapAmount = BigInt(0);
       }
-      const wrapAmount = intent.native && amount > alreadyWrapped ? amount - alreadyWrapped : BigInt(0);
       checkActive();
       if (input.hasInputBalance && !await input.hasInputBalance((intent.native ? wrapAmount : amount).toString())) {
         throw new Error("Insufficient input balance for this swap");
@@ -186,7 +187,7 @@ export function createSwapExecutor({
         input.onStep("WRAP", index++);
         checkActive();
         await input.wrap(wrapAmount.toString());
-        wrapped = { key, amount: alreadyWrapped + wrapAmount };
+        wrappedKey = key;
         // A late receipt still confirms funds for the captured account, even
         // when its controller was aborted while the transaction was pending.
         input.onWrapped();
@@ -199,22 +200,12 @@ export function createSwapExecutor({
         await input.approve();
         checkActive();
       }
-      // Confirmed receipts and allowance reads can briefly disagree. Bound the
-      // rereads and never issue another approval automatically.
-      let sufficient = false;
-      for (let attempt = 0; attempt < 4; attempt++) {
+      await confirmAllowance(async () => {
         await assertWallet();
-        if (await input.hasAllowance()) {
-          checkActive();
-          sufficient = true;
-          break;
-        }
+        const sufficient = await input.hasAllowance();
         checkActive();
-        if (attempt < 3 && allowanceRetryDelayMillis > 0) {
-          await new Promise(resolve => setTimeout(resolve, allowanceRetryDelayMillis));
-        }
-      }
-      if (!sufficient) throw new Error("Confirmed allowance is still below the swap amount");
+        return sufficient;
+      }, { message: "Confirmed allowance is still below the swap amount", delayMillis: allowanceRetryDelayMillis });
       if (!approved) input.onApproved();
       const assertSpendBalance = async () => {
         checkActive();
@@ -233,18 +224,7 @@ export function createSwapExecutor({
       checkActive();
       // Preparation may refresh a quote while configuration or RPC reads are pending.
       // Retain every reviewed identity and require review before signing a worse price.
-      const preparedQuote: BestTradeQuote = {
-        ...quote,
-        originalQuote: prepared.quote,
-        outAmount: prepared.quote.netAmountOut,
-        minAmountOut: prepared.quote.minimumAmountOut,
-      };
-      assertIdentity(preparedQuote);
-      if (BigInt(preparedQuote.minAmountOut) < BigInt(reviewedMinimum)
-        || BigInt(preparedQuote.outAmount) < BigInt(reviewedQuote.outAmount)) {
-        throw new QuoteUpdatedError(reviewedQuote, structuredClone(preparedQuote));
-      }
-      quote = structuredClone(preparedQuote);
+      acceptQuote(toBestTradeQuote(prepared.quote, quote.inToken));
       await assertSpendBalance();
       await assertWallet();
       checkActive();
@@ -264,7 +244,7 @@ export function createSwapExecutor({
       checkActive();
       submitted = true;
       // A lost POST response may still have spent these wrapped funds.
-      wrapped = undefined;
+      wrappedKey = undefined;
       // No wallet writes remain. Another draft can submit while this POST and
       // its settlement finish, without sharing this attempt's state or toast.
       release();

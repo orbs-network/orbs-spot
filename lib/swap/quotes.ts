@@ -1,3 +1,4 @@
+import { toBestTradeQuote } from "./quote-review.ts";
 import { isNativeAddress } from "../spot/token-utils.ts";
 import { QuoteError, type SpotClient } from "@orbs-network/spot-ui";
 import { queryOptions } from "@tanstack/react-query";
@@ -28,15 +29,7 @@ export function spotSwapQuoteQueryOptions(
       }
       const quote = await client.getQuote({ inToken, outToken, inAmount: rawAmount,
         user: account, slippage, dexMinAmountOut: "-1", signal });
-      return {
-        outAmount: quote.netAmountOut,
-        minAmountOut: quote.minimumAmountOut,
-        inToken: source,
-        outToken,
-        inAmount: rawAmount,
-        slippage,
-        originalQuote: quote,
-      };
+      return toBestTradeQuote(quote, source);
     },
     staleTime: 10_000,
     retry: (failureCount, error) => failureCount < 2 && (!(error instanceof QuoteError) || error.retryable),

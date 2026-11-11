@@ -19,19 +19,19 @@ import { useSpotMarketReferencePrice, useSpotToken } from "./hooks";
 import { getOrderDraftKey, usesMarketPrice, type OrderInput } from "@/lib/spot/form";
 import { useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { FormTab } from "@/lib/types";
-import { getModule } from "./utils";
+import { getOrderType } from "./utils";
 import { formatAmount } from "@/lib/token-display";
 import BN from "bignumber.js";
 import { invertPricePercentage } from "@/lib/exchange-rates";
 const EMPTY_INPUT: OrderInput = {};
 
 /** Called once by AdvancedOrderForm. All consumers share this calculated snapshot. */
-export function useCalculatedOrder(module: OrderType) {
+export function useCalculatedOrder(orderType: OrderType) {
   const { inputCurrency, outputCurrency, inputAmount, quoteUsd } = useDerivedSwap();
   const chainId = useDataChainId();
   const { address } = useConnection();
-  // Draft prices and schedules belong to a specific chain, module and token pair.
-  const key = getOrderDraftKey(chainId, module, inputCurrency?.address, outputCurrency?.address);
+  // Draft prices and schedules belong to a specific chain, orderType and token pair.
+  const key = getOrderDraftKey(chainId, orderType, inputCurrency?.address, outputCurrency?.address);
   const input = useSwapStore((state) =>
     state.orderDraft.key === key ? state.orderDraft.input : EMPTY_INPUT,
   );
@@ -59,7 +59,7 @@ export function useCalculatedOrder(module: OrderType) {
       const triggerPercent = BN(input.triggerPricePercent ?? "").lte(-100) ? "-100" : input.triggerPricePercent;
       const limitPercent = BN(input.limitPricePercent ?? "").lte(-100) ? "-100" : input.limitPricePercent;
       const params: CalculateOrderFormParams = {
-        orderType: module,
+        orderType,
         inputTokenDecimals: inputToken?.decimals ?? 18,
         outputTokenDecimals: outputToken?.decimals ?? 18,
         quotedOutputAmountRaw: quote,
@@ -77,7 +77,7 @@ export function useCalculatedOrder(module: OrderType) {
           limitPricePercent: input.isPriceInverted ? invertPricePercentage(limitPercent) : limitPercent,
           inputAmountUi: inputAmount,
           isMarketOrder:
-            usesMarketPrice(module, limitPriceEnabled),
+            usesMarketPrice(orderType, limitPriceEnabled),
         },
       };
       const form = calculateOrder(params);
@@ -88,13 +88,13 @@ export function useCalculatedOrder(module: OrderType) {
           triggerPriceUi: undefined,
           triggerPricePercent: undefined,
           limitPriceUi: undefined,
-          limitPricePercent: module === OrderType.STOP_LOSS || module === OrderType.TAKE_PROFIT ? undefined : "0",
+          limitPricePercent: orderType === OrderType.STOP_LOSS || orderType === OrderType.TAKE_PROFIT ? undefined : "0",
         },
       });
       return { form, defaultPrices: { trigger: defaults.triggerPrice.raw, limit: defaults.limitPrice.raw } };
     },
     [
-      module,
+      orderType,
       inputToken?.decimals,
       outputToken?.decimals,
       quote,
@@ -240,7 +240,7 @@ export function useDisclaimer() {
   const { selectedTab } = useSelectedFormTab();
   const limitPriceEnabled = useSwapStore(state => state.orderLimitPriceEnabled);
   if (selectedTab.value === FormTab.SWAP) return undefined;
-  const orderModule = getModule(selectedTab.value);
+  const orderModule = getOrderType(selectedTab.value);
   return usesMarketPrice(orderModule, limitPriceEnabled)
     ? orderModule === OrderType.STOP_LOSS || orderModule === OrderType.TAKE_PROFIT
       ? "triggerMarketPriceDisclaimer"

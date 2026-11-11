@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "deploy": "bash scripts/deploy.sh"
+    "deploy": "bash scripts/deploy.sh",
+    "test": "node --experimental-transform-types --test scripts/*.test.mjs && yarn examples:check",
+    "examples:generate": "node --experimental-transform-types scripts/export-sdk-examples.mjs",
+    "examples:check": "yarn examples:generate --check"
   },
   "dependencies": {
     "@base-org/account": "~2.4.0",

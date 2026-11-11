@@ -235,10 +235,10 @@ function TimeInputPanel({ kind, disabledReason }: { kind: "duration" | "fillDela
   );
 }
 
-export function ModuleInputs({ orderModule }: { orderModule: OrderType }) {
-  const { schedule } = useOrderForm();
+export function OrderSchedule() {
+  const { schedule, orderType } = useOrderForm();
 
-  if (orderModule === OrderType.TWAP) {
+  if (orderType === OrderType.TWAP) {
     return (
       <div data-twap-schedule className="contents">
         <TradesPanel />

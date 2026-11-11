@@ -9,9 +9,9 @@ export function DownloadIntegrationButton({ flow, getCode }: {
 }) {
   function download() {
     const setup = flow === "spot-swap"
-      ? "Install: npm install @orbs-network/spot-ui viem\nConfigure: chain, partner, and your connected wallet provider.\nCall swapFlow with your reviewed quote, quote polling controls, and cancellation signal. Display quote.minimumAmountOut unchanged in review."
-      : "Install: npm install @orbs-network/spot-ui viem\nConfigure: chain, partner, and your connected wallet provider.\nThe calculation parameters below reflect the current saved form.\nCall createAdvancedOrderFlow with the wallet account and token addresses.";
-    const blob = new Blob([`/*\n${setup}\nBrowser integration: import this module only on the client.\n*/\n\n`, getCode()], { type: "text/plain;charset=utf-8" });
+      ? "Install: npm install @orbs-network/spot-ui viem bignumber.js\nConfigure: chain, partner, and your connected wallet provider.\nCall swapFlow with your reviewed quote, quote polling controls, and cancellation signal. Display quote.minimumAmountOut unchanged in review."
+      : "Install: npm install @orbs-network/spot-ui viem\nConfigure: chain, partner, and your connected wallet provider.\nThe calculation parameters below reflect the current saved form.\nCall createAdvancedOrderFlow with the wallet account, token addresses, and current formParams.";
+    const blob = new Blob([`/*\n${setup}\nBrowser integration: load this module inside a browser event handler; it reads window at module scope.\n*/\n\n`, getCode()], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
