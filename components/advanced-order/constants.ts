@@ -1,4 +1,4 @@
-import { Module, TimeUnit } from "@orbs-network/spot-ui";
+import { OrderType, TimeUnit } from "@orbs-network/spot-ui";
 
 export const DURATION_OPTIONS = [
   { text: "Minutes", value: TimeUnit.Minutes },
@@ -7,19 +7,16 @@ export const DURATION_OPTIONS = [
 ] as const;
 
 export const MODULE_META = {
-  [Module.SWAP]: {
-    titleKey: "swap",
-  },
-  [Module.TWAP]: {
+  [OrderType.TWAP]: {
     titleKey: "twap",
   },
-  [Module.LIMIT]: {
+  [OrderType.LIMIT]: {
     titleKey: "limit",
   },
-  [Module.STOP_LOSS]: {
+  [OrderType.STOP_LOSS]: {
     titleKey: "stopLoss",
   },
-  [Module.TAKE_PROFIT]: {
+  [OrderType.TAKE_PROFIT]: {
     titleKey: "takeProfit",
   },
 } as const;

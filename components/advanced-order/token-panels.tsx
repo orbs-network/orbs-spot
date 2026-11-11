@@ -16,7 +16,7 @@ import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useTranslations } from "@/lib/use-translations";
 import { Field } from "@/lib/types";
 import { displayTokenAmount } from "@/lib/token-display";
-import { Module, type InputError } from "@orbs-network/spot-ui";
+import { OrderType, type InputError } from "@orbs-network/spot-ui";
 import { type ReactNode, useCallback } from "react";
 import { DURATION_OPTIONS } from "./constants";
 import { formatInputError } from "./utils";
@@ -235,10 +235,10 @@ function TimeInputPanel({ kind, disabledReason }: { kind: "duration" | "fillDela
   );
 }
 
-export function ModuleInputs({ orderModule }: { orderModule: Module }) {
+export function ModuleInputs({ orderModule }: { orderModule: OrderType }) {
   const { schedule } = useOrderForm();
 
-  if (orderModule === Module.TWAP) {
+  if (orderModule === OrderType.TWAP) {
     return (
       <div data-twap-schedule className="contents">
         <TradesPanel />

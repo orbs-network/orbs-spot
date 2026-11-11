@@ -19,7 +19,7 @@ const FLOW_STEPS = [
   },
   {
     detail:
-      "Submit the exact prepared order and original signature. submitOrder returns an accepted order; waitForOrder confirms its completed fill.",
+      "Submit the exact prepared order and original signature. submitSwap returns an accepted order; host polling through client.getOrder confirms its completed fill.",
     meta: "Spot · completed order",
     title: "Submit and confirm",
   },

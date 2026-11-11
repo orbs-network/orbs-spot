@@ -1,4 +1,4 @@
-import { calculateOrder, Module, type CalculatedOrderForm, type CalculateOrderFormParams, type SpotClient, type RePermitData } from "@orbs-network/spot-ui";
+import { calculateOrder, OrderType, type CalculatedOrderForm, type CalculateOrderFormParams, type SpotClient, type RePermitData } from "@orbs-network/spot-ui";
 import type { useDeveloperOrder } from "./use-developer-order";
 import BN from "bignumber.js";
 import type { JsonContainer, JsonValidationIssue } from "./json-inspector";
@@ -12,13 +12,11 @@ export function getLiveOrderFormInput(spot: SpotData): JsonContainer {
     return value.isFinite() && value.gt(0) ? value.toFixed() : undefined;
   };
   const params: CalculateOrderFormParams = {
-    module: spot.module,
+    orderType: spot.orderType,
     inputTokenDecimals: data.srcToken?.decimals ?? 18,
     outputTokenDecimals: data.dstToken?.decimals ?? 18,
     quotedOutputAmountRaw: data.quotedOutputAmountRaw,
     inputAmountUsd: data.srcAmountUsd || undefined,
-    quotedOutputAmountUsd: data.quoteUsd?.outputAmountUsd,
-    minimumOutputAmountUsd: data.quoteUsd?.minimumAmountOutUsd,
     inputTokenUsdPrice: data.quoteUsd?.inputTokenUsdPrice ?? unitPrice(data.srcAmountUsd, data.srcAmountUI),
     outputTokenUsdPrice: data.quoteUsd?.outputTokenUsdPrice ?? unitPrice(data.dstAmountUsd, data.dstAmountUI),
     minTradeSizeUsd: 10,
@@ -43,8 +41,8 @@ function readParams(data: JsonContainer): CalculateOrderFormParams {
     throw new Error("Order calculation inputs are missing.");
   }
   const params = data.formParams;
-  if (!Object.values(Module).some((module) => module === params.module)) {
-    throw new Error("Select a supported order module.");
+  if (!Object.values(OrderType).some((orderType) => orderType === params.orderType)) {
+    throw new Error("Select a supported order type.");
   }
   for (const key of ["inputTokenDecimals", "outputTokenDecimals", "minTradeSizeUsd", "priceProtectionPercent", "displayFeePercent"] as const) {
     if (typeof params[key] !== "number" || !Number.isFinite(params[key]) || params[key] < 0) {
@@ -81,7 +79,7 @@ export function rebuildCalculatedPermit(permitData: RePermitData, form: Calculat
     form,
     inputTokenAddress: permitData.order.permitted.token,
     outputTokenAddress: permitData.order.witness.output.token,
-    swapperAddress: account,
+    account,
   });
   return { ...client.rePermitData, order: prepared.order };
 }

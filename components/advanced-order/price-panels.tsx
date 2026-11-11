@@ -9,7 +9,7 @@ import { NumericInput } from "@/components/ui/numeric-input";
 import { Switch } from "@/components/ui/switch";
 import { useTranslations } from "@/lib/use-translations";
 import { cn } from "@/lib/utils";
-import { Module, type Token } from "@orbs-network/spot-ui";
+import { OrderType, type Token } from "@orbs-network/spot-ui";
 import { ArrowLeftRightIcon, RotateCcwIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { numericFormatter } from "react-number-format";
@@ -132,7 +132,7 @@ function PriceInvertButton() {
   </button>;
 }
 
-function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
+function TriggerPricePanel({ orderModule }: { orderModule: OrderType }) {
   const t = useTranslations();
   const { displayInputToken, isInverted } = usePriceDisplay();
   const {
@@ -146,10 +146,10 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
     error,
   } = useTriggerPrice();
 
-  if (orderModule !== Module.STOP_LOSS && orderModule !== Module.TAKE_PROFIT) {
+  if (orderModule !== OrderType.STOP_LOSS && orderModule !== OrderType.TAKE_PROFIT) {
     return null;
   }
-  const activatesBelow = (orderModule === Module.STOP_LOSS) !== isInverted;
+  const activatesBelow = (orderModule === OrderType.STOP_LOSS) !== isInverted;
   const activationHelp = `Activates at or ${activatesBelow ? "below" : "above"} this price.`;
 
   return (
@@ -160,7 +160,7 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
           textClassName="min-w-0 text-xs text-foreground"
           tooltipAriaLabel="Trigger price information"
           tooltip={`${activationHelp} ${t(
-            orderModule === Module.STOP_LOSS
+            orderModule === OrderType.STOP_LOSS
               ? "stopLossTooltip"
               : "takeProfitTooltip",
           )} ${t("triggerLimitRelationshipTooltip")}`}
@@ -186,7 +186,7 @@ function TriggerPricePanel({ orderModule }: { orderModule: Module }) {
   );
 }
 
-function LimitPricePanel({ orderModule }: { orderModule: Module }) {
+function LimitPricePanel({ orderModule }: { orderModule: OrderType }) {
   const t = useTranslations();
   const toggleId = useId();
   const descriptionId = `${toggleId}-description`;
@@ -204,15 +204,15 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
     error,
   } = useLimitPrice();
 
-  const isTrigger = orderModule === Module.STOP_LOSS || orderModule === Module.TAKE_PROFIT;
-  const isOptional = orderModule !== Module.LIMIT;
-  const limitHelp = orderModule === Module.TWAP
+  const isTrigger = orderModule === OrderType.STOP_LOSS || orderModule === OrderType.TAKE_PROFIT;
+  const isOptional = orderModule !== OrderType.LIMIT;
+  const limitHelp = orderModule === OrderType.TWAP
     ? "The limit applies to every individual trade. Trades only fill at your limit rate or better. If the market moves beyond the limit, remaining trades can stay unfilled until conditions improve or the order expires. The order may expire partially filled."
     : isTrigger ? t("triggerLimitRelationshipTooltip") : t("limitPriceTooltip");
   const priceHelp = isLimitPrice ? limitHelp : `${limitHelp} The market rate is an indicative reference, not a guaranteed execution price. It may change before a trade executes.`;
   const modeDescription = isLimitPrice
-    ? orderModule === Module.TWAP ? "Each trade executes only at your limit price or better." : "Once triggered, execute only at your limit price or better."
-    : orderModule === Module.TWAP ? "Each trade uses the current market price." : "Once triggered, execute at the current market price.";
+    ? orderModule === OrderType.TWAP ? "Each trade executes only at your limit price or better." : "Once triggered, execute only at your limit price or better."
+    : orderModule === OrderType.TWAP ? "Each trade uses the current market price." : "Once triggered, execute at the current market price.";
 
   return (
     <div data-limit-price-panel className={cn("flex flex-col gap-1.5", isTrigger && "mt-1")}>
@@ -263,7 +263,7 @@ function LimitPricePanel({ orderModule }: { orderModule: Module }) {
   );
 }
 
-export function PricesPanel({ orderModule }: { orderModule: Module }) {
+export function PricesPanel({ orderModule }: { orderModule: OrderType }) {
   return (
     <FormPanel data-order-prices-panel className="flex flex-col gap-1.5">
       <TriggerPricePanel orderModule={orderModule} />

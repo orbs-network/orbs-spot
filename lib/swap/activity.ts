@@ -1,6 +1,8 @@
 "use client";
 
-import { OrderSettlementError, OrderStatus, Partners, type Order, type Token } from "@orbs-network/spot-ui";
+import { OrderSettlementError } from "./settlement.ts";
+
+import { OrderStatus, Partners, type Order, type Token } from "@orbs-network/spot-ui";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 

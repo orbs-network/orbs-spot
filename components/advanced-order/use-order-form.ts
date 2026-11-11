@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo, useCallback } from "react";
 import {
   calculateOrder,
   invertPriceInput,
-  Module,
+  OrderType,
   type CalculateOrderFormParams,
   type TimeUnit,
 } from "@orbs-network/spot-ui";
@@ -26,7 +26,7 @@ import { invertPricePercentage } from "@/lib/exchange-rates";
 const EMPTY_INPUT: OrderInput = {};
 
 /** Called once by AdvancedOrderForm. All consumers share this calculated snapshot. */
-export function useCalculatedOrder(module: Module) {
+export function useCalculatedOrder(module: OrderType) {
   const { inputCurrency, outputCurrency, inputAmount, quoteUsd } = useDerivedSwap();
   const chainId = useDataChainId();
   const { address } = useConnection();
@@ -59,13 +59,11 @@ export function useCalculatedOrder(module: Module) {
       const triggerPercent = BN(input.triggerPricePercent ?? "").lte(-100) ? "-100" : input.triggerPricePercent;
       const limitPercent = BN(input.limitPricePercent ?? "").lte(-100) ? "-100" : input.limitPricePercent;
       const params: CalculateOrderFormParams = {
-        module,
+        orderType: module,
         inputTokenDecimals: inputToken?.decimals ?? 18,
         outputTokenDecimals: outputToken?.decimals ?? 18,
         quotedOutputAmountRaw: quote,
         inputAmountUsd: quoteUsd.inputAmountUsd,
-        quotedOutputAmountUsd: quoteUsd.outputAmountUsd,
-        minimumOutputAmountUsd: quoteUsd.minimumAmountOutUsd,
         inputTokenUsdPrice: inputUsd,
         outputTokenUsdPrice: outputUsd,
         inputBalanceRaw: address ? balance : undefined,
@@ -90,7 +88,7 @@ export function useCalculatedOrder(module: Module) {
           triggerPriceUi: undefined,
           triggerPricePercent: undefined,
           limitPriceUi: undefined,
-          limitPricePercent: module === Module.STOP_LOSS || module === Module.TAKE_PROFIT ? undefined : "0",
+          limitPricePercent: module === OrderType.STOP_LOSS || module === OrderType.TAKE_PROFIT ? undefined : "0",
         },
       });
       return { form, defaultPrices: { trigger: defaults.triggerPrice.raw, limit: defaults.limitPrice.raw } };
@@ -103,8 +101,6 @@ export function useCalculatedOrder(module: Module) {
       inputUsd,
       outputUsd,
       quoteUsd.inputAmountUsd,
-      quoteUsd.outputAmountUsd,
-      quoteUsd.minimumAmountOutUsd,
       address,
       balance,
       priceProtection,
@@ -231,7 +227,7 @@ export function useLimitPrice() {
       updateInput({
         limitPriceUi: undefined,
         limitPricePercent:
-          form.module === Module.STOP_LOSS || form.module === Module.TAKE_PROFIT
+          form.orderType === OrderType.STOP_LOSS || form.orderType === OrderType.TAKE_PROFIT
             ? undefined
             : "",
       }),
@@ -246,7 +242,7 @@ export function useDisclaimer() {
   if (selectedTab.value === FormTab.SWAP) return undefined;
   const orderModule = getModule(selectedTab.value);
   return usesMarketPrice(orderModule, limitPriceEnabled)
-    ? orderModule === Module.STOP_LOSS || orderModule === Module.TAKE_PROFIT
+    ? orderModule === OrderType.STOP_LOSS || orderModule === OrderType.TAKE_PROFIT
       ? "triggerMarketPriceDisclaimer"
       : "marketOrderDisclaimer"
     : "limitOrderDisclaimer";

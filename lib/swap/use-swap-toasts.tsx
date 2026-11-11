@@ -1,7 +1,9 @@
 "use client";
 
+import { OrderSettlementError } from "./settlement.ts";
+
 import { toast } from "sonner";
-import { OrderSettlementError, OrderStatus, type Order, type Partners, type Token } from "@orbs-network/spot-ui";
+import { OrderStatus, type Order, type Partners, type Token } from "@orbs-network/spot-ui";
 import { dismissTransactionRejectedToast } from "@/lib/tx-rejection";
 import { TradeToastDetails, type ToastTransaction } from "@/components/ui/trade-toast-details";
 import { showSwapSuccessToast } from "@/components/ui/swap-success-toast";

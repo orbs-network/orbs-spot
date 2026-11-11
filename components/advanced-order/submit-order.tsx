@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
 import { useTranslations } from "@/lib/use-translations";
-import { Module, type Order } from "@orbs-network/spot-ui";
+import { OrderType, type Order } from "@orbs-network/spot-ui";
 import { ExecutionPhase } from "@/lib/spot/execution";
 import { useOrderExecution } from "./use-order-execution";
 import { useEffect, useState } from "react";
@@ -17,7 +17,7 @@ import { SubmitOrderPanel } from "./review-panel";
 import { useOrderReview } from "./use-order-review";
 import { OrderDetailsModal } from "@/features/order-history/details-modal";
 
-export function SubmitOrder({ orderModule }: { orderModule: Module }) {
+export function SubmitOrder({ orderModule }: { orderModule: OrderType }) {
   const { isDeveloperPlayground } = useDeveloperMode();
   const t = useTranslations();
   const execution = useOrderExecution();
@@ -37,7 +37,7 @@ export function SubmitOrder({ orderModule }: { orderModule: Module }) {
   }, [isDeveloperPlayground, setOpen, detachSubmission]);
   const orderTitle = getOrderTitle(orderModule, t);
   const order = useOrderReview();
-  const orderType = order.form.module === Module.LIMIT
+  const orderType = order.form.orderType === OrderType.LIMIT
     ? orderTitle
     : `${orderTitle} ${order.form.values.isMarketOrder ? "Market" : "Limit"}`;
 

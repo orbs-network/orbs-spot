@@ -1,6 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createOrderExecutor, ExecutionPhase, Steps } from "../lib/spot/execution.ts";
+import { isNativeAddress, toAmountRaw, toAmountUI } from "../lib/spot/token-utils.ts";
+import { isUserRejectedError } from "../lib/spot/wallet-errors.ts";
+
+test("host token conversions preserve precise amounts and native placeholder support", () => {
+  assert.equal(isNativeAddress("0x0000000000000000000000000000000000000000"), true);
+  assert.equal(isNativeAddress("0xEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"), true);
+  assert.equal(isNativeAddress("0x1111111111111111111111111111111111111111"), false);
+  assert.equal(toAmountUI("123456789012345678901234567890123456789", 24), "123456789012345.678901234567890123456789");
+  assert.equal(toAmountRaw("1.23456789", 6), "1234567");
+  assert.equal(toAmountUI(undefined, 18), "");
+  assert.equal(toAmountRaw("NaN", 18), "");
+});
+
+test("host rejection detection handles nested wallet errors and cyclic causes", () => {
+  assert.equal(isUserRejectedError({ error: { code: 4001 } }), true);
+  assert.equal(isUserRejectedError({ cause: { code: "ACTION_REJECTED" } }), true);
+  const error = new Error("RPC unavailable");
+  error.cause = error;
+  assert.equal(isUserRejectedError(error), false);
+});
 
 function fixture() {
   const snapshots = [];

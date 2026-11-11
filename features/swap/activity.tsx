@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { OrderSettlementError, OrderStatus, watchOrder } from "@orbs-network/spot-ui";
-import { useQueries, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import { OrderStatus } from "@orbs-network/spot-ui";
+import { useQueries, useQueryClient, type QueryClient, type UseQueryResult } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { SUPPORTED_CHAINS } from "@/lib/consts";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
@@ -10,13 +10,16 @@ import { SwapStatus } from "@/lib/types";
 import { getFillTransactionHash, getSwapActivityId, resolveSwapSettlementOrder, useSwapActivity, type SwapActivity, type SpotSwapActivity } from "@/lib/swap/activity";
 import { swapOrderKey, swapSubmissions } from "@/lib/swap/submissions";
 import { createSwapToasts } from "@/lib/swap/use-swap-toasts";
+import { OrderSettlementError, watchOrder } from "@/lib/swap/settlement";
+import { spotClientQueryOptions } from "@/lib/spot/queries";
+import { getActiveSpotPartner } from "@/lib/partners/spot";
 
 const supportedChains = new Set<number>(SUPPORTED_CHAINS.map(chain => chain.id));
 const legacyReceiptTimeoutMillis = 24 * 60 * 60 * 1_000;
 const completedResults = (results: UseQueryResult<SwapActivity>[]) =>
   results.flatMap(result => result.data && result.data.status !== "pending" ? [result.data] : []);
 
-async function trackSpotSwap(item: SpotSwapActivity, signal: AbortSignal): Promise<SpotSwapActivity> {
+async function trackSpotSwap(item: SpotSwapActivity, signal: AbortSignal, queryClient: QueryClient): Promise<SpotSwapActivity> {
   let order = item.order;
   const toasts = createSwapToasts({ id: `recovered-swap-${swapOrderKey(item.chainId, item.orderId)}`,
     inputSymbol: item.inputSymbol, outputSymbol: item.outputSymbol, inputAmount: item.inputAmount,
@@ -24,7 +27,9 @@ async function trackSpotSwap(item: SpotSwapActivity, signal: AbortSignal): Promi
     account: item.account, partner: item.partner });
   toasts.onSwapConfirming(order);
   try {
-    for await (const current of watchOrder({ order, signal })) {
+    const client = await queryClient.fetchQuery(spotClientQueryOptions(item.partner ?? getActiveSpotPartner(), item.chainId));
+    signal.throwIfAborted();
+    for await (const current of watchOrder({ client, order, signal })) {
       order = current;
       if (order.status === OrderStatus.Open) toasts.onSwapConfirming(order);
     }
@@ -44,8 +49,8 @@ async function trackSpotSwap(item: SpotSwapActivity, signal: AbortSignal): Promi
   }
 }
 
-async function trackSwap(item: SwapActivity, signal: AbortSignal): Promise<SwapActivity> {
-  if (item.kind === "spot") return trackSpotSwap(item, signal);
+async function trackSwap(item: SwapActivity, signal: AbortSignal, queryClient: QueryClient): Promise<SwapActivity> {
+  if (item.kind === "spot") return trackSpotSwap(item, signal, queryClient);
   try {
     const response = await fetch(`/api/transaction-receipt?chainId=${item.chainId}&hash=${item.hash}`, { signal });
     if (response.status === 202) return { ...item, status: Date.now() - item.createdAt >= legacyReceiptTimeoutMillis ? "unconfirmed" : "pending" };
@@ -72,9 +77,9 @@ export function PendingSwapMonitor() {
     && (item.kind === "spot" ? item.orderId !== activeOrderId && !activeOrders.includes(swapOrderKey(item.chainId, item.orderId)) : item.hash !== activeHash)), [items, address, activeHash, activeOrderId, activeOrders]);
   const completed = useQueries({ combine: completedResults, queries: pending.map(item => ({
     queryKey: ["persisted-swap-status", item.kind ?? "transaction", item.chainId, getSwapActivityId(item)],
-    queryFn: ({ signal }: { signal: AbortSignal }) => trackSwap(item, signal),
+    queryFn: ({ signal }: { signal: AbortSignal }) => trackSwap(item, signal, queryClient),
     staleTime: item.kind === "spot" ? Infinity : 10_000,
-    // The SDK already polls Spot orders serially through deadline + 60 seconds.
+    // One host tracker polls Spot orders serially through deadline + 60 seconds.
     refetchInterval: item.kind === "spot" ? false as const : 15_000,
     retry: item.kind === "spot" ? false as const : 1,
   })) });

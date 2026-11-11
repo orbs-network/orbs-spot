@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  getTwapConfig,
   OrderStatus,
   type Order,
   type Token,
@@ -225,7 +224,6 @@ export function useHistoryOrder(
   inputToken?: Token,
   outputToken?: Token,
 ) {
-  const { partner } = useSpotPartner();
   return useMemo(
     () =>
       order
@@ -233,11 +231,8 @@ export function useHistoryOrder(
             order,
             inputToken,
             outputToken,
-            order.version === 1
-              ? getTwapConfig(partner, order.chainId)
-              : undefined,
           )
         : undefined,
-    [order, inputToken, outputToken, partner],
+    [order, inputToken, outputToken],
   );
 }

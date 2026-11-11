@@ -40,7 +40,7 @@ const quoteArgs = ${JSON.stringify(quoteArgs, null, 2)} satisfies ClientGetQuote
 export async function getSpotSwapQuote(signal?: AbortSignal): Promise<SwapQuote> {
   // Use the wrapped ERC-20 input address for native input. This is a read only request.
   // A disconnected preview can use the host's preview address. Pass the actual
-  // connected account separately to client.prepareSwap(quote, userAddress).
+  // connected account to await client.prepareSwap({ quote, account, signal }).
   return client.getQuote({ ...quoteArgs, signal });
 }
 `;
@@ -98,22 +98,22 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   outToken: "The token received by the signer when this exact input swap fills.",
   inAmount: "Exact input amount as an integer in input token base units.",
   user: "The account sent to the quote service, including a preview address before connection. It does not determine the signer.",
-  userAddress: "The connected account passed separately to client.prepareSwap(quote, userAddress). It signs the order and receives the output.",
+  userAddress: "The connected account passed to await client.prepareSwap({ quote, account, signal }). It signs the order and receives the output.",
   slippage: "UI slippage percentage: 0.5 means 0.5%. It is separate from the signed order's fixed SWAP protection.",
   dexMinAmountOut: "DEX minimum in output token base units, or -1 when no DEX quote is available.",
-  receivedAt: "Local quote receipt time in Unix milliseconds. Use isQuoteFresh(quote, 60_000) before signing and submission.",
+  receivedAt: "Local quote receipt time in Unix milliseconds. Use isQuoteFresh(quote, 20_000) before signing and submission.",
   amountOut: "Raw output amount returned by the quote service.",
   netAmountOut: "Net output amount used for display.",
   minimumAmountOut: "Service-provided minimum shown unchanged in review and signed by client.prepareSwap.",
   feeAmount: "Service fee amount in output token base units.",
   minimumOutputAmountRaw: "The prepared minimum copied unchanged from quote.minimumAmountOut.",
   deadlineMillis: "Swap expiration as a Unix timestamp in milliseconds, three minutes after preparation.",
-  prepared: "Locally prepared swap order, approval request, and original wallet signing payload.",
+  prepared: "Prepared swap order, selected quote, approval request, and original wallet signing payload. Stale quotes can refresh during preparation.",
   signingRequest: "Original SDK signer and typed data. Sign unchanged and keep its order paired with the original signature.",
   approvalRequest: "Input token, raw input amount, and configured RePermit spender requiring allowance.",
   spenderAddress: "The spender supplied by this client's configuration. Do not substitute a hardcoded contract.",
   execution: "The local signature and accepted or completed order for this developer flow.",
-  order: "The order accepted by submitOrder. Acceptance is followed by waitForOrder to confirm a completed fill.",
+  order: "The order accepted by submitSwap. Host polling through client.getOrder confirms a completed fill.",
   id: "Full signed order ID for settlement lookup and history reconciliation. This is not a transaction hash.",
   signature: "Original wallet signature over the prepared signing request. Submit it unchanged with the exact prepared order.",
   status: "Order lifecycle status. Only a completed fill is reported as swap success.",

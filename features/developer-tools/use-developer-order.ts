@@ -25,13 +25,13 @@ export function useDeveloperOrder(mode: DeveloperExecutionMode = "demo") {
       ? getWrappedNativeCurrency(chainId)?.address
       : review.srcToken.address;
     if (!inputTokenAddress) return;
-    const prepared = client.data.prepareOrder({ form, inputTokenAddress, outputTokenAddress: review.dstToken.address, swapperAddress: address });
+    const prepared = client.data.prepareOrder({ form, inputTokenAddress, outputTokenAddress: review.dstToken.address, account: address });
     return { ...client.data.rePermitData, order: prepared.order };
   }, [address, chainId, client.data, form, review.srcToken, review.dstToken]);
   return {
     client: client.data,
     canDemoExecute: form.canSubmit && Boolean(market.value) && !market.isLoading && !market.noLiquidity && !market.error,
-    module: review.form.module,
+    orderType: review.form.orderType,
     derivedFormData: {
       ...review,
       form,

@@ -1,4 +1,5 @@
-import { isNativeAddress, QuoteError, type SpotClient } from "@orbs-network/spot-ui";
+import { isNativeAddress } from "../spot/token-utils.ts";
+import { QuoteError, type SpotClient } from "@orbs-network/spot-ui";
 import { queryOptions } from "@tanstack/react-query";
 import type { BestTradeQuote, Currency } from "../types";
 

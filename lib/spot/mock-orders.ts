@@ -1,4 +1,4 @@
-import { OrderStatus, OrderType, Partners, type Order } from "@orbs-network/spot-ui";
+import { OrderStatus, OrderVariant, Partners, type Order } from "@orbs-network/spot-ui";
 import { parseUnits, zeroAddress } from "viem";
 import type { HistoryOrder, OrderToken } from "./order-tokens";
 const MOCK_ORDER_ACCOUNT = "0x000000000000000000000000000000000000dEaD";
@@ -15,18 +15,18 @@ const baseUsdc = { chainId: 8453, address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bd
 const baseWeth = { chainId: 8453, address: "0x4200000000000000000000000000000000000006", symbol: "WETH", decimals: 18 } as const;
 type SampleToken = OrderToken & { symbol: string; decimals: number };
 type Sample = {
-  type: OrderType; status: OrderStatus; input: SampleToken; output: SampleToken;
+  type: OrderVariant; status: OrderStatus; input: SampleToken; output: SampleToken;
   amount: string; received: string; trades: number; filled: number;
 };
 const samples: Sample[] = [
-  { type: OrderType.STOP_LOSS_MARKET, status: OrderStatus.Open, input: wbnb, output: bscUsdt, amount: "2", received: "1200", trades: 1, filled: 0 },
-  { type: OrderType.TWAP_MARKET, status: OrderStatus.Open, input: bscUsdt, output: wbnb, amount: "1000", received: "1.5", trades: 10, filled: 4 },
-  { type: OrderType.LIMIT, status: OrderStatus.Open, input: weth, output: usdc, amount: "2", received: "6800", trades: 1, filled: 0 },
-  { type: OrderType.TAKE_PROFIT_LIMIT, status: OrderStatus.Open, input: baseWeth, output: baseUsdc, amount: "0.5", received: "2000", trades: 1, filled: 0 },
-  { type: OrderType.TWAP_MARKET, status: OrderStatus.Completed, input: bscUsdt, output: wbnb, amount: "800", received: "1.2", trades: 8, filled: 8 },
-  { type: OrderType.LIMIT, status: OrderStatus.Cancelled, input: usdc, output: weth, amount: "500", received: "0.16", trades: 1, filled: 0 },
-  { type: OrderType.TWAP_LIMIT, status: OrderStatus.Cancelled, input: bscUsdt, output: wbnb, amount: "1200", received: "2", trades: 6, filled: 2 },
-  { type: OrderType.STOP_LOSS_LIMIT, status: OrderStatus.Expired, input: baseWeth, output: baseUsdc, amount: "1", received: "3200", trades: 1, filled: 0 },
+  { type: OrderVariant.STOP_LOSS_MARKET, status: OrderStatus.Open, input: wbnb, output: bscUsdt, amount: "2", received: "1200", trades: 1, filled: 0 },
+  { type: OrderVariant.TWAP_MARKET, status: OrderStatus.Open, input: bscUsdt, output: wbnb, amount: "1000", received: "1.5", trades: 10, filled: 4 },
+  { type: OrderVariant.LIMIT, status: OrderStatus.Open, input: weth, output: usdc, amount: "2", received: "6800", trades: 1, filled: 0 },
+  { type: OrderVariant.TAKE_PROFIT_LIMIT, status: OrderStatus.Open, input: baseWeth, output: baseUsdc, amount: "0.5", received: "2000", trades: 1, filled: 0 },
+  { type: OrderVariant.TWAP_MARKET, status: OrderStatus.Completed, input: bscUsdt, output: wbnb, amount: "800", received: "1.2", trades: 8, filled: 8 },
+  { type: OrderVariant.LIMIT, status: OrderStatus.Cancelled, input: usdc, output: weth, amount: "500", received: "0.16", trades: 1, filled: 0 },
+  { type: OrderVariant.TWAP_LIMIT, status: OrderStatus.Cancelled, input: bscUsdt, output: wbnb, amount: "1200", received: "2", trades: 6, filled: 2 },
+  { type: OrderVariant.STOP_LOSS_LIMIT, status: OrderStatus.Expired, input: baseWeth, output: baseUsdc, amount: "1", received: "3200", trades: 1, filled: 0 },
 ];
 
 /** Generated only in /dev with mockorders=true, with dates relative to now. */
@@ -40,8 +40,8 @@ export function createMockOrders(now = Date.now()): HistoryOrder[] {
     const outputPerTrade = totalOutput / BigInt(trades);
     const createdAt = now - (index + 1) * 3_600_000;
     const deadline = status === OrderStatus.Expired ? now - 3_600_000 : now + 86_400_000;
-    const isMarketPrice = [OrderType.TWAP_MARKET, OrderType.STOP_LOSS_MARKET, OrderType.TAKE_PROFIT_MARKET].includes(type);
-    const isTriggerPrice = [OrderType.STOP_LOSS_MARKET, OrderType.STOP_LOSS_LIMIT, OrderType.TAKE_PROFIT_LIMIT].includes(type);
+    const isMarketPrice = [OrderVariant.TWAP_MARKET, OrderVariant.STOP_LOSS_MARKET, OrderVariant.TAKE_PROFIT_MARKET].includes(type);
+    const isTriggerPrice = [OrderVariant.STOP_LOSS_MARKET, OrderVariant.STOP_LOSS_LIMIT, OrderVariant.TAKE_PROFIT_LIMIT].includes(type);
     const fills = Array.from({ length: filled }, (_, fillIndex) => ({
       inAmount: inputPerTrade.toString(), outAmount: outputPerTrade.toString(),
       timestamp: createdAt + (fillIndex + 1) * 60_000,

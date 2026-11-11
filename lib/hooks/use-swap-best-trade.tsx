@@ -1,4 +1,5 @@
-import { OrderSettlementError, OrderStatus, type Order, type Partners } from "@orbs-network/spot-ui";
+import { OrderSettlementError } from "../swap/settlement";
+import { OrderStatus, type Order, type Partners } from "@orbs-network/spot-ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { erc20Abi } from "viem";
 import { useSignTypedDataPayload } from "./use-sign-typed-data";

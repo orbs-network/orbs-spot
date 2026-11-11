@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { calculateOrder, Module } from "@orbs-network/spot-ui";
+import { calculateOrder, OrderType } from "@orbs-network/spot-ui";
 import BN from "bignumber.js";
 import { assertMinimumQuoteValue, getQuoteValuation } from "../lib/swap/quote-valuation.ts";
 import { formatDisplayAmount } from "../lib/token-display.ts";
@@ -10,16 +10,14 @@ const quote = {
   originalQuote: { inputAmountUsd: "200", netAmountOutUsd: "148", minimumAmountOutUsd: "139.25", priceImpactPercentage: "-20" },
 };
 
-const formParams = (quoted, values, orderModule = Module.TWAP) => ({
-  module: orderModule, inputTokenDecimals: 18, outputTokenDecimals: 6,
+const formParams = (quoted, values, orderModule = OrderType.TWAP) => ({
+  orderType: orderModule, inputTokenDecimals: 18, outputTokenDecimals: 6,
   quotedOutputAmountRaw: quoted.outAmount,
-  minimumOutputAmountRaw: quoted.minAmountOut,
   inputAmountUsd: values.inputAmountUsd,
-  quotedOutputAmountUsd: values.outputAmountUsd,
-  minimumOutputAmountUsd: values.minimumAmountOutUsd,
   inputTokenUsdPrice: values.inputTokenUsdPrice,
   outputTokenUsdPrice: values.outputTokenUsdPrice,
   minTradeSizeUsd: 10,
+  priceProtectionPercent: 3,
   userInput: { inputAmountUi: "2", isMarketOrder: true },
 });
 
@@ -28,7 +26,7 @@ test("quote input and output USD stay distinct without changing advanced executi
   assert.equal(values.inputAmountUsd, "200");
   assert.equal(values.outputAmountUsd, "148");
   assert.equal(values.minimumAmountOutUsd, "139.25");
-  for (const orderModule of [Module.TWAP, Module.LIMIT, Module.STOP_LOSS, Module.TAKE_PROFIT]) {
+  for (const orderModule of [OrderType.TWAP, OrderType.LIMIT, OrderType.STOP_LOSS, OrderType.TAKE_PROFIT]) {
     const form = calculateOrder(formParams(quote, values, orderModule));
     assert.equal(form.inputAmount.usd, "200", orderModule);
     // Trigger orders can estimate a different receive amount at their trigger price.
@@ -98,11 +96,10 @@ test("SDK calculations retain exact totals at recurring unit prices and trade-si
 
 test("swaps retain exact output/minimum USD while edited advanced output uses its quote unit value", () => {
   const values = getQuoteValuation(quote, 18, 6);
-  const swap = calculateOrder(formParams(quote, values, Module.SWAP));
-  assert.equal(swap.inputAmount.usd, "200");
-  assert.equal(swap.outputAmount.usd, "148");
-  assert.equal(swap.minOutputAmountTotal.usd, "139.25");
-  const params = formParams(quote, values, Module.LIMIT);
+  assert.equal(values.inputAmountUsd, "200");
+  assert.equal(values.outputAmountUsd, "148");
+  assert.equal(values.minimumAmountOutUsd, "139.25");
+  const params = formParams(quote, values, OrderType.LIMIT);
   const limit = calculateOrder({ ...params, userInput: { ...params.userInput, isMarketOrder: false, limitPriceUi: "40" } });
   assert.equal(limit.inputAmount.usd, "200");
   assert.equal(limit.outputAmount.ui, "80");

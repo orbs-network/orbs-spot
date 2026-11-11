@@ -3,7 +3,7 @@
 import { useOrderForm, usePriceDisplay } from "./use-order-form";
 
 import { useOrderSubmitFlowStore } from "@/lib/hooks/store";
-import { toAmountUI } from "@orbs-network/spot-ui";
+import { toAmountUI } from "@/lib/spot/token-utils";
 import BN from "bignumber.js";
 
 /** Adapt the shared SDK calculation to the existing review labels. */

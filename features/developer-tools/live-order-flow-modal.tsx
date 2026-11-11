@@ -26,7 +26,8 @@ import { createLoadingToast } from "@/lib/loading-toast";
 import { maxUint256, type Hex } from "viem";
 import { useConnection } from "wagmi";
 import { useConnectModal } from "@rainbow-me/rainbowkit";
-import { isNativeAddress, type RePermitData } from "@orbs-network/spot-ui";
+import type { RePermitData } from "@orbs-network/spot-ui";
+import { isNativeAddress } from "@/lib/spot/token-utils";
 import type { CalculatedOrderForm } from "@orbs-network/spot-ui";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -421,7 +422,7 @@ function LiveOrderFlowModalContent({
       form,
       inputTokenAddress: permitData.order.permitted.token,
       outputTokenAddress: permitData.order.witness.output.token,
-      swapperAddress: permitData.order.witness.swapper,
+      account: permitData.order.witness.swapper,
     });
     // Share the exact arguments between the inspector and submission.
     return {
@@ -886,7 +887,7 @@ function LiveOrderFlowModalContent({
         data: calculationInput ?? calculationDefaults,
         editable: !isRunning && step !== "success",
         explanation:
-          "Edit the inline calculation inputs and save to rebuild the live RePermit data before checking allowance and signing. Examples target @orbs-network/spot-ui 2.1.23 or later.",
+          "Edit the inline calculation inputs and save to rebuild the live RePermit data before checking allowance and signing. Examples target @orbs-network/spot-ui 2.2.0 or later.",
         title: "Advanced Orders Typescript SDK flow",
       };
     }

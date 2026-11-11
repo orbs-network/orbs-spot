@@ -2,7 +2,7 @@
 
 import { FormActionPanel } from "@/components/form-action-panel";
 import { ToggleCurrencies } from "@/components/toggle-currencies";
-import { Module } from "@orbs-network/spot-ui";
+import { OrderType } from "@orbs-network/spot-ui";
 import { InputErrorPanel } from "./feedback-panels";
 import { ModuleInputs, TokenPanel } from "./token-panels";
 import { PricesPanel } from "./price-panels";
@@ -13,7 +13,7 @@ import { useOutputAmount } from "./use-order-form";
 export function AdvancedOrderContent({
   orderModule,
 }: {
-  orderModule: Module;
+  orderModule: OrderType;
 }) {
   const { amount } = useOutputAmount();
   return (

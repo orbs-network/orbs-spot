@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { OrderSettlementError, OrderStatus } from "@orbs-network/spot-ui";
+import { OrderStatus } from "@orbs-network/spot-ui";
+import { OrderSettlementError } from "../lib/swap/settlement.ts";
 import { getFillTransactionHash, resolveSwapSettlementOrder, useSwapActivity, validSwapActivity } from "../lib/swap/activity.ts";
 
 const account = `0x${"1".repeat(40)}`;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import BN from "bignumber.js";
-import { calculateOrder, Module, InputErrors } from "@orbs-network/spot-ui";
+import { calculateOrder, OrderType, InputErrors } from "@orbs-network/spot-ui";
 import { registerHooks } from "node:module";
 
 registerHooks({ resolve(specifier, context, nextResolve) {
@@ -13,10 +13,12 @@ const { invertPricePercentage } = await import("../lib/exchange-rates.ts");
 const Precise = BN.clone({ DECIMAL_PLACES: 512 });
 
 const calculate = userInput => calculateOrder({
-  module: Module.STOP_LOSS,
+  orderType: OrderType.STOP_LOSS,
   inputTokenDecimals: 18,
   outputTokenDecimals: 18,
   quotedOutputAmountRaw: "1000000000000000000000",
+  minTradeSizeUsd: 10,
+  priceProtectionPercent: 3,
   userInput: { inputAmountUi: "1", isMarketOrder: false, ...userInput },
 });
 

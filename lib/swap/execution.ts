@@ -1,12 +1,11 @@
 import {
-  isNativeAddress,
   isQuoteFresh,
-  OrderSettlementError,
-  waitForOrder,
   type Order,
   type OrderSigningRequest,
   type SpotClient,
 } from "@orbs-network/spot-ui";
+import { isNativeAddress } from "../spot/token-utils.ts";
+import { OrderSettlementError, waitForOrder } from "./settlement.ts";
 import type { BestTradeQuote } from "../types";
 import { acquireSubmissionLock, isSubmissionBusy } from "../spot/submission-lock.js";
 
@@ -22,7 +21,7 @@ export interface SwapIntent {
   native: boolean;
 }
 
-const MAX_QUOTE_AGE_MILLIS = 60_000;
+const MAX_QUOTE_AGE_MILLIS = 20_000;
 const sameAddress = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const positiveInteger = (value: string) => /^\d+$/.test(value) && BigInt(value) > BigInt(0);
 
@@ -230,7 +229,24 @@ export function createSwapExecutor({
       await assertWallet();
       input.onStep("SWAP", index);
       checkActive();
-      const prepared = client.prepareSwap(quote.originalQuote, intent.account);
+      const prepared = await client.prepareSwap({ quote: quote.originalQuote, account: intent.account, signal });
+      checkActive();
+      // Preparation may refresh a quote while configuration or RPC reads are pending.
+      // Retain every reviewed identity and require review before signing a worse price.
+      const preparedQuote: BestTradeQuote = {
+        ...quote,
+        originalQuote: prepared.quote,
+        outAmount: prepared.quote.netAmountOut,
+        minAmountOut: prepared.quote.minimumAmountOut,
+      };
+      assertIdentity(preparedQuote);
+      if (BigInt(preparedQuote.minAmountOut) < BigInt(reviewedMinimum)
+        || BigInt(preparedQuote.outAmount) < BigInt(reviewedQuote.outAmount)) {
+        throw new QuoteUpdatedError(reviewedQuote, structuredClone(preparedQuote));
+      }
+      quote = structuredClone(preparedQuote);
+      await assertSpendBalance();
+      await assertWallet();
       checkActive();
       const signature = await input.sign(prepared.signingRequest);
       await assertWallet();
@@ -253,11 +269,11 @@ export function createSwapExecutor({
       // its settlement finish, without sharing this attempt's state or toast.
       release();
       input.onSubmitting?.();
-      const order = await client.submitOrder(prepared.order, signature);
+      const order = await client.submitSwap(prepared.order, signature);
       // Keep the accepted ID even when an abort happened while POST was pending.
       input.onSubmitted(order);
       checkActive();
-      const completedOrder = await settle({ order, signal });
+      const completedOrder = await settle({ client, order, signal });
       checkActive();
       return { order: completedOrder };
     } catch (error) {

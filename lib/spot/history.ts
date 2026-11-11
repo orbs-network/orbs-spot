@@ -1,10 +1,9 @@
+import { toAmountUI, toAmountRaw } from "./token-utils";
 import { getExchangeRates } from "@/lib/exchange-rates";
 import {
   getOrderFillDelayMillis,
   getOrderLimitPriceRate,
   getTriggerPriceRate,
-  toAmountUI,
-  toAmountRaw,
   type Config,
   type Order,
   type Token,

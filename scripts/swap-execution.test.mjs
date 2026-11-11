@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { OrderSettlementError, OrderStatus } from "@orbs-network/spot-ui";
+import { OrderStatus } from "@orbs-network/spot-ui";
+import { OrderSettlementError } from "../lib/swap/settlement.ts";
 import {
   acquireSwapExecutionLock,
   assertSwapQuote,
@@ -55,12 +56,12 @@ function fixture({ native = false, approved = true } = {}) {
     intent, quote,
     client: {
       chainId: intent.chainId, partner: originalQuote.request.partner, spenderAddress: "0xspender",
-      prepareSwap: (quote, userAddress) => {
+      prepareSwap: async ({ quote, account: userAddress }) => {
         actions.push(["prepare"]);
         preparations.push({ quote, userAddress });
-        return { order: preparedOrder, signingRequest };
+        return { order: preparedOrder, signingRequest, quote };
       },
-      submitOrder: async (order, signature) => {
+      submitSwap: async (order, signature) => {
         actions.push(["submit"]);
         submissions.push([order, signature]);
         return acceptedOrder;
@@ -165,7 +166,7 @@ test("review hands off only after signing and final wallet, quote and balance va
     handoffs++;
     review.close();
   };
-  input.client.submitOrder = async () => {
+  input.client.submitSwap = async () => {
     assert.equal(handoffs, 1);
     assert.equal(review.isModalOpen(), false);
     postStarted.resolve();
@@ -340,7 +341,7 @@ test("the reviewed quote, intent, client and callbacks remain fixed while wallet
   input.quote.minAmountOut = "1";
   input.quote.originalQuote.request.inAmount = "99";
   input.intent.amount = "99";
-  input.client = { submitOrder: async () => { throw new Error("wrong client"); } };
+  input.client = { submitSwap: async () => { throw new Error("wrong client"); } };
   input.sign = async () => { throw new Error("wrong callback"); };
   resume();
   await pending;
@@ -402,7 +403,7 @@ test("signed swaps release the wallet lock before POST and settlement without un
     submittingNotifications++;
     assert.equal(isSwapExecutionBusy(), false);
   };
-  first.input.client.submitOrder = async () => { postStarted(); return posted; };
+  first.input.client.submitSwap = async () => { postStarted(); return posted; };
   const executor = createSwapExecutor({ settle: async params => {
     settlementStarted();
     await settled;
@@ -459,7 +460,7 @@ test("a wallet lock reserved before configuration is handed to the executor unti
     submitting = true;
     assert.equal(isSwapExecutionBusy(), false);
   };
-  input.client.submitOrder = async () => {
+  input.client.submitSwap = async () => {
     assert.equal(submitting, true);
     return acceptedOrder;
   };
@@ -523,7 +524,7 @@ test("an abort during submission preserves the accepted order before stopping tr
   const { input, executor, acceptedOrder, submitted, settlements } = fixture();
   const controller = new AbortController();
   input.signal = controller.signal;
-  input.client.submitOrder = async () => { controller.abort(); return acceptedOrder; };
+  input.client.submitSwap = async () => { controller.abort(); return acceptedOrder; };
   await assert.rejects(executor.execute(input), /Check order history before retrying/);
   assert.deepEqual(submitted, [acceptedOrder]);
   assert.deepEqual(settlements, []);
@@ -532,7 +533,7 @@ test("an abort during submission preserves the accepted order before stopping tr
 test("a lost submission response is uncertain and never automatically retried", async () => {
   const { input, executor, submitted, settlements } = fixture();
   let submissions = 0;
-  input.client.submitOrder = async () => { submissions++; throw new Error("Connection lost"); };
+  input.client.submitSwap = async () => { submissions++; throw new Error("Connection lost"); };
   await assert.rejects(executor.execute(input), error => {
     assert.ok(error instanceof SwapSubmissionUncertainError);
     assert.match(error.message, /status is uncertain.*Check order history/);
@@ -547,7 +548,7 @@ test("a lost submission response is uncertain and never automatically retried", 
 test("a POST rejection remains typed submission uncertainty even when its cause resembles a wallet rejection", async () => {
   for (const cause of [Object.assign(new Error("User rejected request"), { code: 4001 }), new Error("Order request rejected")]) {
     const { input, executor } = fixture();
-    input.client.submitOrder = async () => { throw cause; };
+    input.client.submitSwap = async () => { throw cause; };
     await assert.rejects(executor.execute(input), error => {
       assert.ok(error instanceof SwapSubmissionUncertainError);
       assert.equal(error.cause, cause);
@@ -666,8 +667,55 @@ test("live input balance is checked for the required native wrap or complete ERC
 
 test("submission uncertainty invalidates cached wraps before another manual attempt", async () => {
   const { input, executor, actions } = fixture({ native: true });
-  input.client.submitOrder = async () => { throw new Error("Connection lost"); };
+  input.client.submitSwap = async () => { throw new Error("Connection lost"); };
   await assert.rejects(executor.execute(input), /Check order history/);
   await assert.rejects(executor.execute(input), /Check order history/);
   assert.deepEqual(actions.filter(([action]) => action === "wrap"), [["wrap", "10"], ["wrap", "10"]]);
+});
+
+test("async preparation validates a refreshed quote before signing even when its minimum improves", async () => {
+  const { input, executor, actions } = fixture();
+  const prepare = input.client.prepareSwap;
+  input.client.prepareSwap = async params => {
+    const prepared = await prepare(params);
+    return { ...prepared, quote: { ...prepared.quote, netAmountOut: "19", minimumAmountOut: "19" } };
+  };
+  await assert.rejects(executor.execute(input), error => error instanceof QuoteUpdatedError
+    && error.next.outAmount === "19" && error.next.minAmountOut === "19");
+  assert.equal(actions.some(([action]) => action === "sign" || action === "submit"), false);
+});
+
+test("a preparation refresh cannot substitute a different request identity", async () => {
+  const { input, executor, actions } = fixture();
+  const prepare = input.client.prepareSwap;
+  input.client.prepareSwap = async params => {
+    const prepared = await prepare(params);
+    return { ...prepared, quote: { ...prepared.quote, request: { ...prepared.quote.request, chainId: 137 } } };
+  };
+  await assert.rejects(executor.execute(input), /does not match/);
+  assert.equal(actions.some(([action]) => action === "sign" || action === "submit"), false);
+});
+
+test("abort during asynchronous preparation prevents a signing prompt", async () => {
+  const { input, executor, actions } = fixture();
+  const controller = new AbortController();
+  input.signal = controller.signal;
+  const prepare = input.client.prepareSwap;
+  input.client.prepareSwap = async params => {
+    assert.equal(params.signal, controller.signal);
+    const prepared = await prepare(params);
+    controller.abort();
+    return prepared;
+  };
+  await assert.rejects(executor.execute(input), /aborted/);
+  assert.equal(actions.some(([action]) => action === "sign" || action === "submit"), false);
+});
+
+test("host quote freshness agrees with SDK preparation's twenty-second refresh window", async () => {
+  const { input, executor } = fixture();
+  input.quote.originalQuote.receivedAt -= 20_001;
+  let refreshes = 0;
+  input.refreshQuote = async () => { refreshes++; return refreshedQuote(input.quote); };
+  await executor.execute(input);
+  assert.equal(refreshes, 1);
 });

@@ -1,6 +1,6 @@
 # Orbs Spot — TypeScript SDK Example
 
-A working reference integration for swap quotes, swaps, and advanced orders using `@orbs-network/spot-ui`.
+A working reference integration for swap quotes, swaps, and advanced orders using `@orbs-network/spot-ui` 2.2.0.
 The playground uses Next.js/React for its UI, wagmi/viem for its wallet, Zustand for editable state,
 and TanStack Query for reads and async actions. Spot calculation and execution use the framework-neutral SDK directly;
 there is no `@orbs-network/spot-react` dependency or Spot provider.
@@ -45,8 +45,8 @@ receipts are cached by chain and transaction hash. Successful writes invalidate 
    `calculateOrder`. Its result owns defaults, validation, trade counts, prices and schedules.
    Every form uses the cached `client.getQuote` for the complete input amount and passes its raw `quote.netAmountOut`
    unchanged as `quotedOutputAmountRaw`. Dollar estimates use the quote's `inputAmountUsd`,
-   `netAmountOutUsd`, and `minimumAmountOutUsd` independently. Pass these totals directly into
-   `calculateOrder` as `inputAmountUsd`, `quotedOutputAmountUsd`, and `minimumOutputAmountUsd`.
+   `netAmountOutUsd`, and `minimumAmountOutUsd` independently. Pass the input total into
+   `calculateOrder` as `inputAmountUsd` and derive token unit prices for advanced-order output valuation.
    Input USD determines minimum-trade validation; quote-derived unit prices value edited limit/trigger
    output amounts. Missing input USD leaves submission disabled without substituting output USD.
    Token lists and direct
@@ -76,7 +76,7 @@ const prepared = client.prepareOrder({
   form,
   inputTokenAddress,
   outputTokenAddress,
-  swapperAddress: account,
+  account,
 });
 const signature = await wallet.signOrder(prepared.signingRequest);
 const order = await client.submitOrder(prepared.order, signature);
@@ -87,7 +87,7 @@ const order = await client.submitOrder(prepared.order, signature);
 Swap, TWAP, limit, stop-loss and take-profit forms share an exact-input `client.getQuote` for their
 market reference. Advanced-order limit and trigger settings continue to determine their target output.
 The swap form confirms wrapping and approval to `client.spenderAddress`, then uses
-`client.prepareSwap`, the wallet's EIP-712 signature and `client.submitOrder`.
+`await client.prepareSwap({ quote, account, signal })`, the wallet's EIP-712 signature and `client.submitSwap`.
 Quotes retain their account, chain, token, raw amount and slippage identity. Swap execution pauses
 quote refreshes, and a changed or stale quote requires review before signing.
 
@@ -100,15 +100,18 @@ in the background while another order or swap is prepared and submitted.
 
 `quote.netAmountOut` and `quote.minimumAmountOut` are integer output-token base units.
 The UI displays the service-provided `minimumAmountOut` unchanged, and
-`client.prepareSwap(quote, account)` uses that same minimum in the signed order.
+`await client.prepareSwap({ quote, account, signal })` uses the selected quote’s minimum in the signed order.
+Preparation reuses quotes up to 20 seconds old and refreshes older quotes. The host validates
+and displays `prepared.quote` before signing; worse output or minimum requires a new review.
 Quote slippage remains a percentage; `0.5` means 0.5%. This minimum is distinct from the swap order's
 fixed 5% signed oracle protection. Prepared swaps expire after three minutes.
 The quote's net output and raw fee do not provide a USD gas cost.
 
 Submission returns an accepted signed order. Its `order.id` identifies an intent and must never be
 used as a transaction hash. The swap remains in progress until the SDK reports `OrderStatus.Completed`.
-`waitForOrder`/`watchOrder` track the accepted order serially through its signed deadline plus
-60 seconds for indexing. Cancellation and expiration are terminal outcomes; aborted or unconfirmed
+The host’s polling helpers in `lib/swap/settlement.ts` call `client.getOrder({ orderId, signal })`
+serially through the accepted order’s signed deadline plus 60 seconds for indexing.
+Cancellation and expiration are terminal outcomes; aborted or unconfirmed
 tracking does not prove the order failed. Check history before submitting another swap after an
 uncertain outcome. Never automatically retry submission or execute a fallback.
 

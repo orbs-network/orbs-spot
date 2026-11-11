@@ -1,5 +1,5 @@
 import { formatDisplayAmount } from "@/lib/token-display";
-import { OrderFilter, OrderStatus, OrderType, TimeUnit, type Order } from "@orbs-network/spot-ui";
+import { OrderFilter, OrderStatus, OrderVariant, TimeUnit, type Order } from "@orbs-network/spot-ui";
 
 import { formatDateTime } from "@/lib/date";
 import BN from "bignumber.js";
@@ -42,15 +42,15 @@ export const STATUS_CLASS_NAMES: Record<OrderStatus, string> = {
   [OrderStatus.Expired]: "text-red-400",
 };
 
-export const ORDER_TYPE_LABELS: Record<OrderType, string> = {
-  [OrderType.SWAP]: "Swap",
-  [OrderType.LIMIT]: "Limit",
-  [OrderType.TWAP_LIMIT]: "TWAP Limit",
-  [OrderType.TWAP_MARKET]: "TWAP Market",
-  [OrderType.TAKE_PROFIT_LIMIT]: "Take Profit Limit",
-  [OrderType.TAKE_PROFIT_MARKET]: "Take Profit Market",
-  [OrderType.STOP_LOSS_LIMIT]: "Stop Loss Limit",
-  [OrderType.STOP_LOSS_MARKET]: "Stop Loss Market",
+export const ORDER_TYPE_LABELS: Record<OrderVariant, string> = {
+  [OrderVariant.SWAP]: "Swap",
+  [OrderVariant.LIMIT]: "Limit",
+  [OrderVariant.TWAP_LIMIT]: "TWAP Limit",
+  [OrderVariant.TWAP_MARKET]: "TWAP Market",
+  [OrderVariant.TAKE_PROFIT_LIMIT]: "Take Profit Limit",
+  [OrderVariant.TAKE_PROFIT_MARKET]: "Take Profit Market",
+  [OrderVariant.STOP_LOSS_LIMIT]: "Stop Loss Limit",
+  [OrderVariant.STOP_LOSS_MARKET]: "Stop Loss Market",
 };
 
 export function getOrderFilterLabel(filter: OrderFilter) {
@@ -79,7 +79,7 @@ export function getNoOrdersTitle(filter: HistoryFilter) {
   return `No ${getOrderFilterLabel(filter).toLowerCase()} orders`;
 }
 
-export function getOrderTypeLabel(orderType?: OrderType) {
+export function getOrderTypeLabel(orderType?: OrderVariant) {
   if (!orderType) return "Order";
   return ORDER_TYPE_LABELS[orderType] ?? "Order";
 }

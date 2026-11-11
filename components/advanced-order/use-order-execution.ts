@@ -20,7 +20,8 @@ import { useClient } from "./use-order-client";
 import { useWalletInteractions } from "./hooks";
 import { isUserRejectedError } from "@/lib/tx-rejection";
 import { createElement, useCallback, useRef, useSyncExternalStore } from "react";
-import { isNativeAddress, type Order } from "@orbs-network/spot-ui";
+import type { Order } from "@orbs-network/spot-ui";
+import { isNativeAddress } from "@/lib/spot/token-utils";
 import { useSubmissionPreview } from "@/lib/submission-preview";
 import { useActionHandlers } from "@/lib/hooks/use-action-handlers";
 import { Field } from "@/lib/types";
@@ -64,14 +65,14 @@ export function useOrderExecution() {
         isNativeAddress(inputToken?.address ?? "")) {
       // Wrapping is 1:1, so retain the reviewed amount, prices and schedule.
       useSwapStore.getState().setOrderInput(
-        getOrderDraftKey(chainId, form.module, pendingWrappedInputAddress, outputToken?.address),
+        getOrderDraftKey(chainId, form.orderType, pendingWrappedInputAddress, outputToken?.address),
         orderInput,
       );
       handleCurrencyChange(pendingWrappedInputAddress, Field.INPUT);
     }
     setPendingWrappedInputAddress(undefined);
     submissions.reset();
-  }, [address, chainId, form.module, handleCurrencyChange, inputToken?.address, orderInput, outputToken?.address]);
+  }, [address, chainId, form.orderType, handleCurrencyChange, inputToken?.address, orderInput, outputToken?.address]);
   const detachSubmission = useCallback(() => {
     submissions.detach();
     useOrderSubmitFlowStore.getState().setPendingWrappedInputAddress(undefined);
@@ -107,7 +108,7 @@ export function useOrderExecution() {
         useSubmissionPreview.getState().upsert({ id: toastId, kind: "order", title, status, message,
           input: toastInput, output: toastOutput, chainId, account: address, partner: client.data?.partner,
           order: acceptedOrder, transactions: transactions(), details: [
-            { label: "Order type", value: form.module.replaceAll("_", " ") },
+            { label: "Order type", value: form.orderType.replaceAll("_", " ") },
             { label: "Trades", value: String(form.trades.totalTrades) },
             { label: "Order duration", value: formatDuration(form.schedule.durationMillis) },
             ...(form.trades.totalTrades > 1 ? [{ label: "Trade interval", value: formatDuration(form.schedule.fillDelayMillis) }] : []),

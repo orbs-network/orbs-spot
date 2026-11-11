@@ -1,7 +1,7 @@
 import { FormTab } from "@/lib/types";
 import { formatDateTime } from "@/lib/date";
 import type { useTranslations } from "@/lib/use-translations";
-import { InputErrors, Module, TimeUnit, type InputError } from "@orbs-network/spot-ui";
+import { InputErrors, OrderType, TimeUnit, type InputError } from "@orbs-network/spot-ui";
 import { MODULE_META } from "./constants";
 
 export type Translate = ReturnType<typeof useTranslations>;
@@ -9,18 +9,18 @@ export type Translate = ReturnType<typeof useTranslations>;
 export function getModule(tab: FormTab) {
   switch (tab) {
     case FormTab.LIMIT:
-      return Module.LIMIT;
+      return OrderType.LIMIT;
     case FormTab.STOP_LOSS:
-      return Module.STOP_LOSS;
+      return OrderType.STOP_LOSS;
     case FormTab.TAKE_PROFIT:
-      return Module.TAKE_PROFIT;
+      return OrderType.TAKE_PROFIT;
     case FormTab.TWAP:
     default:
-      return Module.TWAP;
+      return OrderType.TWAP;
   }
 }
 
-export function getOrderTitle(orderModule: Module, t: Translate) {
+export function getOrderTitle(orderModule: OrderType, t: Translate) {
   return t(MODULE_META[orderModule]?.titleKey ?? "placeOrder");
 }
 

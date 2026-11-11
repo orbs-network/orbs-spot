@@ -1,6 +1,46 @@
 import type { CodeSnippetOptions, JsonContainer } from "@/features/developer-tools/json-inspector";
 import { getOrderFormFieldExplanation } from "@/features/developer-tools/order-form-field-explanations";
 
+const NATIVE_ADDRESS_HELPER = `const isNativeAddress = (address: string) =>
+  address.toLowerCase() === "0x0000000000000000000000000000000000000000"
+  || address.toLowerCase() === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";`;
+
+const SWAP_SETTLEMENT_CODE = `async function waitForSwap(client: SpotClient, accepted: Order, signal?: AbortSignal): Promise<Order> {
+  // Keep the accepted identity; a timeout or stopped poll does not prove failure.
+  const deadline = accepted.deadline + 60_000;
+  if (!Number.isFinite(deadline) || accepted.deadline <= 0) throw new Error("Missing swap deadline; check order history");
+  let latest = accepted;
+  while (Date.now() < deadline) {
+    signal?.throwIfAborted();
+    if (latest.status === OrderStatus.Completed) return latest;
+    if (latest.status === OrderStatus.Cancelled || latest.status === OrderStatus.Expired) {
+      throw new Error("Swap " + latest.status.toLowerCase() + "; inspect history for partial fills");
+    }
+    const timeout = AbortSignal.timeout(Math.max(1, Math.min(10_000, deadline - Date.now())));
+    const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+    let current: Order | undefined;
+    try {
+      current = await client.getOrder({ orderId: accepted.id, signal: requestSignal });
+    } catch {
+      signal?.throwIfAborted(); // Retry status reads only; never repeat submission.
+    }
+    if (current && current.id === accepted.id && current.chainId === accepted.chainId) latest = current;
+    if (latest.status !== OrderStatus.Open) continue;
+    await new Promise<void>((resolve, reject) => {
+      const finish = () => { signal?.removeEventListener("abort", abort); resolve(); };
+      const timer = setTimeout(finish, Math.min(2_000, Math.max(0, deadline - Date.now())));
+      const abort = () => { clearTimeout(timer); signal?.removeEventListener("abort", abort); reject(signal?.reason); };
+      signal?.addEventListener("abort", abort, { once: true });
+      if (signal?.aborted) abort();
+    });
+  }
+  if (latest.status === OrderStatus.Completed) return latest;
+  if (latest.status === OrderStatus.Cancelled || latest.status === OrderStatus.Expired) {
+    throw new Error("Swap " + latest.status.toLowerCase() + "; inspect history for partial fills");
+  }
+  throw new Error("Swap settlement is unconfirmed. Check order history before retrying.");
+}`;
+
 const TRANSACTION_CONFIRMATION_CODE = `async function waitForTransactionConfirmation(hash: Hash) {
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status !== "success") throw new Error("Transaction reverted");
@@ -52,7 +92,7 @@ const ADVANCED_SIGN_CODE = `const prepared = client.prepareOrder({
   form,
   inputTokenAddress: inputToken,
   outputTokenAddress: input.outputToken,
-  swapperAddress: account,
+  account,
 });
 const { signerAddress, typedData: message } = prepared.signingRequest;
 const signature = await walletClient.signTypedData({
@@ -79,13 +119,15 @@ function getClient() {
 export function formatAdvancedOrdersSdkFlow(data: JsonContainer = {}): string {
   const params = Array.isArray(data) ? {} : data.formParams ?? {};
   const calculationInput = JSON.stringify(params, null, 2)
-    .replace(/"module": "(TWAP|LIMIT|STOP_LOSS|TAKE_PROFIT)"/, '"module": Module.$1');
-  return `// advanced-orders.ts — requires @orbs-network/spot-ui 2.1.28 or later.
-import { calculateOrder, createClient, isNativeAddress, Module, Partners } from "@orbs-network/spot-ui";
+    .replace(/"orderType": "(TWAP|LIMIT|STOP_LOSS|TAKE_PROFIT)"/, '"orderType": OrderType.$1');
+  return `// advanced-orders.ts — requires @orbs-network/spot-ui 2.2.0 or later.
+import { calculateOrder, createClient, OrderType, Partners } from "@orbs-network/spot-ui";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import { polygon } from "viem/chains";
 
 // Browser example: use the chain selected in the host wallet.
+${NATIVE_ADDRESS_HELPER}
+
 const chain = polygon;
 const partner = Partners.External;
 const provider = (window as Window & { ethereum?: EIP1193Provider }).ethereum;
@@ -216,9 +258,17 @@ const SWAP_APPROVAL_CODE = `async function approveTokenIfNeeded(token: Address, 
   throw new Error("Approval is not available. Check allowance before retrying.");
 }`;
 
-const SWAP_SIGN_CODE = `// Refresh stale quotes after wallet transactions and review any worse output or minimum.
-// The SDK signs quote.minimumAmountOut unchanged and sets a three-minute expiration.
-const prepared = client.prepareSwap(quote, account);
+const SWAP_SIGN_CODE = `// Preparation can refresh quotes older than 20 seconds. Review any worse output.
+const prepared = await client.prepareSwap({ quote, account, signal: input.signal });
+await assertContext();
+if (BigInt(prepared.quote.netAmountOut) < BigInt(quote.netAmountOut)
+    || BigInt(prepared.quote.minimumAmountOut) < BigInt(quote.minimumAmountOut)) {
+  if (!await input.reviewChangedQuote(quote, prepared.quote)) throw new Error("Updated quote was not accepted");
+  await assertContext();
+}
+quote = prepared.quote; // Freeze and display the exact quote selected for signing.
+assertQuoteValue(quote);
+// The SDK signs this service minimum unchanged with a three-minute expiration.
 const { signerAddress, typedData } = prepared.signingRequest;
 const signature = await walletClient.signTypedData({
   ...typedData,
@@ -228,20 +278,22 @@ const signature = await walletClient.signTypedData({
 
 const SWAP_SUBMIT_CODE = `// Submission accepts an order; it does not confirm a fill.
 // Submit this exact prepared order and its original wallet signature only once.
-const order = await client.submitOrder(prepared.order, signature);
+const order = await client.submitSwap(prepared.order, signature, { signal: input.signal });
 // Retain order.id for history/reconciliation if tracking stops or times out.
-const completed = await waitForOrder({ order, signal: input.signal });
+const completed = await waitForSwap(client, order, input.signal);
 return completed;`;
 
 export function formatSpotSwapSdkFlow(data: JsonContainer = {}): string {
   const root = Array.isArray(data) ? {} : data;
   const chainId = typeof root.chainId === "number" ? root.chainId : 137;
   const partner = typeof root.partner === "string" && root.partner ? root.partner : "external";
-  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.1.28 or later.
-import { createClient, isNativeAddress, isQuoteFresh, Partners, waitForOrder, type SpotClient, type SwapQuote } from "@orbs-network/spot-ui";
+  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.2.0 or later.
+import { createClient, isQuoteFresh, OrderStatus, Partners, type Order, type SpotClient, type SwapQuote } from "@orbs-network/spot-ui";
 import BN from "bignumber.js";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import * as chains from "viem/chains";
+
+${NATIVE_ADDRESS_HELPER}
 
 const chainId = ${chainId};
 const chain = Object.values(chains).find((value) => value.id === chainId);
@@ -293,7 +345,11 @@ export async function swapFlow(account: Address, input: SwapInput) {
     await assertContext();
     // The connected signer is explicit, including for a disconnected preview quote.
     // Validate the signer, chain, partner, token pair, and quote minimum before wallet actions.
-    client.prepareSwap(quote, account);
+    if (request.chainId !== client.chainId || request.partner !== client.partner
+        || !/^\\d+$/.test(quote.netAmountOut) || !/^\\d+$/.test(quote.minimumAmountOut)
+        || BigInt(quote.minimumAmountOut) <= 0n || BigInt(quote.minimumAmountOut) > BigInt(quote.netAmountOut)) {
+      throw new Error("Quote does not match the selected Spot configuration");
+    }
     const token = request.inToken as Address;
     const amount = BigInt(request.inAmount);
     const nativeInput = isNativeAddress(input.sourceToken);
@@ -322,7 +378,7 @@ export async function swapFlow(account: Address, input: SwapInput) {
     await approveTokenIfNeeded(token, account, client.spenderAddress, amount, input.signal);
     await assertSpendBalance();
     await assertContext();
-    if (!isQuoteFresh(quote, 60_000)) {
+    if (!isQuoteFresh(quote, 20_000)) {
       const next = await client.getQuote({ ...request, user: account, signal: input.signal });
       await assertContext();
       const worse = BigInt(next.netAmountOut) < BigInt(quote.netAmountOut)
@@ -341,7 +397,7 @@ export async function swapFlow(account: Address, input: SwapInput) {
 ${SWAP_SIGN_CODE.split("\n").map((line) => "    " + line).join("\n")}
     await assertSpendBalance();
     await assertContext();
-    if (!isQuoteFresh(quote, 60_000)) throw new Error("Quote expired during signing. Review and sign again.");
+    if (!isQuoteFresh(quote, 20_000)) throw new Error("Quote expired during signing. Review and sign again.");
 ${SWAP_SUBMIT_CODE.split("\n").map((line) => "    " + line).join("\n")}
   } finally {
     busy = false;
@@ -355,6 +411,8 @@ ${SWAP_ALLOWANCE_CODE}
 ${SWAP_WRAP_CODE}
 
 ${SWAP_APPROVAL_CODE}
+
+${SWAP_SETTLEMENT_CODE}
 
 // A failed submit response can leave acceptance uncertain. Reconcile order history before retrying.
 `;
@@ -376,7 +434,7 @@ export function formatSpotSwapSdkStep(step: "check" | "wrap" | "approve" | "sign
     wrap: SWAP_WRAP_CODE,
     approve: `${SWAP_ALLOWANCE_CODE}\n\n${SWAP_APPROVAL_CODE}\n\nawait approveTokenIfNeeded(quote.request.inToken as Address, account, client.spenderAddress, BigInt(quote.request.inAmount), input.signal);`,
     sign: SWAP_SIGN_CODE,
-    swap: `import { waitForOrder } from "@orbs-network/spot-ui";\n\n${root.demo ? "// Demo only: no wallet signature or order is submitted.\n" : ""}${SWAP_SUBMIT_CODE}`,
+    swap: `${root.demo ? "// Demo only: no wallet signature or order is submitted.\n" : ""}${SWAP_SUBMIT_CODE}\n\n${SWAP_SETTLEMENT_CODE}`,
   };
   return `// From spot-swap.ts; uses the same client, reviewed quote, and connected wallet.\n${sections[step]}\n`;
 }

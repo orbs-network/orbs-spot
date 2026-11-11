@@ -1,6 +1,6 @@
 "use client";
 
-import { Module } from "@orbs-network/spot-ui";
+import { OrderType } from "@orbs-network/spot-ui";
 import BN from "bignumber.js";
 import { TokenExchangeRate } from "@/components/exchange-rate";
 import { TradeDetails } from "@/components/trade-details";
@@ -19,7 +19,7 @@ export function AdvancedOrderSummary() {
   const duration = Math.max(0, schedule.totalTrades - 1) * schedule.fillDelayMillis;
   const validDuration = Number.isFinite(duration) && duration > 0 && !schedule.fillDelayError && !trades.error;
   const hasAmount = inputToken && !inputAmount.isEmpty && !trades.error;
-  const showSchedule = form.module === Module.TWAP && schedule.totalTrades > 1;
+  const showSchedule = form.orderType === OrderType.TWAP && schedule.totalTrades > 1;
   const minimumReceived = trades.minOutputAmountPerTrade;
   const hasMinimumReceived = outputToken?.symbol && !inputAmount.isEmpty && !trades.error && !form.limitPrice.error && BN(minimumReceived.raw).gt(0);
   const expiry = useOrderExpiry(schedule.durationMillis, Boolean(schedule.durationError));

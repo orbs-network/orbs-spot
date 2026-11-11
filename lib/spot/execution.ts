@@ -1,7 +1,6 @@
+import { isNativeAddress } from "./token-utils.ts";
+import { isUserRejectedError } from "./wallet-errors.ts";
 import {
-  isNativeAddress,
-  isTxRejected,
-  type AllowanceRequest,
   type ApprovalRequest,
   type CancelOrderRequest,
   type OrderSigningRequest,
@@ -11,11 +10,14 @@ import {
   type Token,
 } from "@orbs-network/spot-ui";
 
+type AllowanceRequest = Pick<ApprovalRequest, "tokenAddress" | "spenderAddress">;
+type TokenApprovalRequest = Pick<ApprovalRequest, "tokenAddress" | "spenderAddress" | "amount">;
+
 /** App-owned wallet adapter. On-chain writes resolve only after successful receipts. */
 export interface SpotWalletPort {
   getAllowance(request: AllowanceRequest): Promise<string>;
   wrapNativeToken(amountRaw: string, onSubmitted?: (hash: `0x${string}`) => void): Promise<`0x${string}`>;
-  approveToken(request: ApprovalRequest, onSubmitted?: (hash: `0x${string}`) => void): Promise<`0x${string}`>;
+  approveToken(request: TokenApprovalRequest, onSubmitted?: (hash: `0x${string}`) => void): Promise<`0x${string}`>;
   signOrder(request: OrderSigningRequest): Promise<`0x${string}`>;
   cancelOrder(request: CancelOrderRequest): Promise<`0x${string}`>;
   assertContext(account: string, chainId: number): Promise<void>;
@@ -188,7 +190,7 @@ export function createOrderExecutor(
         form,
         inputTokenAddress: token.address,
         outputTokenAddress: outputToken.address,
-        swapperAddress: account,
+        account,
       });
       publish({ phase: ExecutionPhase.SIGNING, currentStep: Steps.CREATE });
       const signature = await wallet.signOrder(prepared.signingRequest);
@@ -205,7 +207,7 @@ export function createOrderExecutor(
       });
       return order;
     } catch (error) {
-      const rejected = !submitting && isTxRejected(error);
+      const rejected = !submitting && isUserRejectedError(error);
       const message = error instanceof Error ? error.message : String(error);
       // A lost HTTP response does not prove that submission failed on the server.
       // Surface that ambiguity so the caller checks history before resubmitting.
