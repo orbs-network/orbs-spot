@@ -7,6 +7,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { type BestTradeQuote, type Currency, SwapStatus, SwapStep } from "../types";
 import { DEFAULT_PRICE_PROTECTION, DEFAULT_SLIPPAGE } from "../consts";
 import { getTokenKey } from "../utils";
+import type { SwapAmountSide } from "../swap/quotes";
 
 type CustomCurrencies = { [chainId: number]: Currency[] };
 export type PercentSettingMode = "auto" | "custom";
@@ -87,6 +88,9 @@ type SwapStore = {
   setOrderInput: (key: string, input: OrderInput) => void;
   inputAmount: string;
   setInputAmount: (inputAmount: string) => void;
+  outputAmount: string;
+  setOutputAmount: (outputAmount: string) => void;
+  amountSide: SwapAmountSide;
   pauseQuote: boolean;
   quotePauseOwner?: string;
   setPauseQuote: (pauseQuote: boolean) => void;
@@ -108,7 +112,10 @@ export const useSwapStore = create<SwapStore>((set) => ({
     },
   })),
   inputAmount: "",
-  setInputAmount: (inputAmount: string) => set({ inputAmount }),
+  setInputAmount: (inputAmount: string) => set({ inputAmount, outputAmount: "", amountSide: "input" }),
+  outputAmount: "",
+  setOutputAmount: (outputAmount: string) => set({ outputAmount, inputAmount: "", amountSide: "output" }),
+  amountSide: "input",
   pauseQuote: false,
   setPauseQuote: (pauseQuote: boolean) => set({ pauseQuote, quotePauseOwner: undefined }),
   pauseQuotesFor: quotePauseOwner => set({ pauseQuote: true, quotePauseOwner }),

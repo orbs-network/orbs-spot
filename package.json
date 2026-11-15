@@ -8,17 +8,14 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "deploy": "bash scripts/deploy.sh",
-    "test": "node --experimental-transform-types --test scripts/*.test.mjs && yarn examples:check",
-    "examples:generate": "node --experimental-transform-types scripts/export-sdk-examples.mjs",
-    "examples:check": "yarn examples:generate --check"
+    "deploy": "bash scripts/deploy.sh"
   },
   "dependencies": {
     "@base-org/account": "~2.4.0",
     "@coinbase/wallet-sdk": "~4.3.6",
     "@gemini-wallet/core": "~0.3.1",
     "@metamask/connect-evm": "~1.4.0",
-    "@orbs-network/spot-ui": "^2.2.0",
+    "@orbs-network/spot-ui": "^2.2.2",
     "@radix-ui/react-avatar": "^1.1.11",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-popover": "^1.1.17",

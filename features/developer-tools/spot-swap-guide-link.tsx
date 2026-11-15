@@ -8,7 +8,7 @@ export function SpotSwapGuideLink({
 }) {
   return (
     <DeveloperGuideLink
-      baseHref="https://github.com/orbs-network/spot-ui/blob/master/skills/spot-integration/references/07-swap-and-migration.md"
+      baseHref="https://github.com/orbs-network/spot-ui/blob/master/skills/spot-swap-integration/references/02-swap-flow.md"
       className={className}
       section={undefined}
     />

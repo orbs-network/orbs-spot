@@ -30,6 +30,8 @@ export function useReviewQuote(): ReviewQuote {
   const snapshot = useContext(SwapReviewSnapshotContext);
   const quote = reviewed ?? current.trade;
   return snapshot?.quote ?? { ...current, quote,
+    inputAmount: quote ? toAmountUI(quote.inAmount, current.inputCurrency?.decimals) : current.inputAmount,
+    parsedInputAmount: quote?.inAmount ?? current.parsedInputAmount,
     outputAmount: quote ? toAmountUI(quote.outAmount, current.outputCurrency?.decimals) : current.outputAmount,
   };
 }

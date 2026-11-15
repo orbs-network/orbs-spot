@@ -17,14 +17,16 @@ For adapting this example to another app, follow [examples/spot/AGENTS.md](examp
 ## Choose the relevant source
 
 - Standalone SDK calls: `examples/spot/spot-swap.ts` or `examples/spot/advanced-orders.ts`.
-- Change example/download behavior: `features/developer-tools/snippets/sdk-flow-examples.ts`, then `yarn examples:generate`. Generated files are checked for drift by `yarn test`.
+- Change example/download behavior: `features/developer-tools/snippets/sdk-flow-examples.ts`; keep the standalone examples aligned with that source.
 - Production swap orchestration: `lib/swap/execution.ts`; polling: `lib/swap/settlement.ts`; recovery: `lib/swap/activity.ts`.
 - Advanced-order calculation: `components/advanced-order/use-order-form.ts`; execution: `lib/spot/execution.ts`; wallet adapter: `components/advanced-order/hooks.tsx`.
 - Client caching/history: `lib/spot/queries.ts`; cancellation: `lib/spot/cancellation.ts`.
 - Playground setup and deployment: `docs/playground.md`.
 
-Before changing SDK integration, read `node_modules/@orbs-network/spot-ui/dist/integration-skill/SKILL.md`
-and only the references for the affected flow. The bundled manifest records the matching SDK version.
+Before changing SDK integration, read the matching skill under
+`node_modules/@orbs-network/spot-ui/dist/integration-skills/`: `spot-swap-integration/SKILL.md`
+for swaps or `spot-advanced-orders-integration/SKILL.md` for advanced orders, history, and cancellation.
+Read only the references for the affected flow. Each bundled manifest records the matching SDK version.
 Import SDK code through its public package root. `OrderType` selects the four advanced strategies;
 `OrderVariant` describes detailed history modes. Swaps use quotes directly.
 
@@ -34,6 +36,6 @@ fill tracking uses `client.getOrder`. Keep developer UI behind the existing `@de
 
 ## Verify
 
-Use Node/Yarn versions in `package.json`. Run `yarn test`, `yarn typecheck`, `yarn lint`, and `yarn build`.
+Use Node/Yarn versions in `package.json`. Run `yarn typecheck`, `yarn lint`, and `yarn build`.
 For flow changes, run `yarn dev` and exercise `/dev` (swaps) or `/dev?tab=twap` (orders) with **Demo**.
 The demo does not sign or submit. Keep wallet verification read-only unless live execution is authorized.

@@ -1,3 +1,4 @@
+import { maxUint256 } from "viem";
 import { useMutation } from "@tanstack/react-query";
 import BN from "bignumber.js";
 import { useCallback } from "react";
@@ -35,7 +36,7 @@ export const useApproval = (
       const { receipt } = await approveToken({
         tokenAddress: currencyAddress,
         spenderAddress: spender,
-        amount,
+        amount: maxUint256.toString(),
         onSubmitted,
       });
       // Check the actual allowance after confirmation, rather than assuming the write took effect.

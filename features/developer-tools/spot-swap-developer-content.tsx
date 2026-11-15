@@ -13,7 +13,7 @@ import { type ReactElement, useCallback, useEffect, useId, useMemo, useRef, useS
 import { toast } from "sonner";
 import { createLoadingToast } from "@/lib/loading-toast";
 import { useConnection, usePublicClient, useWalletClient } from "wagmi";
-import { erc20Abi } from "viem";
+import { erc20Abi, maxUint256 } from "viem";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -114,7 +114,7 @@ function getPresentation({ data, step }: { data: JsonContainer; step: SpotSwapFl
     flow: "Quote, wrap and approve when needed, prepare a swap from the reviewed quote and connected account, sign the original request, submit the order, and wait for a completed fill.",
     check: "Read the input token allowance for client.spenderAddress. Native input uses its wrapped ERC-20 token.",
     wrap: "Deposit the exact native input into its wrapped ERC-20 contract and wait for a successful receipt before continuing.",
-    approve: "Approve the exact input amount for client.spenderAddress, confirm the transaction, and verify allowance with bounded retries.",
+    approve: "Approve maximum uint256 allowance for client.spenderAddress, confirm the transaction, and verify allowance with bounded retries.",
     sign: "await client.prepareSwap({ quote, account, signal }) refreshes stale quotes and signs prepared.quote.minimumAmountOut unchanged with a three-minute expiration. The connected account signs this original signingRequest unchanged. The quote itself contains no signing payload.",
     swap: "Submit the exact prepared order and original signature once. submitSwap returns an accepted order; host polling through client.getOrder confirms the completed fill.",
     success: "Host status polling returned a completed order. Its fills contain the actual settlement transaction hashes and amounts.",
@@ -140,10 +140,9 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
   const isWalletLoading = isConnecting || isReconnecting;
   const chainId = useDataChainId();
   const { openConnectModal } = useConnectModal();
-  const { slippage } = useSettings();
-  const { inputCurrency, inputAmount, isLoadingTrade, outputCurrency, parsedInputAmount, trade } = useDerivedSwap();
+  const { slippage, slippageMode } = useSettings();
+  const { inputCurrency, inputAmount, isLoadingTrade, outputCurrency, parsedQuoteAmount, amountSide, trade } = useDerivedSwap();
   const inputBalance = useBalance(inputCurrency).wei;
-  const hasBalance = Boolean(account && BN(inputBalance ?? "0").gte(parsedInputAmount));
   const { data: client } = useSpotSwapClient();
   const { requestData } = useQuoteInspectionData();
   const queryClient = useQueryClient();
@@ -176,8 +175,10 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
   const step = navigation.history.at(-1) ?? "flow";
   const viewedStep = navigation.history[navigation.viewedIndex] ?? step;
   const liveQuote = trade;
+  const selectedQuote = executionQuote ?? reviewedQuote ?? liveQuote;
+  const hasBalance = Boolean(account && selectedQuote && BN(inputBalance ?? "0").gte(selectedQuote.inAmount));
   const inputIsNative = isNativeAddress(inputCurrency?.address);
-  const contextKey = [account?.toLowerCase(), chainId, client?.partner, inputCurrency?.address.toLowerCase(), outputCurrency?.address.toLowerCase(), parsedInputAmount, slippage].join(":");
+  const contextKey = [account?.toLowerCase(), chainId, client?.partner, inputCurrency?.address.toLowerCase(), outputCurrency?.address.toLowerCase(), amountSide, parsedQuoteAmount, slippageMode, slippage].join(":");
   const stopSession = useCallback(() => {
     const session = sessionRef.current;
     if (!session) return;
@@ -373,7 +374,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
         } else if (step === "approve") {
           if (!(await hasAllowance())) {
             await assertContext();
-            const { receipt } = await approveToken({ tokenAddress: request.inToken, spenderAddress: client.spenderAddress, amount: request.inAmount });
+            const { receipt } = await approveToken({ tokenAddress: request.inToken, spenderAddress: client.spenderAddress, amount: maxUint256.toString() });
             if (receipt.status !== "success") throw new Error("Token approval reverted");
             await confirmAllowance(hasAllowance, {
               message: "Approval is not available. Check allowance before retrying.",
@@ -550,13 +551,13 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
     }
     if (!isDemo && step === "flow" && !hasBalance)
       return "Insufficient balance for a real swap.";
-    if (!parsedInputAmount || parsedInputAmount === "0") {
+    if (!parsedQuoteAmount || parsedQuoteAmount === "0") {
       return "Enter a swap amount before running the live flow.";
     }
-    if (isLoadingTrade && !liveQuote) {
+    if (isLoadingTrade && !selectedQuote) {
       return "Wait for the current Spot quote.";
     }
-    if (!executionQuote && !liveQuote) {
+    if (!selectedQuote) {
       return "A live Spot quote is required.";
     }
     return undefined;
@@ -572,7 +573,8 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
     executionQuote,
     isLoadingTrade,
     liveQuote,
-    parsedInputAmount,
+    parsedQuoteAmount,
+    selectedQuote,
     step,
   ]);
   const guideSection =

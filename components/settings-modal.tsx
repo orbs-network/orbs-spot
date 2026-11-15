@@ -1,5 +1,5 @@
 import { MAX_PERCENT_SETTING } from "@/lib/percent-settings";
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,7 @@ import { FormLabel, InfoTooltip } from "./ui/form-label";
 import { FormNumberField } from "./ui/form-number-field";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
+import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 
 const SLIPPAGE_PRESETS = [0.1, 0.5, 1] as const;
 const PRICE_PROTECTION_PRESETS = [1, 3, 5] as const;
@@ -69,6 +70,18 @@ const formatInlinePercent = (value: number) => {
   if (Number.isInteger(value)) return value.toString();
   return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
 };
+
+const formatSettingsPercent = (
+  value: number | undefined,
+  mode: PercentSettingMode,
+  separator: string,
+  isResolving: boolean,
+) => {
+  if (isResolving) return `Auto${separator}Resolving…`;
+  if (value === undefined) return mode === "auto" ? "Auto" : "—";
+  return `${mode === "auto" ? `Auto${separator}` : ""}${formatInlinePercent(value)}%`;
+};
+
 type PercentTabValue = "auto" | number;
 
 const PercentSettings = ({
@@ -77,12 +90,14 @@ const PercentSettings = ({
   onChange,
   presets,
   value,
+  description,
 }: {
   defaultValue: number;
   mode: PercentSettingMode;
   onChange: (value: number, mode?: PercentSettingMode) => void;
   presets: readonly number[];
   value: number;
+  description?: ReactNode;
 }) => {
   const isAuto = mode === "auto";
   const selectedPresetIndex = presets.findIndex((preset) => value === preset);
@@ -138,9 +153,9 @@ const PercentSettings = ({
         </FormNumberField>
       </div>
       <p role="status" className="mt-3 text-xs text-muted-foreground">
-        {isAuto
+        {description ?? (isAuto
           ? `Auto uses ${defaultValue}%. Enter a custom percentage to override it.`
-          : `Using ${value}% custom tolerance.`}
+          : `Using ${value}% custom tolerance.`)}
       </p>
     </div>
   );
@@ -148,6 +163,16 @@ const PercentSettings = ({
 
 const SwapSettings = () => {
   const { slippage, slippageMode, setSlippage } = useSettings();
+  const { trade, quoteSlippage, isLoadingSlippage } = useDerivedSwap();
+  const effectiveSlippage = trade?.slippage ?? quoteSlippage;
+  const description = slippageMode === "auto" ? <>
+    {isLoadingSlippage && !trade
+      ? "Resolving automatic tolerance…"
+      : effectiveSlippage === undefined
+        ? "Automatic tolerance is selected before quoting."
+        : `Current tolerance: ${formatInlinePercent(effectiveSlippage)}%.`}
+    {" "}Auto uses at least 1% for trades up to $100, and {formatInlinePercent(slippage || DEFAULT_SLIPPAGE)}% for larger trades or when pricing is unavailable. Enter a custom percentage to override it.
+  </> : undefined;
 
   return (
     <PercentSettings
@@ -156,6 +181,7 @@ const SwapSettings = () => {
       onChange={setSlippage}
       presets={SLIPPAGE_PRESETS}
       value={slippage}
+      description={description}
     />
   );
 };
@@ -179,10 +205,12 @@ type SettingsTriggerVariant = "card" | "action" | "icon" | "footer";
 
 const SettingsFooterTrigger = ({ Trigger }: { Trigger: typeof DialogTrigger }) => {
   const isSpotTab = useIsSpotTab();
-  const { slippage, slippageMode, priceProtection, priceProtectionMode } = useSettings();
-  const value = isSpotTab ? priceProtection : slippage;
+  const { slippageMode, priceProtection, priceProtectionMode } = useSettings();
+  const { trade, quoteSlippage, isLoadingSlippage } = useDerivedSwap();
+  const value = isSpotTab ? priceProtection : trade?.slippage ?? quoteSlippage;
   const mode = isSpotTab ? priceProtectionMode : slippageMode;
   const label = isSpotTab ? "Price Protection" : "Slippage Tolerance";
+  const displayValue = formatSettingsPercent(value, mode, " · ", !isSpotTab && isLoadingSlippage && !trade);
 
   return <Trigger asChild>
     <button
@@ -194,7 +222,7 @@ const SettingsFooterTrigger = ({ Trigger }: { Trigger: typeof DialogTrigger }) =
     >
       <SettingsIcon aria-hidden="true" className="size-3.5" />
       <span>Trade settings</span>
-      <span className="ml-auto text-primary">{mode === "auto" ? "Auto · " : ""}{formatInlinePercent(value)}%</span>
+      <span className="ml-auto text-primary">{displayValue}</span>
       <ChevronRightIcon aria-hidden="true" className="size-3.5 text-primary" />
     </button>
   </Trigger>;
@@ -208,15 +236,14 @@ const SettingsInlineTrigger = ({
   Trigger: typeof DialogTrigger;
 }) => {
   const isSpotTab = useIsSpotTab();
-  const { slippage, slippageMode, priceProtection, priceProtectionMode } =
+  const { slippageMode, priceProtection, priceProtectionMode } =
     useSettings();
+  const { trade, quoteSlippage, isLoadingSlippage } = useDerivedSwap();
   const label = isSpotTab ? "Price Protection" : "Slippage Tolerance";
   const tooltip = isSpotTab ? PRICE_PROTECTION_TOOLTIP : SLIPPAGE_TOOLTIP;
-  const value = isSpotTab ? priceProtection : slippage;
+  const value = isSpotTab ? priceProtection : trade?.slippage ?? quoteSlippage;
   const mode = isSpotTab ? priceProtectionMode : slippageMode;
-  const formattedValue = formatInlinePercent(value);
-  const displayValue =
-    mode === "auto" ? `Auto: ${formattedValue}%` : `${formattedValue}%`;
+  const displayValue = formatSettingsPercent(value, mode, ": ", !isSpotTab && isLoadingSlippage && !trade);
   const isActionVariant = variant === "action";
 
   return (

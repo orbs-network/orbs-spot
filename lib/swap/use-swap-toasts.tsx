@@ -66,18 +66,18 @@ export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, o
   const rememberTransaction = (label: string, hash?: string) => {
     if (hash) transactions.set(label, hash);
   };
-  const details = (message?: string) => {
+  const details = (message?: string, visibleTransactions = Array.from(transactions, ([label, hash]): ToastTransaction => ({ label, hash }))) => {
     return <TradeToastDetails
       input={input}
       output={output}
       message={message}
       chainId={chainId}
-      transactions={Array.from(transactions, ([label, hash]): ToastTransaction => ({ label, hash }))}
+      transactions={visibleTransactions}
     />;
   };
-  const loading = (title: string, message?: string) => {
+  const loading = (title: string, message?: string, visibleTransactions?: ToastTransaction[]) => {
     publishPreview(title, "pending", message);
-    publishToast(() => loadingToast.show(title, { description: details(message) }));
+    publishToast(() => loadingToast.show(title, { description: details(message, visibleTransactions) }));
   };
   const success = (txHash?: string, order?: Order) => {
     rememberTransaction("Swap transaction", txHash ?? (order && getFillTransactionHash(order)));
@@ -108,11 +108,11 @@ export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, o
       loading(`Approving ${inputSymbol}`, "Waiting for confirmation");
     },
     onApproveSuccess: () => loading("Preparing swap"),
-    onSwapRequest: () => loading("Swap in progress", "Confirm the signature in your wallet."),
+    onSwapRequest: () => loading("Swap in progress", "Confirm the signature in your wallet.", []),
     onSwapConfirming: (order?: Order) => {
       acceptedOrder = order ?? acceptedOrder;
       rememberTransaction("Swap transaction", order && getFillTransactionHash(order));
-      loading("Swap in progress");
+      loading("Swap in progress", undefined, []);
     },
     onSwapSuccess: success,
     onSwapFailed: (error: unknown, order?: Order) => {

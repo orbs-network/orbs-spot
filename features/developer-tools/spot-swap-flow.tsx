@@ -7,7 +7,7 @@ const FLOW_STEPS = [
   },
   {
     detail:
-      "When allowance for client.spenderAddress is below quote.request.inAmount, approve the exact input amount, confirm the receipt, and verify allowance.",
+      "When allowance for client.spenderAddress is below quote.request.inAmount, approve maximum uint256 allowance, confirm the receipt, and verify allowance.",
     meta: "Wallet · if required",
     title: "Approve configured spender",
   },

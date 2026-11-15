@@ -8,6 +8,7 @@ This document explains the reference app’s state, history, valuation, and back
 | Responsibility | Source |
 | --- | --- |
 | Shared Spot quote identity and display units | [`lib/hooks/use-trade.ts`](../lib/hooks/use-trade.ts) |
+| Automatic slippage before quoting | [`lib/swap/slippage.ts`](../lib/swap/slippage.ts) |
 | Swap signing, submission and settlement | [`lib/swap/execution.ts`](../lib/swap/execution.ts) |
 | Accepted swap activity and reload recovery | [`lib/swap/activity.ts`](../lib/swap/activity.ts), [`features/swap/activity.tsx`](../features/swap/activity.tsx) |
 | Advanced-order wallet port and submission sequence | [`lib/spot/execution.ts`](../lib/spot/execution.ts) |
@@ -37,8 +38,9 @@ receipts are cached by chain and transaction hash. Successful writes invalidate 
    leave configuration failures retryable. An enabled Orbs partner is required.
 2. Map editable inputs, balances, token decimals, USD prices and the current raw output quote into
    `calculateOrder`. Its result owns defaults, validation, trade counts, prices and schedules.
-   Every form uses the cached `client.getQuote` for the complete input amount and passes its raw `quote.netAmountOut`
-   unchanged as `quotedOutputAmountRaw`. Dollar estimates use the quote's `inputAmountUsd`,
+   Advanced-order forms use the cached `client.getQuote` for the complete input amount and pass its raw `quote.netAmountOut`
+   unchanged as `quotedOutputAmountRaw`. The swap form also supports quoting a receive target with `outAmount`.
+   Dollar estimates use the quote's `inputAmountUsd`,
    `netAmountOutUsd`, and `minimumAmountOutUsd` independently. Pass the input total into
    `calculateOrder` as `inputAmountUsd` and derive token unit prices for advanced-order output valuation.
    Input USD determines minimum-trade validation; quote-derived unit prices value edited limit/trigger
@@ -49,7 +51,7 @@ receipts are cached by chain and transaction hash. Successful writes invalidate 
 3. Adapt your wallet to `SpotWalletPort`. Transaction writes must resolve after successful receipts,
    and `assertContext` must verify the connected account and chain before wallet actions.
 4. Create one `createOrderExecutor(onChange)` per form. Submit its reviewed snapshot with the SDK client,
-   wallet adapter, account and tokens. It wraps native input, approves the exact raw amount if needed,
+   wallet adapter, account and tokens. It wraps native input, approves maximum uint256 allowance if needed,
    verifies allowance, prepares immediately before signing, and forwards the original signature unchanged.
 5. Use `getOrders({ swapper: account, exchange: partner, getv1orders: false, signal })` for V2 history
    and `order.historyKey` for row/cache identity. The host cache adds token metadata for display.
@@ -78,8 +80,29 @@ const order = await client.submitOrder(prepared.order, signature);
 
 ### Swap quotes, minimum output and settlement
 
-Swap, TWAP, limit, stop-loss and take-profit forms share an exact-input `client.getQuote` for their
+TWAP, limit, stop-loss and take-profit forms use an exact-input `client.getQuote` for their
 market reference. Advanced-order limit and trigger settings continue to determine their target output.
+The swap form accepts either an input amount or a receive target. Editing the receive amount calls
+`client.getQuote` with `outAmount` in output-token base units and the actual token pair unchanged.
+The server resolves the required input into `quote.request.inAmount`; `quote.requestedOutAmount`
+retains the entered target. The typed side stays editable while the opposite amount comes from that quote.
+Changing amount side, target, pair, wallet, chain, or slippage uses a separate quote identity and withholds stale values.
+Balances, allowance, wrapping, review, and submission use the returned input amount at full precision.
+After review, refreshes quote that fixed spend rather than recalculating the target or increasing spending.
+
+Automatic swap slippage is resolved before the quote request. The host reads `client.getTokenUsd`
+for the typed side's token and computes the full trade value with decimal arithmetic:
+raw amount divided by `10 ** tokenDecimals`, multiplied by USD per whole token.
+For native input, pricing uses the configured wrapped-token address. Output entry uses the output
+target token and its decimals. The host passes this total to the synchronous
+`getSwapSlippage({ amountUsd, slippage: baseline })` helper. Positive totals worth $100 or less
+use at least 1%; larger totals retain the baseline. The price wait is bounded to 1,500 ms;
+failed or timed-out lookups use `amountUsd: undefined` and retain the baseline, while caller cancellation
+propagates. Custom slippage bypasses pricing and the helper and is sent unchanged.
+The quote request and UI use the same resolved percentage; review and execution refreshes retain
+`quote.request.slippage`. The helper's valuation is separate from quote USD metadata used for
+display and the minimum-trade check. Never derive policy from rounded display values or reapply it to a signed order.
+
 The swap form confirms wrapping and approval to `client.spenderAddress`, then uses
 `await client.prepareSwap({ quote, account, signal })`, the wallet's EIP-712 signature and `client.submitSwap`.
 Quotes retain their account, chain, token, raw amount and slippage identity. Swap execution pauses

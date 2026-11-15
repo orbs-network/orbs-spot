@@ -1,7 +1,7 @@
 # Spot integration example
 
 Use this repository to add Spot swaps, TWAP, limit, stop-loss, or take-profit orders to an app.
-It uses `@orbs-network/spot-ui` 2.2.0 with the app’s own wallet and UI.
+It uses `@orbs-network/spot-ui` 2.2.2 with the app’s own wallet and UI.
 
 ## Start here
 
@@ -13,6 +13,13 @@ It uses `@orbs-network/spot-ui` 2.2.0 with the app’s own wallet and UI.
 If you are using this repo as a reference for another app, follow [examples/spot/AGENTS.md](examples/spot/AGENTS.md).
 
 ## The SDK flow
+
+The swap form accepts an input amount or a receive target. Output entry calls
+`client.getQuote({ inToken, outToken, outAmount, user, slippage })` for the same pair.
+Review the returned `quote.request.inAmount` as the fixed spend before wallet actions.
+Before quoting, automatic slippage uses `getSwapSlippage` with the typed amount's USD value.
+Pricing waits up to 1.5 seconds and falls back to the baseline when unavailable; custom slippage stays unchanged.
+Review displays the percentage captured in the quote.
 
 The host confirms wrapping and allowance, then prepares, signs, and submits:
 
@@ -66,16 +73,17 @@ Use `/dev?tab=twap` for advanced orders and `/dev/orders?mockorders=true` for sa
 WalletConnect setup and deployment are described in [playground operations](docs/playground.md).
 
 ```bash
-yarn test       # Regression tests and generated-example consistency
 yarn typecheck  # Includes the standalone TypeScript examples
 yarn lint
 yarn build
 ```
 
-The examples and playground downloads share one generator. After editing it, run
-`yarn examples:generate`; `yarn examples:check` detects stale examples without changing files.
+Keep the standalone examples aligned with the playground downloads in
+`features/developer-tools/snippets/sdk-flow-examples.ts`.
 
-SDK instructions matching the installed version are bundled at
-`node_modules/@orbs-network/spot-ui/dist/integration-skill/SKILL.md`.
-See also the [SDK repository guide](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration),
+SDK instructions matching the installed version are bundled under
+`node_modules/@orbs-network/spot-ui/dist/integration-skills/`: `spot-swap-integration/SKILL.md`
+for swaps and `spot-advanced-orders-integration/SKILL.md` for advanced orders, history, and cancellation.
+See also the SDK repository guides for [swaps](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-swap-integration)
+and [advanced orders](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-advanced-orders-integration),
 [integration documentation](https://docs.orbs.com/), and [live playground](https://spot-app.orbs.com/).

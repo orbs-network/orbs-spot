@@ -72,7 +72,7 @@ const ADVANCED_APPROVAL_CODE = `async function approveToken(inputToken: Address,
   if (allowance < amount) {
     const hash = await walletClient.writeContract({
       address: inputToken, abi: erc20Abi, functionName: "approve",
-      args: [spender, amount], account, chain: walletClient.chain,
+      args: [spender, maxUint256], account, chain: walletClient.chain,
     });
     await waitForTransactionConfirmation(hash);
     for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -126,7 +126,7 @@ export function formatAdvancedOrdersSdkFlow(data: JsonContainer = {}): string {
 // Call createAdvancedOrderFlow only from an explicit user action. Submission returns acceptance.
 // For host guards and recovery, follow lib/spot/execution.ts in the reference app.
 import { calculateOrder, createClient, OrderType, Partners, type CalculateOrderFormParams } from "@orbs-network/spot-ui";
-import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
+import { createPublicClient, createWalletClient, custom, erc20Abi, http, maxUint256, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import { polygon } from "viem/chains";
 
 // Browser example: use the chain selected in the host wallet.
@@ -254,7 +254,7 @@ const SWAP_APPROVAL_CODE = `async function approveTokenIfNeeded(token: Address, 
   signal?.throwIfAborted();
   const hash = await walletClient.writeContract({
     address: token, abi: erc20Abi, functionName: "approve",
-    args: [spender, amount], account, chain,
+    args: [spender, maxUint256], account, chain,
   });
   await waitForTransactionConfirmation(hash);
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -294,15 +294,17 @@ export function formatSpotSwapSdkFlow(data: JsonContainer = {}): string {
   const root = Array.isArray(data) ? {} : data;
   const chainId = typeof root.chainId === "number" ? root.chainId : 137;
   const partner = typeof root.partner === "string" && root.partner ? root.partner : "external";
-  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.2.0 or later.
+  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.2.2 or later.
 // Adapt chain, partner, and wallet provider to your app; reuse existing wallet services.
 // Get a current client.getQuote for the selected pair and show its minimum before calling swapFlow.
+// Supply inAmount to quote spending or outAmount to quote a receive target, in token base units.
+// Keep the same token pair and freeze the returned quote.request.inAmount as the reviewed spend.
 // Implement pauseQuotes/resumeQuotes and reviewChangedQuote using your host UI.
 // Call swapFlow only from an explicit user action; it waits for a completed fill.
 // For persisted recovery, follow lib/swap/activity.ts in the reference app.
 import { createClient, isQuoteFresh, OrderStatus, Partners, type Order, type SpotClient, type SwapQuote } from "@orbs-network/spot-ui";
 import BN from "bignumber.js";
-import { createPublicClient, createWalletClient, custom, erc20Abi, http, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
+import { createPublicClient, createWalletClient, custom, erc20Abi, http, maxUint256, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import * as chains from "viem/chains";
 
 ${NATIVE_ADDRESS_HELPER}
@@ -327,7 +329,7 @@ function getClient() {
 let busy = false;
 
 export type SwapInput = {
-  quote: SwapQuote; // Display quote.minimumAmountOut unchanged in host review.
+  quote: SwapQuote; // Input or output-target quote; display its minimum unchanged in host review.
   sourceToken: Address;
   wrappedNativeTokenAddress: Address; // Chain configuration, never taken from an untrusted quote.
   signal?: AbortSignal; // Abort on unmount, account/chain change, or cancellation.
@@ -363,7 +365,7 @@ export async function swapFlow(account: Address, input: SwapInput) {
       throw new Error("Quote does not match the selected Spot configuration");
     }
     const token = request.inToken as Address;
-    const amount = BigInt(request.inAmount);
+    const amount = BigInt(request.inAmount); // Resolved spend, including for an output target.
     const nativeInput = isNativeAddress(input.sourceToken);
     if ((nativeInput ? input.wrappedNativeTokenAddress : input.sourceToken).toLowerCase() !== token.toLowerCase()) {
       throw new Error("Quote input does not match the selected token or configured wrapped native token");
@@ -391,6 +393,7 @@ export async function swapFlow(account: Address, input: SwapInput) {
     await assertSpendBalance();
     await assertContext();
     if (!isQuoteFresh(quote, 20_000)) {
+      // Refresh the reviewed fixed spend, never recalculate an output target after wallet work.
       const next = await client.getQuote({ ...request, user: account, signal: input.signal });
       await assertContext();
       const worse = BigInt(next.netAmountOut) < BigInt(quote.netAmountOut)

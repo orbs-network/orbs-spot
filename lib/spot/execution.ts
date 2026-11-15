@@ -1,3 +1,4 @@
+import { maxUint256 } from "viem";
 import { confirmAllowance } from "./allowance.ts";
 import { isNativeAddress } from "./token-utils.ts";
 import { isUserRejectedError } from "./wallet-errors.ts";
@@ -163,7 +164,7 @@ export function createOrderExecutor(
         });
         const txHash = await wallet.approveToken({
           ...allowanceRequest,
-          amount: amount.toString(),
+          amount: maxUint256.toString(),
         }, (approvalTxHash) => publish({ approvalTxHash }));
         publish({ approvalTxHash: txHash });
         await confirmAllowance(async () => {

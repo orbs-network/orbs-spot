@@ -21,7 +21,7 @@ import { createLoadingToast } from "@/lib/loading-toast";
 
 export function SubmitNativeConversion({ direction }: { direction: NativeConversion }) {
   const t = useTranslations();
-  const { inputCurrency, outputCurrency, inputAmount, parsedInputAmount } = useDerivedSwap();
+  const { inputCurrency, outputCurrency, inputAmount, parsedInputAmount, amountSide } = useDerivedSwap();
   const balance = useBalance(inputCurrency);
   const chainId = useDataChainId();
   const { address: account } = useConnection();
@@ -33,7 +33,7 @@ export function SubmitNativeConversion({ direction }: { direction: NativeConvers
   const walletBusy = useSyncExternalStore(subscribeSubmissionLock, isSubmissionBusy, () => false);
   useEffect(() => {
     if (submitting.current) draftChanged.current = true;
-  }, [account, chainId, direction, inputCurrency?.address, outputCurrency?.address, inputAmount]);
+  }, [account, chainId, direction, inputCurrency?.address, outputCurrency?.address, inputAmount, amountSide]);
   useEffect(() => () => { draftChanged.current = true; }, []);
   const isPending = wrap.isPending || unwrap.isPending;
   const action = direction === "wrap" ? "Wrap" : "Unwrap";
@@ -49,6 +49,7 @@ export function SubmitNativeConversion({ direction }: { direction: NativeConvers
     submitting.current = true;
     draftChanged.current = false;
     const draftUrl = window.location.href;
+    const draft = useSwapStore.getState();
     let transactionHash: string | undefined;
     const toastInput = { token: { ...inputCurrency }, amount: inputAmount };
     const toastOutput = { token: { ...outputCurrency }, amount: inputAmount };
@@ -93,7 +94,11 @@ export function SubmitNativeConversion({ direction }: { direction: NativeConvers
         description: toastDetails(),
       });
       // Do not discard an amount edited while the wallet was confirming.
-      if (!draftChanged.current && window.location.href === draftUrl && useSwapStore.getState().inputAmount === inputAmount) useSwapStore.getState().setInputAmount("");
+      const currentDraft = useSwapStore.getState();
+      if (!draftChanged.current && window.location.href === draftUrl
+        && currentDraft.amountSide === draft.amountSide
+        && currentDraft.inputAmount === draft.inputAmount
+        && currentDraft.outputAmount === draft.outputAmount) currentDraft.setInputAmount("");
     } catch (error) {
       publishPreview(`${action} failed`, "error", error instanceof Error ? error.message : "The transaction could not be completed. Try again.");
       if (isUserRejectedError(error) && !transactionHash) toast.dismiss(toastId);

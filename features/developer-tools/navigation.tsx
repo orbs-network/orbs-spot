@@ -78,7 +78,7 @@ export function DeveloperNavigation() {
         tooltip: "Open Advanced Order Docs",
       }
     : {
-        href: "https://github.com/orbs-network/spot-ui/blob/master/skills/spot-integration/references/07-swap-and-migration.md",
+        href: "https://github.com/orbs-network/spot-ui/blob/master/skills/spot-swap-integration/references/02-swap-flow.md",
         linkLabel: "Spot Docs",
         tooltip: "Open Spot integration guide",
       };

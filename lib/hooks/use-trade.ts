@@ -1,60 +1,105 @@
 import { QuoteError } from "@orbs-network/spot-ui";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Currency } from "../types";
 import { useSettings } from "./use-settings";
 import BN from "bignumber.js";
-import { getWrappedNativeCurrency } from "../utils";
+import { getWrappedNativeCurrency, isNativeAddress } from "../utils";
 import { useDataChainId } from "./use-data-chain-id";
 import { QUOTE_PREVIEW_ACCOUNT } from "@/lib/swap/quote-preview";
-import { spotSwapQuoteQueryOptions } from "@/lib/swap/quotes";
+import { matchesSpotSwapQuoteAmount, spotSwapQuoteQueryOptions, type SwapAmountSide } from "@/lib/swap/quotes";
 import { useConnection } from "wagmi";
 import { useSwapStore } from "./store";
 import { useCallback, useMemo } from "react";
-import { useIsSwapTab } from "./use-form-tab";
 import { useSpotSwapClient } from "./use-spot-swap-client";
 import { getNativeConversion } from "../native-conversion";
+import { spotSwapSlippageQueryOptions } from "../swap/slippage";
+import { DEFAULT_SLIPPAGE } from "../consts";
 
 export const useTrade = (
   inputCurrency?: Currency,
   outputCurrency?: Currency,
-  parsedInputAmount = "",
+  parsedAmount = "",
+  amountSide: SwapAmountSide = "input",
 ) => {
-  const isSwapTab = useIsSwapTab();
   const chainId = useDataChainId();
   const { address } = useConnection();
-  const { slippage } = useSettings();
+  const { slippage, slippageMode } = useSettings();
+  const queryClient = useQueryClient();
   const pauseQuote = useSwapStore(state => state.pauseQuote);
   const wrappedNative = getWrappedNativeCurrency(chainId)?.address;
-  // Every advanced order uses the same full-input quote as swaps. Only the
-  // swap tab's direct wrap/unwrap operation bypasses market quoting.
-  const usesSpotQuote = !isSwapTab || !getNativeConversion(
+  // Native/wrapped pairs show the direct conversion form on every tab.
+  const usesSpotQuote = !getNativeConversion(
     inputCurrency?.address, outputCurrency?.address, wrappedNative,
   );
-  const quoteEnabled = usesSpotQuote && !pauseQuote && Boolean(inputCurrency && outputCurrency) && BN(parsedInputAmount).gt(0);
+  const hasQuoteAmount = usesSpotQuote && Boolean(inputCurrency && outputCurrency) && BN(parsedAmount).gt(0);
+  const quoteEnabled = hasQuoteAmount && !pauseQuote;
   const client = useSpotSwapClient(quoteEnabled);
-  const query = useQuery({
-    ...spotSwapQuoteQueryOptions(client.data, address ?? QUOTE_PREVIEW_ACCOUNT,
-      inputCurrency, outputCurrency, parsedInputAmount, slippage, wrappedNative),
-    enabled: quoteEnabled && Boolean(client.data),
-    refetchInterval: state => pauseQuote || (state.state.error instanceof QuoteError && !state.state.error.retryable) ? false : 10_000,
+  const automaticSlippage = slippageMode === "auto";
+  const amountCurrency = amountSide === "output" ? outputCurrency : inputCurrency;
+  const slippageTokenAddress = isNativeAddress(amountCurrency?.address)
+    ? wrappedNative ?? "" : amountCurrency?.address ?? "";
+  const slippageQuery = useQuery({
+    ...spotSwapSlippageQueryOptions(client.data, slippageTokenAddress,
+      amountCurrency?.decimals, parsedAmount, slippage, amountSide),
+    enabled: quoteEnabled && Boolean(client.data) && automaticSlippage,
+    refetchInterval: state => {
+      if (!quoteEnabled || !automaticSlippage || !state.state.data) return false;
+      const options = spotSwapQuoteQueryOptions(client.data, address ?? QUOTE_PREVIEW_ACCOUNT,
+        inputCurrency, outputCurrency, parsedAmount, state.state.data.slippagePercent, wrappedNative, amountSide);
+      const lastQuote = queryClient.getQueryState([...options.queryKey, state.state.dataUpdatedAt]);
+      return lastQuote?.error instanceof QuoteError && !lastQuote.error.retryable ? false : 10_000;
+    },
     refetchIntervalInBackground: false,
-    refetchOnWindowFocus: !pauseQuote,
+    refetchOnWindowFocus: quoteEnabled && automaticSlippage,
+    refetchOnReconnect: quoteEnabled && automaticSlippage,
+  });
+  const slippageError = automaticSlippage ? slippageQuery.error : null;
+  const quoteSlippage = automaticSlippage
+    ? hasQuoteAmount ? slippageQuery.data?.slippagePercent : slippage || DEFAULT_SLIPPAGE
+    : slippage;
+  const isLoadingSlippage = automaticSlippage && quoteEnabled && !client.error
+    && (client.isLoading || slippageQuery.isFetching);
+  const quoteOptions = spotSwapQuoteQueryOptions(client.data, address ?? QUOTE_PREVIEW_ACCOUNT,
+    inputCurrency, outputCurrency, parsedAmount, quoteSlippage ?? slippage, wrappedNative, amountSide);
+  const query = useQuery({
+    ...quoteOptions,
+    // Every automatic preview refresh prices first, then quotes once using that policy.
+    queryKey: automaticSlippage ? [...quoteOptions.queryKey, slippageQuery.dataUpdatedAt] : quoteOptions.queryKey,
+    enabled: quoteEnabled && Boolean(client.data) && quoteSlippage !== undefined && !slippageError
+      && (!automaticSlippage || !slippageQuery.isFetching),
+    refetchInterval: state => automaticSlippage || pauseQuote || (state.state.error instanceof QuoteError && !state.state.error.retryable) ? false : 10_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: !automaticSlippage && !pauseQuote,
+    refetchOnReconnect: !automaticSlippage && !pauseQuote,
   });
   const refetchQuote = query.refetch;
   const refetchClient = client.refetch;
+  const refetchSlippage = slippageQuery.refetch;
+  const resolvedSlippage = slippageQuery.data;
   const configuredClient = client.data;
   // TanStack's enabled flag does not prevent imperative refetches.
   const refetch = useCallback(() => {
-    if (useSwapStore.getState().pauseQuote) return Promise.resolve(undefined);
+    if (!quoteEnabled || useSwapStore.getState().pauseQuote) return Promise.resolve(undefined);
     if (!configuredClient) return refetchClient().then(() => undefined);
+    if (automaticSlippage) return refetchSlippage().then(() => undefined);
     return refetchQuote();
-  }, [configuredClient, refetchClient, refetchQuote]);
+  }, [automaticSlippage, configuredClient, quoteEnabled, refetchClient, refetchQuote, refetchSlippage]);
+
+  const trade = usesSpotQuote && quoteSlippage !== undefined && !slippageError && !query.error
+    && matchesSpotSwapQuoteAmount(query.data, parsedAmount, amountSide)
+    ? query.data : undefined;
+  const slippageAmountUsd = automaticSlippage ? resolvedSlippage?.amountUsd : undefined;
 
   return useMemo(() => ({
-    error: usesSpotQuote ? (quoteEnabled ? client.error : null) ?? query.error : null,
-    isLoading: quoteEnabled && (client.isLoading || query.isLoading),
+    error: quoteEnabled ? client.error ?? slippageError ?? (quoteSlippage !== undefined ? query.error : null) : null,
+    isLoading: quoteEnabled && (client.isLoading || isLoadingSlippage || query.isLoading),
     refetch,
-    data: usesSpotQuote ? query.data : undefined,
+    data: trade,
     usesSpotQuote,
-  }), [usesSpotQuote, quoteEnabled, client.error, client.isLoading, query.data, query.error, query.isLoading, refetch]);
+    quoteSlippage,
+    isLoadingSlippage,
+    slippageTokenAddress,
+    slippageAmountUsd,
+  }), [usesSpotQuote, quoteEnabled, client.error, client.isLoading, trade, query.error, query.isLoading, refetch,
+    quoteSlippage, isLoadingSlippage, slippageError, slippageTokenAddress, slippageAmountUsd]);
 };

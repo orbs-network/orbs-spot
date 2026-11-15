@@ -4,7 +4,7 @@ Choose one browser example:
 
 | You need | Read | Call |
 | --- | --- | --- |
-| Exact-input swaps | [spot-swap.ts](spot-swap.ts) | `swapFlow(account, input)` |
+| Swaps from an input amount or receive target | [spot-swap.ts](spot-swap.ts) | `swapFlow(account, input)` |
 | TWAP, limit, stop-loss, take-profit | [advanced-orders.ts](advanced-orders.ts) | `createAdvancedOrderFlow(account, input, formParams)` |
 
 These files use the public SDK and viem directly. They have no React, Zustand, or playground imports.
@@ -24,6 +24,27 @@ wallet stack, replace that setup with your connected wallet clients.
 5. Keep the accepted order in host state and reconcile it in history if submission or tracking becomes uncertain. The app implementations linked below show persistent activity and guards.
 
 For **swaps**, obtain the reviewed quote through `client.getQuote({ inToken, outToken, inAmount, user: account, slippage })`.
+When the user enters a receive target, supply `outAmount` instead of `inAmount`:
+
+```ts
+const quote = await client.getQuote({
+  inToken, outToken, outAmount: outputAmountRaw, user: account, slippage, signal,
+});
+```
+
+Keep the actual token pair unchanged. The SDK returns the required spend as
+`quote.request.inAmount` and retains the target as `quote.requestedOutAmount`.
+Display that spend, the estimated `quote.netAmountOut`, and the protected minimum before calling the flow.
+After review, refresh the resolved fixed input rather than recalculating the receive target.
+
+Resolve slippage before requesting either quote. In automatic mode, read the typed side's
+unit price with `client.getTokenUsd`, calculate the full USD total using token decimals and decimal arithmetic,
+then call `getSwapSlippage({ amountUsd, slippage: baseline })`. Use its `slippagePercent`
+in the quote request. The playground waits up to 1.5 seconds for pricing and passes `undefined`
+for `amountUsd` after a failure or timeout; caller cancellation still stops quoting.
+Custom mode skips both pricing and the helper, using the user's percentage unchanged.
+Keep `quote.request.slippage` through review, preparation, and refreshes; the quote minimum already includes it.
+
 Pass the wrapped ERC-20 input address for native input. Implement `pauseQuotes` and `resumeQuotes`
 using your quote lifecycle. `reviewChangedQuote` must display the new output and minimum and resolve
 true only when the user accepts them. Pass an `AbortSignal` tied to this attempt.
@@ -36,7 +57,7 @@ The flow returns an accepted order. Refresh history to show later fills.
 
 ## Preserve these contracts
 
-- Use `client.spenderAddress` for approvals. Native input must be wrapped before signing.
+- Use `client.spenderAddress` for approvals. These examples approve max uint256 only when allowance is below the input amount; verify allowance against that input after confirmation. Native input must be wrapped before signing.
 - Preparation can refresh quotes older than 20 seconds. Display and validate `prepared.quote`; ask for review if output or minimum worsens. Sign its minimum unchanged.
 - Sign the returned typed data and submit the exact prepared order with the original hex signature.
 - Submission establishes acceptance. Only `OrderStatus.Completed` establishes completion. IDs are not transaction hashes; explorer links use actual fill hashes.
@@ -58,7 +79,6 @@ For SDK API details, read the integration skill bundled with your installed SDK 
 
 ## Maintain this repository’s examples
 
-The `.ts` files are generated from the same source as playground downloads:
-`features/developer-tools/snippets/sdk-flow-examples.ts`. Edit that source, then run
-`yarn examples:generate`. `yarn test` checks consistency and compiles generated programs
-against the installed public SDK. `yarn typecheck` also checks the files in this directory.
+Keep these `.ts` examples aligned with the playground downloads in
+`features/developer-tools/snippets/sdk-flow-examples.ts`. `yarn typecheck` checks the
+standalone files against the installed public SDK.

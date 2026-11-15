@@ -1,7 +1,7 @@
 import { OrderSettlementError } from "../swap/settlement";
 import { OrderStatus, type Order, type Partners } from "@orbs-network/spot-ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { erc20Abi } from "viem";
+import { erc20Abi, maxUint256 } from "viem";
 import { useSignTypedDataPayload } from "./use-sign-typed-data";
 import { useApproveToken } from "./use-token-approval";
 import { useGetTokenAllowance } from "./use-token-allowance";
@@ -71,7 +71,7 @@ export const useSwapBestTrade = () => {
   const totalSteps = useBestTradeSwapStore(state => state.totalSteps);
   const currentStepIndex = useBestTradeSwapStore(state => state.currentStepIndex);
   const txHash = useBestTradeSwapStore(state => state.txHash);
-  const { parsedInputAmount, inputCurrency, outputCurrency, inputAmount, trade } = useDerivedSwap();
+  const { inputCurrency, outputCurrency, trade } = useDerivedSwap();
   const { partner } = useSpotPartner();
   const { isDeveloperPlayground } = useDeveloperMode();
   const { address: account, chainId } = useConnection();
@@ -132,13 +132,13 @@ export const useSwapBestTrade = () => {
           updateStore({ isAwaitingWallet: false, wrapTxHash });
           toasts.onWrapConfirming(wrapTxHash);
         } }),
-        approve: async () => approveToken({ tokenAddress: inputToken, spenderAddress: client.spenderAddress, amount,
+        approve: async () => approveToken({ tokenAddress: inputToken, spenderAddress: client.spenderAddress, amount: maxUint256.toString(),
           onSubmitted: approvalTxHash => {
             updateStore({ isAwaitingWallet: false, approvalTxHash });
             toasts.onApproveConfirming(approvalTxHash);
           } }),
         refreshQuote: () => {
-          const options = spotSwapQuoteQueryOptions(client, account, inputCurrency, outputCurrency, amount, quote.slippage, wrappedToken);
+          const options = spotSwapQuoteQueryOptions(client, account, inputCurrency, outputCurrency, amount, quote.slippage, wrappedToken, "input");
           const queryFn = options.queryFn;
           if (typeof queryFn !== "function") throw new Error("Spot quote request is unavailable");
           return queryClient.fetchQuery({ ...options, staleTime: 0, retry: false,
@@ -249,6 +249,10 @@ export const useSwapBestTrade = () => {
     if (useBestTradeSwapStore.getState().status === SwapStatus.LOADING) return;
     if (!inputCurrency || !outputCurrency || !trade || !account || !chainId) return;
     const quote = useBestTradeSwapStore.getState().reviewedQuote ?? trade;
+    // Output-target quotes resolve to a fixed spend before review. Capture that
+    // reviewed spend even if the live quote has refreshed in the background.
+    const amount = quote.inAmount;
+    const inputAmount = toAmountUI(amount, inputCurrency.decimals);
     const releaseWalletLock = acquireSubmissionLock();
     const abortController = new AbortController();
     const id = crypto.randomUUID();
@@ -274,9 +278,9 @@ export const useSwapBestTrade = () => {
       totalSteps: undefined, currentStepIndex: 0, txHash: undefined, orderId: undefined, order: undefined,
       wrapTxHash: undefined, confirmedWrappedInputAddress: undefined, approvalTxHash: undefined, quoteUpdate: undefined, error: undefined });
     swapBestTrade({ account, chainId, partner, quote: structuredClone(quote), inputCurrency: { ...inputCurrency },
-      outputCurrency: { ...outputCurrency }, inputAmount, amount: parsedInputAmount, signal: abortController.signal,
+      outputCurrency: { ...outputCurrency }, inputAmount, amount, signal: abortController.signal,
       id, toasts, progress: { review }, releaseWalletLock, onSubmissionStarted });
-  }, [account, chainId, inputAmount, inputCurrency, outputCurrency, parsedInputAmount, partner, swapBestTrade, trade, updateStore]);
+  }, [account, chainId, inputCurrency, outputCurrency, partner, swapBestTrade, trade, updateStore]);
 
   const reset = useCallback(() => {
     const id = swapSubmissions.current();

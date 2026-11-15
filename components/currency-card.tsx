@@ -19,6 +19,7 @@ type Props = {
   amount: string;
   usdValue?: string;
   disabled?: boolean;
+  side?: "input" | "output";
   title?: string;
   titleAction?: ReactNode;
   isLoading?: boolean;
@@ -92,6 +93,7 @@ export function CurrencyCard({
   onCurrencyChange,
   onAmountChange,
   disabled,
+  side = "input",
   amount,
   usdValue,
   title,
@@ -105,8 +107,8 @@ export function CurrencyCard({
 
   return (
     <>
-      {!disabled && onAmountChange && <PercentageButtons onAmountChange={onAmountChange} currency={currency} />}
-      <FormPanel data-currency-card className="group relative flex min-w-0 flex-col gap-2 bg-secondary/55 transition-colors ">
+      {!disabled && side === "input" && onAmountChange && <PercentageButtons onAmountChange={onAmountChange} currency={currency} />}
+      <FormPanel data-currency-card className="group relative flex min-w-0 flex-col gap-2 bg-secondary/55 transition-colors focus-within:ring-1 focus-within:ring-primary/40">
         <div data-currency-card-header className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
@@ -116,13 +118,13 @@ export function CurrencyCard({
         <div
           data-currency-amount-row
           className={`grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${
-            disabled ? "" : "mt-2 sm:mt-3"
+            disabled || side === "output" ? "" : "mt-2 sm:mt-3"
           }`}
         >
           <NumericInput
             error={error}
             aria-label={`${title ?? (disabled ? "To" : "From")} amount`}
-            name={disabled ? "destination-amount" : "source-amount"}
+            name={disabled || side === "output" ? "destination-amount" : "source-amount"}
             placeholder="0"
             disabled={disabled}
             decimalScale={currency?.decimals ?? 18}
@@ -156,7 +158,7 @@ export function CurrencyCard({
           ) : (
             <USD value={usdValue} amount={amount} isLoading={usdLoading} />
           )}
-          <Balance currency={currency} onAmountChange={onAmountChange} />
+          <Balance currency={currency} onAmountChange={side === "input" ? onAmountChange : undefined} />
         </div>
       </FormPanel>
     </>

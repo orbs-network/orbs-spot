@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { erc20Abi, type TransactionReceipt } from "viem";
+import { erc20Abi, maxUint256, type TransactionReceipt } from "viem";
 import { useConnection, useWalletClient } from "wagmi";
 import { useGetTransactionReceipt } from "./use-get-transaction-receipt";
 
@@ -22,7 +22,7 @@ export const useApproveToken = () => {
 
   return useMutation({
     mutationFn: async ({
-      amount,
+      amount = maxUint256.toString(),
       spenderAddress,
       tokenAddress,
       onSubmitted,

@@ -113,6 +113,7 @@ const ValidatedSubmitSwapButton = ({
     inputCurrency,
     outputCurrency,
     parsedInputAmount,
+    parsedQuoteAmount,
     isLoadingTrade,
     noLiquidity,
     quoteError,
@@ -128,7 +129,7 @@ const ValidatedSubmitSwapButton = ({
   const insufficientBalance = useMemo(() => {
     return BN(inputTokenBalance ?? "0").lt(parsedInputAmount ?? "0");
   }, [inputTokenBalance, parsedInputAmount]);
-  const enterAmount = !BN(parsedInputAmount).isFinite() || BN(parsedInputAmount).lte(0)
+  const enterAmount = !BN(parsedQuoteAmount).isFinite() || BN(parsedQuoteAmount).lte(0)
 
   const _disabled =
     disabled ||

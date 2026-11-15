@@ -13,6 +13,7 @@ export const useActionHandlers = () => {
     toggleCurrencies,
   } = useSwapParams();
   const setInputAmount = useSwapStore((state) => state.setInputAmount);
+  const setOutputAmount = useSwapStore((state) => state.setOutputAmount);
 
   const handleInputCurrencyChange = useCallback(
     (currency: string) => {
@@ -52,7 +53,8 @@ export const useActionHandlers = () => {
       handleCurrencyChange,
       handleToggleCurrencies: toggleCurrencies,
       setInputAmount,
+      setOutputAmount,
     }),
-    [handleCurrencyChange, setInputAmount, toggleCurrencies]
+    [handleCurrencyChange, setInputAmount, setOutputAmount, toggleCurrencies]
   );
 };

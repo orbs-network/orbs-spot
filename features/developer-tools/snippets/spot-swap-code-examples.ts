@@ -31,17 +31,69 @@ export type { Address, Hash } from "viem";`;
 export function formatSpotSwapLiveQuoteCode(data: JsonContainer = {}): string {
   const root = Array.isArray(data) ? {} : data;
   const args = record(root.quoteArgs);
-  const quoteArgs = Object.keys(args).length ? args : SPOT_SWAP_EXAMPLE_DATA.quoteArgs;
+  const quoteArgs: Record<string, JsonValue> = Object.keys(args).length ? args : SPOT_SWAP_EXAMPLE_DATA.quoteArgs;
+  const policy = record(root.slippagePolicy);
+  const outputTarget = typeof quoteArgs.outAmount === "string";
+  const slippagePolicy = {
+    mode: policy.mode === "custom" ? "custom" : "auto",
+    baseline: typeof policy.baseline === "number" ? policy.baseline
+      : typeof quoteArgs.slippage === "number" ? quoteArgs.slippage : 0.5,
+    tokenAddress: typeof policy.tokenAddress === "string" ? policy.tokenAddress
+      : outputTarget ? quoteArgs.outToken : quoteArgs.inToken,
+    tokenDecimals: typeof policy.tokenDecimals === "number" ? policy.tokenDecimals : 18,
+    rawAmount: typeof policy.rawAmount === "string" ? policy.rawAmount
+      : outputTarget ? quoteArgs.outAmount : quoteArgs.inAmount,
+  };
   return `${formatSpotSwapSetupCode(data)}
 
-import type { ClientGetQuoteParams, SwapQuote } from "@orbs-network/spot-ui";
+import BN from "bignumber.js";
+import { getSwapSlippage, type ClientGetQuoteParams, type SwapQuote } from "@orbs-network/spot-ui";
 const quoteArgs = ${JSON.stringify(quoteArgs, null, 2)} satisfies ClientGetQuoteParams;
+// Use the typed side's token, raw amount, and registry decimals for automatic policy.
+const slippagePolicy: {
+  mode: "auto" | "custom";
+  baseline: number;
+  tokenAddress: string;
+  tokenDecimals: number;
+  rawAmount: string;
+} = ${JSON.stringify(slippagePolicy, null, 2)};
+
+async function resolveSlippage(signal?: AbortSignal): Promise<number> {
+  signal?.throwIfAborted();
+  if (slippagePolicy.mode === "custom") return slippagePolicy.baseline;
+
+  let amountUsd: string | undefined;
+  if (new BN(slippagePolicy.rawAmount).gt(0)) {
+    const waitController = new AbortController();
+    const waitSignal = signal
+      ? AbortSignal.any([signal, waitController.signal]) : waitController.signal;
+    const timeout = setTimeout(() => waitController.abort(), 1_500);
+    try {
+      const unitPriceUsd = await client.getTokenUsd({
+        tokenAddress: slippagePolicy.tokenAddress, signal: waitSignal,
+      });
+      amountUsd = new BN(slippagePolicy.rawAmount)
+        .shiftedBy(-slippagePolicy.tokenDecimals).times(unitPriceUsd).toFixed();
+    } catch {
+      signal?.throwIfAborted(); // Price failure/timeout falls back; caller cancellation stops quoting.
+    } finally {
+      clearTimeout(timeout);
+      waitController.abort(); // Stops this wait, without cancelling shared SDK pricing.
+    }
+  }
+  signal?.throwIfAborted();
+  return getSwapSlippage({ amountUsd, slippage: slippagePolicy.baseline || 0.5 }).slippagePercent;
+}
 
 export async function getSpotSwapQuote(signal?: AbortSignal): Promise<SwapQuote> {
   // Use the wrapped ERC-20 input address for native input. This is a read only request.
   // A disconnected preview can use the host's preview address. Pass the actual
   // connected account to await client.prepareSwap({ quote, account, signal }).
-  return client.getQuote({ ...quoteArgs, signal });
+  // Supply exactly one amount: inAmount for spending or outAmount for a receive
+  // target. Keep the token pair unchanged; request.inAmount resolves the spend.
+  const slippage = await resolveSlippage(signal);
+  // Display quote.request.slippage after quoting and preserve it through review.
+  return client.getQuote({ ...quoteArgs, slippage, signal });
 }
 `;
 }
@@ -93,14 +145,24 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   chainId: "The EVM chain used for the quote, configured spender, wallet operations, and order settlement.",
   inputIsNative: "Native input is quoted using its wrapped ERC-20 address and deposited before allowance and signing.",
   quoteArgs: "Inputs passed to client.getQuote. This request does not open a wallet or prepare an order.",
-  request: "Frozen request identity retained with this quote. It is not a signing payload.",
+  slippagePolicy: "Host policy resolved before quoting. Automatic mode prices the typed side and calls getSwapSlippage; custom mode uses the chosen percentage directly.",
+  mode: "Automatic mode applies the SDK's USD-based slippage policy. Custom mode skips pricing and the automatic helper.",
+  baseline: "Positive DEX slippage percentage used as the automatic baseline, or the unchanged user-selected custom percentage.",
+  tokenAddress: "The typed side's token address for the USD unit-price lookup. Native input uses its configured wrapped token.",
+  tokenDecimals: "Registry decimals for the typed token. Convert rawAmount with these decimals before multiplying by USD per whole token.",
+  rawAmount: "Typed amount in token base units. Input entry uses input-token units; receive entry uses output-token units.",
+  amountUsd: "Full-precision total USD value used by automatic slippage, calculated from raw amount, token decimals, and the SDK unit price. Missing pricing retains the baseline.",
+  slippagePercent: "Resolved percentage passed to the quote. Automatic trades worth $100 or less use at least 1%; larger or unpriced amounts retain the baseline.",
+  request: "Frozen executable input identity retained with this quote. For an output target, inAmount is the server-resolved spend. It is not a signing payload.",
   inToken: "ERC-20 input address. Pass the wrapped native token address for native input.",
-  outToken: "The token received by the signer when this exact input swap fills.",
-  inAmount: "Exact input amount as an integer in input token base units.",
+  outToken: "The token received by the signer when the swap fills. Keep the actual pair unchanged for output targets.",
+  inAmount: "Exact spend as an integer in input-token base units. In quote.request, this is the resolved input even when the request used outAmount.",
+  outAmount: "Output-token amount in integer base units. In quoteArgs this is the requested receive target, supplied instead of inAmount so the server calculates the input.",
+  requestedOutAmount: "Original output-token target for an outAmount quote. The frozen request.inAmount is its executable spend, and the protected minimum covers the target.",
   user: "The account sent to the quote service, including a preview address before connection. It does not determine the signer.",
   userAddress: "The connected account passed to await client.prepareSwap({ quote, account, signal }). It signs the order and receives the output.",
   slippage: "UI slippage percentage: 0.5 means 0.5%. It is separate from the signed order's fixed SWAP protection.",
-  dexMinAmountOut: "DEX minimum in output token base units, or -1 when no DEX quote is available.",
+  dexMinAmountOut: "Optional local competing minimum for input quotes. It is not sent to the service; omit it for output-target requests.",
   receivedAt: "Local quote receipt time in Unix milliseconds. Use isQuoteFresh(quote, 20_000) before signing and submission.",
   amountOut: "Raw output amount returned by the quote service.",
   netAmountOut: "Net output amount used for display.",
@@ -128,6 +190,10 @@ export function getSpotSwapFieldExplanation(path: JsonValuePath): string | undef
 
 export const SPOT_SWAP_EXAMPLE_DATA = {
   partner: "external", chainId: DEFAULT_CHAIN_ID, inputIsNative: false,
+  slippagePolicy: {
+    mode: "auto", baseline: 0.5, tokenAddress: DEFAULT_INPUT_TOKEN,
+    tokenDecimals: 18, rawAmount: "1000000000000000000",
+  },
   quoteArgs: {
     inToken: DEFAULT_INPUT_TOKEN, outToken: DEFAULT_OUTPUT_TOKEN,
     inAmount: "1000000000000000000", dexMinAmountOut: "-1", slippage: 0.5, user: DEFAULT_ACCOUNT,

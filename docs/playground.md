@@ -56,7 +56,7 @@ order action offers a switch to a compatible network.
 
 Swap and advanced-order forms share the same 23 supported networks and partner filtering,
 excluding Fantom and Polygon zkEVM. Wallets and public clients also retain Blast for legacy swap activity.
-See the [Spot integration guide](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-integration)
+See the [Spot swap integration guide](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-swap-integration)
 for quoting and capability checks. Swap and advanced-order creation require a valid partner/chain
 configuration returned by the Spot SDK.
 
@@ -138,7 +138,7 @@ Trading components live in `components/advanced-order`, `features/swap`, and `fe
 
 Developer inspectors and simulations live in `features/developer-tools`, with copyable example generators in its `snippets` directory. Import their UI only through `@developer-tools`. ESLint enforces the production import boundary. Developer tools load only inside `/dev`; `debug=true` on the main UI enables partner testing without loading developer implementations.
 
-Before release, run `yarn lint`, `yarn typecheck`, `yarn test`, and `yarn build`. Production hosting should enforce request rate limits for the public RPC endpoints and provide `RPC_URL` and `NEXT_PUBLIC_PROJECT_ID` through its environment configuration.
+Before release, run `yarn lint`, `yarn typecheck`, and `yarn build`. Production hosting should enforce request rate limits for the public RPC endpoints and provide `RPC_URL` and `NEXT_PUBLIC_PROJECT_ID` through its environment configuration.
 
 Dependency security overrides in `package.json` keep Axios, viem's WebSocket client, Protobuf, browser mapping data, and MetaMask's UUID utility on patched releases. Remove these overrides when upstream dependency ranges include the fixes. MetaMask uses the compatible UUID v4 API; its override retains CommonJS support.
 
@@ -148,4 +148,4 @@ The October 1, 2026 production dependency audit reports no known vulnerabilities
 
 The SDK provides `getv1orders: false` to restrict order-sink history reads to `https://order-sink-v2.orbs.network`. Both history views and the developer example pass this option, replacing the local patch required by 2.1.17.
 
-Account, chain, and exchange filters are preserved. Submission and legacy subgraph behavior are unchanged; `legacyOrders` controls subgraph reads separately, and the developer example disables those too. Orders available only from the old order-sink host are excluded. The endpoint regression tests cover both ESM and CommonJS builds, including a v2 failure without a fallback request.
+Account, chain, and exchange filters are preserved. Submission and legacy subgraph behavior are unchanged; `legacyOrders` controls subgraph reads separately, and the developer example disables those too. Orders available only from the old order-sink host are excluded.

@@ -10,12 +10,16 @@ import { SpotSwapQuoteDeveloperTrigger } from "@developer-tools";
 import { SubmitSwap } from "@/features/swap/review";
 import { SwapQuoteSummary } from "@/features/swap/quote-summary";
 import { SubmitNativeConversion } from "@/features/swap/native-conversion";
+import BN from "bignumber.js";
 
 export function SwapBestTradeForm() {
   const t = useTranslations();
-  const { inputCurrency, outputCurrency, inputAmount, outputAmount, trade, quoteUsd, isLoadingTrade, noLiquidity, quoteError, refetchTrade, nativeConversion } =
+  const { inputCurrency, outputCurrency, inputAmount, outputAmount, amountSide, trade, quoteUsd, isLoadingTrade, noLiquidity, quoteError, refetchTrade, nativeConversion } =
     useDerivedSwap();
-  const { setInputAmount, handleCurrencyChange } = useActionHandlers();
+  const { setInputAmount, setOutputAmount, handleCurrencyChange } = useActionHandlers();
+  const outputUsdValue = amountSide === "output" && quoteUsd.outputTokenUsdPrice
+    ? BN(outputAmount).times(quoteUsd.outputTokenUsdPrice).toFixed()
+    : quoteUsd.outputAmountUsd;
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -29,6 +33,7 @@ export function SwapBestTradeForm() {
           amount={inputAmount}
           usdValue={quoteUsd.inputAmountUsd}
           usdLoading={isLoadingTrade}
+          isLoading={isLoadingTrade && amountSide === "output"}
           title={t("from")}
         />
         <ToggleCurrencies outputAmount={outputAmount} />
@@ -37,12 +42,14 @@ export function SwapBestTradeForm() {
           onCurrencyChange={(currency: string) =>
             handleCurrencyChange(currency, Field.OUTPUT)
           }
-          disabled={true}
+          side="output"
+          onAmountChange={setOutputAmount}
           amount={outputAmount}
-          usdValue={quoteUsd.outputAmountUsd}
+          usdValue={outputUsdValue}
           title={t("to")}
           titleAction={!nativeConversion ? <SpotSwapQuoteDeveloperTrigger /> : undefined}
-          isLoading={isLoadingTrade}
+          isLoading={isLoadingTrade && amountSide === "input"}
+          usdLoading={isLoadingTrade}
           statusText={noLiquidity ? t("noLiquidity") : undefined}
         />
       </div>
