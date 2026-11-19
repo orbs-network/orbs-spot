@@ -924,10 +924,10 @@
   resolved "https://registry.yarnpkg.com/@nolyfill/is-core-module/-/is-core-module-1.0.39.tgz#3dc35ba0f1e66b403c00b39344f870298ebb1c8e"
   integrity sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==
 
-"@orbs-network/spot-ui@^2.2.2":
-  version "2.2.2"
-  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-2.2.2.tgz#3eded18321b9016d0a02231f9405929b9fa1d24e"
-  integrity sha512-5mqKgNtz4Evhg+6Sleong2xavchKJ5zcEIL+J/eSdVdb99CQ6AzQzwZzDNO7OjWtKvfvXbm2y6/VbGJuO1ejiQ==
+"@orbs-network/spot-ui@^2.2.9":
+  version "2.2.9"
+  resolved "https://registry.yarnpkg.com/@orbs-network/spot-ui/-/spot-ui-2.2.9.tgz#4a5b693b34d61a6ac502b9f52fcf8942e5a58cc2"
+  integrity sha512-Lzc3Tk7Zf/iQompXWnECLyz82+SpY0qJV1I6+G+v32BqTEOA821g3ceDCEte03/NcMRWiO5O5fLx8LYn9p4FVA==
 
 "@paraswap/core@2.4.3":
   version "2.4.3"

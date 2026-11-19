@@ -1,7 +1,7 @@
 # Spot integration example
 
 Use this repository to add Spot swaps, TWAP, limit, stop-loss, or take-profit orders to an app.
-It uses `@orbs-network/spot-ui` 2.2.2 with the app’s own wallet and UI.
+It uses `@orbs-network/spot-ui` 2.2.9 with the app’s own wallet and UI.
 
 ## Start here
 
@@ -18,8 +18,11 @@ The swap form accepts an input amount or a receive target. Output entry calls
 `client.getQuote({ inToken, outToken, outAmount, user, slippage })` for the same pair.
 Review the returned `quote.request.inAmount` as the fixed spend before wallet actions.
 Before quoting, automatic slippage uses `getSwapSlippage` with the typed amount's USD value.
+Selecting tokens starts cached USD-price queries before an amount is entered; quoting reuses those prices.
+The app owns this cache; each standalone SDK price call makes a fresh cancellable request.
 Pricing waits up to 1.5 seconds and falls back to the baseline when unavailable; custom slippage stays unchanged.
 Review displays the percentage captured in the quote.
+Preparation signs that percentage in basis points and preserves the quote's minimum unchanged.
 
 The host confirms wrapping and allowance, then prepares, signs, and submits:
 
@@ -41,6 +44,7 @@ The [standalone examples](examples/spot/) show the surrounding wallet steps and 
 | Task | Start with |
 | --- | --- |
 | Quote request and request identity | [lib/swap/quotes.ts](lib/swap/quotes.ts) |
+| Token USD-price cache | [lib/spot/prices.ts](lib/spot/prices.ts) |
 | Swap wallet sequence | [lib/swap/execution.ts](lib/swap/execution.ts) |
 | Fill polling | [lib/swap/settlement.ts](lib/swap/settlement.ts) |
 | Reload recovery | [lib/swap/activity.ts](lib/swap/activity.ts) |

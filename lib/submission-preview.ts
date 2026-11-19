@@ -22,6 +22,7 @@ export type SubmissionPreview = {
   chainId: number;
   account?: string;
   partner?: Partners;
+  apiUrl?: string;
   order?: Order;
   transactions?: { label: string; hash: string }[];
   details?: { label: string; value: string }[];

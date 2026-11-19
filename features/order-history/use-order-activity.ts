@@ -6,6 +6,8 @@ import { useRecentOrder } from "@/lib/spot/recent-order";
 import { matchesOrderSearch, pairKey } from "./activity-model";
 import { normalizeTimestamp } from "./format";
 import { useActivityRows } from "./use-activity-rows";
+import { useSpotApiUrl } from "@/lib/hooks/use-spot-api-url";
+import { DEFAULT_SPOT_API_URL } from "@/lib/spot/api";
 
 /** Combine optimistic orders, cached metadata and local filters without refetching. */
 export function useOrderActivity({ orders, allOrders = orders, search, view, network, pair = "all", address }: {
@@ -17,17 +19,19 @@ export function useOrderActivity({ orders, allOrders = orders, search, view, net
   pair?: string;
   address?: string;
 }) {
+  const apiUrl = useSpotApiUrl();
   const recentPending = useRecentOrder(state => state.pending);
-  const recentKey = useRecentOrder(state => state.key);
-  const recentAccount = useRecentOrder(state => state.account);
+  const recentKey = useRecentOrder(state => (state.apiUrl ?? DEFAULT_SPOT_API_URL) === apiUrl ? state.key : undefined);
+  const recentAccount = useRecentOrder(state => (state.apiUrl ?? DEFAULT_SPOT_API_URL) === apiUrl ? state.account : undefined);
   const pending = useMemo(() => {
     const indexed = new Set(allOrders.map(order => order.historyKey));
     return view === "open" ? recentPending.filter(order =>
-      order.maker.toLowerCase() === address?.toLowerCase()
+      (order.apiUrl ?? DEFAULT_SPOT_API_URL) === apiUrl
+      && order.maker.toLowerCase() === address?.toLowerCase()
       && (network === "all" || String(order.chainId) === network)
       && !indexed.has(order.historyKey),
     ) : [];
-  }, [recentPending, allOrders, view, address, network]);
+  }, [recentPending, allOrders, view, address, network, apiUrl]);
   const pendingKeys = useMemo(() => new Set(pending.map(order => order.historyKey)), [pending]);
   const metadataOrders = useMemo(() => pending.length ? [...pending, ...allOrders] : allOrders, [pending, allOrders]);
   const { rows, isLoading: symbolsLoading, hasErrors: symbolErrors } = useActivityRows(metadataOrders);

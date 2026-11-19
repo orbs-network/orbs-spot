@@ -5,6 +5,7 @@ import { OrderSettlementError } from "./settlement.ts";
 import { OrderStatus, Partners, type Order, type Token } from "@orbs-network/spot-ui";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { DEFAULT_SPOT_API_URL, DEV_SPOT_API_URL, PROD_V1_SPOT_API_URL } from "../spot/api.ts";
 
 type ActivityDetails = {
   account: string;
@@ -31,6 +32,8 @@ export type TransactionSwapActivity = ActivityDetails & {
 
 export type SpotSwapActivity = ActivityDetails & {
   kind: "spot";
+  /** Missing origin on older stored swaps means the original production v2 service. */
+  apiUrl?: string;
   orderId: string;
   order: Order;
   // A signed intent ID is not an on-chain transaction hash.
@@ -42,6 +45,7 @@ export type SwapActivity = TransactionSwapActivity | SpotSwapActivity;
 
 const validHash = (value: unknown): value is `0x${string}` =>
   typeof value === "string" && /^0x[\da-f]{64}$/i.test(value);
+const trustedApiUrls = new Set([DEFAULT_SPOT_API_URL, DEV_SPOT_API_URL, PROD_V1_SPOT_API_URL]);
 
 /** A typed terminal result can arrive after the last open polling snapshot. */
 export function resolveSwapSettlementOrder(order: Order | undefined, error: unknown): Order | undefined {
@@ -72,6 +76,10 @@ export function getSwapActivityId(item: SwapActivity): string {
   return item.kind === "spot" ? item.orderId : item.hash;
 }
 
+export function getSwapActivityApiUrl(item: SwapActivity): string {
+  return item.kind === "spot" ? item.apiUrl ?? DEFAULT_SPOT_API_URL : DEFAULT_SPOT_API_URL;
+}
+
 export function validSwapActivity(value: unknown): value is SwapActivity {
   if (!value || typeof value !== "object") return false;
   const item = value as Partial<ActivityDetails> & Record<string, unknown>;
@@ -88,7 +96,8 @@ export function validSwapActivity(value: unknown): value is SwapActivity {
     return (item.kind === undefined || item.kind === "transaction") && validHash(item.hash)
       && ["pending", "confirmed", "reverted", "unconfirmed"].includes(String(item.status));
   }
-  if (!item.order || typeof item.order !== "object") return false;
+  if (!item.order || typeof item.order !== "object"
+    || (item.apiUrl !== undefined && (typeof item.apiUrl !== "string" || !trustedApiUrls.has(item.apiUrl)))) return false;
   const order = item.order as Partial<Order>;
   // These are the SDK tracker's identity/bounds and the only persisted fill data we read.
   return validHash(item.orderId) && order.id === item.orderId && order.chainId === item.chainId
@@ -104,18 +113,22 @@ export function validSwapActivity(value: unknown): value is SwapActivity {
 type ActivityState = {
   items: SwapActivity[];
   add: (item: SwapActivity) => void;
-  settle: (chainId: number, identity: string, status: SwapSettlementStatus, order?: Order) => void;
+  settle: (chainId: number, identity: string, status: SwapSettlementStatus, order?: Order, apiUrl?: string) => void;
 };
 
 // Storage failures must never turn an accepted intent into a failed swap.
 export const useSwapActivity = create<ActivityState>()(persist((set) => ({
   items: [],
-  add: item => set(state => ({ items: [item, ...state.items.filter(existing => existing.chainId !== item.chainId
-    || getSwapActivityId(existing) !== getSwapActivityId(item))] })),
-  settle: (chainId, identity, status, order) => set(state => {
-    if (!state.items.some(item => item.chainId === chainId && getSwapActivityId(item) === identity && item.status !== status)) return state;
+  add: item => set(state => ({ items: [item.kind === "spot" ? { ...item, apiUrl: getSwapActivityApiUrl(item) } : item,
+    ...state.items.filter(existing => existing.chainId !== item.chainId
+      || getSwapActivityId(existing) !== getSwapActivityId(item)
+      || getSwapActivityApiUrl(existing) !== getSwapActivityApiUrl(item))] })),
+  settle: (chainId, identity, status, order, apiUrl = DEFAULT_SPOT_API_URL) => set(state => {
+    const matches = (item: SwapActivity) => item.chainId === chainId && getSwapActivityId(item) === identity
+      && (item.kind !== "spot" || getSwapActivityApiUrl(item) === apiUrl);
+    if (!state.items.some(item => matches(item) && item.status !== status)) return state;
     return { items: state.items.map(item => {
-      if (item.chainId !== chainId || getSwapActivityId(item) !== identity) return item;
+      if (!matches(item)) return item;
       if (item.kind !== "spot") return status === "confirmed" || status === "reverted" || status === "unconfirmed" ? { ...item, status } : item;
       if (status === "reverted") return item;
       const snapshot = order?.id === item.orderId && order.chainId === chainId ? order : item.order;
@@ -134,6 +147,7 @@ export const useSwapActivity = create<ActivityState>()(persist((set) => ({
   partialize: state => ({ items: state.items.filter(item => item.status === "pending" || Date.now() - item.createdAt < 90 * 86_400_000) }),
   merge: (persisted, current) => {
     const items = (persisted as { items?: unknown } | undefined)?.items;
-    return { ...current, items: Array.isArray(items) ? items.filter(validSwapActivity) : [] };
+    return { ...current, items: Array.isArray(items) ? items.filter(validSwapActivity)
+      .map(item => item.kind === "spot" ? { ...item, apiUrl: getSwapActivityApiUrl(item) } : item) : [] };
   },
 }));

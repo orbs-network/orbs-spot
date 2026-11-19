@@ -2,24 +2,25 @@ import { createClient, getOrders } from "@orbs-network/spot-ui";
 import { queryOptions, replaceEqualDeep, type QueryClient } from "@tanstack/react-query";
 import { getOrderTokens, orderTokensQueryOptions, withOrderTokens, type HistoryOrder } from "./order-tokens";
 import { normalizeOrderStatus } from "./order-status";
+import { DEFAULT_SPOT_API_URL } from "./api";
 
 type Partner = Parameters<typeof createClient>[0];
 
-export type OrderQueryScope = { partner: Partner; chainId: number; account: string };
+export type OrderQueryScope = { partner: Partner; chainId: number; account: string; apiUrl?: string };
 
 export const spotKeys = {
-  cancellation: (partner: Partner, chainId?: number, account?: string, historyKey?: string) =>
-    ["spot-cancellation", partner, chainId, account?.toLowerCase(), historyKey] as const,
-  client: (partner: Partner, chainId: number) => ["spot-client", partner, chainId] as const,
-  orders: (partner: Partner, chainId: number | "all", account?: string) =>
-    ["spot-orders", partner, chainId, account?.toLowerCase()] as const,
+  cancellation: (partner: Partner, chainId?: number, account?: string, historyKey?: string, apiUrl = DEFAULT_SPOT_API_URL) =>
+    ["spot-cancellation", partner, chainId, account?.toLowerCase(), historyKey, apiUrl] as const,
+  client: (partner: Partner, chainId: number, apiUrl = DEFAULT_SPOT_API_URL) => ["spot-client", partner, chainId, apiUrl] as const,
+  orders: (partner: Partner, chainId: number | "all", account?: string, apiUrl = DEFAULT_SPOT_API_URL) =>
+    ["spot-orders", partner, chainId, account?.toLowerCase(), apiUrl] as const,
 };
 
-/** Execution clients are initialized on demand and shared per partner/chain. */
-export function spotClientQueryOptions(partner: Partner, chainId: number, disableAnalytics = false) {
+/** Execution clients are shared per partner, chain, and selected service. */
+export function spotClientQueryOptions(partner: Partner, chainId: number, disableAnalytics = false, apiUrl = DEFAULT_SPOT_API_URL) {
   return queryOptions({
-    queryKey: spotKeys.client(partner, chainId),
-    queryFn: () => createClient(partner, chainId, { disableAnalytics }),
+    queryKey: spotKeys.client(partner, chainId, apiUrl),
+    queryFn: () => createClient(partner, chainId, { disableAnalytics, apiUrl }),
     staleTime: Infinity,
     gcTime: Infinity,
     retry: false,
@@ -29,22 +30,23 @@ export function spotClientQueryOptions(partner: Partner, chainId: number, disabl
 }
 
 /** One wallet-wide read shared by history, details, notifications and cancellation. */
-export function spotOrdersQueryOptions(partner: Partner, account: string | undefined, queryClient: QueryClient) {
+export function spotOrdersQueryOptions(partner: Partner, account: string | undefined, queryClient: QueryClient, apiUrl = DEFAULT_SPOT_API_URL) {
   return queryOptions({
-    queryKey: spotKeys.orders(partner, "all", account),
+    queryKey: spotKeys.orders(partner, "all", account, apiUrl),
     queryFn: async ({ signal }) => {
       if (!account) throw new Error("Connect a wallet to view activity");
       const orders = (await getOrders({
         swapper: account,
         exchange: partner,
         getv1orders: false,
+        apiUrl,
         signal: AbortSignal.any([signal, AbortSignal.timeout(15_000)]),
       })).map(normalizeOrderStatus);
       const tokens = await queryClient.fetchQuery(orderTokensQueryOptions(queryClient, getOrderTokens(orders)));
       signal.throwIfAborted();
       // The SDK omits the partner name from its normalized order model. Keep
       // the exchange captured by this request alongside the fetched rows.
-      return withOrderTokens(orders, tokens).map(order => ({ ...order, partner }));
+      return withOrderTokens(orders, tokens).map(order => ({ ...order, partner, apiUrl }));
     },
     enabled: Boolean(account),
     staleTime: 60_000,
@@ -69,10 +71,10 @@ export function shareOrders(previous: unknown, next: unknown): HistoryOrder[] {
 /** Refresh the scope captured by the write, even if the wallet has since changed. */
 export function invalidateOrderQueries(
   queryClient: QueryClient,
-  { partner, chainId, account }: OrderQueryScope,
+  { partner, chainId, account, apiUrl }: OrderQueryScope,
 ) {
   return Promise.allSettled([
-    queryClient.invalidateQueries({ queryKey: spotKeys.orders(partner, "all", account) }),
+    queryClient.invalidateQueries({ queryKey: spotKeys.orders(partner, "all", account, apiUrl) }),
     queryClient.invalidateQueries({ queryKey: ["balances", chainId, account.toLowerCase()] }),
   ]);
 }

@@ -156,6 +156,7 @@ export const useOrderSubmitFlowStore = create<OrderSubmitFlowStore>((set) => ({
 }));
 
 type BestTradeSwapStore = {
+  apiUrl?: string;
   reviewedQuote?: BestTradeQuote;
   quoteUpdate?: { previous: BestTradeQuote; next: BestTradeQuote };
   error?: { message: string; submissionUncertain?: boolean };
@@ -186,6 +187,7 @@ export const useBestTradeSwapStore = create<BestTradeSwapStore>((set) => ({
   resetStore: () =>
     set({
       status: undefined,
+      apiUrl: undefined,
       totalSteps: undefined,
       steps: undefined,
       currentStep: undefined,

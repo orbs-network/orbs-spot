@@ -37,13 +37,23 @@ Keep the actual token pair unchanged. The SDK returns the required spend as
 Display that spend, the estimated `quote.netAmountOut`, and the protected minimum before calling the flow.
 After review, refresh the resolved fixed input rather than recalculating the receive target.
 
-Resolve slippage before requesting either quote. In automatic mode, read the typed side's
-unit price with `client.getTokenUsd`, calculate the full USD total using token decimals and decimal arithmetic,
+Resolve slippage before requesting either quote. The playground starts token-level `useQuery` reads
+when the input and output tokens are selected, even with an empty amount and before a Spot client is ready.
+Their cache key contains only chain ID and lowercase ERC-20 token address, with a 30-second freshness window
+and no polling interval. Native input uses the configured wrapped-token address.
+Quoting reuses the selected token's fresh cached price or an in-flight lookup instead of making an amount-specific price request.
+In automatic mode, read the typed side's
+unit price with standalone `getTokenUsd({ tokenAddress, chainId, signal })`,
+calculate the full USD total using token decimals and decimal arithmetic,
 then call `getSwapSlippage({ amountUsd, slippage: baseline })`. Use its `slippagePercent`
 in the quote request. The playground waits up to 1.5 seconds for pricing and passes `undefined`
 for `amountUsd` after a failure or timeout; caller cancellation still stops quoting.
-Custom mode skips both pricing and the helper, using the user's percentage unchanged.
+Pricing uses the SDK's production service independently of the selected order backend.
+Each SDK call makes a fresh cancellable request; the playground owns the shared price cache.
+Custom mode skips both pricing and the helper, using the user's percentage unchanged. Direct wrap/unwrap also skips price queries.
 Keep `quote.request.slippage` through review, preparation, and refreshes; the quote minimum already includes it.
+Preparation converts that reviewed percentage to basis points in signed `witness.slippage`
+and preserves the quoted minimum unchanged in `witness.output.limit`.
 
 Pass the wrapped ERC-20 input address for native input. Implement `pauseQuotes` and `resumeQuotes`
 using your quote lifecycle. `reviewChangedQuote` must display the new output and minimum and resolve
@@ -72,6 +82,7 @@ The flow returns an accepted order. Refresh history to show later fills.
 | Serial, bounded status polling | [settlement](../../lib/swap/settlement.ts) |
 | Persist accepted swaps across reloads | [activity](../../lib/swap/activity.ts) |
 | Shared client/history queries | [queries](../../lib/spot/queries.ts) |
+| Token USD-price cache | [prices](../../lib/spot/prices.ts) |
 | Cancellation through the host wallet | [cancellation](../../lib/spot/cancellation.ts) |
 
 For an agent adapting this example, follow [AGENTS.md](AGENTS.md).

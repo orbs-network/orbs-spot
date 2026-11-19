@@ -44,6 +44,7 @@ export enum FormTab {
 }
 
   export type BestTradeQuote = {
+    apiUrl?: string;
     outAmount: string;
     minAmountOut: string;
     inToken: string;

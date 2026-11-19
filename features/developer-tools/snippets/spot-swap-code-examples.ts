@@ -14,11 +14,13 @@ export function formatSpotSwapSetupCode(data: JsonContainer = {}): string {
   const root = Array.isArray(data) ? {} : data;
   const chainId = typeof root.chainId === "number" ? root.chainId : DEFAULT_CHAIN_ID;
   const partner = typeof root.partner === "string" && root.partner ? root.partner : "external";
+  const clientOptions = typeof root.apiUrl === "string" ? `, { apiUrl: ${JSON.stringify(root.apiUrl)} }` : "";
   return `import { createClient, Partners } from "@orbs-network/spot-ui";
 
 // Reuse this client for the same chain and partner in quote and submission calls.
 // Use your configured partner instead of External when applicable.
-export const client = await createClient(${JSON.stringify(partner)} as Partners, ${chainId});
+export const client = await createClient(${JSON.stringify(partner)} as Partners, ${chainId}${clientOptions});
+// Configuration and quotes always use production v2; apiUrl selects the order backend.
 // client.spenderAddress is the ERC-20 allowance spender for this configuration.
 `;
 }
@@ -47,7 +49,7 @@ export function formatSpotSwapLiveQuoteCode(data: JsonContainer = {}): string {
   return `${formatSpotSwapSetupCode(data)}
 
 import BN from "bignumber.js";
-import { getSwapSlippage, type ClientGetQuoteParams, type SwapQuote } from "@orbs-network/spot-ui";
+import { getSwapSlippage, getTokenUsd, type ClientGetQuoteParams, type SwapQuote } from "@orbs-network/spot-ui";
 const quoteArgs = ${JSON.stringify(quoteArgs, null, 2)} satisfies ClientGetQuoteParams;
 // Use the typed side's token, raw amount, and registry decimals for automatic policy.
 const slippagePolicy: {
@@ -62,6 +64,10 @@ async function resolveSlippage(signal?: AbortSignal): Promise<number> {
   signal?.throwIfAborted();
   if (slippagePolicy.mode === "custom") return slippagePolicy.baseline;
 
+  // Host apps can start token-price queries on selection, before typing or client setup.
+  // Cache by chainId and lowercase token address for 30 seconds, then reuse that
+  // fresh or in-flight result for quoting. This standalone example makes a fresh
+  // price request each time; the SDK does not cache or share price requests.
   let amountUsd: string | undefined;
   if (new BN(slippagePolicy.rawAmount).gt(0)) {
     const waitController = new AbortController();
@@ -69,8 +75,9 @@ async function resolveSlippage(signal?: AbortSignal): Promise<number> {
       ? AbortSignal.any([signal, waitController.signal]) : waitController.signal;
     const timeout = setTimeout(() => waitController.abort(), 1_500);
     try {
-      const unitPriceUsd = await client.getTokenUsd({
-        tokenAddress: slippagePolicy.tokenAddress, signal: waitSignal,
+      const unitPriceUsd = await getTokenUsd({
+        tokenAddress: slippagePolicy.tokenAddress, chainId: client.chainId,
+        signal: waitSignal,
       });
       amountUsd = new BN(slippagePolicy.rawAmount)
         .shiftedBy(-slippagePolicy.tokenDecimals).times(unitPriceUsd).toFixed();
@@ -78,7 +85,7 @@ async function resolveSlippage(signal?: AbortSignal): Promise<number> {
       signal?.throwIfAborted(); // Price failure/timeout falls back; caller cancellation stops quoting.
     } finally {
       clearTimeout(timeout);
-      waitController.abort(); // Stops this wait, without cancelling shared SDK pricing.
+      waitController.abort(); // Cancels this request if it is still in progress.
     }
   }
   signal?.throwIfAborted();
@@ -143,6 +150,8 @@ export const SPOT_SWAP_SWAP_CODE_SNIPPET = SPOT_SWAP_SWAP_AND_CONFIRM_CODE_SNIPP
 const FIELD_EXPLANATIONS: Record<string, string> = {
   partner: "The Spot partner used to initialize this client. Quotes and submitted orders must use the same partner.",
   chainId: "The EVM chain used for the quote, configured spender, wallet operations, and order settlement.",
+  apiUrl: "Selected order backend for submission, status, history, and recovery. Configuration and client.getQuote always use production v2.",
+  quoteApiUrl: "Production v2 service used by client.getQuote, independently of the selected order backend.",
   inputIsNative: "Native input is quoted using its wrapped ERC-20 address and deposited before allowance and signing.",
   quoteArgs: "Inputs passed to client.getQuote. This request does not open a wallet or prepare an order.",
   slippagePolicy: "Host policy resolved before quoting. Automatic mode prices the typed side and calls getSwapSlippage; custom mode uses the chosen percentage directly.",
@@ -161,7 +170,7 @@ const FIELD_EXPLANATIONS: Record<string, string> = {
   requestedOutAmount: "Original output-token target for an outAmount quote. The frozen request.inAmount is its executable spend, and the protected minimum covers the target.",
   user: "The account sent to the quote service, including a preview address before connection. It does not determine the signer.",
   userAddress: "The connected account passed to await client.prepareSwap({ quote, account, signal }). It signs the order and receives the output.",
-  slippage: "UI slippage percentage: 0.5 means 0.5%. It is separate from the signed order's fixed SWAP protection.",
+  slippage: "Reviewed swap slippage percentage: 0.5 means 0.5%. Preparation converts this to 50 basis points in witness.slippage and preserves the quoted minimum unchanged.",
   dexMinAmountOut: "Optional local competing minimum for input quotes. It is not sent to the service; omit it for output-target requests.",
   receivedAt: "Local quote receipt time in Unix milliseconds. Use isQuoteFresh(quote, 20_000) before signing and submission.",
   amountOut: "Raw output amount returned by the quote service.",

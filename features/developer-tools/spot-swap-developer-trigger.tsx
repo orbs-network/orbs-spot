@@ -33,20 +33,17 @@ function SpotSwapDeveloperTriggerContent({ mode }: { mode: DeveloperExecutionMod
   const disabled = !hasQuote || (mode === "live" && (!address || !BN(balance ?? "0").gte(parsedInputAmount)));
   const trigger = (
     <Button data-submit-button type="button" variant={variant} size="lg"
-      className="h-12 w-full rounded-[14px] px-3 text-sm" disabled={disabled}>
+      className="h-12 w-full rounded-[14px] px-3 text-sm" disabled={disabled} isLoading={!hasQuote && isLoadingTrade}>
       {label}
     </Button>
   );
   return (
     <>
       <div ref={targetRef} className={mode === "demo" ? "w-24 shrink-0" : "min-w-0 flex-1"} data-dev-submit-target data-dev-flow="spot-swap" data-dev-execution-mode={mode}>
-        {hasQuote ? (
-          <Suspense fallback={<Button data-submit-button variant={variant} className="h-12 w-full rounded-[14px] px-3 text-sm" disabled isLoading>{label}</Button>}>
-            <SpotSwapDeveloperContent mode={mode} trigger={trigger} />
-          </Suspense>
-        ) : (
-          <Button data-submit-button variant={variant} className="h-12 w-full rounded-[14px] px-3 text-sm" disabled isLoading={isLoadingTrade}>{label}</Button>
-        )}
+        {/* Preserve the open flow while preview quotes refresh. */}
+        <Suspense fallback={<Button data-submit-button variant={variant} className="h-12 w-full rounded-[14px] px-3 text-sm" disabled isLoading>{label}</Button>}>
+          <SpotSwapDeveloperContent mode={mode} trigger={trigger} />
+        </Suspense>
       </div>
       {mode === "demo" && <DeveloperModeSpotlight targetRef={targetRef} variant="spot-swap" />}
     </>

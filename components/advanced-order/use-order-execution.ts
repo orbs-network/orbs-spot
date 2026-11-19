@@ -1,4 +1,6 @@
 "use client";
+
+import { getSpotApiUrl } from "@/lib/spot/api";
 import { useRecentOrder } from "@/lib/spot/recent-order";
 import { trackFunnel } from "@/lib/funnel-analytics";
 
@@ -79,6 +81,7 @@ export function useOrderExecution() {
   }, []);
 
   const submitOrder = useCallback(() => {
+    const executionClient = client.data;
     const submissionToast = deferredToast.current?.isDeferred()
       ? deferredToast.current
       : createSubmissionToast({
@@ -106,7 +109,7 @@ export function useOrderExecution() {
       const publishPreview = (title: string, status: "pending" | "success" | "error", message?: string) => {
         if (!toastId || !chainId) return;
         useSubmissionPreview.getState().upsert({ id: toastId, kind: "order", title, status, message,
-          input: toastInput, output: toastOutput, chainId, account: address, partner: client.data?.partner,
+          input: toastInput, output: toastOutput, chainId, account: address, partner: executionClient?.partner, apiUrl: executionClient?.apiUrl,
           order: acceptedOrder, transactions: transactions(), details: [
             { label: "Order type", value: form.orderType.replaceAll("_", " ") },
             { label: "Trades", value: String(form.trades.totalTrades) },
@@ -134,7 +137,7 @@ export function useOrderExecution() {
           throw new SubmissionPreflightError(
             "Connect a wallet before submitting an order.",
           );
-        if (!client.data)
+        if (!executionClient)
           throw new SubmissionPreflightError(
             "Order configuration is not ready. Wait for it to load or retry.",
           );
@@ -206,8 +209,20 @@ export function useOrderExecution() {
         // Capture the form and wallet scope once, before the first wallet request.
         trackFunnel({ name: "submit_requested", product: "advanced" });
         const order = await executor.submit({
-          client: client.data,
-          wallet,
+          client: executionClient,
+          wallet: {
+            ...wallet,
+            assertContext: async (account, chainId) => {
+              const assertApi = () => {
+                if (getSpotApiUrl(new URLSearchParams(window.location.search)) !== executionClient.apiUrl) {
+                  throw new Error("Spot API changed. Review the order again before continuing.");
+                }
+              };
+              assertApi();
+              await wallet.assertContext(account, chainId);
+              assertApi();
+            },
+          },
           account: address,
           form,
           inputToken,
@@ -215,13 +230,13 @@ export function useOrderExecution() {
           wrappedNativeToken,
         });
         trackFunnel({ name: "submission_succeeded", product: "advanced" });
-        useRecentOrder.getState().add(order);
+        useRecentOrder.getState().add({ ...order, apiUrl: executionClient.apiUrl });
         fillTxHash = getFillTransactionHash(order);
         acceptedOrder = order;
         publishPreview("Order placed", "success");
         submissionToast.publishSuccess(() => toast.success("Order placed", { id: currentToastId, description: toastDetails(), duration: 8_000, closeButton: true }));
         // A refresh failure must not turn an accepted order into a failed submission.
-        void invalidateOrderQueries(queryClient, { partner: client.data.partner, chainId, account: address }).catch(() => undefined);
+        void invalidateOrderQueries(queryClient, { partner: executionClient.partner, apiUrl: executionClient.apiUrl, chainId, account: address }).catch(() => undefined);
       } catch (error) {
         trackFunnel({ name: "submission_failed", product: "advanced" });
         const wrappedGuidance = confirmedWrappedSymbol

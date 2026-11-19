@@ -14,6 +14,7 @@ import { useSpotSwapClient } from "./use-spot-swap-client";
 import { getNativeConversion } from "../native-conversion";
 import { spotSwapSlippageQueryOptions } from "../swap/slippage";
 import { DEFAULT_SLIPPAGE } from "../consts";
+import { spotTokenUsdQueryOptions } from "../spot/prices";
 
 export const useTrade = (
   inputCurrency?: Currency,
@@ -35,11 +36,28 @@ export const useTrade = (
   const quoteEnabled = hasQuoteAmount && !pauseQuote;
   const client = useSpotSwapClient(quoteEnabled);
   const automaticSlippage = slippageMode === "auto";
+  const inputPriceToken = isNativeAddress(inputCurrency?.address)
+    ? wrappedNative ?? "" : inputCurrency?.address ?? "";
+  const outputPriceToken = isNativeAddress(outputCurrency?.address)
+    ? wrappedNative ?? "" : outputCurrency?.address ?? "";
+  const preloadPrices = usesSpotQuote && automaticSlippage && !pauseQuote;
+  // Warm token prices on selection, independently of amounts or client configuration.
+  useQuery({
+    ...spotTokenUsdQueryOptions(chainId, inputPriceToken),
+    enabled: preloadPrices && Boolean(inputPriceToken),
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
+  useQuery({
+    ...spotTokenUsdQueryOptions(chainId, outputPriceToken),
+    enabled: preloadPrices && Boolean(outputPriceToken),
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
   const amountCurrency = amountSide === "output" ? outputCurrency : inputCurrency;
-  const slippageTokenAddress = isNativeAddress(amountCurrency?.address)
-    ? wrappedNative ?? "" : amountCurrency?.address ?? "";
+  const slippageTokenAddress = amountSide === "output" ? outputPriceToken : inputPriceToken;
   const slippageQuery = useQuery({
-    ...spotSwapSlippageQueryOptions(client.data, slippageTokenAddress,
+    ...spotSwapSlippageQueryOptions(queryClient, client.data, slippageTokenAddress,
       amountCurrency?.decimals, parsedAmount, slippage, amountSide),
     enabled: quoteEnabled && Boolean(client.data) && automaticSlippage,
     refetchInterval: state => {

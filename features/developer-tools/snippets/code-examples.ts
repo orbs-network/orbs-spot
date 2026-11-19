@@ -11,6 +11,7 @@ import {
   formatPartnerDeclaration,
   getExamplePartnerId,
 } from "@/features/developer-tools/developer-partner";
+import { DEFAULT_SPOT_API_URL } from "@/lib/spot/api";
 
 const ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
 
@@ -68,6 +69,7 @@ function serializeTypeScriptValue(
 const CANCEL_FIELD_EXPLANATIONS: Record<string, string> = {
   partner:
     "The Orders Sink partner ID used to resolve the trusted RePermit configuration.",
+  apiUrl: "Selected backend for submission, status, and history. The SDK loads cancellation configuration from production v2.",
   abi: "The cancel function signature used to encode this contract call.",
   functionName: "The smart-contract function invoked to cancel the order.",
   address: "The RePermit contract that owns the order.",
@@ -451,18 +453,20 @@ export function formatFetchOrdersCode(data: JsonContainer) {
       ? query.swapper
       : "<connected-wallet-address>";
   const partner = getExamplePartnerId(query.exchange ?? data.partner);
+  const apiUrl = typeof data.apiUrl === "string" ? data.apiUrl : DEFAULT_SPOT_API_URL;
 
   return `import { getOrders, Partners, type Order } from "@orbs-network/spot-ui";
 
 const exchange = Object.values(Partners).find((value) => value === ${JSON.stringify(partner)});
+const apiUrl = ${JSON.stringify(apiUrl)};
 
 export async function fetchOrders(
   account = ${JSON.stringify(swapper)},
   signal?: AbortSignal,
 ): Promise<Order[]> {
   if (!exchange) throw new Error("Unknown Spot exchange");
-  // Fetch v2 orders across every network in one request, without a client/config.
-  const orders = await getOrders({ swapper: account, exchange, signal, getv1orders: false });
+  // Fetch orders across every network from the selected service, without a client/config.
+  const orders = await getOrders({ swapper: account, exchange, apiUrl, signal, getv1orders: false });
   // Key rendered rows and cached records by order.historyKey, not order.id.
   return orders;
 }`;
@@ -539,18 +543,21 @@ function assertPermitData(permitData: PermitData, activeChainId: number): void {
 export const permitDataRequest = fetchRePermitData(partner, chainId);`;
 }
 
-export function formatCancelOrderCode() {
+export function formatCancelOrderCode(data: JsonContainer = {}) {
+  const root = Array.isArray(data) ? {} : data;
+  const apiUrl = typeof root.apiUrl === "string" ? root.apiUrl : DEFAULT_SPOT_API_URL;
   return `import { createClient, type Order, type Partners, type SpotClient } from "@orbs-network/spot-ui";
 import type { Abi, Address, PublicClient, WalletClient } from "viem";
 
+const apiUrl = ${JSON.stringify(apiUrl)};
 const pending = new Set<string>();
 const clients = new Map<string, Promise<SpotClient>>();
 
 function getClient(exchange: Partners, chainId: number): Promise<SpotClient> {
-  const key = exchange + ":" + chainId;
+  const key = apiUrl + ":" + exchange + ":" + chainId;
   let client = clients.get(key);
   if (!client) {
-    client = createClient(exchange, chainId, { disableAnalytics: true }).catch((error: unknown) => {
+    client = createClient(exchange, chainId, { apiUrl, disableAnalytics: true }).catch((error: unknown) => {
       clients.delete(key);
       throw error;
     });

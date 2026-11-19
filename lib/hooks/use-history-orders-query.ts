@@ -9,19 +9,21 @@ import { createMockOrders } from "@/lib/spot/mock-orders";
 import type { HistoryOrder } from "@/lib/spot/order-tokens";
 import { useSpotPartner } from "@/lib/hooks/use-spot-partner";
 import { useDeveloperMode } from "./use-developer-mode";
+import { useSpotApiUrl } from "./use-spot-api-url";
 
 const EMPTY_ORDERS: HistoryOrder[] = [];
 
 /** Append designer samples at the read boundary, keeping the wallet cache real. */
 export function useHistoryOrdersQuery(enabled = true, linkedAccount?: string) {
   const { partner } = useSpotPartner();
+  const apiUrl = useSpotApiUrl();
   const { address } = useConnection();
   const account = linkedAccount ?? address;
   const { isDeveloperPlayground } = useDeveloperMode();
   const mockOrders = useSearchParams().get("mockorders") === "true" && isDeveloperPlayground;
   const queryClient = useQueryClient();
   const query = useQuery({
-    ...spotOrdersQueryOptions(partner, account, queryClient),
+    ...spotOrdersQueryOptions(partner, account, queryClient, apiUrl),
     enabled: enabled && Boolean(account),
   });
   const samples = useMemo(() => mockOrders ? createMockOrders() : EMPTY_ORDERS, [mockOrders]);

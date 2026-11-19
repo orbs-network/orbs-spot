@@ -36,14 +36,17 @@ import { TradeToastDetails } from "@/components/ui/trade-toast-details";
 import type { SpotWalletPort } from "@/lib/spot/execution";
 import { useSubmissionPreview, type SubmissionPreview } from "@/lib/submission-preview";
 import { createLoadingToast } from "@/lib/loading-toast";
+import { useSpotApiUrl } from "@/lib/hooks/use-spot-api-url";
+import { DEFAULT_SPOT_API_URL } from "@/lib/spot/api";
 
 export function useClient(requestedChainId?: number, enabled = true) {
   const connectedChainId = useDataChainId();
   const chainId = requestedChainId ?? connectedChainId;
   const { partner, chains } = useSpotPartnerChains(enabled);
+  const apiUrl = useSpotApiUrl();
   // The host cache owns one client per partner/chain; failed initialization can retry.
   return useQuery({
-    ...spotClientQueryOptions(partner, chainId),
+    ...spotClientQueryOptions(partner, chainId, false, apiUrl),
     enabled: enabled && chains.some((chain) => chain.id === chainId),
   });
 }
@@ -63,13 +66,14 @@ export function useOrders(enabled = true) {
 /** One observer on the existing form, independent of form-input subscriptions. */
 export function useHistoryNotifications(orders: Order[]) {
   const { partner } = useSpotPartner();
+  const apiUrl = useSpotApiUrl();
   const { refetch: refetchBalances } = useBalances();
   const { address } = useConnection();
   const chainId = useDataChainId();
   const previous = useRef<{ key: string; orders: Order[] } | undefined>(
     undefined,
   );
-  const key = `${partner}:${chainId}:${address}`;
+  const key = `${apiUrl}:${partner}:${chainId}:${address}`;
   useEffect(() => {
     // Establish a baseline when the partner, network, or account changes.
     if (previous.current?.key === key) {
@@ -97,17 +101,18 @@ export function useHistoryNotifications(orders: Order[]) {
 }
 
 interface CancellationInput {
-  order?: Order;
+  order?: HistoryOrder;
   address?: string;
   partner: Partners;
+  apiUrl: string;
   wallet: SpotWalletPort;
   toastId: string;
 }
 
-function cancellationPreviews(order?: Pick<Order, "chainId" | "historyKey" | "maker">) {
+function cancellationPreviews(order: Pick<Order, "chainId" | "historyKey" | "maker"> | undefined, apiUrl: string) {
   if (!order) return [];
   return Object.values(useSubmissionPreview.getState().entries).filter(entry =>
-    entry.order?.chainId === order.chainId && entry.order.historyKey === order.historyKey &&
+    (entry.apiUrl ?? DEFAULT_SPOT_API_URL) === apiUrl && entry.order?.chainId === order.chainId && entry.order.historyKey === order.historyKey &&
     entry.order.maker.toLowerCase() === order.maker.toLowerCase());
 }
 
@@ -124,32 +129,34 @@ function cancellationNotification(title: string, preview: SubmissionPreview | un
   };
 }
 
-export function useCancelOrder(order?: Order, partnerOverride?: Partners) {
+export function useCancelOrder(order?: HistoryOrder, partnerOverride?: Partners, apiUrlOverride?: string) {
   const { partner: selectedPartner } = useSpotPartner();
   const partner = partnerOverride ?? selectedPartner;
+  const selectedApiUrl = useSpotApiUrl();
+  const apiUrl = apiUrlOverride ?? order?.apiUrl ?? selectedApiUrl;
   const wallet = useWalletInteractions();
   const { address } = useConnection();
   const queryClient = useQueryClient();
-  const isOrderCancelling = useOrderCancelling(order, partner);
-  const toastId = `${CANCEL_ORDER_TOAST_ID}:${partner}:${order?.chainId}:${order?.maker.toLowerCase()}:${order?.historyKey}`;
+  const isOrderCancelling = useOrderCancelling(order, partner, apiUrl);
+  const toastId = `${CANCEL_ORDER_TOAST_ID}:${apiUrl}:${partner}:${order?.chainId}:${order?.maker.toLowerCase()}:${order?.historyKey}`;
   const [confirmed, setConfirmed] = useState<{ toastId: string; hash: `0x${string}` }>();
   // Cancellation is a wallet write: start it only from an explicit user action.
   const mutation = useMutation({
-    mutationKey: spotKeys.cancellation(partner, order?.chainId, order?.maker, order?.historyKey),
-    mutationFn: async ({ order, address, partner, wallet, toastId }: CancellationInput) => {
+    mutationKey: spotKeys.cancellation(partner, order?.chainId, order?.maker, order?.historyKey, apiUrl),
+    mutationFn: async ({ order, address, partner, apiUrl, wallet, toastId }: CancellationInput) => {
       if (isMockOrder(order)) throw new Error("Sample orders are read-only");
       if (!order || !address)
         throw new Error("Connect the order's wallet and network to cancel");
       // Keep the submission's scope if the selector or wallet changes while the
       // client loads, the wallet confirms, or history catches up.
-      const scope = { partner, chainId: order.chainId, account: address, historyKey: order.historyKey, toastId };
-      const client = await queryClient.fetchQuery(spotClientQueryOptions(scope.partner, scope.chainId, true));
-      const cached = queryClient.getQueryData<Order[]>(spotKeys.orders(scope.partner, "all", scope.account));
+      const scope = { partner, apiUrl, chainId: order.chainId, account: address, historyKey: order.historyKey, toastId };
+      const client = await queryClient.fetchQuery(spotClientQueryOptions(scope.partner, scope.chainId, true, scope.apiUrl));
+      const cached = queryClient.getQueryData<Order[]>(spotKeys.orders(scope.partner, "all", scope.account, scope.apiUrl));
       const latest = cached?.find(item => item.chainId === scope.chainId && item.historyKey === scope.historyKey) ?? order;
       const hash = await cancelSdkOrder(client, wallet, latest, scope.account);
       // Retain receipt links with the captured submission details even after
       // its form closes, so later notifications include confirmed transactions.
-      for (const preview of cancellationPreviews(latest)) {
+      for (const preview of cancellationPreviews(latest, scope.apiUrl)) {
         useSubmissionPreview.getState().upsert({
           ...preview,
           transactions: [{ label: "Cancellation transaction", hash }],
@@ -162,15 +169,15 @@ export function useCancelOrder(order?: Order, partnerOverride?: Partners) {
       };
     },
     retry: false,
-    onMutate: ({ toastId, order }) => {
+    onMutate: ({ toastId, order, apiUrl }) => {
       setConfirmed(undefined);
       const loadingToast = createLoadingToast(toastId);
-      const notification = cancellationNotification("Cancelling order…", cancellationPreviews(order)[0], order?.chainId);
+      const notification = cancellationNotification("Cancelling order…", cancellationPreviews(order, apiUrl)[0], order?.chainId);
       loadingToast.show(notification.title, { description: notification.description });
       return { toastId, loadingToast };
     },
     onSuccess: async (result, _variables, context) => {
-      const preview = cancellationPreviews({ chainId: result.chainId, historyKey: result.historyKey, maker: result.account })[0];
+      const preview = cancellationPreviews({ chainId: result.chainId, historyKey: result.historyKey, maker: result.account }, result.apiUrl)[0];
       const details = cancellationNotification("Confirming order cancellation…", preview, result.chainId);
       const notification = {
         id: result.toastId,
@@ -201,7 +208,7 @@ export function useCancelOrder(order?: Order, partnerOverride?: Partners) {
       if (isUserRejectedError(error)) {
         dismissTransactionRejectedToast({ id });
       } else {
-        const preview = cancellationPreviews(variables.order)[0];
+        const preview = cancellationPreviews(variables.order, variables.apiUrl)[0];
         const notification = cancellationNotification("Cancel failed", preview, variables.order?.chainId, error.message);
         toast.error(notification.title, {
           id,
@@ -212,7 +219,7 @@ export function useCancelOrder(order?: Order, partnerOverride?: Partners) {
   });
   return {
     cancelOrder: (_variables?: void, options?: Parameters<typeof mutation.mutate>[1]) =>
-      mutation.mutate({ order, address, partner, wallet, toastId }, options),
+      mutation.mutate({ order, address, partner, apiUrl, wallet, toastId }, options),
     isLoading: mutation.isPending || isOrderCancelling,
     isSuccess: mutation.isSuccess,
     transactionHash: confirmed?.toastId === toastId ? confirmed.hash : undefined,

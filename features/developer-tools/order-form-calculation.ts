@@ -33,7 +33,7 @@ export function getLiveOrderFormInput(spot: SpotData): JsonContainer {
       isPriceInverted: false,
     },
   };
-  return JSON.parse(JSON.stringify({ formParams: params })) as JsonContainer;
+  return JSON.parse(JSON.stringify({ apiUrl: spot.apiUrl, formParams: params })) as JsonContainer;
 }
 
 function readParams(data: JsonContainer): CalculateOrderFormParams {

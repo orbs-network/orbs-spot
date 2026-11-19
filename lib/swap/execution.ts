@@ -10,6 +10,7 @@ import { isNativeAddress } from "../spot/token-utils.ts";
 import { OrderSettlementError, waitForOrder } from "./settlement.ts";
 import type { BestTradeQuote } from "../types";
 import { acquireSubmissionLock, isSubmissionBusy } from "../spot/submission-lock.js";
+import { DEFAULT_SPOT_API_URL } from "../spot/api.ts";
 
 export interface SwapIntent {
   account: string;
@@ -133,6 +134,7 @@ export function createSwapExecutor({
         if (requireFresh) assertSwapQuote(candidate, intent);
         else assertSwapQuoteIdentity(candidate, intent);
         if (client.chainId !== intent.chainId || candidate.originalQuote.request.partner !== client.partner ||
+            (candidate.apiUrl ?? DEFAULT_SPOT_API_URL) !== (client.apiUrl ?? DEFAULT_SPOT_API_URL) ||
             candidate.slippage !== reviewedQuote.slippage) {
           throw new Error("Quote does not match the reviewed swap. Request a new quote.");
         }
@@ -224,7 +226,7 @@ export function createSwapExecutor({
       checkActive();
       // Preparation may refresh a quote while configuration or RPC reads are pending.
       // Retain every reviewed identity and require review before signing a worse price.
-      acceptQuote(toBestTradeQuote(prepared.quote, quote.inToken));
+      acceptQuote(toBestTradeQuote(prepared.quote, quote.inToken, client.apiUrl));
       await assertSpendBalance();
       await assertWallet();
       checkActive();

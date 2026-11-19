@@ -5,6 +5,7 @@ import { useConnection } from "wagmi";
 import { useClient, useOrders } from "@/components/advanced-order/use-order-client";
 import { getWrappedNativeCurrency, isNativeAddress } from "@/lib/utils";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
+import { useSpotApiUrl } from "@/lib/hooks/use-spot-api-url";
 import { getDemoOrderForm, DEMO_ACCOUNT, type DeveloperExecutionMode } from "./demo-order";
 import { useOrderReview } from "@/components/advanced-order/use-order-review";
 import { useOrderModel } from "@/components/advanced-order/use-order-form";
@@ -17,6 +18,7 @@ export function useDeveloperOrder(mode: DeveloperExecutionMode = "demo") {
   const history = useOrders();
   const { address: connectedAddress } = useConnection();
   const chainId = useDataChainId();
+  const apiUrl = useSpotApiUrl();
   const address = connectedAddress ?? (mode === "demo" ? DEMO_ACCOUNT : undefined);
   const form = useMemo(() => mode === "demo" ? getDemoOrderForm(review.form) : review.form, [mode, review.form]);
   const permit = useMemo(() => {
@@ -29,6 +31,7 @@ export function useDeveloperOrder(mode: DeveloperExecutionMode = "demo") {
     return { ...client.data.rePermitData, order: prepared.order };
   }, [address, chainId, client.data, form, review.srcToken, review.dstToken]);
   return {
+    apiUrl,
     client: client.data,
     canDemoExecute: form.canSubmit && Boolean(market.value) && !market.isLoading && !market.noLiquidity && !market.error,
     orderType: review.form.orderType,

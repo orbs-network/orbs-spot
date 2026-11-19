@@ -9,13 +9,13 @@ import {
 /** Keep the confirmed cancellation's original scope until history catches up. */
 export function watchCancelledOrder(
   queryClient: QueryClient,
-  { partner, chainId, account, historyKey }: OrderQueryScope & { historyKey: string },
+  { partner, chainId, account, historyKey, apiUrl }: OrderQueryScope & { historyKey: string },
 ) {
-  const allOrdersKey = spotKeys.orders(partner, "all", account);
+  const allOrdersKey = spotKeys.orders(partner, "all", account, apiUrl);
   // An older all-chain request must not overwrite the refreshed order status.
   void queryClient.cancelQueries({ queryKey: allOrdersKey, exact: true });
   const observer = new QueryObserver(queryClient, {
-    ...spotOrdersQueryOptions(partner, account, queryClient),
+    ...spotOrdersQueryOptions(partner, account, queryClient, apiUrl),
     staleTime: 0,
     refetchOnMount: "always",
     refetchInterval: 2_000,

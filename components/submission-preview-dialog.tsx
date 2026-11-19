@@ -19,6 +19,7 @@ import { useSubmissionPreview, type SubmissionPreview } from "@/lib/submission-p
 import { getExplorerUrl, toAmountUI } from "@/lib/utils";
 import { getOrderHref } from "@/lib/spot/order-link";
 import { formatDisplayAmount } from "@/lib/token-display";
+import { DEFAULT_SPOT_API_URL } from "@/lib/spot/api";
 import styles from "./submission-preview-dialog.module.css";
 
 type PreviewAsset = NonNullable<SubmissionPreview["input"]>;
@@ -70,11 +71,12 @@ function PreviewContent({ preview }: { preview: SubmissionPreview }) {
   }, [preview.id]);
   const capturedOrder = preview.order;
   const partner = preview.partner ?? getActiveSpotPartner();
+  const apiUrl = preview.apiUrl ?? DEFAULT_SPOT_API_URL;
   const account = capturedOrder?.maker ?? preview.account;
   // Follow the captured wallet and partner rather than the current form draft.
   // This shares the existing account-history cache and stops on a terminal status.
   const history = useQuery({
-    ...spotOrdersQueryOptions(partner, account, queryClient),
+    ...spotOrdersQueryOptions(partner, account, queryClient, apiUrl),
     enabled: Boolean(capturedOrder?.status === OrderStatus.Open && preview.partner && account),
     staleTime: 0,
     refetchOnMount: "always",
@@ -90,7 +92,7 @@ function PreviewContent({ preview }: { preview: SubmissionPreview }) {
     if (refreshedOrder && refreshedOrder !== capturedOrder) updateOrder(preview.id, refreshedOrder);
   }, [capturedOrder, preview.id, refreshedOrder, updateOrder]);
 
-  const { cancelOrder, isLoading: cancelling, transactionHash } = useCancelOrder(order, preview.partner);
+  const { cancelOrder, isLoading: cancelling, transactionHash } = useCancelOrder(order, preview.partner, apiUrl);
   useEffect(() => {
     if (!transactionHash) return;
     const store = useSubmissionPreview.getState();
@@ -193,7 +195,7 @@ function PreviewContent({ preview }: { preview: SubmissionPreview }) {
       </div>
     </div>}
     {order?.status === OrderStatus.Open && !preview.partner && <p className="text-xs leading-relaxed text-muted-foreground">
-      Cancellation is unavailable in this older preview. <a href={getOrderHref(order)} className="rounded-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring">View order details</a>.
+      Cancellation is unavailable in this older preview. <a href={getOrderHref(order, apiUrl)} className="rounded-sm text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring">View order details</a>.
     </p>}
     {!openOrder && <Button variant="outline" className="min-h-11 w-full" onClick={close}>Close</Button>}
   </DialogContent>;

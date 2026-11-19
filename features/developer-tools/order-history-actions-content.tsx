@@ -32,7 +32,7 @@ export function FetchOrdersDeveloperButtonContent({
         headers: { Accept: "application/json" },
       }}
       description=""
-      explanation="The Request tab shows the HTTP GET request used by order history across all networks for the connected wallet and exchange. The Response tab shows the raw RePermit records for the displayed orders. The SDK snippet returns normalized v2 orders without loading configuration."
+      explanation="The Request tab shows the HTTP GET request used by order history across all networks for the connected wallet, exchange, and selected Spot API. The Response tab shows the raw RePermit records for the displayed orders. The SDK snippet returns normalized orders without loading configuration."
       requestResponseTabs
       requiresDeveloperMode={false}
       responseData={responseData}

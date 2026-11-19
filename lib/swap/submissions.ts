@@ -1,5 +1,8 @@
+import { DEFAULT_SPOT_API_URL } from "../spot/api.ts";
+
 const emptyKeys: readonly string[] = [];
-export const swapOrderKey = (chainId: number, orderId: string) => `${chainId}:${orderId.toLowerCase()}`;
+export const swapOrderKey = (chainId: number, orderId: string, apiUrl = DEFAULT_SPOT_API_URL) =>
+  `${apiUrl}:${chainId}:${orderId.toLowerCase()}`;
 
 /** Foreground ownership is independent of background settlement and recovery. */
 export function createSwapSubmissions() {
@@ -16,7 +19,7 @@ export function createSwapSubmissions() {
     current: () => foreground,
     isCurrent: (id: string) => foreground === id,
     detach(id: string) { if (foreground === id) foreground = undefined; },
-    track(id: string, chainId: number, orderId: string) { orders.set(id, swapOrderKey(chainId, orderId)); publish(); },
+    track(id: string, chainId: number, orderId: string, apiUrl = DEFAULT_SPOT_API_URL) { orders.set(id, swapOrderKey(chainId, orderId, apiUrl)); publish(); },
     finish(id: string) { if (orders.delete(id)) publish(); },
     getOrderKeys: () => orderKeys,
     getServerOrderKeys: () => emptyKeys,

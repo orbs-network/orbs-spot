@@ -7,12 +7,13 @@ import { useConnection } from "wagmi";
 import { SUPPORTED_CHAINS } from "@/lib/consts";
 import { useBestTradeSwapStore } from "@/lib/hooks/store";
 import { SwapStatus } from "@/lib/types";
-import { getFillTransactionHash, getSwapActivityId, resolveSwapSettlementOrder, useSwapActivity, type SwapActivity, type SpotSwapActivity } from "@/lib/swap/activity";
+import { getFillTransactionHash, getSwapActivityApiUrl, getSwapActivityId, resolveSwapSettlementOrder, useSwapActivity, type SwapActivity, type SpotSwapActivity } from "@/lib/swap/activity";
 import { swapOrderKey, swapSubmissions } from "@/lib/swap/submissions";
 import { createSwapToasts } from "@/lib/swap/use-swap-toasts";
 import { OrderSettlementError, watchOrder } from "@/lib/swap/settlement";
 import { spotClientQueryOptions } from "@/lib/spot/queries";
 import { getActiveSpotPartner } from "@/lib/partners/spot";
+import { DEFAULT_SPOT_API_URL } from "@/lib/spot/api";
 
 const supportedChains = new Set<number>(SUPPORTED_CHAINS.map(chain => chain.id));
 const legacyReceiptTimeoutMillis = 24 * 60 * 60 * 1_000;
@@ -21,13 +22,14 @@ const completedResults = (results: UseQueryResult<SwapActivity>[]) =>
 
 async function trackSpotSwap(item: SpotSwapActivity, signal: AbortSignal, queryClient: QueryClient): Promise<SpotSwapActivity> {
   let order = item.order;
-  const toasts = createSwapToasts({ id: `recovered-swap-${swapOrderKey(item.chainId, item.orderId)}`,
+  const apiUrl = getSwapActivityApiUrl(item);
+  const toasts = createSwapToasts({ id: `recovered-swap-${swapOrderKey(item.chainId, item.orderId, apiUrl)}`,
     inputSymbol: item.inputSymbol, outputSymbol: item.outputSymbol, inputAmount: item.inputAmount,
     inputCurrency: item.inputToken, outputCurrency: item.outputToken, outputAmount: item.outputAmount, chainId: item.chainId,
-    account: item.account, partner: item.partner });
+    account: item.account, partner: item.partner, apiUrl });
   toasts.onSwapConfirming(order);
   try {
-    const client = await queryClient.fetchQuery(spotClientQueryOptions(item.partner ?? getActiveSpotPartner(), item.chainId));
+    const client = await queryClient.fetchQuery(spotClientQueryOptions(item.partner ?? getActiveSpotPartner(), item.chainId, false, apiUrl));
     signal.throwIfAborted();
     for await (const current of watchOrder({ client, order, signal })) {
       order = current;
@@ -69,14 +71,18 @@ export function PendingSwapMonitor() {
   useEffect(() => { void useSwapActivity.persist.rehydrate(); }, []);
   const activeHash = useBestTradeSwapStore(state => state.status === SwapStatus.LOADING ? state.txHash : undefined);
   const activeOrderId = useBestTradeSwapStore(state => state.status === SwapStatus.LOADING ? state.orderId : undefined);
+  const activeApiUrl = useBestTradeSwapStore(state => state.apiUrl ?? DEFAULT_SPOT_API_URL);
   const { address } = useConnection();
   const items = useSwapActivity(state => state.items);
   const activeOrders = useSyncExternalStore(swapSubmissions.subscribe, swapSubmissions.getOrderKeys, swapSubmissions.getServerOrderKeys);
   const pending = useMemo(() => items.filter(item => item.account.toLowerCase() === address?.toLowerCase()
     && item.status === "pending" && supportedChains.has(item.chainId)
-    && (item.kind === "spot" ? item.orderId !== activeOrderId && !activeOrders.includes(swapOrderKey(item.chainId, item.orderId)) : item.hash !== activeHash)), [items, address, activeHash, activeOrderId, activeOrders]);
+    && (item.kind === "spot"
+      ? (item.orderId !== activeOrderId || getSwapActivityApiUrl(item) !== activeApiUrl)
+        && !activeOrders.includes(swapOrderKey(item.chainId, item.orderId, getSwapActivityApiUrl(item)))
+      : item.hash !== activeHash)), [items, address, activeHash, activeOrderId, activeApiUrl, activeOrders]);
   const completed = useQueries({ combine: completedResults, queries: pending.map(item => ({
-    queryKey: ["persisted-swap-status", item.kind ?? "transaction", item.chainId, getSwapActivityId(item)],
+    queryKey: ["persisted-swap-status", item.kind ?? "transaction", item.chainId, getSwapActivityId(item), getSwapActivityApiUrl(item)],
     queryFn: ({ signal }: { signal: AbortSignal }) => trackSwap(item, signal, queryClient),
     staleTime: item.kind === "spot" ? Infinity : 10_000,
     // One host tracker polls Spot orders serially through deadline + 60 seconds.
@@ -89,11 +95,13 @@ export function PendingSwapMonitor() {
       const identity = getSwapActivityId(result);
       // Cached results and Strict Mode replay must not settle/invalidate twice.
       if (result.status !== "pending" && activity.items.some(item => item.chainId === result.chainId
-        && getSwapActivityId(item) === identity && item.status === "pending")) {
-        activity.settle(result.chainId, identity, result.status, result.kind === "spot" ? result.order : undefined);
+        && getSwapActivityId(item) === identity && getSwapActivityApiUrl(item) === getSwapActivityApiUrl(result)
+        && item.status === "pending")) {
+        activity.settle(result.chainId, identity, result.status, result.kind === "spot" ? result.order : undefined, getSwapActivityApiUrl(result));
         void queryClient.invalidateQueries({ queryKey: ["balances", result.chainId, result.account.toLowerCase()] });
         void queryClient.invalidateQueries({ predicate: query => query.queryKey[0] === "spot-orders"
-          && query.queryKey[3] === result.account.toLowerCase() });
+          && query.queryKey[3] === result.account.toLowerCase()
+          && query.queryKey[4] === getSwapActivityApiUrl(result) });
       }
     }
   }, [completed, queryClient]);

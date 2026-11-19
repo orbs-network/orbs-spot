@@ -1,6 +1,6 @@
 // Reference copy of the playground SDK flow in sdk-flow-examples.ts.
 // Read README.md and AGENTS.md in this directory before adapting this browser example.
-// spot-swap.ts — requires @orbs-network/spot-ui 2.2.2 or later.
+// spot-swap.ts — requires @orbs-network/spot-ui 2.2.7 or later.
 // Adapt chain, partner, and wallet provider to your app; reuse existing wallet services.
 // Get a current client.getQuote for the selected pair and show its minimum before calling swapFlow.
 // Supply inAmount to quote spending or outAmount to quote a receive target, in token base units.
@@ -127,7 +127,7 @@ export async function swapFlow(account: Address, input: SwapInput) {
     }
     quote = prepared.quote; // Freeze and display the exact quote selected for signing.
     assertQuoteValue(quote);
-    // The SDK signs this service minimum unchanged with a three-minute expiration.
+    // The SDK signs this minimum unchanged, the reviewed quote slippage in basis points, and a three-minute expiration.
     const { signerAddress, typedData } = prepared.signingRequest;
     const signature = await walletClient.signTypedData({
       ...typedData,

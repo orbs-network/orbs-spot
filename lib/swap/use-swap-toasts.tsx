@@ -25,7 +25,7 @@ const getReadableSwapError = (error: unknown) => {
 };
 
 /** Each submission owns a toast and immutable labels, independent of the next draft. */
-export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, outputAmount, outputAmountUsd, inputCurrency, outputCurrency, chainId, account, partner, minimumOutputAmount, publishToast = show => show(), publishSuccessToast = publishToast }: {
+export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, outputAmount, outputAmountUsd, inputCurrency, outputCurrency, chainId, account, partner, apiUrl, minimumOutputAmount, publishToast = show => show(), publishSuccessToast = publishToast }: {
   id: string;
   inputSymbol: string;
   outputSymbol: string;
@@ -37,6 +37,7 @@ export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, o
   chainId: number;
   account?: string;
   partner?: Partners;
+  apiUrl?: string;
   minimumOutputAmount?: string;
   publishToast?: (show: () => void) => void;
   publishSuccessToast?: (show: () => void) => void;
@@ -58,7 +59,7 @@ export function createSwapToasts({ id, inputSymbol, outputSymbol, inputAmount, o
     acceptedOrder = order ?? acceptedOrder;
     useSubmissionPreview.getState().upsert({ id, kind: "swap", title, status, message, input,
       output, swapQuote,
-      chainId, account: account ?? acceptedOrder?.maker, partner, order: acceptedOrder,
+      chainId, account: account ?? acceptedOrder?.maker, partner, apiUrl, order: acceptedOrder,
       transactions: Array.from(transactions, ([label, hash]) => ({ label, hash })),
       details: minimumOutputAmount ? [{ label: "Minimum received", value: `${formatDisplayAmount(minimumOutputAmount)} ${outputSymbol}` }] : undefined,
     });

@@ -24,7 +24,7 @@ export function matchesSpotSwapQuoteAmount(
 
 /** One request identity shared by previews, review refreshes, and developer tools. */
 export function spotSwapQuoteQueryOptions(
-  client: Pick<SpotClient, "partner" | "chainId" | "getQuote"> | undefined,
+  client: Pick<SpotClient, "partner" | "chainId" | "getQuote" | "apiUrl"> | undefined,
   account: string,
   inputCurrency: Currency | undefined,
   outputCurrency: Currency | undefined,
@@ -37,7 +37,7 @@ export function spotSwapQuoteQueryOptions(
   const inToken = isNativeAddress(source) ? wrappedNativeTokenAddress ?? "" : source;
   const outToken = outputCurrency?.address ?? "";
   return queryOptions({
-    queryKey: [...SPOT_SWAP_QUOTE_KEY, client?.partner, client?.chainId, account.toLowerCase(), source.toLowerCase(), inToken.toLowerCase(), outToken.toLowerCase(), amountSide, rawAmount, slippage, "-1"],
+    queryKey: [...SPOT_SWAP_QUOTE_KEY, client?.apiUrl, client?.partner, client?.chainId, account.toLowerCase(), source.toLowerCase(), inToken.toLowerCase(), outToken.toLowerCase(), amountSide, rawAmount, slippage, "-1"],
     queryFn: async ({ signal }): Promise<BestTradeQuote> => {
       if (!client) throw new Error("Spot configuration is not ready. Retry before requesting a quote");
       if (!inToken || !outToken || !/^\d+$/.test(rawAmount) || BigInt(rawAmount) <= BigInt(0)) {
@@ -46,7 +46,7 @@ export function spotSwapQuoteQueryOptions(
       const quote = await client.getQuote({ inToken, outToken,
         ...(amountSide === "output" ? { outAmount: rawAmount } : { inAmount: rawAmount, dexMinAmountOut: "-1" }),
         user: account, slippage, signal });
-      const trade = toBestTradeQuote(quote, source);
+      const trade = toBestTradeQuote(quote, source, client.apiUrl);
       if (!matchesSpotSwapQuoteAmount(trade, rawAmount, amountSide)) {
         throw new Error("Quote does not match the requested swap amount. Request a new quote.");
       }

@@ -6,6 +6,8 @@ import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { useSettings } from "@/lib/hooks/use-settings";
 import { useSpotPartner } from "@/lib/hooks/use-spot-partner";
+import { useSpotApiUrl } from "@/lib/hooks/use-spot-api-url";
+import { DEFAULT_SPOT_API_URL } from "@/lib/spot/api";
 import { QUOTE_PREVIEW_ACCOUNT } from "@/lib/swap/quote-preview";
 import { getWrappedNativeCurrency, isNativeAddress } from "@/lib/utils";
 import type { JsonContainer } from "./json-inspector";
@@ -15,6 +17,7 @@ export function useQuoteInspectionData() {
   const chainId = useDataChainId();
   const { slippage, slippageMode } = useSettings();
   const { partner } = useSpotPartner();
+  const apiUrl = useSpotApiUrl();
   const { inputCurrency, isLoadingTrade, outputCurrency, amountSide, parsedQuoteAmount, trade,
     quoteSlippage, isLoadingSlippage, slippageTokenAddress, slippageAmountUsd } = useDerivedSwap();
   const liveQuote = trade?.originalQuote;
@@ -22,6 +25,8 @@ export function useQuoteInspectionData() {
   const requestData = useMemo<JsonContainer>(() => ({
     partner,
     chainId,
+    apiUrl,
+    quoteApiUrl: DEFAULT_SPOT_API_URL,
     inputIsNative,
     slippagePolicy: {
       mode: slippageMode,
@@ -50,7 +55,7 @@ export function useQuoteInspectionData() {
       user: account ?? QUOTE_PREVIEW_ACCOUNT,
     },
   }), [account, chainId, inputCurrency?.address, inputCurrency?.decimals, inputIsNative, liveQuote, outputCurrency?.address,
-    outputCurrency?.decimals, amountSide, parsedQuoteAmount, partner, slippage, slippageMode, quoteSlippage, slippageTokenAddress, slippageAmountUsd]);
+    outputCurrency?.decimals, amountSide, parsedQuoteAmount, partner, apiUrl, slippage, slippageMode, quoteSlippage, slippageTokenAddress, slippageAmountUsd]);
   const responseNotice = liveQuote ? undefined : isLoadingSlippage ? "Resolving automatic slippage before requesting a quote…"
     : isLoadingTrade ? "Loading quote response…"
     : parsedQuoteAmount && parsedQuoteAmount !== "0" ? "Quote response is not available yet." : "Enter an amount to see quote response.";

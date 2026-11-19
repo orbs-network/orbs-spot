@@ -9,6 +9,7 @@ This document explains the reference app’s state, history, valuation, and back
 | --- | --- |
 | Shared Spot quote identity and display units | [`lib/hooks/use-trade.ts`](../lib/hooks/use-trade.ts) |
 | Automatic slippage before quoting | [`lib/swap/slippage.ts`](../lib/swap/slippage.ts) |
+| Token USD-price query and cache | [`lib/spot/prices.ts`](../lib/spot/prices.ts) |
 | Swap signing, submission and settlement | [`lib/swap/execution.ts`](../lib/swap/execution.ts) |
 | Accepted swap activity and reload recovery | [`lib/swap/activity.ts`](../lib/swap/activity.ts), [`features/swap/activity.tsx`](../features/swap/activity.tsx) |
 | Advanced-order wallet port and submission sequence | [`lib/spot/execution.ts`](../lib/spot/execution.ts) |
@@ -34,7 +35,7 @@ receipts are cached by chain and transaction hash. Successful writes invalidate 
 
 ### Integration flow
 
-1. Reuse `createClient(partner, chainId)` through your host cache. Include both partner and chain in its key;
+1. Reuse `createClient(partner, chainId, { apiUrl })` through your host cache. Include partner, chain, and API URL in its key;
    leave configuration failures retryable. An enabled Orbs partner is required.
 2. Map editable inputs, balances, token decimals, USD prices and the current raw output quote into
    `calculateOrder`. Its result owns defaults, validation, trade counts, prices and schedules.
@@ -53,7 +54,7 @@ receipts are cached by chain and transaction hash. Successful writes invalidate 
 4. Create one `createOrderExecutor(onChange)` per form. Submit its reviewed snapshot with the SDK client,
    wallet adapter, account and tokens. It wraps native input, approves maximum uint256 allowance if needed,
    verifies allowance, prepares immediately before signing, and forwards the original signature unchanged.
-5. Use `getOrders({ swapper: account, exchange: partner, getv1orders: false, signal })` for V2 history
+5. Use `getOrders({ swapper: account, exchange: partner, apiUrl, getv1orders: false, signal })` for history from the selected service
    and `order.historyKey` for row/cache identity. The host cache adds token metadata for display.
 6. Cancel using `client.getCancelOrderRequest(order)` and a confirmed wallet write, then refetch history.
    The app refreshes while history is open and pauses polling in background tabs.
@@ -80,6 +81,24 @@ const order = await client.submitOrder(prepared.order, signature);
 
 ### Swap quotes, minimum output and settlement
 
+The host selects a trusted API URL from the page query: `api=dev` uses
+`https://order-sink-dev.orbs.network`, `api=v1` uses `https://order-sink.orbs.network`, and
+`api=v2` explicitly selects `https://order-sink-v2.orbs.network`.
+An absent, empty, or unrecognized `api` value uses production v2 without enabling implicit debug mode.
+All three recognized values also enable debug partner testing, including the partner selector,
+supported-network filtering, and the Partner column in history. Explicit `debug=true` still
+enables those features on the default service. Navigation retains the API and partner without
+injecting `debug=true`, so clearing the API selection disables implicit debug mode. Developer
+inspectors and demos remain restricted to `/dev`.
+The SDK receives this URL explicitly through `createClient(..., { apiUrl })` and standalone
+history reads; it does not inspect the page query.
+Only order submission, status, and history use that selected backend. Configuration and
+`client.getQuote` always use `https://order-sink-v2.orbs.network`, independently of `apiUrl`.
+Cancellation uses the protocol configuration loaded from production v2. Client and attempt
+cache keys and retained swap activity include the order backend, and execution guards reject a destination change after review.
+Internal links preserve API selection; developer inspectors and generated code show the effective URL.
+USD token pricing remains on the production pricing service, independent of API selection.
+
 TWAP, limit, stop-loss and take-profit forms use an exact-input `client.getQuote` for their
 market reference. Advanced-order limit and trigger settings continue to determine their target output.
 The swap form accepts either an input amount or a receive target. Editing the receive amount calls
@@ -90,8 +109,16 @@ Changing amount side, target, pair, wallet, chain, or slippage uses a separate q
 Balances, allowance, wrapping, review, and submission use the returned input amount at full precision.
 After review, refreshes quote that fixed spend rather than recalculating the target or increasing spending.
 
-Automatic swap slippage is resolved before the quote request. The host reads `client.getTokenUsd`
-for the typed side's token and computes the full trade value with decimal arithmetic:
+Automatic swap slippage is resolved before the quote request. Selecting the input and output
+tokens starts independent token-level `useQuery` price reads, including when the amount is empty
+and before a Spot client is initialized. Price identity is `chainId` plus the lowercase ERC-20
+address, independent of the amount, input/output side, account, or Spot partner. Each query uses
+standalone `getTokenUsd({ tokenAddress, chainId, signal })`. The SDK makes a fresh cancellable
+request on every call; TanStack Query owns the shared 30-second freshness window and in-flight
+reuse, with no polling interval. Custom slippage and direct wrap/unwrap skip these reads.
+The slippage query uses `queryClient.fetchQuery` for that same token key, reusing fresh data
+or the existing in-flight request. Cancelling an amount draft stops its wait without cancelling
+the shared price lookup. The host computes the full trade value with decimal arithmetic:
 raw amount divided by `10 ** tokenDecimals`, multiplied by USD per whole token.
 For native input, pricing uses the configured wrapped-token address. Output entry uses the output
 target token and its decimals. The host passes this total to the synchronous
@@ -99,6 +126,7 @@ target token and its decimals. The host passes this total to the synchronous
 use at least 1%; larger totals retain the baseline. The price wait is bounded to 1,500 ms;
 failed or timed-out lookups use `amountUsd: undefined` and retain the baseline, while caller cancellation
 propagates. Custom slippage bypasses pricing and the helper and is sent unchanged.
+Pricing always uses the SDK's production service, independently of the selected order backend.
 The quote request and UI use the same resolved percentage; review and execution refreshes retain
 `quote.request.slippage`. The helper's valuation is separate from quote USD metadata used for
 display and the minimum-trade check. Never derive policy from rounded display values or reapply it to a signed order.
@@ -120,8 +148,9 @@ The UI displays the service-provided `minimumAmountOut` unchanged, and
 `await client.prepareSwap({ quote, account, signal })` uses the selected quote’s minimum in the signed order.
 Preparation reuses quotes up to 20 seconds old and refreshes older quotes. The host validates
 and displays `prepared.quote` before signing; worse output or minimum requires a new review.
-Quote slippage remains a percentage; `0.5` means 0.5%. This minimum is distinct from the swap order's
-fixed 5% signed oracle protection. Prepared swaps expire after three minutes.
+Quote slippage remains a percentage; `0.5` means 0.5%. Preparation converts the reviewed percentage
+to integer basis points in signed `witness.slippage` (`0.5` becomes `50`) and preserves the quoted
+minimum unchanged in `witness.output.limit`. Prepared swaps expire after three minutes.
 The quote's net output and raw fee do not provide a USD gas cost.
 
 Submission returns an accepted signed order. Its `order.id` identifies an intent and must never be

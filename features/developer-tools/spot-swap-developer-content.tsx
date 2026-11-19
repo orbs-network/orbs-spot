@@ -22,6 +22,8 @@ import { useBalance, useBalances } from "@/lib/hooks/use-balances";
 import { useDataChainId } from "@/lib/hooks/use-data-chain-id";
 import { useDerivedSwap } from "@/lib/hooks/use-derived-swap";
 import { useSettings } from "@/lib/hooks/use-settings";
+import { useSpotApiUrl } from "@/lib/hooks/use-spot-api-url";
+import { DEFAULT_SPOT_API_URL, getSpotApiUrl } from "@/lib/spot/api";
 import { useSignTypedDataPayload } from "@/lib/hooks/use-sign-typed-data";
 import { useSpotSwapClient } from "@/lib/hooks/use-spot-swap-client";
 import { useGetTokenAllowance } from "@/lib/hooks/use-token-allowance";
@@ -115,7 +117,7 @@ function getPresentation({ data, step }: { data: JsonContainer; step: SpotSwapFl
     check: "Read the input token allowance for client.spenderAddress. Native input uses its wrapped ERC-20 token.",
     wrap: "Deposit the exact native input into its wrapped ERC-20 contract and wait for a successful receipt before continuing.",
     approve: "Approve maximum uint256 allowance for client.spenderAddress, confirm the transaction, and verify allowance with bounded retries.",
-    sign: "await client.prepareSwap({ quote, account, signal }) refreshes stale quotes and signs prepared.quote.minimumAmountOut unchanged with a three-minute expiration. The connected account signs this original signingRequest unchanged. The quote itself contains no signing payload.",
+    sign: "await client.prepareSwap({ quote, account, signal }) refreshes stale quotes, preserves prepared.quote.minimumAmountOut, and converts the reviewed quote slippage to signed basis points with a three-minute expiration. The connected account signs this original signingRequest unchanged. The quote itself contains no signing payload.",
     swap: "Submit the exact prepared order and original signature once. submitSwap returns an accepted order; host polling through client.getOrder confirms the completed fill.",
     success: "Host status polling returned a completed order. Its fills contain the actual settlement transaction hashes and amounts.",
   };
@@ -141,6 +143,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
   const chainId = useDataChainId();
   const { openConnectModal } = useConnectModal();
   const { slippage, slippageMode } = useSettings();
+  const apiUrl = useSpotApiUrl();
   const { inputCurrency, inputAmount, isLoadingTrade, outputCurrency, parsedQuoteAmount, amountSide, trade } = useDerivedSwap();
   const inputBalance = useBalance(inputCurrency).wei;
   const { data: client } = useSpotSwapClient();
@@ -178,7 +181,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
   const selectedQuote = executionQuote ?? reviewedQuote ?? liveQuote;
   const hasBalance = Boolean(account && selectedQuote && BN(inputBalance ?? "0").gte(selectedQuote.inAmount));
   const inputIsNative = isNativeAddress(inputCurrency?.address);
-  const contextKey = [account?.toLowerCase(), chainId, client?.partner, inputCurrency?.address.toLowerCase(), outputCurrency?.address.toLowerCase(), amountSide, parsedQuoteAmount, slippageMode, slippage].join(":");
+  const contextKey = [account?.toLowerCase(), chainId, client?.partner, apiUrl, inputCurrency?.address.toLowerCase(), outputCurrency?.address.toLowerCase(), amountSide, parsedQuoteAmount, slippageMode, slippage].join(":");
   const stopSession = useCallback(() => {
     const session = sessionRef.current;
     if (!session) return;
@@ -201,10 +204,11 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
   const quoteData = useMemo(() => toJsonContainer(executionQuote?.originalQuote ?? reviewedQuote?.originalQuote ?? liveQuote?.originalQuote) ?? {}, [executionQuote, reviewedQuote, liveQuote]);
   const integrationData = useMemo<JsonContainer>(() => ({
     ...asRecord(requestData), quote: asRecord(quoteData), demo: isDemo,
+    apiUrl: selectedQuote?.apiUrl ?? apiUrl,
     userAddress: account ?? "<connected-account>",
     prepared: toJsonContainer(prepared) ?? {},
     execution: { signature: signature ?? "<wallet-signature>", order: toJsonContainer(completedOrder ?? acceptedOrder) ?? {} },
-  }), [acceptedOrder, account, completedOrder, isDemo, prepared, quoteData, requestData, signature]);
+  }), [acceptedOrder, account, completedOrder, isDemo, prepared, quoteData, requestData, signature, selectedQuote?.apiUrl, apiUrl]);
   const liveFlowPhases = useMemo(() => {
     const visitedSteps = new Set(navigation.history);
     const phases: SpotSwapFlowPhase[] = [ALLOWANCE_PHASE];
@@ -237,6 +241,9 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
         if (!selected || !BN(selected.inAmount).gt(0) || !BN(selected.outAmount).gt(0) || !client) {
           throw new Error("Enter a valid amount and wait for a live Spot quote and configuration.");
         }
+        if (client.apiUrl !== apiUrl || (selected.apiUrl ?? DEFAULT_SPOT_API_URL) !== apiUrl) {
+          throw new Error("Order API changed. Reopen the flow to review this swap for the selected submission service.");
+        }
         if (isDemo) {
           if (step === "flow") advanceToStep("check");
           else if (step === "check") { setApprovalRequired(true); advanceToStep(sourceIsNative ? "wrap" : "approve"); }
@@ -244,7 +251,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           else if (step === "approve") {
             const preview = await client.prepareSwap({ quote: selected.originalQuote, account: account ?? selected.originalQuote.request.user });
             setPrepared(preview);
-            setExecutionQuote(toBestTradeQuote(preview.quote, selected.inToken));
+            setExecutionQuote(toBestTradeQuote(preview.quote, selected.inToken, client.apiUrl));
             advanceToStep("sign");
           } else if (step === "sign") { setSignature(DEMO_SIGNATURE); advanceToStep("swap"); }
           else if (step === "swap") advanceToStep("success");
@@ -270,6 +277,9 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
         const request = selected.originalQuote.request;
         const assertContext = async () => {
           signal.throwIfAborted();
+          if (getSpotApiUrl(new URLSearchParams(window.location.search)) !== client.apiUrl) {
+            throw new Error("Spot API changed. Reopen the flow to review a fresh quote.");
+          }
           if (sessionRef.current !== session || session.contextKey !== contextKey) throw new Error("Swap changed. Review the swap again.");
           const [addresses, connectedChain] = await Promise.all([walletClient.getAddresses(), walletClient.getChainId()]);
           signal.throwIfAborted();
@@ -326,7 +336,7 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
           if (valueError) throw new Error(valueError);
           const prepared = await client.prepareSwap({ quote: quote.originalQuote, account, signal });
           await assertContext();
-          return reviewQuote(toBestTradeQuote(prepared.quote, quote.inToken)) ? prepared : undefined;
+          return reviewQuote(toBestTradeQuote(prepared.quote, quote.inToken, client.apiUrl)) ? prepared : undefined;
         };
         const refreshIfNeeded = async (): Promise<BestTradeQuote | undefined> => {
           if (isQuoteFresh(selected.originalQuote, MAX_QUOTE_AGE_MILLIS)) return selected;
@@ -425,26 +435,26 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
             submittedRef.current = true;
             setSubmissionUncertain(true);
             order = await client.submitSwap(prepared.order, signature, { signal });
-            useSwapActivity.getState().add({ kind: "spot", orderId: order.id, order, account, chainId, partner: client.partner,
+            useSwapActivity.getState().add({ kind: "spot", orderId: order.id, order, account, chainId, partner: client.partner, apiUrl: client.apiUrl,
               inputAmount, inputSymbol: inputCurrency?.symbol ?? "", outputSymbol: outputCurrency?.symbol ?? "",
               createdAt: Date.now(), status: "pending" });
-            void invalidateOrderQueries(queryClient, { partner: client.partner, chainId, account });
+            void invalidateOrderQueries(queryClient, { partner: client.partner, chainId, account, apiUrl: client.apiUrl });
             acceptedOrderRef.current = order;
             setAcceptedOrder(order);
-            useBestTradeSwapStore.getState().updateStore({ status: SwapStatus.LOADING, currentStep: SwapStep.SWAP,
+            useBestTradeSwapStore.getState().updateStore({ status: SwapStatus.LOADING, currentStep: SwapStep.SWAP, apiUrl: client.apiUrl,
               orderId: order.id, order, isAwaitingWallet: false });
             setSubmissionUncertain(false);
             wrappedCreditRef.current = undefined;
           }
           signal.throwIfAborted();
-          useBestTradeSwapStore.getState().updateStore({ status: SwapStatus.LOADING, currentStep: SwapStep.SWAP,
+          useBestTradeSwapStore.getState().updateStore({ status: SwapStatus.LOADING, currentStep: SwapStep.SWAP, apiUrl: client.apiUrl,
             orderId: order.id, order, isAwaitingWallet: false });
           const completed = await waitForOrder({ client, order, signal });
           signal.throwIfAborted();
           setCompletedOrder(completed);
-          useBestTradeSwapStore.getState().updateStore({ status: SwapStatus.SUCCESS, order: completed, isAwaitingWallet: false });
-          useSwapActivity.getState().settle(chainId, completed.id, "confirmed", completed);
-          void invalidateOrderQueries(queryClient, { partner: client.partner, chainId, account });
+          useBestTradeSwapStore.getState().updateStore({ status: SwapStatus.SUCCESS, apiUrl: client.apiUrl, order: completed, isAwaitingWallet: false });
+          useSwapActivity.getState().settle(chainId, completed.id, "confirmed", completed, client.apiUrl);
+          void invalidateOrderQueries(queryClient, { partner: client.partner, chainId, account, apiUrl: client.apiUrl });
           advanceToStep("success");
           stopSession();
           toast.success("Swap completed", { id: actionToastId, duration: 3_000, description: "The Spot order filled successfully.", position: "bottom-right" });
@@ -455,11 +465,13 @@ export function SpotSwapDeveloperContent({ trigger, mode }: { mode: DeveloperExe
       } catch (error) {
         if (error instanceof OrderSettlementError && error.reason !== "aborted") {
           useSwapActivity.getState().settle(chainId, error.orderId, error.reason,
-            resolveSwapSettlementOrder(acceptedOrderRef.current, error));
+            resolveSwapSettlementOrder(acceptedOrderRef.current, error), client?.apiUrl);
         }
         const accepted = acceptedOrderRef.current;
-        if (accepted && useBestTradeSwapStore.getState().orderId === accepted.id) {
-          useBestTradeSwapStore.getState().updateStore({ status: SwapStatus.FAILED, isAwaitingWallet: false,
+        const currentSubmission = useBestTradeSwapStore.getState();
+        if (accepted && currentSubmission.orderId === accepted.id
+          && (currentSubmission.apiUrl ?? DEFAULT_SPOT_API_URL) === client?.apiUrl) {
+          useBestTradeSwapStore.getState().updateStore({ status: SwapStatus.FAILED, apiUrl: client?.apiUrl, isAwaitingWallet: false,
             error: { message: getErrorMessage(error) } });
         }
         stopSession();

@@ -23,7 +23,7 @@ Orbs includes light and dark themes based on the Orbs website. The frontend uses
 `external` partner for Spot swaps and advanced orders.
 Developer tools are available only inside `/dev`. The main trading UI
 keeps its normal review and execution flow, including with `debug=true`.
-The debug flag enables partner testing without exposing developer controls,
+Explicit `debug=true`, `api=dev`, `api=v1`, or `api=v2` enables partner testing without exposing developer controls,
 inspection buttons, demos, or the wizard outside `/dev`.
 
 Open `/dev` for the developer playground. This route enables the walkthrough,
@@ -44,8 +44,9 @@ Open `/?tab=twap&debug=true` to show the searchable Spot partner selector beside
 the chain selector for every trading form. It loads the available integration partners from the Spot
 configuration used by `projects/spot-ui`. Selection is saved as `partner=<name>`
 in the URL and applies to order configuration, creation, history, and cancellation.
-Internal navigation preserves the debug selection. Without exactly `debug=true`,
-the URL override is ignored and the `external` integration partner is used.
+The same partner selector is enabled automatically by `api=dev`, `api=v1`, and `api=v2`.
+Internal navigation preserves the API and partner selection. Without `debug=true` or one of those
+recognized API overrides, the partner URL override is ignored and the `external` integration partner is used.
 Orders also show a Partner column in debug mode, using the partner retained
 with each fetched order.
 The selected Spot partner also applies to swaps;
@@ -59,6 +60,27 @@ excluding Fantom and Polygon zkEVM. Wallets and public clients also retain Blast
 See the [Spot swap integration guide](https://github.com/orbs-network/spot-ui/tree/master/skills/spot-swap-integration)
 for quoting and capability checks. Swap and advanced-order creation require a valid partner/chain
 configuration returned by the Spot SDK.
+
+## Spot API selection
+
+The default Spot service is `https://order-sink-v2.orbs.network`. Add `?api=dev` to use
+`https://order-sink-dev.orbs.network`, `?api=v1` to use `https://order-sink.orbs.network`,
+or `?api=v2` to select production v2 explicitly.
+An absent, empty, or unrecognized `api` value uses the default service without enabling implicit debug mode.
+The parameter works on the main app and `/dev` without `debug=true`.
+`api=dev`, `api=v1`, and `api=v2` automatically enable debug partner testing: the partner selector,
+supported-network filtering, and the Partner column in order history. Developer inspectors,
+demos, and walkthroughs remain inside `/dev`. Internal links preserve the selected API and partner
+without adding `debug=true`; clearing the API selection disables implicit debug features unless
+`debug=true` was explicitly set.
+
+The selected service handles order submission, history, and order-status reads.
+SDK configuration and `client.getQuote` always use production v2 at
+`https://order-sink-v2.orbs.network`; cancellation configuration comes from that service too.
+Clients, reviewed swap attempts, history, and retained swap activity include the order backend in their identity, and
+changing services requires a fresh review before wallet work continues. Internal navigation
+preserves `api`, and developer inspectors and downloads show the effective API URL.
+Standalone token USD pricing always uses the SDK's production pricing service.
 
 ## Build
 
@@ -146,6 +168,10 @@ The October 1, 2026 production dependency audit reports no known vulnerabilities
 
 ## Spot SDK history endpoints
 
-The SDK provides `getv1orders: false` to restrict order-sink history reads to `https://order-sink-v2.orbs.network`. Both history views and the developer example pass this option, replacing the local patch required by 2.1.17.
+The SDK provides `getv1orders: false` to avoid merging a secondary order-sink service into history.
+Both history views and the developer example pass this option with the selected `apiUrl`.
+Without an API selection they read `https://order-sink-v2.orbs.network`; `api=dev`, `api=v1`, and `api=v2`
+select the same services used for submission and status reads. Configuration and quotes remain on production v2.
 
-Account, chain, and exchange filters are preserved. Submission and legacy subgraph behavior are unchanged; `legacyOrders` controls subgraph reads separately, and the developer example disables those too. Orders available only from the old order-sink host are excluded.
+Account, chain, and exchange filters are preserved. `legacyOrders` controls legacy subgraph reads separately,
+and the developer example disables those too. History only includes orders returned by the selected service.

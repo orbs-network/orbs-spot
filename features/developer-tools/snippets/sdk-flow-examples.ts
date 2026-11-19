@@ -116,6 +116,16 @@ function getClient() {
   return clientPromise;
 }`;
 
+function clientApiOptions(data?: JsonContainer): string {
+  return data && !Array.isArray(data) && typeof data.apiUrl === "string"
+    ? `, { apiUrl: ${JSON.stringify(data.apiUrl)} }` : "";
+}
+
+function formatAdvancedClientHelper(data?: JsonContainer): string {
+  return ADVANCED_CLIENT_HELPER.replace("createClient(partner, chain.id)",
+    `createClient(partner, chain.id${clientApiOptions(data)})`);
+}
+
 export function formatAdvancedOrdersSdkFlow(data: JsonContainer = {}): string {
   const params = Array.isArray(data) ? {} : data.formParams ?? {};
   const calculationInput = JSON.stringify(params, null, 2)
@@ -175,7 +185,7 @@ ${ADVANCED_WRAP_CODE}
 
 ${ADVANCED_APPROVAL_CODE}
 
-${ADVANCED_CLIENT_HELPER}
+${formatAdvancedClientHelper(data)}
 `;
 }
 
@@ -227,7 +237,7 @@ ${signCode.split("\n").map((line) => "  " + line).join("\n")}
   return { prepared, signature };
 }
 
-${ADVANCED_CLIENT_HELPER}`,
+${formatAdvancedClientHelper(data)}`,
     submit: submitCode,
   };
   return `// From advanced-orders.ts; uses the same clients and order values.
@@ -275,7 +285,7 @@ if (BigInt(prepared.quote.netAmountOut) < BigInt(quote.netAmountOut)
 }
 quote = prepared.quote; // Freeze and display the exact quote selected for signing.
 assertQuoteValue(quote);
-// The SDK signs this service minimum unchanged with a three-minute expiration.
+// The SDK signs this minimum unchanged, the reviewed quote slippage in basis points, and a three-minute expiration.
 const { signerAddress, typedData } = prepared.signingRequest;
 const signature = await walletClient.signTypedData({
   ...typedData,
@@ -294,7 +304,7 @@ export function formatSpotSwapSdkFlow(data: JsonContainer = {}): string {
   const root = Array.isArray(data) ? {} : data;
   const chainId = typeof root.chainId === "number" ? root.chainId : 137;
   const partner = typeof root.partner === "string" && root.partner ? root.partner : "external";
-  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.2.2 or later.
+  return `// spot-swap.ts — requires @orbs-network/spot-ui 2.2.7 or later.
 // Adapt chain, partner, and wallet provider to your app; reuse existing wallet services.
 // Get a current client.getQuote for the selected pair and show its minimum before calling swapFlow.
 // Supply inAmount to quote spending or outAmount to quote a receive target, in token base units.
@@ -320,7 +330,7 @@ const publicClient = createPublicClient({ chain, transport: http() });
 const walletClient = createWalletClient({ chain, transport: custom(provider) });
 let clientPromise: Promise<SpotClient> | undefined;
 function getClient() {
-  clientPromise ??= createClient(partner, chainId).catch((error) => {
+  clientPromise ??= createClient(partner, chainId${clientApiOptions(data)}).catch((error) => {
     clientPromise = undefined;
     throw error;
   });

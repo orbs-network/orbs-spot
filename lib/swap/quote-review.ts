@@ -1,11 +1,13 @@
 import type { SwapQuote } from "@orbs-network/spot-ui";
 import type { BestTradeQuote } from "../types";
+import { DEFAULT_SPOT_API_URL } from "../spot/api.ts";
 
 export const MAX_QUOTE_AGE_MILLIS = 20_000;
 
 /** Keep host display amounts and the exact SDK quote together, including native input identity. */
-export function toBestTradeQuote(quote: SwapQuote, sourceToken = quote.request.inToken): BestTradeQuote {
+export function toBestTradeQuote(quote: SwapQuote, sourceToken = quote.request.inToken, apiUrl = DEFAULT_SPOT_API_URL): BestTradeQuote {
   return {
+    apiUrl,
     inToken: sourceToken,
     outToken: quote.request.outToken,
     inAmount: quote.request.inAmount,

@@ -1,16 +1,33 @@
 import { getSwapSlippage, type SpotClient, type SwapSlippage } from "@orbs-network/spot-ui";
-import { queryOptions } from "@tanstack/react-query";
+import { queryOptions, type QueryClient } from "@tanstack/react-query";
 import BN from "bignumber.js";
 import { isAddress, maxUint256, zeroAddress } from "viem";
 import { DEFAULT_SLIPPAGE } from "../consts";
+import { spotTokenUsdQueryOptions } from "../spot/prices";
 import type { SwapAmountSide } from "./quotes";
 
 export const SPOT_SWAP_SLIPPAGE_KEY = ["spot-swap-slippage"] as const;
 const PRICE_WAIT_MILLIS = 1_500;
 
+/** Stop this draft's wait without cancelling the price shared with other drafts. */
+async function waitForPrice(price: Promise<string>, signal: AbortSignal): Promise<string> {
+  let abort: () => void = () => {};
+  const cancelled = new Promise<never>((_resolve, reject) => {
+    abort = () => reject(signal.reason);
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+  });
+  try {
+    return await Promise.race([price, cancelled]);
+  } finally {
+    signal.removeEventListener("abort", abort);
+  }
+}
+
 /** Resolve automatic tolerance before quoting; the stored percentage remains the baseline. */
 export function spotSwapSlippageQueryOptions(
-  client: Pick<SpotClient, "partner" | "chainId" | "apiUrl" | "getTokenUsd"> | undefined,
+  queryClient: QueryClient,
+  client: Pick<SpotClient, "partner" | "chainId" | "apiUrl"> | undefined,
   tokenAddress: string,
   tokenDecimals: number | undefined,
   rawAmount: string,
@@ -33,10 +50,10 @@ export function spotSwapSlippageQueryOptions(
       const fallback = getSwapSlippage({ slippage: baseline });
       let unitPriceUsd: string | undefined;
       try {
-        unitPriceUsd = await client.getTokenUsd({
-          tokenAddress,
-          signal: AbortSignal.any([signal, AbortSignal.timeout(PRICE_WAIT_MILLIS)]),
-        });
+        unitPriceUsd = await waitForPrice(
+          queryClient.fetchQuery(spotTokenUsdQueryOptions(client.chainId, tokenAddress)),
+          AbortSignal.any([signal, AbortSignal.timeout(PRICE_WAIT_MILLIS)]),
+        );
       } catch {
         // Pricing failure or timeout uses the baseline; cancelling this draft still propagates.
         signal.throwIfAborted();

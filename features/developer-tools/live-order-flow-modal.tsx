@@ -79,6 +79,7 @@ import {
   validateOrderFormInput,
 } from "./order-form-calculation";
 import { useSpotPartner } from "@/lib/hooks/use-spot-partner";
+import { getSpotApiUrl } from "@/lib/spot/api";
 
 type LivePermitData = RePermitData;
 
@@ -186,6 +187,7 @@ function createSignatureData(
   permitData: LivePermitData,
   partner: string,
   sourceTokenAddress?: string,
+  apiUrl?: string,
 ): JsonContainer {
   const account = permitData.order.witness.swapper || PLACEHOLDER_ACCOUNT;
   const order = {
@@ -203,6 +205,7 @@ function createSignatureData(
   return JSON.parse(
     JSON.stringify({
       partner,
+      apiUrl,
       sourceTokenAddress,
       message: order,
       domain: permitData.domain,
@@ -318,6 +321,8 @@ function LiveOrderFlowModalContent({
 }) {
   const isDemo = mode === "demo";
   const spot = useDeveloperOrder(mode);
+  const apiUrl = spot.apiUrl;
+  const [reviewedApiUrl, setReviewedApiUrl] = useState(apiUrl);
   const flowToastId = useId();
   const flowToastDismissed = useRef(false);
   const actionToastId = useId();
@@ -341,8 +346,9 @@ function LiveOrderFlowModalContent({
         currentPermitData,
         partner,
         currentSourceTokenAddress,
+        apiUrl,
       ),
-    [currentPermitData, currentSourceTokenAddress, partner],
+    [currentPermitData, currentSourceTokenAddress, partner, apiUrl],
   );
 
   const calculationDefaultsJson = JSON.stringify(getLiveOrderFormInput(spot));
@@ -378,7 +384,7 @@ function LiveOrderFlowModalContent({
     clonePermitData(currentPermitData),
   );
   const [signatureData, setSignatureData] = useState<JsonContainer>(() =>
-    createSignatureData(currentPermitData, partner, currentSourceTokenAddress),
+    createSignatureData(currentPermitData, partner, currentSourceTokenAddress, apiUrl),
   );
   const [sourceIsNative, setSourceIsNative] = useState(false);
   const [approvalRequired, setApprovalRequired] = useState(false);
@@ -460,6 +466,13 @@ function LiveOrderFlowModalContent({
       );
 
       try {
+        const assertApiContext = () => {
+          if (reviewedApiUrl !== getSpotApiUrl(new URLSearchParams(window.location.search))
+            || spot.client?.apiUrl !== reviewedApiUrl) {
+            throw new Error("Order API changed. Reopen the flow to review the selected submission service.");
+          }
+        };
+        assertApiContext();
         if (
           `${permitData.domain.chainId}:${permitData.order.permitted.token}:${permitData.order.witness.output.token}` !==
             calculationContext ||
@@ -527,6 +540,7 @@ function LiveOrderFlowModalContent({
               nextPermitData,
               partner,
               currentSourceTokenAddress,
+              apiUrl,
             ),
           );
           setWrapAmount(nextPermitData.order.permitted.amount);
@@ -555,6 +569,7 @@ function LiveOrderFlowModalContent({
             tokenAddress,
             spenderAddress: permitData.domain.verifyingContract,
           });
+          assertApiContext();
           const nextApprovalRequired = BigInt(allowance) < BigInt(amount);
           const amountToWrap = remainingWrapAmount(
             BigInt(amount),
@@ -596,6 +611,7 @@ function LiveOrderFlowModalContent({
             if (receipt.status !== "success")
               throw new Error("Native token wrapping reverted");
             completedStepsRef.current.wrappedAmount += amount;
+            assertApiContext();
           }
           advanceToStep(approvalRequired ? "approve" : "sign");
           toast.success("Native token wrapped", {
@@ -613,12 +629,14 @@ function LiveOrderFlowModalContent({
             tokenAddress: permitData.order.permitted.token,
             spenderAddress: permitData.domain.verifyingContract,
           });
+          assertApiContext();
           if (BigInt(allowance) < BigInt(permitData.order.permitted.amount)) {
             await approveToken({
               amount: maxUint256.toString(),
               spenderAddress: permitData.domain.verifyingContract,
               tokenAddress: permitData.order.permitted.token,
             });
+            assertApiContext();
           }
           setApprovalRequired(false);
           advanceToStep("sign");
@@ -680,6 +698,7 @@ function LiveOrderFlowModalContent({
             primaryType: executionPermitData.primaryType,
             types: executionPermitData.types,
           });
+          assertApiContext();
 
           // Preserve the complete 65-byte EIP-712 signature returned by the wallet.
           setOrderSignature(signature);
@@ -782,6 +801,7 @@ function LiveOrderFlowModalContent({
       }
 
       if (nextOpen) {
+        setReviewedApiUrl(apiUrl);
         flowToastDismissed.current = false;
         const nextPermitData = clonePermitData(currentPermitData);
         setCalculationInput(undefined);
@@ -793,6 +813,7 @@ function LiveOrderFlowModalContent({
             nextPermitData,
             partner,
             currentSourceTokenAddress,
+            apiUrl,
           ),
         );
         setSourceIsNative(isNativeAddress(currentSourceTokenAddress ?? ""));
@@ -820,6 +841,7 @@ function LiveOrderFlowModalContent({
       partner,
       setInputAmount,
       step,
+      apiUrl,
     ],
   );
 
@@ -859,7 +881,7 @@ function LiveOrderFlowModalContent({
       setSavedCalculationContext(calculationContext);
       setPermitData(nextPermitData);
       setSignatureData(
-        createSignatureData(nextPermitData, partner, currentSourceTokenAddress),
+        createSignatureData(nextPermitData, partner, currentSourceTokenAddress, apiUrl),
       );
       setWrapAmount(nextPermitData.order.permitted.amount);
       setOrderSignature(undefined);
@@ -875,6 +897,7 @@ function LiveOrderFlowModalContent({
       currentSourceTokenAddress,
       partner,
       spot.client,
+      apiUrl,
     ],
   );
 
@@ -1250,6 +1273,7 @@ function LiveOrderFlowModalContent({
                             timingPermitData,
                             partner,
                             currentSourceTokenAddress,
+                            apiUrl,
                           );
                           const tokens = [
                             isNativeAddress(spot.derivedFormData.srcToken?.address ?? "")

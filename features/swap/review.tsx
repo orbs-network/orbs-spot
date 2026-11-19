@@ -113,7 +113,7 @@ function SwapAmountSummary({ layout = "review" }: { layout?: TradeReviewLayout }
 }
 
 function SwapSuccess({ onClose }: { onClose: () => void }) {
-  const { review, txHash, order } = useSwapReviewState();
+  const { review, txHash, order, apiUrl } = useSwapReviewState();
   const explorerUrl = getExplorerUrl(review?.chainId, txHash);
 
   // Use the submitted trade snapshot so later quote refreshes cannot change the pair.
@@ -128,7 +128,7 @@ function SwapSuccess({ onClose }: { onClose: () => void }) {
     {explorerUrl && <a href={explorerUrl} target="_blank" rel="noopener noreferrer">
       View on explorer<ExternalLinkIcon aria-hidden="true" className="size-3" />
     </a>}
-    {!explorerUrl && order && <Link href={getOrderHref(order)}>View order details</Link>}
+    {!explorerUrl && order && <Link href={getOrderHref(order, apiUrl)}>View order details</Link>}
   </SubmissionSuccess></div>;
 }
 
