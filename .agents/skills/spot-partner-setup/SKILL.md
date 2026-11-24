@@ -1,0 +1,44 @@
+---
+name: spot-partner-setup
+description: Configure a fork of the Spot app from a short partner brief, including branding, environment settings, local preview, and integration verification. Use when a user wants to launch, white-label, or set up their own Spot trading app.
+---
+
+# Set up a Spot partner app
+
+Use this existing checkout and preserve the trading UI, wallet sequence, reviewed quote protections, and history. Read the repository `README.md`, `.env.example`, `docs/playground.md`, and the adjacent [spot-theme skill](../spot-theme/SKILL.md). Follow current source if these instructions become stale. Do not scaffold a replacement app.
+
+## Turn a brief into a working fork
+
+Reuse the user's name, logo, colors, mode, partner identifier, URLs, network choices, and other supplied details. Apply the theme skill without asking the user to invoke it or provide individual CSS tokens. If choices are missing, make reasonable reversible defaults or ask only when the choice is necessary; offer text-only branding when no logo is available. Do not fabricate logos, credentials, partner activation, or a partner identifier. Distinguish `APP_ID` (a stable app/RPC identifier) from `NEXT_PUBLIC_SPOT_PARTNER` (an actual SDK partner). The latter defaults to `external`; use a different value only if supplied or confirmed. SDK membership does not prove partner activation on a chain.
+
+Preserve existing local changes and environment values. Put partner-specific values in ignored `.env.local`, keeping unrelated entries; do not print secrets or copy credentials from unrelated projects. Check `.env.example` and the Next.js environment precedence in the installed Next documentation. Set the name, ID, metadata, image paths, default mode, and theme values requested by the brief. `NEXT_PUBLIC_PROJECT_ID` belongs to the partner's WalletConnect project and `RPC_URL` is a server-side RPC service URL. This app requires the project ID to render the wallet providers and the RPC URL for RPC requests. If either is missing, continue independent configuration and report what prevents a real preview; never invent credentials. `NEXT_PUBLIC_APP_URL` is wallet metadata, not a replacement for the provider's origin allowlist.
+
+Values prefixed `NEXT_PUBLIC_` are public and inlined at build time. Branding is also applied during build/prerender; restart the dev server and rebuild after changes. Keep secrets out of public values and source control. Assets go in `public/` and URLs use root-relative paths or suitable HTTPS URLs.
+
+## Remove developer tools for the partner fork
+
+Before the partner preview or release, remove the reference-only playground and debug surfaces from the fork. Keep this cleanup scoped to the partner checkout; the upstream reference can retain its developer UI. Preserve production swap, advanced-order, order-history, wallet, and settlement behavior.
+
+- Remove `/dev` and its child routes, the legacy developer inspector route, developer navigation, Demo controls, inspectors, walkthroughs, mock orders, SDK download UI, and their unused feature modules, assets, aliases, and imports. Audit both `@developer-tools` and `@developer-inspector` consumers before deleting them; replace developer-specific branches with the normal production behavior rather than leaving broken imports.
+- Remove `debug=true` behavior and partner testing controls, including the debug partner selector and debug-only history columns. Ignore debug and partner query overrides rather than letting URL parameters change the configured partner. Remove test-backend selection and related query propagation where it exists solely for debugging; retain the production backend and the configured `NEXT_PUBLIC_SPOT_PARTNER`. Keep the network availability checks for that actual partner. Remove dead developer redirects, flags, and links from navigation, configuration, and documentation.
+- Do not remove the partner's trading forms, normal order details/history, real quote refreshes, reviewed minimums, wallet guards, or cancellation and settlement logic. Consult the bundled Spot SDK integration skills before touching these paths. Do not replace missing live services with mocks or test-mode shortcuts.
+
+Additional cleanup candidates in this checkout:
+
+- Once all consumers are removed, delete `features/developer-tools/`, `features/eip712-inspector/`, `features/partner-selector/`, developer route helpers, the `@developer-tools` and `@developer-inspector` aliases, and their developer-only CSS selectors. Remove the inspector-only `prism-react-renderer` and `react-json-view-lite` dependencies and the latter's import in `app/globals.css` if no consumers remain, using Yarn so the lockfile stays consistent. Keep `react-virtuoso`: token selection and real order history use it.
+- Remove sample order creation and `mockorders` branches from history and cancellation only after eliminating all sample-order entry points. Retain the actual wallet, account, chain, order status, and duplicate-cancellation checks. Delete the sample module when it has no consumers.
+- Simplify debug-only route and query plumbing in `components/app-link.tsx`, `lib/developer-routes.ts`, `lib/hooks/use-developer-mode.ts`, `lib/hooks/use-spot-partner.ts`, `lib/spot/api.ts`, and debug-dependent history columns. Audit `lib/spot/order-link.ts` and `lib/swap/activity.ts` before removing test API URLs: persisted pending swaps can reference older backends. Preserve recovery and existing order links or explicitly migrate/resolve legacy records; never silently drop an uncertain or pending submission. Keep configured-partner chain discovery in `use-spot-partner-chains` and its shared fetch/parser even if the debug selector is removed.
+- Remove the debug-only redirects and their docs URL setting in `next.config.ts` and `.env.example` if no longer used. Remove unused playground docs and standalone download examples only when the fork no longer needs them; update links and typecheck includes. The upstream `yarn deploy` script is tied to the Orbs production project: remove its package script and unused helpers from a partner fork if it is not intentionally adapted to that partner's own host. Do not delete general runtime configuration or route handlers needed by production.
+- Audit leftover reference branding and assets against actual imports. Orbs attribution in the Spot route, protocol information, SDK service endpoints, and required legal links are not automatically developer UI; retain them unless the user explicitly requests a change and the replacement remains accurate. Likewise, a custom wallet picker or theme assets may still be used; remove them only after confirming they have no production consumers.
+
+Audit the resulting source for stale `/dev`, `debug`, developer aliases, demo and inspector references, then run the checks below. Confirm `/dev` and its subroutes and the legacy inspector no longer serve developer tools; verify `?debug=true` and old debug query parameters do not expose controls or alter the production partner/backend. Keep a user's explicit later request to retain a specific tool as an exception.
+
+## Preview and verify
+
+Install dependencies from the lockfile if needed using the versions in `package.json`. Start `yarn dev`, use its actual URL, and inspect the real app in desktop and mobile layouts. Check both themes, branding, metadata, and the wallet dialog when configuration allows. Exercise the production swap and advanced-order forms without wallet signing or live submission; check quote loading, errors, and unchanged review protections. Confirm the removed developer routes and debug overrides remain unavailable. Run `yarn typecheck`, `yarn lint`, and `yarn build`; report missing credentials, network failures, and untested states accurately.
+
+If changing SDK integration or partner behavior, follow the matching versioned SDK skill under `node_modules/@orbs-network/spot-ui/dist/integration-skills/` and its relevant references. Preserve the actual partner/chain identity; never switch partner or invent contracts to make a preview pass. A working UI or build does not establish live trading activation. Do not sign or submit real transactions without authorization.
+
+## Hosting and handoff
+
+Only deploy when the user requests it. This Next.js app has server routes and needs a host that supports them; a static-only upload is insufficient. **Do not use `yarn deploy` for a fork:** `docs/playground.md` says its script targets the upstream Orbs production project regardless of local linking. For an authorized deployment, inspect the chosen host and project ownership, configure both build and server runtime values appropriately, and use the host's supported Next.js workflow. Report the URL, actual checks, wallet origin setup, and separately whether partner/chain activation was verified. Never infer activation from a published page.

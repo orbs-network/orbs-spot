@@ -14,7 +14,6 @@ import { useSpotSwapClient } from "./use-spot-swap-client";
 import { getNativeConversion } from "../native-conversion";
 import { spotSwapSlippageQueryOptions } from "../swap/slippage";
 import { DEFAULT_SLIPPAGE } from "../consts";
-import { spotTokenUsdQueryOptions } from "../spot/prices";
 
 export const useTrade = (
   inputCurrency?: Currency,
@@ -40,20 +39,6 @@ export const useTrade = (
     ? wrappedNative ?? "" : inputCurrency?.address ?? "";
   const outputPriceToken = isNativeAddress(outputCurrency?.address)
     ? wrappedNative ?? "" : outputCurrency?.address ?? "";
-  const preloadPrices = usesSpotQuote && automaticSlippage && !pauseQuote;
-  // Warm token prices on selection, independently of amounts or client configuration.
-  useQuery({
-    ...spotTokenUsdQueryOptions(chainId, inputPriceToken),
-    enabled: preloadPrices && Boolean(inputPriceToken),
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
-  useQuery({
-    ...spotTokenUsdQueryOptions(chainId, outputPriceToken),
-    enabled: preloadPrices && Boolean(outputPriceToken),
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
   const amountCurrency = amountSide === "output" ? outputCurrency : inputCurrency;
   const slippageTokenAddress = amountSide === "output" ? outputPriceToken : inputPriceToken;
   const slippageQuery = useQuery({
@@ -75,7 +60,7 @@ export const useTrade = (
   const quoteSlippage = automaticSlippage
     ? hasQuoteAmount ? slippageQuery.data?.slippagePercent : slippage || DEFAULT_SLIPPAGE
     : slippage;
-  const isLoadingSlippage = automaticSlippage && quoteEnabled && !client.error
+  const isResolvingSlippage = automaticSlippage && quoteEnabled && !client.error
     && (client.isLoading || slippageQuery.isFetching);
   const quoteOptions = spotSwapQuoteQueryOptions(client.data, address ?? QUOTE_PREVIEW_ACCOUNT,
     inputCurrency, outputCurrency, parsedAmount, quoteSlippage ?? slippage, wrappedNative, amountSide);
@@ -85,6 +70,16 @@ export const useTrade = (
     queryKey: automaticSlippage ? [...quoteOptions.queryKey, slippageQuery.dataUpdatedAt] : quoteOptions.queryKey,
     enabled: quoteEnabled && Boolean(client.data) && quoteSlippage !== undefined && !slippageError
       && (!automaticSlippage || !slippageQuery.isFetching),
+    // Automatic refreshes use a new timestamp key after rechecking slippage.
+    // Retain the previous quote only when every actual request field is identical.
+    placeholderData: (previous, previousQuery) => {
+      if (!automaticSlippage || !previousQuery) return undefined;
+      const previousKey = previousQuery.queryKey;
+      const currentKey = quoteOptions.queryKey;
+      return previousKey.length === currentKey.length + 1
+        && currentKey.every((part, index) => part === previousKey[index])
+        ? previous : undefined;
+    },
     refetchInterval: state => automaticSlippage || pauseQuote || (state.state.error instanceof QuoteError && !state.state.error.retryable) ? false : 10_000,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: !automaticSlippage && !pauseQuote,
@@ -106,11 +101,12 @@ export const useTrade = (
   const trade = usesSpotQuote && quoteSlippage !== undefined && !slippageError && !query.error
     && matchesSpotSwapQuoteAmount(query.data, parsedAmount, amountSide)
     ? query.data : undefined;
+  const isLoadingSlippage = isResolvingSlippage && !trade;
   const slippageAmountUsd = automaticSlippage ? resolvedSlippage?.amountUsd : undefined;
 
   return useMemo(() => ({
     error: quoteEnabled ? client.error ?? slippageError ?? (quoteSlippage !== undefined ? query.error : null) : null,
-    isLoading: quoteEnabled && (client.isLoading || isLoadingSlippage || query.isLoading),
+    isLoading: quoteEnabled && !trade && (client.isLoading || isLoadingSlippage || query.isLoading),
     refetch,
     data: trade,
     usesSpotQuote,

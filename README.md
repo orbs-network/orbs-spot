@@ -9,8 +9,63 @@ It uses `@orbs-network/spot-ui` 2.2.9 with the app’s own wallet and UI.
 2. Adapt that flow to your app’s wallet, tokens, chain, and Spot partner. Reuse your existing services.
 3. Validate the integration with the checks below and the browser demo.
 
-**For coding agents:** [AGENTS.md](AGENTS.md) identifies the source files, SDK instructions, and checks.
-If you are using this repo as a reference for another app, follow [examples/spot/AGENTS.md](examples/spot/AGENTS.md).
+For SDK integration guidance, start with [the example guide](examples/spot/README.md)
+and the version-matched skills bundled with the installed SDK.
+
+## White-label setup
+
+Copy `.env.example` to `.env.local`, set `NEXT_PUBLIC_PROJECT_ID` and `RPC_URL`,
+and configure your brand before building. `APP_ID` identifies the fork in RPC
+requests and disables the Orbs-specific visual overrides; give each deployment a
+stable, unique ID. Set `APP_NAME`, `APP_WORDMARK`, `APP_LOGO_URL`, `APP_LOGO_ALT`,
+`APP_ICON_URL`, `APP_APPLE_ICON_URL`, `APP_TITLE`, `APP_DESCRIPTION`,
+`APP_TRADING_LABEL` and `NEXT_PUBLIC_APP_URL` for your brand and wallet metadata. Put local images in
+`public/` and refer to them by an absolute path such as `/brand/logo.svg`.
+Leave the optional wordmark empty if the logo already contains your name.
+
+`APP_DEFAULT_THEME` chooses `light` or `dark` on a first visit; visitors can
+still switch modes. `APP_THEME_LIGHT` and `APP_THEME_DARK` are JSON objects
+containing any of the style and color properties in
+[PartnerStyles](lib/partners/types.ts). For example:
+
+```dotenv
+APP_THEME_LIGHT='{"fontFamily":"Arial, sans-serif","radius":"1rem","colors":{"background":"#ffffff","primary":"#175cd3","primaryForeground":"#ffffff"}}'
+APP_THEME_DARK='{"colors":{"background":"#101828","primary":"#84adff","primaryForeground":"#101828"}}'
+```
+
+Unspecified values retain the reference palette, so supply both palettes for a
+fully custom theme and check text contrast in both modes. Color values are CSS
+values; avoid semicolons or braces. Settings are applied at build time: rebuild
+when changing them. Set the same `APP_*` values in the server runtime environment too, so dynamic
+pages and RPC requests use the same branding and identity.
+Never put secrets in `NEXT_PUBLIC_` variables, which are
+included in browser bundles.
+
+Set `NEXT_PUBLIC_SPOT_PARTNER` to your actual Spot SDK partner identifier (the
+default is `external`). Confirm that partner is enabled for the chains you
+intend to support before live trading. The developer playground remains at
+`/dev`, including the Demo and SDK examples.
+
+## Set up a fork with an agent
+
+Repository-local skills guide an agent through branding, configuration, and
+verification: [spot-partner-setup](.agents/skills/spot-partner-setup/SKILL.md)
+and [spot-theme](.agents/skills/spot-theme/SKILL.md). In an agent chat opened
+on your fork, you can start with a prompt such as:
+
+> Use spot-partner-setup to brand this app as Acme Swap. Use my logo at
+> `./acme-logo.svg`, a dark theme, and `#3b82f6` as the primary color.
+> Choose sensible defaults for missing visual details and show me the local
+> preview.
+
+The partner setup skill removes the developer playground and debug controls from
+the fork; this reference checkout retains them.
+
+Supply your actual Spot partner identifier and partner-owned WalletConnect and
+RPC configuration when available. Never paste private keys or seed phrases into
+an agent prompt. For a later appearance-only change, ask for `spot-theme`.
+The existing `yarn deploy` script targets the upstream Orbs production project;
+use a deployment configured for your own fork instead.
 
 ## The SDK flow
 
@@ -20,6 +75,7 @@ Review the returned `quote.request.inAmount` as the fixed spend before wallet ac
 Before quoting, automatic slippage uses `getSwapSlippage` with the typed amount's USD value.
 Selecting tokens starts cached USD-price queries before an amount is entered; quoting reuses those prices.
 The app owns this cache; each standalone SDK price call makes a fresh cancellable request.
+USD displays and minimum-value checks use those token prices rather than quote USD metadata.
 Pricing waits up to 1.5 seconds and falls back to the baseline when unavailable; custom slippage stays unchanged.
 Review displays the percentage captured in the quote.
 Preparation signs that percentage in basis points and preserves the quote's minimum unchanged.

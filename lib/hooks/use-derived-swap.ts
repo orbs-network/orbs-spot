@@ -6,7 +6,7 @@ import { useTrade } from "./use-trade";
 import { useMemo } from "react";
 import BN from "bignumber.js";
 import { useNativeConversion } from "./use-native-conversion";
-import { getQuoteValuation } from "../swap/quote-valuation";
+import { useUsd } from "./use-usd";
 import { useIsSwapTab } from "./use-form-tab";
 import { toAmountUI, toAmountWei } from "../utils";
 
@@ -53,11 +53,14 @@ export const useDerivedSwap = () => {
   const outputAmount = amountSide === "output" ? outputDraft
     : directConversion ? inputDraft
     : trade ? toAmountUI(trade.outAmount, outputCurrency?.decimals) : "";
-  const quoteUsd = useMemo(() => getQuoteValuation(
-    isLoadingTrade || quoteError ? undefined : trade,
-    inputCurrency?.decimals,
-    outputCurrency?.decimals,
-  ), [isLoadingTrade, quoteError, trade, inputCurrency?.decimals, outputCurrency?.decimals]);
+  const inputUsd = useUsd(inputCurrency, inputAmount);
+  const outputUsd = useUsd(outputCurrency, outputAmount);
+  const quoteUsd = useMemo(() => ({
+    inputAmountUsd: inputUsd.value,
+    outputAmountUsd: outputUsd.value,
+    inputTokenUsdPrice: inputUsd.price,
+    outputTokenUsdPrice: outputUsd.price,
+  }), [inputUsd.value, outputUsd.value, inputUsd.price, outputUsd.price]);
 
   const noLiquidity = useMemo(
     () =>

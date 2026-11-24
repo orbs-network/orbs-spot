@@ -223,13 +223,13 @@ export function Navigation({ brand }: { brand: PartnerBrand }) {
               {brand.name}
             </span>
           )}
-          {brand.navWordmark && (
+          {brand.logoSrc && brand.navWordmark && (
             <span data-nav-wordmark className="text-xl font-normal uppercase tracking-[0.12em] text-foreground">
               {brand.navWordmark}
             </span>
           )}
         </AppLink>
-        <TradingNavigation />
+        <TradingNavigation brand={brand} />
         <div data-nav-actions className="ml-auto flex w-auto shrink-0 items-center justify-end gap-1.5 sm:gap-2">
           {!isDeveloperGuideRoute && !isOrdersRoute && (
             <div data-header-network-selector className="flex min-w-0 items-center gap-2">

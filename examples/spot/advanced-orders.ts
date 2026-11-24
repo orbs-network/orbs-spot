@@ -1,5 +1,5 @@
 // Reference copy of the playground SDK flow in sdk-flow-examples.ts.
-// Read README.md and AGENTS.md in this directory before adapting this browser example.
+// Read README.md in this directory before adapting this browser example.
 // advanced-orders.ts — requires @orbs-network/spot-ui 2.2.0 or later.
 // Adapt chain, partner, wallet provider, token addresses, and calculation inputs to your app.
 // The embedded calculation is a saved snapshot; request a current quote when inputs change.

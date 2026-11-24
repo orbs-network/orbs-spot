@@ -415,7 +415,6 @@ export const DEFAULT_SLIPPAGE = 0.5;
 
 export const DEFAULT_PRICE_PROTECTION = 3;
 
-export const PERPS_URL = "https://perps.orbs.network/";
 
 export const FORM_TABS = [
   {

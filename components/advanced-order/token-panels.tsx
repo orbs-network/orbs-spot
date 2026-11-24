@@ -44,7 +44,7 @@ export function TokenPanel({ isSource }: { isSource: boolean }) {
       onAmountChange={isSource ? setInputAmount : undefined}
       amount={isSource ? inputAmount : displayTokenAmount(dstAmount, outputCurrency?.symbol, outputCurrency?.decimals)}
       usdValue={isSource ? formInputAmount.usd : formOutputAmount.usd}
-      usdLoading={isLoading}
+      usdLoading={!isSource && isLoading}
       title={isSource ? t("from") : values.isMarketOrder ? "Estimated receive" : "To (est.)"}
       disabled={!isSource}
       isLoading={!isSource && Boolean(isLoading)}

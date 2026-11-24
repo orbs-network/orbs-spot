@@ -9,6 +9,7 @@ import { USD } from "./ui/usd";
 import { Balance } from "./ui/balance";
 import { TokenSelectorTrigger } from "./ui/token-selector-trigger";
 import { FormPanel } from "./ui/form-panel";
+import { Skeleton } from "./ui/skeleton";
 import { useCurrenciesQuery } from "@/lib/hooks/use-currencies-query";
 import { toPresetAmount } from "@/lib/input-amount";
 
@@ -121,18 +122,20 @@ export function CurrencyCard({
             disabled || side === "output" ? "" : "mt-2 sm:mt-3"
           }`}
         >
-          <NumericInput
-            error={error}
-            aria-label={`${title ?? (disabled ? "To" : "From")} amount`}
-            name={disabled || side === "output" ? "destination-amount" : "source-amount"}
-            placeholder="0"
-            disabled={disabled}
-            decimalScale={currency?.decimals ?? 18}
-            value={amount}
-            onChange={onAmountChange ?? (() => {})}
-            isLoading={isLoading && Boolean(amount) && !BN(amount).isZero()}
-            className="min-w-0 text-[30px] font-medium leading-none"
-          />
+          <div className="relative min-w-0" aria-busy={isLoading}>
+            <NumericInput
+              error={error}
+              aria-label={`${title ?? (disabled ? "To" : "From")} amount`}
+              name={disabled || side === "output" ? "destination-amount" : "source-amount"}
+              placeholder="0"
+              disabled={disabled}
+              decimalScale={currency?.decimals ?? 18}
+              value={amount}
+              onChange={onAmountChange ?? (() => {})}
+              className={`min-w-0 text-[30px] font-medium leading-none ${isLoading ? "text-transparent placeholder:text-transparent" : ""}`}
+            />
+            {isLoading && <Skeleton role="status" aria-label={`Loading ${title ?? "token"} amount…`} className="pointer-events-none absolute left-0 top-1/2 h-7 w-28 max-w-full -translate-y-1/2" />}
+          </div>
           <CurrencySelector
             onCurrencyChange={(currency: Currency) =>
               onCurrencyChange(currency.address)

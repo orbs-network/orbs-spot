@@ -28,6 +28,7 @@ import { toast } from "sonner";
 import { createSubmissionToast } from "@/lib/spot/submission-toast";
 import { useSpotApiUrl } from "./use-spot-api-url";
 import { DEFAULT_SPOT_API_URL, getSpotApiUrl } from "@/lib/spot/api";
+import { spotTokenUsdQueryOptions } from "@/lib/spot/prices";
 
 const executor = createSwapExecutor();
 
@@ -74,7 +75,7 @@ export const useSwapBestTrade = () => {
   const totalSteps = useBestTradeSwapStore(state => state.totalSteps);
   const currentStepIndex = useBestTradeSwapStore(state => state.currentStepIndex);
   const txHash = useBestTradeSwapStore(state => state.txHash);
-  const { inputCurrency, outputCurrency, trade } = useDerivedSwap();
+  const { inputCurrency, outputCurrency, trade, quoteUsd } = useDerivedSwap();
   const { partner } = useSpotPartner();
   const apiUrl = useSpotApiUrl();
   const { isDeveloperPlayground } = useDeveloperMode();
@@ -107,22 +108,26 @@ export const useSwapBestTrade = () => {
       await queryClient.cancelQueries({ queryKey: SPOT_SWAP_QUOTE_KEY });
       signal.throwIfAborted();
       if (!walletClient || !publicClient || publicClient.chain.id !== chainId) throw new Error("Connect your wallet to the selected network and review the swap again.");
-      assertMinimumQuoteValue(quote, MIN_SWAP_VALUE_USD);
       const client = await queryClient.fetchQuery(spotClientQueryOptions(partner, chainId, isDeveloperPlayground, apiUrl));
       signal.throwIfAborted();
       const native = isNativeAddress(inputCurrency.address);
       const wrappedToken = getWrappedNativeCurrency(chainId)?.address;
       const inputToken = native ? wrappedToken : inputCurrency.address;
       if (!inputToken) throw new Error("Wrapped native currency is unavailable");
+      const priceOptions = spotTokenUsdQueryOptions(chainId, inputToken);
+      const priceFn = priceOptions.queryFn;
+      if (typeof priceFn !== "function") throw new Error("USD price request is unavailable");
+      const inputPrice = await queryClient.fetchQuery({ ...priceOptions,
+        queryFn: context => priceFn({ ...context, signal: AbortSignal.any([signal, context.signal]) }) });
+      signal.throwIfAborted();
+      assertMinimumQuoteValue(quote, MIN_SWAP_VALUE_USD, inputCurrency.decimals, inputPrice);
       const readTokenBalance = () => publicClient.readContract({ address: inputToken as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [account] });
       const onWalletSubmitted = () => updateStore({ isAwaitingWallet: false });
-      const { inputAmountUsd, outputAmountUsd } = getQuoteValuation(quote);
-      updateStore({ review: { inputCurrency, outputCurrency, inputAmount, outputAmount: toAmountUI(quote.outAmount, outputCurrency.decimals), inputAmountUsd, outputAmountUsd, chainId, account } });
       return executor.execute({
         client, signal, releaseWalletLock: attempt.releaseWalletLock,
         intent: { account, chainId, amount, inputToken, originalInputToken: inputCurrency.address, outputToken: outputCurrency.address, native },
         quote,
-        validateQuote: candidate => assertMinimumQuoteValue(candidate, MIN_SWAP_VALUE_USD),
+        validateQuote: candidate => assertMinimumQuoteValue(candidate, MIN_SWAP_VALUE_USD, inputCurrency.decimals, inputPrice),
         assertWallet: async () => {
           if (getSpotApiUrl(new URLSearchParams(window.location.search)) !== apiUrl) throw new Error("Swap API changed. Review a new quote before continuing.");
           const [accounts, activeChain] = await Promise.all([walletClient.getAddresses(), walletClient.getChainId()]);
@@ -273,7 +278,7 @@ export const useSwapBestTrade = () => {
       subscribe: listener => useBestTradeSwapStore.subscribe(listener),
     });
     reviewToast.current = notifications;
-    const { inputAmountUsd, outputAmountUsd } = getQuoteValuation(quote);
+    const { inputAmountUsd, outputAmountUsd } = getQuoteValuation(quote, inputCurrency.decimals, outputCurrency.decimals, quoteUsd.inputTokenUsdPrice, quoteUsd.outputTokenUsdPrice);
     const toasts = createSwapToasts({ id: `swap-${id}`, inputSymbol: inputCurrency.symbol,
       outputSymbol: outputCurrency.symbol, inputAmount, outputAmount: toAmountUI(quote.outAmount, outputCurrency.decimals),
       outputAmountUsd, apiUrl,
@@ -290,7 +295,7 @@ export const useSwapBestTrade = () => {
     swapBestTrade({ account, chainId, partner, apiUrl, quote: structuredClone(quote), inputCurrency: { ...inputCurrency },
       outputCurrency: { ...outputCurrency }, inputAmount, amount, signal: abortController.signal,
       id, toasts, progress: { review }, releaseWalletLock, onSubmissionStarted });
-  }, [account, chainId, apiUrl, inputCurrency, outputCurrency, partner, swapBestTrade, trade, updateStore]);
+  }, [account, chainId, apiUrl, inputCurrency, outputCurrency, partner, quoteUsd.inputTokenUsdPrice, quoteUsd.outputTokenUsdPrice, swapBestTrade, trade, updateStore]);
 
   const reset = useCallback(() => {
     const id = swapSubmissions.current();

@@ -41,13 +41,11 @@ receipts are cached by chain and transaction hash. Successful writes invalidate 
    `calculateOrder`. Its result owns defaults, validation, trade counts, prices and schedules.
    Advanced-order forms use the cached `client.getQuote` for the complete input amount and pass its raw `quote.netAmountOut`
    unchanged as `quotedOutputAmountRaw`. The swap form also supports quoting a receive target with `outAmount`.
-   Dollar estimates use the quote's `inputAmountUsd`,
-   `netAmountOutUsd`, and `minimumAmountOutUsd` independently. Pass the input total into
-   `calculateOrder` as `inputAmountUsd` and derive token unit prices for advanced-order output valuation.
-   Input USD determines minimum-trade validation; quote-derived unit prices value edited limit/trigger
-   output amounts. Missing input USD leaves submission disabled without substituting output USD.
-   Token lists and direct
-   wrap/unwrap flows display token amounts without separate USD-price requests.
+   Dollar estimates use `getTokenUsd` unit prices, cached per chain and token and
+   multiplied by the current amounts using decimal arithmetic. Pass these prices and
+   the input total to `calculateOrder`; input USD determines minimum-trade validation.
+   Missing prices leave the relevant valuation unavailable without replacing it with
+   quote-provided USD. Native tokens use the configured wrapped-token price.
    Missing or failed quotes leave the market reference unavailable. Input changes request a fresh quote.
 3. Adapt your wallet to `SpotWalletPort`. Transaction writes must resolve after successful receipts,
    and `assertContext` must verify the connected account and chain before wallet actions.
@@ -115,7 +113,7 @@ and before a Spot client is initialized. Price identity is `chainId` plus the lo
 address, independent of the amount, input/output side, account, or Spot partner. Each query uses
 standalone `getTokenUsd({ tokenAddress, chainId, signal })`. The SDK makes a fresh cancellable
 request on every call; TanStack Query owns the shared 30-second freshness window and in-flight
-reuse, with no polling interval. Custom slippage and direct wrap/unwrap skip these reads.
+reuse, with no polling interval. USD display uses the same price cache in custom slippage and direct wrap/unwrap modes.
 The slippage query uses `queryClient.fetchQuery` for that same token key, reusing fresh data
 or the existing in-flight request. Cancelling an amount draft stops its wait without cancelling
 the shared price lookup. The host computes the full trade value with decimal arithmetic:
@@ -125,11 +123,10 @@ target token and its decimals. The host passes this total to the synchronous
 `getSwapSlippage({ amountUsd, slippage: baseline })` helper. Positive totals worth $100 or less
 use at least 1%; larger totals retain the baseline. The price wait is bounded to 1,500 ms;
 failed or timed-out lookups use `amountUsd: undefined` and retain the baseline, while caller cancellation
-propagates. Custom slippage bypasses pricing and the helper and is sent unchanged.
+propagates. Custom slippage bypasses the pricing step for slippage and the helper; its percentage is sent unchanged.
 Pricing always uses the SDK's production service, independently of the selected order backend.
 The quote request and UI use the same resolved percentage; review and execution refreshes retain
-`quote.request.slippage`. The helper's valuation is separate from quote USD metadata used for
-display and the minimum-trade check. Never derive policy from rounded display values or reapply it to a signed order.
+`quote.request.slippage`. Display and minimum-trade validation use token unit prices independently of quote USD metadata. Never derive policy from rounded display values or reapply it to a signed order.
 
 The swap form confirms wrapping and approval to `client.spenderAddress`, then uses
 `await client.prepareSwap({ quote, account, signal })`, the wallet's EIP-712 signature and `client.submitSwap`.

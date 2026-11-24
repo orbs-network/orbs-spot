@@ -1,5 +1,5 @@
 // Reference copy of the playground SDK flow in sdk-flow-examples.ts.
-// Read README.md and AGENTS.md in this directory before adapting this browser example.
+// Read README.md in this directory before adapting this browser example.
 // spot-swap.ts — requires @orbs-network/spot-ui 2.2.7 or later.
 // Adapt chain, partner, and wallet provider to your app; reuse existing wallet services.
 // Get a current client.getQuote for the selected pair and show its minimum before calling swapFlow.
@@ -8,7 +8,7 @@
 // Implement pauseQuotes/resumeQuotes and reviewChangedQuote using your host UI.
 // Call swapFlow only from an explicit user action; it waits for a completed fill.
 // For persisted recovery, follow lib/swap/activity.ts in the reference app.
-import { createClient, isQuoteFresh, OrderStatus, Partners, type Order, type SpotClient, type SwapQuote } from "@orbs-network/spot-ui";
+import { createClient, getTokenUsd, isQuoteFresh, OrderStatus, Partners, type Order, type SpotClient, type SwapQuote } from "@orbs-network/spot-ui";
 import BN from "bignumber.js";
 import { createPublicClient, createWalletClient, custom, erc20Abi, http, maxUint256, parseAbi, type Address, type EIP1193Provider, type Hash } from "viem";
 import * as chains from "viem/chains";
@@ -39,6 +39,7 @@ let busy = false;
 export type SwapInput = {
   quote: SwapQuote; // Input or output-target quote; display its minimum unchanged in host review.
   sourceToken: Address;
+  inputTokenDecimals: number; // Decimals from the host token registry.
   wrappedNativeTokenAddress: Address; // Chain configuration, never taken from an untrusted quote.
   signal?: AbortSignal; // Abort on unmount, account/chain change, or cancellation.
   pauseQuotes(): Promise<void>; // Pause polling and cancel in-flight quote requests.
@@ -78,9 +79,14 @@ export async function swapFlow(account: Address, input: SwapInput) {
     if ((nativeInput ? input.wrappedNativeTokenAddress : input.sourceToken).toLowerCase() !== token.toLowerCase()) {
       throw new Error("Quote input does not match the selected token or configured wrapped native token");
     }
+    if (!Number.isInteger(input.inputTokenDecimals) || input.inputTokenDecimals < 0 || input.inputTokenDecimals > 255) {
+      throw new Error("Provide valid input token decimals");
+    }
+    const inputPrice = await getTokenUsd({ tokenAddress: token, chainId, signal: input.signal });
+    await assertContext();
     function assertQuoteValue(quote: SwapQuote) {
-      // Product minimum uses the service's quoted input value, without a separate price request.
-      const valueUsd = BN(quote.inputAmountUsd ?? "");
+      // Value the fixed input with the token's independently fetched USD price.
+      const valueUsd = BN(quote.request.inAmount).shiftedBy(-input.inputTokenDecimals).times(inputPrice);
       if (!valueUsd.isFinite() || valueUsd.lt(10)) throw new Error("A quote worth at least $10 with a USD value is required");
     }
     assertQuoteValue(quote);

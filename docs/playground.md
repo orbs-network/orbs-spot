@@ -13,14 +13,11 @@ yarn dev
 
 The app runs on [http://localhost:3000](http://localhost:3000).
 
-Orbs is the only frontend. Use `yarn dev`, `yarn build`, and `yarn start`;
-branding is fixed and does not use a partner environment variable.
-
-Orbs uses the standard RainbowKit wallet picker. The custom chooser is disabled
-by `features.customConnectModal` in `lib/partners/orbs.ts`. The picker uses the
-configured wallet connectors; email, passkey, and social account sign-in are not configured.
-Orbs includes light and dark themes based on the Orbs website. The frontend uses the
-`external` partner for Spot swaps and advanced orders.
+The default frontend uses Orbs branding. Forks can configure their identity,
+metadata, icons, default color mode and complete light/dark palettes using
+`.env.local`; see [white-label setup](../README.md#white-label-setup). The
+standard RainbowKit wallet picker remains available. The default Spot partner
+is `external` and can be configured with `NEXT_PUBLIC_SPOT_PARTNER`.
 Developer tools are available only inside `/dev`. The main trading UI
 keeps its normal review and execution flow, including with `debug=true`.
 Explicit `debug=true`, `api=dev`, `api=v1`, or `api=v2` enables partner testing without exposing developer controls,
@@ -46,12 +43,12 @@ configuration used by `projects/spot-ui`. Selection is saved as `partner=<name>`
 in the URL and applies to order configuration, creation, history, and cancellation.
 The same partner selector is enabled automatically by `api=dev`, `api=v1`, and `api=v2`.
 Internal navigation preserves the API and partner selection. Without `debug=true` or one of those
-recognized API overrides, the partner URL override is ignored and the `external` integration partner is used.
+recognized API overrides, the partner URL override is ignored and the configured integration partner is used.
 Orders also show a Partner column in debug mode, using the partner retained
 with each fetched order.
 The selected Spot partner also applies to swaps;
 developer tools stay inside `/dev`, even when `debug=true` is passed.
-In debug mode, the network picker lists only chains supported by the selected
+For a non-default configured partner or in debug mode, the network picker lists only chains supported by the selected
 partner. An incompatible connected network shows **Wrong network**, and the
 order action offers a switch to a compatible network.
 
@@ -126,7 +123,7 @@ The script pulls production project settings, runs `vercel build --prod` locally
 `.vercel/output`, then uploads that output with `vercel deploy --prebuilt --prod`.
 Application compilation happens locally; Vercel publishes the prebuilt artifacts.
 It stops before building if required variables are missing and never deploys after
-a failed build. `RPC_URL` and `NEXT_PUBLIC_*` values are also
+a failed build. `RPC_URL`, the documented branding `APP_*` variables, and `NEXT_PUBLIC_*` values are also
 forwarded as deployment runtime variables; other local secrets are not forwarded.
 Local `.env` files are not uploaded as source files or overwritten by the pull.
 Next.js tracing excludes `.env*` files. Because Vercel's builder also adds these

@@ -1,9 +1,10 @@
+import { getAppConfig } from "@/lib/partners/config";
 import { notFound } from "next/navigation";
 import { isAddress } from "viem";
 import { SPOT_CHAINS } from "@/lib/consts";
 import { OrderDetailPage } from "@/features/order-history/order-page";
 
-export const metadata = { title: "Order details | Orbs" };
+export const metadata = { title: `Order details | ${getAppConfig().brand.name}` };
 
 export default async function OrderPage({ params, searchParams }: {
   params: Promise<{ chainId: string; orderId: string }>;

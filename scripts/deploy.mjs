@@ -102,7 +102,12 @@ if (options.has("--build-only")) process.exit(0);
 
 // Server env isn't embedded by next build. Forward only app variables, by name,
 // so RPC credentials aren't printed or placed in the child process arguments.
+const brandRuntimeKeys = new Set([
+  "APP_ID", "APP_NAME", "APP_WORDMARK", "APP_TRADING_LABEL", "APP_LOGO_URL", "APP_LOGO_ALT", "APP_ICON_URL",
+  "APP_APPLE_ICON_URL", "APP_TITLE", "APP_DESCRIPTION", "APP_DEFAULT_THEME",
+  "APP_THEME_LIGHT", "APP_THEME_DARK",
+]);
 const runtimeKeys = Object.keys(deploymentEnv).filter(key =>
-  key === "RPC_URL" || key.startsWith("NEXT_PUBLIC_"),
+  key === "RPC_URL" || brandRuntimeKeys.has(key) || key.startsWith("NEXT_PUBLIC_"),
 ).sort();
 run(["deploy", "--prebuilt", "--prod", ...runtimeKeys.flatMap(key => ["--env", key])]);

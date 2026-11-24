@@ -66,6 +66,7 @@ export type PartnerStyles = {
 export type PartnerBrand = {
   name: string;
   navWordmark?: string;
+  tradingLabel?: string;
   logoSrc?: string;
   navLogoClassName?: string;
   iconSrc?: string;
@@ -81,6 +82,7 @@ export type PartnerBrand = {
 
 export type PartnerConfig = {
   id: string;
+  defaultTheme?: "light" | "dark";
   features?: {
     customConnectModal?: boolean;
   };

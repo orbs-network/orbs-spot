@@ -5,7 +5,8 @@ import { darkTheme, lightTheme, RainbowKitProvider } from "@rainbow-me/rainbowki
 import { useTheme } from "./theme";
 import dynamic from "next/dynamic";
 import { WagmiProvider } from "wagmi";
-import type { PartnerBrand } from "./partners/types";
+import type { PartnerBrand, PartnerStyles } from "./partners/types";
+import { getThemeStyles } from "./partners/themes";
 import { QueryProvider } from "./query-provider";
 import { useWagmiConfig } from "./wagmi-config";
 import { WalletReturnReconnect } from "@/features/wallet-connection/return-reconnect";
@@ -54,14 +55,19 @@ const WagmiWrapper = ({
 export function Providers({
   children,
   partnerBrand,
+  partnerStyles,
 }: {
   children: React.ReactNode;
   partnerBrand: PartnerBrand;
+  partnerStyles: PartnerStyles;
 }) {
   const [queryClient] = useState(createQueryClient);
   const { theme } = useTheme();
   const isMobile = useIsMobile("(max-width: 767px)");
-  const walletTheme = useMemo(() => (theme === "dark" ? darkTheme : lightTheme)(), [theme]);
+  const walletTheme = useMemo(() => {
+    const colors = getThemeStyles(partnerStyles, theme).colors;
+    return (theme === "dark" ? darkTheme : lightTheme)({ accentColor: colors.primary, accentColorForeground: colors.primaryForeground });
+  }, [partnerStyles, theme]);
   useEffect(() => {
     const background = getComputedStyle(document.documentElement).getPropertyValue("--background").trim();
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", background);

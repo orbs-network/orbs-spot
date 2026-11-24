@@ -4,9 +4,9 @@ import { Providers } from "@/lib/providers";
 import { Navigation } from "@/components/navigation";
 import "@rainbow-me/rainbowkit/styles.css";
 import { Toaster } from "@/components/ui/sonner";
-import { getDefaultTheme, getPartnerThemeCss } from "@/lib/partners/themes";
+import { getDefaultTheme, getPartnerThemeCss, getThemeStyles } from "@/lib/partners/themes";
 import type { PartnerBrand } from "@/lib/partners/types";
-import { orbsPartner } from "@/lib/partners/orbs";
+import { getAppConfig } from "@/lib/partners/config";
 
 function getIconType(url: string) {
   const pathname = url.split("?")[0]?.toLowerCase() ?? "";
@@ -36,7 +36,7 @@ function getPartnerIcons(brand: PartnerBrand): Metadata["icons"] {
 }
 
 export function generateMetadata(): Metadata {
-  const partner = orbsPartner;
+  const partner = getAppConfig();
   const { metadata, name } = partner.brand;
 
   return {
@@ -60,10 +60,10 @@ export function generateMetadata(): Metadata {
 }
 
 export function generateViewport(): Viewport {
-  const partner = orbsPartner;
+  const partner = getAppConfig();
 
   return {
-    themeColor: partner.styles.colors.background,
+    themeColor: getThemeStyles(partner.styles, partner.defaultTheme ?? getDefaultTheme(partner.styles)).colors.background,
   };
 }
 
@@ -72,18 +72,19 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const partner = orbsPartner;
+  const partner = getAppConfig();
 
   return (
-    <html lang="en" data-partner={partner.id} className={getDefaultTheme(partner.styles)} suppressHydrationWarning>
+    <html lang="en" data-partner={partner.id} className={partner.defaultTheme ?? getDefaultTheme(partner.styles)} suppressHydrationWarning>
       <head>
-        <link rel="preload" href="/fonts/orbs-montserrat-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+        {partner.styles.fontFamily.includes("Orbs Montserrat") && <link rel="preload" href="/fonts/orbs-montserrat-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />}
         <style dangerouslySetInnerHTML={{ __html: getPartnerThemeCss(partner.styles) }} />
         <script dangerouslySetInnerHTML={{ __html: `try{const t=localStorage.getItem("orbs-color-theme");if(t==="light"||t==="dark")document.documentElement.className=t;}catch{}` }} />
       </head>
       <body className="antialiased">
         <Providers
           partnerBrand={partner.brand}
+          partnerStyles={partner.styles}
         >
           <Toaster />
           <div className="app-shell flex min-h-screen flex-col font-sans text-foreground">

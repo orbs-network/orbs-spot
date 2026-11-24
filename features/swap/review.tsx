@@ -9,6 +9,7 @@ import { useBestTradeSwapStore } from "@/lib/hooks/store";
 import { Field, SwapStatus, SwapStep } from "@/lib/types";
 import { useConnection } from "wagmi";
 import { getQuoteValuation } from "@/lib/swap/quote-valuation";
+import { useUsd } from "@/lib/hooks/use-usd";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn, getExplorerUrl, toAmountUI } from "@/lib/utils";
 import { useTranslations } from "@/lib/use-translations";
@@ -36,7 +37,9 @@ const Rate = () => {
     inAmount: quote?.inAmount, outAmount: quote?.outAmount,
     inputDecimals: inputCurrency?.decimals, outputDecimals: outputCurrency?.decimals,
   });
-  const quoteUsd = getQuoteValuation(quote, inputCurrency?.decimals, outputCurrency?.decimals);
+  const inputUsd = useUsd(inputCurrency);
+  const outputUsd = useUsd(outputCurrency);
+  const quoteUsd = getQuoteValuation(quote, inputCurrency?.decimals, outputCurrency?.decimals, inputUsd.price, outputUsd.price);
 
   return (
     <DetailRow
@@ -53,7 +56,9 @@ const Rate = () => {
 const MinimumAmountOut = () => {
   const { quote, inputCurrency, outputCurrency } = useReviewQuote();
   const amount = useToAmountUI(outputCurrency?.decimals, quote?.minAmountOut);
-  const quoteUsd = getQuoteValuation(quote, inputCurrency?.decimals, outputCurrency?.decimals);
+  const inputUsd = useUsd(inputCurrency);
+  const outputUsd = useUsd(outputCurrency);
+  const quoteUsd = getQuoteValuation(quote, inputCurrency?.decimals, outputCurrency?.decimals, inputUsd.price, outputUsd.price);
   const usd = useFormatNumber({ value: quoteUsd.minimumAmountOutUsd, decimalScale: 2, prefix: "$" });
   const formatted = useFormatNumber({ value: amount, decimalScale: tokenDisplayDecimals(outputCurrency?.symbol, outputCurrency?.decimals) });
   return (
@@ -101,7 +106,7 @@ function SwapAmountSummary({ layout = "review" }: { layout?: TradeReviewLayout }
   const { status, review: reviewed } = useSwapReviewState();
   // Keep the reviewed amounts and pair visible while wallet actions are pending.
   const { inputCurrency, outputCurrency, inputAmount, outputAmount } = status && reviewed ? reviewed : current;
-  const quoteUsd = status && reviewed ? reviewed : getQuoteValuation(current.quote, inputCurrency?.decimals, outputCurrency?.decimals);
+  const quoteUsd = status && reviewed ? reviewed : getQuoteValuation(current.quote, inputCurrency?.decimals, outputCurrency?.decimals, current.quoteUsd.inputTokenUsdPrice, current.quoteUsd.outputTokenUsdPrice);
   const inputUsdFormatted = useFormatNumber({ value: quoteUsd.inputAmountUsd, decimalScale: 2, prefix: "$" });
   const outputUsdFormatted = useFormatNumber({ value: quoteUsd.outputAmountUsd, decimalScale: 2, prefix: "$" });
   const inputAmountFormatted = useFormatNumber({ value: inputAmount, decimalScale: tokenDisplayDecimals(inputCurrency?.symbol, inputCurrency?.decimals) });

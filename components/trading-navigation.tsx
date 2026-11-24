@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import { AppLink } from "@/components/app-link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { ExternalLinkIcon } from "lucide-react";
-import { FORM_TABS, PERPS_URL } from "@/lib/consts";
+import { FORM_TABS } from "@/lib/consts";
+import type { PartnerBrand } from "@/lib/partners/types";
 import { preserveFormTabInHref, useSelectedFormTab } from "@/lib/hooks/use-form-tab";
 import { OrderHistoryLink } from "./order-history-trigger";
 import { getTradingPathname } from "@/lib/developer-routes";
@@ -17,7 +17,7 @@ function useTradingHref() {
   return getTradingPathname(pathname) === "/" ? `/?${searchParams.toString()}` : "/";
 }
 
-export function TradingNavigation() {
+export function TradingNavigation({ brand }: { brand: PartnerBrand }) {
   const { selectedTab } = useSelectedFormTab();
   const pathname = usePathname();
   const isTrading = getTradingPathname(pathname) === "/";
@@ -28,14 +28,9 @@ export function TradingNavigation() {
       <div data-trading-modes>
         <AppLink href={preserveFormTabInHref(href, selectedTab.value)} scroll={false}
           aria-current={isTrading ? "page" : undefined}>
-          <Image data-product-mark="spot" src="/dspot-logo.svg" alt="" aria-hidden="true" width={25} height={25} />
-          dSPOT
+          {brand.tradingLabel === "dSPOT" && <Image data-product-mark="spot" src="/dspot-logo.svg" alt="" aria-hidden="true" width={25} height={25} />}
+          {brand.tradingLabel ?? "dSPOT"}
         </AppLink>
-        <a data-perps-link href={PERPS_URL} target="_blank" rel="noopener noreferrer">
-          <Image data-product-mark="perps" src="/dperps-logo.svg" alt="" aria-hidden="true" width={25} height={25} />
-          dPERPS <ExternalLinkIcon aria-hidden="true" className="size-3" />
-          <span className="sr-only">(opens in a new tab)</span>
-        </a>
         <OrderHistoryLink />
       </div>
     </nav>
@@ -69,7 +64,7 @@ export function SpotOrderNavigation() {
   }, [selectedTab.value]);
 
   return (
-    <nav ref={navigationRef} aria-label="dSPOT order type" data-spot-order-navigation>
+    <nav ref={navigationRef} aria-label="Order type" data-spot-order-navigation>
       {FORM_TABS.map((tab) => (
         <AppLink key={tab.value} href={preserveFormTabInHref(href, tab.value)} scroll={false}
           aria-current={selectedTab.value === tab.value ? "page" : undefined}>

@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const spotDocsUrl = (
-  process.env.NEXT_PUBLIC_SPOT_DOCS_URL ??
+  process.env.NEXT_PUBLIC_SPOT_DOCS_URL ||
   "https://docs.orbs.com"
 ).replace(/\/$/, "");
 

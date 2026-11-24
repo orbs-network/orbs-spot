@@ -1,15 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
+import { Partners } from "@orbs-network/spot-ui";
 import { SPOT_CHAINS } from "@/lib/consts";
 import { getPartnerChains } from "@/lib/spot/partners";
 import { useSpotPartner } from "./use-spot-partner";
 import { useSpotPartners } from "./use-spot-partners";
 
-/** A debug partner override uses only networks configured for that integration. */
+/** Non-default partners use only networks configured for that integration. */
 export function useSpotPartnerChains(enabled = true) {
   const { partner, isDebugMode } = useSpotPartner();
-  const shouldFilter = enabled && isDebugMode;
+  const shouldFilter = enabled && (isDebugMode || partner !== Partners.External);
   const query = useSpotPartners(shouldFilter);
   const chains = useMemo(() => shouldFilter
     ? getPartnerChains(SPOT_CHAINS, query.data ?? [], partner)

@@ -1,9 +1,9 @@
-import type { Metadata } from "next";
+import { getAppConfig } from "@/lib/partners/config";
 import { ORDER_INSPECTOR_PATH } from "@/lib/developer-routes";
 import { notFound, redirect } from "next/navigation";
 import { isSpotDebugMode } from "@/lib/spot/api";
 
-export const metadata: Metadata = { title: "Order preview | Orbs Spot" };
+export const metadata = { title: `Order preview | ${getAppConfig().brand.name}` };
 
 export default async function Eip712InspectorPage({ searchParams }: PageProps<"/developers/eip712">) {
   const query = await searchParams;
