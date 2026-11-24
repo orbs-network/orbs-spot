@@ -5,6 +5,7 @@ node_modules
 dist
 .next
 .vercel
+/vercel.json
 out
 
 # Environment files

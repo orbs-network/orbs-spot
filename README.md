@@ -67,9 +67,10 @@ local and deployed builds, including the Demo and SDK examples.
    configured RPC network IDs are selected at build time; rebuild after changes.
    `RPC_URLS` and `RPC_URL` remain server-side. Never put keys in public values.
 4. Protect `/api/rpc`, `/api/balances`, and `/api/transaction-receipt` with your
-   host's shared rate limiter or WAF. The app also has a per-instance ceiling;
-   see [deployment details](docs/playground.md#deploy) for limits and an nginx example.
-5. Run `yarn test`, `yarn typecheck`, `yarn lint`, `yarn build`, and `yarn audit --groups dependencies`.
+   host's shared per-client rate limiter or WAF. `RPC_RATE_LIMIT_PER_MINUTE`
+   sets an additional per-instance ceiling (default 600; `0` disables it).
+   Instance limits are not shared across servers and do not replace host-level limits.
+5. Run `yarn typecheck`, `yarn lint`, `yarn build`, and `yarn audit --groups dependencies`.
    On the actual host, verify each enabled network's RPC chain, token data, prices,
    quotes, and wallet connection. Confirm partner activation separately; use
    read-only checks unless real trading is explicitly authorized.
@@ -142,9 +143,6 @@ Execution modules work independently of React. React hooks connect them to the p
 wallet, and controls. Use the standalone examples to learn the SDK calls; use the app executors
 when studying duplicate guards, wallet changes, and background submissions.
 
-For the app’s detailed valuation and background-submission behavior, see
-[reference integration details](docs/integration-details.md).
-
 ## Run and verify
 
 Use Node 22.23.1 and Yarn 1.22.22, the versions used to verify this app.
@@ -157,10 +155,10 @@ yarn dev
 Open [the developer playground](http://localhost:3000/dev). Select a pair, enter an amount,
 and choose **Demo** to step through the integration without signing or submitting.
 Use `/dev?tab=twap` for advanced orders and `/dev/orders?mockorders=true` for sample history.
-WalletConnect setup and deployment are described in [playground operations](docs/playground.md).
+For WalletConnect, allow the exact site origin in the Reown project dashboard;
+`NEXT_PUBLIC_APP_URL` supplies wallet metadata and does not replace that allowlist.
 
 ```bash
-yarn test       # Palette, configuration, and RPC limit checks
 yarn typecheck  # Includes the standalone TypeScript examples
 yarn lint
 yarn build
