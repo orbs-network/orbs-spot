@@ -4,7 +4,7 @@ import * as chains from "viem/chains";
 
 import { ADDITIONAL_CHAIN_TOKENS } from "./additional-chain-tokens";
 import { wCurrencies } from "./wrapped-currencies";
-import { SUPPORTED_CHAINS } from "./consts";
+import { robinhoodChain, SUPPORTED_CHAINS } from "./consts";
 import type { Currency } from "./types";
 import { MAX_DEFAULT_TOKENS, mergeTokenLists, parseTokenList } from "./token-list";
 import {
@@ -36,6 +36,7 @@ const coinGeckoChainNames: Readonly<Partial<Record<number, string>>> = {
   [chains.rootstock.id]: "rootstock",
   [chains.plasma.id]: "plasma",
   [chains.ink.id]: "ink",
+  [robinhoodChain.id]: 'robinhood'
 };
 
 export async function getCurrencies(

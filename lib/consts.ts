@@ -99,12 +99,12 @@ export const robinhoodChain = defineChain({
 // Swaps and advanced orders share the same external-partner configurations.
 export const SPOT_CHAINS = [
   bsc, linea, sei, base, sonic, polygon, berachain, flare, avalanche, monad,
-  arbitrum, mainnet, katana, optimism, mantle, hyperEvmChain, unichain, xLayer,
-  megaethChain, rootstock, robinhoodChain, plasma, ink,
+  arbitrum, mainnet, katana, optimism, mantle, hyperEvmChain, unichain,
+  robinhoodChain, plasma,
 ] as const;
 
-// Keep public clients for legacy Blast swap activity; all trade forms use SPOT_CHAINS.
-export const SUPPORTED_CHAINS = [...SPOT_CHAINS, blast] as const;
+// Keep clients for legacy swap activity; all trade forms use SPOT_CHAINS.
+export const SUPPORTED_CHAINS = [...SPOT_CHAINS, blast, xLayer, megaethChain, rootstock, ink] as const;
 
 export type SupportedChainId = (typeof SUPPORTED_CHAINS)[number]["id"];
 
@@ -353,7 +353,7 @@ export const POPULAR_TOKENS = {
 
 export const NATIVE_TOKENS_LOGO_URLS = {
   30: "https://icons.llamao.fi/icons/chains/rsz_rootstock",
-  4663: "https://icons.llamao.fi/icons/chains/rsz_robinhood",
+  4663: "https://s2.coinmarketcap.com/static/img/coins/128x128/1027.png",
   9745: "https://icons.llamao.fi/icons/chains/rsz_plasma",
   57073: "https://icons.llamao.fi/icons/chains/rsz_ink",
   81457: "https://icons.llamao.fi/icons/chains/rsz_blast",
