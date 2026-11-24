@@ -1,30 +1,30 @@
-:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) {
+:global(html[data-layout="reference"]) .submissionSummary:global([data-orbs-trade-summary]) {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 8px 0 20px;
   border-bottom: 1px solid var(--border);
 }
-:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-direction]) {
+:global(html[data-layout="reference"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-direction]) {
   margin: 0;
 }
-:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset]) {
+:global(html[data-layout="reference"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset]) {
   gap: 16px;
 }
-:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) {
+:global(html[data-layout="reference"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) {
   display: block;
 }
-:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) p {
+:global(html[data-layout="reference"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) p {
   font-size: clamp(20px, 5vw, 22px);
   font-weight: 500;
   line-height: 1.2;
 }
-:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) > span {
+:global(html[data-layout="reference"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-amount]) > span {
   display: block;
   margin-top: 4px;
   font-size: 12px;
 }
-:global(html[data-partner="orbs"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-icon]) {
+:global(html[data-layout="reference"]) .submissionSummary:global([data-orbs-trade-summary]) :global([data-review-asset-icon]) {
   width: 36px;
   height: 36px;
 }

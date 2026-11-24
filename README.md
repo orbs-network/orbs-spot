@@ -17,9 +17,9 @@ and the version-matched skills bundled with the installed SDK.
 Copy `.env.example` to `.env.local`, set either `RPC_URLS` or `RPC_URL`, and
 configure your brand before building. Set `NEXT_PUBLIC_PROJECT_ID` to enable
 WalletConnect and mobile pairing; without it, browser-injected wallets and Safe
-apps can still connect. `APP_ID` identifies the fork in RPC
-requests and disables the Orbs-specific visual overrides; give each deployment a
-stable, unique ID. Set `APP_NAME`, `APP_WORDMARK`, `APP_LOGO_URL`, `APP_LOGO_ALT`,
+apps can still connect. `APP_ID` identifies the fork in RPC requests; give each
+deployment a stable, unique ID. Every fork uses the reference layout independently
+of `APP_ID` and `NEXT_PARTNER`. Set `APP_NAME`, `APP_WORDMARK`, `APP_LOGO_URL`, `APP_LOGO_ALT`,
 `APP_ICON_URL`, `APP_APPLE_ICON_URL`, `APP_TITLE`, `APP_DESCRIPTION`,
 `APP_TRADING_LABEL` and `NEXT_PUBLIC_APP_URL` for your brand and wallet metadata. Put local images in
 `public/` and refer to them by an absolute path such as `/brand/logo.svg`.

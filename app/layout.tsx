@@ -85,7 +85,7 @@ export default function RootLayout({
   ];
 
   return (
-    <html lang="en" data-partner={partner.id} className={partner.defaultTheme ?? getDefaultTheme(partner.styles)} suppressHydrationWarning>
+    <html lang="en" data-partner={partner.id} data-layout="reference" data-custom-theme={process.env.APP_PRIMARY_COLOR || process.env.APP_THEME_LIGHT || process.env.APP_THEME_DARK ? "true" : undefined} className={partner.defaultTheme ?? getDefaultTheme(partner.styles)} suppressHydrationWarning>
       <head>
         {partner.styles.fontFamily.includes("Orbs Montserrat") && <link rel="preload" href="/fonts/orbs-montserrat-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />}
         <style dangerouslySetInnerHTML={{ __html: getPartnerThemeCss(partner.styles) }} />

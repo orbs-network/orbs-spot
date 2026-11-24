@@ -6,6 +6,24 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Preserve the reference layout while letting configured themes control its colors. */
+html[data-layout="reference"][data-custom-theme]:not(.dark),
+html.dark[data-layout="reference"][data-custom-theme] {
+  --orbs-positive: var(--chart-2);
+  --orbs-primary-hover: var(--primary);
+  --orbs-primary-gradient: linear-gradient(105deg, var(--primary), var(--primary));
+  --orbs-primary-gradient-hover: linear-gradient(105deg, color-mix(in srgb, var(--primary) 85%, var(--foreground)), color-mix(in srgb, var(--primary) 85%, var(--foreground)));
+  --orbs-action-foreground: var(--primary-foreground);
+  --orbs-tab-background: var(--secondary);
+  --orbs-wash-purple: color-mix(in srgb, var(--primary) 2%, transparent);
+  --orbs-wash-blue: color-mix(in srgb, var(--primary) 1%, transparent);
+  --orbs-navigation-background: var(--nav-background);
+  --orbs-accent-tint: var(--accent);
+  --orbs-secondary-text: var(--muted-foreground);
+  --orbs-link: var(--primary);
+  --orbs-error-tint: color-mix(in srgb, var(--destructive) 8%, var(--card));
+}
+
 /* Keep invalid fields visible even in themes that remove panel borders.
    An inset outline preserves the layout as validation changes. */
 html[data-partner] [data-form-panel]:has([aria-invalid="true"]) {
@@ -25,7 +43,7 @@ html[data-partner] [data-currency-card]:has([aria-invalid="true"]):focus-within 
 }
 
 /* Strengthen the existing error edge on focus instead of adding a second ring. */
-html[data-partner="orbs"] [data-currency-card]:has([aria-invalid="true"]):focus-within {
+html[data-layout="reference"] [data-currency-card]:has([aria-invalid="true"]):focus-within {
   outline: none;
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--destructive) 55%, transparent);
 }

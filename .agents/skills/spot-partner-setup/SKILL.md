@@ -7,6 +7,8 @@ description: Configure a fork of the Spot app from a short partner brief, includ
 
 Use this existing checkout and preserve the trading UI, wallet sequence, reviewed quote protections, and history. Read the repository `README.md`, `.env.example`, and the adjacent [spot-theme skill](../spot-theme/SKILL.md). Follow current source if these instructions become stale. Do not scaffold a replacement app.
 
+The partner app must retain the reference app's layout, spacing, typography, responsive behavior, and components regardless of app or partner ID. Change only branding (name, logo, colors, and related metadata) unless the user explicitly requests another UI change. Developer-tool removal below is a separate cleanup and must not alter the production trading interface.
+
 ## Turn a brief into a working fork
 
 Reuse the user's name, logo, colors, mode, partner identifier, URLs, network choices, and other supplied details. Apply the theme skill without asking the user to invoke it or provide individual CSS tokens. If choices are missing, make reasonable reversible defaults or ask only when the choice is necessary; offer text-only branding when no logo is available. Do not fabricate logos, credentials, partner activation, or a partner identifier. Distinguish `APP_ID` (a stable app/RPC identifier) from `NEXT_PARTNER` (the public Spot partner identifier sent to the service). The latter defaults to `external` and is embedded in the browser build; use a different value only if supplied or confirmed. SDK initialization does not prove partner activation on a chain.
@@ -38,6 +40,8 @@ Audit the resulting source for stale `/dev`, `debug`, developer aliases, demo an
 ## Preview and verify
 
 Install dependencies from the lockfile if needed using the versions documented in `README.md`. Start `yarn dev`, use its actual URL, and inspect the real app in desktop and mobile layouts. Check both themes, branding, metadata, and the wallet dialog when configuration allows. Exercise the production swap and advanced-order forms without wallet signing or live submission; check quote loading, errors, and unchanged review protections. Confirm the removed developer routes and debug overrides remain unavailable. Run `yarn typecheck`, `yarn lint`, and `yarn build`; report missing credentials, network failures, and untested states accurately.
+
+Compare the reference app and partner app side by side at the same desktop and mobile viewport sizes and the same light and dark themes. Compare corresponding production routes and UI states, including navigation, swap and advanced-order forms, history, menus, and dialogs when available. Check layout, spacing, typography, components, and responsive behavior; fix unintended differences while allowing the requested branding. Use an accessible reference deployment or an unmodified reference checkout; if either app cannot be compared, report the limitation instead of claiming parity.
 
 If changing SDK integration or partner behavior, follow the matching versioned SDK skill under `node_modules/@orbs-network/spot-ui/dist/integration-skills/` and its relevant references. Preserve the actual partner/chain identity; never switch partner or invent contracts to make a preview pass. A working UI or build does not establish live trading activation. Do not sign or submit real transactions without authorization.
 
