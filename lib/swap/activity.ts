@@ -2,10 +2,11 @@
 
 import { OrderSettlementError } from "./settlement.ts";
 
-import { OrderStatus, Partners, type Order, type Token } from "@orbs-network/spot-ui";
+import { OrderStatus, type Partners, type Order, type Token } from "@orbs-network/spot-ui";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { DEFAULT_SPOT_API_URL, DEV_SPOT_API_URL, PROD_V1_SPOT_API_URL } from "../spot/api.ts";
+import { isSpotPartnerIdentifier } from "../partners/spot";
 
 type ActivityDetails = {
   account: string;
@@ -91,7 +92,7 @@ export function validSwapActivity(value: unknown): value is SwapActivity {
   if ((item.inputToken !== undefined && !validToken(item.inputToken))
     || (item.outputToken !== undefined && !validToken(item.outputToken))
     || (item.outputAmount !== undefined && typeof item.outputAmount !== "string")
-    || (item.partner !== undefined && !Object.values(Partners).includes(item.partner as Partners))) return false;
+    || (item.partner !== undefined && !isSpotPartnerIdentifier(item.partner))) return false;
   if (item.kind !== "spot") {
     return (item.kind === undefined || item.kind === "transaction") && validHash(item.hash)
       && ["pending", "confirmed", "reverted", "unconfirmed"].includes(String(item.status));

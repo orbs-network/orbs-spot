@@ -1,8 +1,10 @@
 import { TransactionReceiptNotFoundError } from "viem";
 import { getPublicClient } from "./get-public-client";
+import { assertRpcChain } from "./rpc-url";
 
 /** One bounded read. The browser polls pending confirmations, not a server worker. */
 export const getTxReceipt = async (chainId: number, hash: `0x${string}`) => {
+  await assertRpcChain(chainId);
   const client = getPublicClient(chainId);
   try {
     const receipt = await client.getTransactionReceipt({ hash });

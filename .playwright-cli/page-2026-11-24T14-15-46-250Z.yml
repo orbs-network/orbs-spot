@@ -1,0 +1,4 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e2]
+  - status [ref=e4]:
+    - generic [ref=e5]: Loading trading interface…

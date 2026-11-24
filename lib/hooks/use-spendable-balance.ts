@@ -19,6 +19,6 @@ export function useSpendableBalance(currency?: Currency) {
   const unavailable = native && (!gas.data || gas.isError);
   const raw = native ? spendableNativeBalance(BigInt(balance.wei || "0"), gas.data ?? BigInt(0)) : BigInt(balance.wei || "0");
   return { ...balance, spendable: formatUnits(raw, currency?.decimals ?? 18),
-    maxDisabled: balance.isLoading || unavailable,
-    maxHint: native ? unavailable ? "Waiting for network fees before calculating Max" : "Keeps an estimated reserve for network fees" : undefined };
+    maxDisabled: balance.isLoading || balance.isUnavailable || unavailable,
+    maxHint: balance.isUnavailable ? "Balance unavailable" : native ? unavailable ? "Waiting for network fees before calculating Max" : "Keeps an estimated reserve for network fees" : undefined };
 }

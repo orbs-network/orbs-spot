@@ -7,6 +7,8 @@ import { Toaster } from "@/components/ui/sonner";
 import { getDefaultTheme, getPartnerThemeCss, getThemeStyles } from "@/lib/partners/themes";
 import type { PartnerBrand } from "@/lib/partners/types";
 import { getAppConfig } from "@/lib/partners/config";
+import { isSpotPartnerIdentifier } from "@/lib/partners/spot";
+import { SPOT_CHAINS } from "@/lib/consts";
 
 function getIconType(url: string) {
   const pathname = url.split("?")[0]?.toLowerCase() ?? "";
@@ -73,6 +75,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const partner = getAppConfig();
+  const rpcChainIds = process.env.NEXT_PUBLIC_RPC_CHAIN_IDS;
+  const missingSetup = [
+    ...(!process.env.RPC_URL && !process.env.RPC_URLS ? ["RPC_URLS or RPC_URL"] : []),
+    ...(rpcChainIds && !SPOT_CHAINS.some(chain => rpcChainIds.split(",").includes(String(chain.id)))
+      ? ["a supported trading network in RPC_URLS"] : []),
+    ...(process.env.NEXT_PARTNER && !isSpotPartnerIdentifier(process.env.NEXT_PARTNER)
+      ? ["a valid NEXT_PARTNER"] : []),
+  ];
 
   return (
     <html lang="en" data-partner={partner.id} className={partner.defaultTheme ?? getDefaultTheme(partner.styles)} suppressHydrationWarning>
@@ -82,7 +92,14 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `try{const t=localStorage.getItem("orbs-color-theme");if(t==="light"||t==="dark")document.documentElement.className=t;}catch{}` }} />
       </head>
       <body className="antialiased">
-        <Providers
+        {missingSetup.length > 0 ? (
+          <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+            <section role="alert" className="w-full max-w-lg rounded-2xl border border-border bg-card p-8 shadow-sm">
+              <h1 className="text-xl font-semibold">Application setup incomplete</h1>
+              <p className="mt-3 text-sm text-muted-foreground">The site operator needs to configure {missingSetup.join(" and ")} before this app can run.</p>
+            </section>
+          </main>
+        ) : <Providers
           partnerBrand={partner.brand}
           partnerStyles={partner.styles}
         >
@@ -102,7 +119,7 @@ export default function RootLayout({
               {children}
             </main>
           </div>
-        </Providers>
+        </Providers>}
       </body>
     </html>
   );

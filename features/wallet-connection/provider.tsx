@@ -13,7 +13,7 @@ const OrbsConnectModal = dynamic(
   { loading: () => null },
 );
 const WalletConnectionContext = createContext<{ openConnectModal?: () => void }>({});
-const enabled = hasOrbsConnectModal(orbsPartner);
+const enabled = Boolean(process.env.NEXT_PUBLIC_PROJECT_ID?.trim()) && hasOrbsConnectModal(orbsPartner);
 
 export function WalletConnectionProvider({ children }: { children: ReactNode }) {
   const standard = useConnectModal();

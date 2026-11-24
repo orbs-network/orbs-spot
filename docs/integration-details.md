@@ -87,7 +87,7 @@ All three recognized values also enable debug partner testing, including the par
 supported-network filtering, and the Partner column in history. Explicit `debug=true` still
 enables those features on the default service. Navigation retains the API and partner without
 injecting `debug=true`, so clearing the API selection disables implicit debug mode. Developer
-inspectors and demos remain restricted to `/dev`.
+inspectors and demos remain restricted to `/dev`, including in deployed builds.
 The SDK receives this URL explicitly through `createClient(..., { apiUrl })` and standalone
 history reads; it does not inspect the page query.
 Only order submission, status, and history use that selected backend. Configuration and

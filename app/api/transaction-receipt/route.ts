@@ -1,3 +1,4 @@
+import { rpcRateLimitResponse } from "@/lib/server/rpc-limit";
 import { getTxReceipt } from "@/lib/get-tx-receipt";
 import { parseSupportedChainId, RequestError } from "@/lib/server/request";
 import { NextResponse } from "next/server";
@@ -5,6 +6,8 @@ import { NextResponse } from "next/server";
 const serializeBigInt = (value: unknown) => JSON.parse(JSON.stringify(value, (_, item) => typeof item === "bigint" ? item.toString() : item));
 
 export async function GET(request: Request) {
+  const limited = rpcRateLimitResponse();
+  if (limited) return limited;
   try {
     const params = new URL(request.url).searchParams;
     const chainId = parseSupportedChainId(params.get("chainId"));

@@ -108,14 +108,15 @@ export const useBalances = () => {
 };
 
 export const useBalance = (currency?: Currency) => {
-  const { data: balances, isLoading, refetch } = useBalances();
+  const { data: balances, isLoading, isError, refetch } = useBalances();
+  const { address } = useConnection();
   const watchedAddresses = useWatchedBalanceAddresses();
   const tokenKey = getTokenKey(currency?.address);
   const isWatched = tokenKey ? watchedAddresses.includes(tokenKey) : false;
 
   const balance = useMemo(() => {
-    return balances?.[tokenKey];
-  }, [balances, tokenKey]);
+    return isError ? undefined : balances?.[tokenKey];
+  }, [balances, isError, tokenKey]);
 
   const ui = useToAmountUI(currency?.decimals, balance);
 
@@ -127,8 +128,9 @@ export const useBalance = (currency?: Currency) => {
       wei: balance,
       formatted,
       isLoading: isWatched && isLoading,
+      isUnavailable: Boolean(address) && isWatched && !isLoading && (isError || balance === undefined),
       refetch,
     }),
-    [balance, formatted, isLoading, isWatched, refetch, ui],
+    [address, balance, formatted, isError, isLoading, isWatched, refetch, ui],
   );
 };

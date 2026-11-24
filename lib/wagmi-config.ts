@@ -6,6 +6,7 @@ import {
 } from "@rainbow-me/rainbowkit";
 import {
   coinbaseWallet,
+  injectedWallet,
   metaMaskWallet,
   phantomWallet,
   rabbyWallet,
@@ -81,15 +82,10 @@ function getAppOrigin() {
 
 export const useWagmiConfig = ({ partnerBrand }: WagmiConfigOptions) => {
   const { iconSrc, metadata, name } = partnerBrand;
-  const customConnectModal = hasOrbsConnectModal(orbsPartner);
+  const projectId = process.env.NEXT_PUBLIC_PROJECT_ID?.trim() ?? "";
+  const customConnectModal = Boolean(projectId) && hasOrbsConnectModal(orbsPartner);
 
   return useMemo(() => {
-    const projectId = process.env.NEXT_PUBLIC_PROJECT_ID;
-
-    if (!projectId) {
-      throw new Error("NEXT_PUBLIC_PROJECT_ID is required to connect wallets");
-    }
-
     const appUrl = getAppOrigin();
     const appIcon =
       getAbsoluteUrl(iconSrc) ?? (appUrl ? `${appUrl}/icon.png` : undefined);
@@ -123,7 +119,7 @@ export const useWagmiConfig = ({ partnerBrand }: WagmiConfigOptions) => {
         ReturnType<typeof http>
       >,
 
-      wallets: [
+      wallets: projectId ? [
         {
           groupName: "Recommended",
           wallets: [
@@ -139,7 +135,9 @@ export const useWagmiConfig = ({ partnerBrand }: WagmiConfigOptions) => {
           groupName: "More",
           wallets: [safeWallet],
         },
+      ] : [
+        { groupName: "Available wallets", wallets: [injectedWallet, safeWallet] },
       ],
     });
-  }, [customConnectModal, iconSrc, metadata.description, name]);
+  }, [customConnectModal, iconSrc, metadata.description, name, projectId]);
 };

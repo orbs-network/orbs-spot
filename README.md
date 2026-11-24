@@ -14,8 +14,10 @@ and the version-matched skills bundled with the installed SDK.
 
 ## White-label setup
 
-Copy `.env.example` to `.env.local`, set `NEXT_PUBLIC_PROJECT_ID` and `RPC_URL`,
-and configure your brand before building. `APP_ID` identifies the fork in RPC
+Copy `.env.example` to `.env.local`, set either `RPC_URLS` or `RPC_URL`, and
+configure your brand before building. Set `NEXT_PUBLIC_PROJECT_ID` to enable
+WalletConnect and mobile pairing; without it, browser-injected wallets and Safe
+apps can still connect. `APP_ID` identifies the fork in RPC
 requests and disables the Orbs-specific visual overrides; give each deployment a
 stable, unique ID. Set `APP_NAME`, `APP_WORDMARK`, `APP_LOGO_URL`, `APP_LOGO_ALT`,
 `APP_ICON_URL`, `APP_APPLE_ICON_URL`, `APP_TITLE`, `APP_DESCRIPTION`,
@@ -24,7 +26,8 @@ stable, unique ID. Set `APP_NAME`, `APP_WORDMARK`, `APP_LOGO_URL`, `APP_LOGO_ALT
 Leave the optional wordmark empty if the logo already contains your name.
 
 `APP_DEFAULT_THEME` chooses `light` or `dark` on a first visit; visitors can
-still switch modes. `APP_THEME_LIGHT` and `APP_THEME_DARK` are JSON objects
+still switch modes. Set `APP_PRIMARY_COLOR` to a six-digit hex color (for example,
+`APP_PRIMARY_COLOR='#2563eb'`) to generate coordinated light and dark palettes. Set a non-Orbs `APP_ID` for custom branding. `APP_THEME_LIGHT` and `APP_THEME_DARK` are JSON objects
 containing any of the style and color properties in
 [PartnerStyles](lib/partners/types.ts). For example:
 
@@ -33,18 +36,43 @@ APP_THEME_LIGHT='{"fontFamily":"Arial, sans-serif","radius":"1rem","colors":{"ba
 APP_THEME_DARK='{"colors":{"background":"#101828","primary":"#84adff","primaryForeground":"#101828"}}'
 ```
 
-Unspecified values retain the reference palette, so supply both palettes for a
-fully custom theme and check text contrast in both modes. Color values are CSS
+Without `APP_PRIMARY_COLOR`, unspecified values retain the reference palette.
+With it, explicit theme JSON values override the generated palette. Check text
+contrast and branding in both modes. Color values are CSS
 values; avoid semicolons or braces. Settings are applied at build time: rebuild
 when changing them. Set the same `APP_*` values in the server runtime environment too, so dynamic
 pages and RPC requests use the same branding and identity.
 Never put secrets in `NEXT_PUBLIC_` variables, which are
 included in browser bundles.
 
-Set `NEXT_PUBLIC_SPOT_PARTNER` to your actual Spot SDK partner identifier (the
-default is `external`). Confirm that partner is enabled for the chains you
-intend to support before live trading. The developer playground remains at
-`/dev`, including the Demo and SDK examples.
+Set `NEXT_PARTNER` to your actual Spot partner identifier (the default is
+`external`). It is included in the browser bundle at build time and is not a
+secret. Confirm that partner is enabled for the chains you intend to support
+before live trading. The developer playground remains available at `/dev` in
+local and deployed builds, including the Demo and SDK examples.
+
+## Deploy your fork
+
+1. In `.env.local`, set your brand and `NEXT_PARTNER`. To enable WalletConnect,
+   create a partner-owned project, set `NEXT_PUBLIC_PROJECT_ID`, and allow the
+   exact site origin in its dashboard. Set `NEXT_PUBLIC_APP_URL` to that origin.
+2. Configure `RPC_URLS` as a JSON object mapping supported chain IDs to private
+   HTTP(S) RPC URLs, for example `'{"1":"https://ethereum.example","56":"https://bsc.example"}'`.
+   With `RPC_URLS` alone, only the listed trading networks appear. Alternatively,
+   use `RPC_URL` for a chain-aware gateway that accepts `chainId` and `appId`
+   query parameters. If both are set, unmapped chains use the gateway. The app
+   verifies `eth_chainId` before using an RPC endpoint.
+3. Set the same build and server environment values on a host that supports
+   Next.js server routes. `NEXT_PARTNER`, `NEXT_PUBLIC_*`, branding, and the
+   configured RPC network IDs are selected at build time; rebuild after changes.
+   `RPC_URLS` and `RPC_URL` remain server-side. Never put keys in public values.
+4. Protect `/api/rpc`, `/api/balances`, and `/api/transaction-receipt` with your
+   host's shared rate limiter or WAF. The app also has a per-instance ceiling;
+   see [deployment details](docs/playground.md#deploy) for limits and an nginx example.
+5. Run `yarn test`, `yarn typecheck`, `yarn lint`, `yarn build`, and `yarn audit --groups dependencies`.
+   On the actual host, verify each enabled network's RPC chain, token data, prices,
+   quotes, and wallet connection. Confirm partner activation separately; use
+   read-only checks unless real trading is explicitly authorized.
 
 ## Set up a fork with an agent
 
@@ -58,14 +86,13 @@ on your fork, you can start with a prompt such as:
 > Choose sensible defaults for missing visual details and show me the local
 > preview.
 
-The partner setup skill removes the developer playground and debug controls from
-the fork; this reference checkout retains them.
+The partner setup skill removes developer tools from a partner fork by default,
+unless the user asks to retain them. This reference app keeps them when deployed.
 
 Supply your actual Spot partner identifier and partner-owned WalletConnect and
 RPC configuration when available. Never paste private keys or seed phrases into
 an agent prompt. For a later appearance-only change, ask for `spot-theme`.
-The existing `yarn deploy` script targets the upstream Orbs production project;
-use a deployment configured for your own fork instead.
+Configure deployment for your own fork and hosting project.
 
 ## The SDK flow
 
@@ -120,7 +147,7 @@ For the app’s detailed valuation and background-submission behavior, see
 
 ## Run and verify
 
-Requires Node 22.23.1 and Yarn 1.22.22 (also recorded in `package.json`).
+Use Node 22.23.1 and Yarn 1.22.22, the versions used to verify this app.
 
 ```bash
 yarn install --frozen-lockfile
@@ -133,6 +160,7 @@ Use `/dev?tab=twap` for advanced orders and `/dev/orders?mockorders=true` for sa
 WalletConnect setup and deployment are described in [playground operations](docs/playground.md).
 
 ```bash
+yarn test       # Palette, configuration, and RPC limit checks
 yarn typecheck  # Includes the standalone TypeScript examples
 yarn lint
 yarn build

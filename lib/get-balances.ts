@@ -1,5 +1,6 @@
 import { Address, erc20Abi, getAddress, isAddress, zeroAddress } from "viem";
 import { getPublicClient } from "./get-public-client";
+import { assertRpcChain } from "./rpc-url";
 import { getTokenKey, isNativeAddress, uniqueTokenAddresses } from "./utils";
 import { Balances } from "./types";
 import { MAX_BALANCE_TOKENS } from "./balance-config";
@@ -34,6 +35,7 @@ export const getBalances = async (
     .map((token) => getAddress(token));
 
   try {
+    await assertRpcChain(chainId);
     const publicClient = getPublicClient(chainId);
 
     const result: Balances = {};
@@ -52,8 +54,8 @@ export const getBalances = async (
 
         batch.forEach((token, index) => {
           const balance = balances[index];
-          result[getTokenKey(token)] =
-            balance?.status === "success" ? balance.result.toString() : "0";
+          // An RPC failure is not a confirmed zero balance.
+          if (balance?.status === "success") result[getTokenKey(token)] = balance.result.toString();
         });
       })
     );

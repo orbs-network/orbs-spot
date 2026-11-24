@@ -10,8 +10,8 @@ export const Balance = ({
     currency?: Currency;
     onAmountChange?: (amount: string) => void;
   }) => {
-    const { formatted, spendable, maxDisabled, maxHint, isLoading } = useSpendableBalance(currency);
-    const label = `Balance: ${formatted}`;
+    const { formatted, spendable, maxDisabled, maxHint, isLoading, isUnavailable } = useSpendableBalance(currency);
+    const label = isUnavailable ? "Balance unavailable" : `Balance: ${formatted}`;
 
     if (!onAmountChange) {
       return isLoading ? (

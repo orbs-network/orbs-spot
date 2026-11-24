@@ -42,7 +42,7 @@ export function SubmitNativeConversion({ direction }: { direction: NativeConvers
   const insufficientBalance = BN(balance.wei ?? "0").lt(amount);
 
   async function submit() {
-    if (submitting.current || enterAmount || insufficientBalance || !inputCurrency || !outputCurrency) return;
+    if (submitting.current || enterAmount || insufficientBalance || balance.isUnavailable || !inputCurrency || !outputCurrency) return;
     let releaseWallet: (() => void) | undefined;
     try { releaseWallet = acquireSubmissionLock(); }
     catch { toast.info("Confirm the pending wallet request before starting another submission."); return; }
@@ -118,7 +118,7 @@ export function SubmitNativeConversion({ direction }: { direction: NativeConvers
     chainId={chainId}
     onClick={() => void submit()}
     isLoading={isPending}
-    disabled={walletBusy || enterAmount || insufficientBalance || !inputCurrency || !outputCurrency || balance.isLoading}
-    text={enterAmount ? t("enterAmount") : balance.isLoading ? "Loading balance…" : insufficientBalance ? t("insufficientFunds") : action}
+    disabled={walletBusy || enterAmount || insufficientBalance || balance.isUnavailable || !inputCurrency || !outputCurrency || balance.isLoading}
+    text={enterAmount ? t("enterAmount") : balance.isLoading ? "Loading balance…" : balance.isUnavailable ? "Balance unavailable" : insufficientBalance ? t("insufficientFunds") : action}
   />;
 }

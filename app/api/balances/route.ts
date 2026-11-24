@@ -1,3 +1,4 @@
+import { rpcRateLimitResponse } from "@/lib/server/rpc-limit";
 import { getBalances, MAX_BALANCE_TOKENS } from "@/lib/get-balances";
 import { isNativeAddress, uniqueTokenAddresses } from "@/lib/utils";
 import { isRecord, parseSupportedChainId, readJsonBody, RequestError } from "@/lib/server/request";
@@ -5,6 +6,8 @@ import { NextResponse } from "next/server";
 import { isAddress } from "viem";
 
 export async function POST(request: Request) {
+  const limited = rpcRateLimitResponse();
+  if (limited) return limited;
   try {
     const body = await readJsonBody(request);
     if (!isRecord(body)) throw new RequestError("A JSON object is required");

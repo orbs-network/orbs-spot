@@ -120,7 +120,8 @@ const ValidatedSubmitSwapButton = ({
     trade,
     quoteUsd,
   } = useDerivedSwap();
-  const inputTokenBalance = useBalance(inputCurrency).wei;
+  const inputBalance = useBalance(inputCurrency);
+  const inputTokenBalance = inputBalance.wei;
   const priceUnavailable = quoteUsd.inputAmountUsd === undefined;
   const belowMinimum = quoteUsd.inputAmountUsd !== undefined && BN(quoteUsd.inputAmountUsd).lt(MIN_SWAP_VALUE_USD);
 
@@ -137,6 +138,7 @@ const ValidatedSubmitSwapButton = ({
     !outputCurrency ||
     isLoading ||
     insufficientBalance ||
+    inputBalance.isUnavailable ||
     isLoadingTrade ||
     !!quoteError ||
     !trade ||
@@ -152,6 +154,7 @@ const ValidatedSubmitSwapButton = ({
     if (isLoadingTrade) {
       return t("fetchingQuote");
     }
+    if (inputBalance.isUnavailable) return "Balance unavailable";
     if (insufficientBalance) {
       return t("insufficientFunds");
     }
@@ -164,6 +167,7 @@ const ValidatedSubmitSwapButton = ({
     return text;
   }, [
     enterAmount,
+    inputBalance.isUnavailable,
     insufficientBalance,
     text,
     t,

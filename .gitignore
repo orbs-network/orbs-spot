@@ -8,9 +8,8 @@ dist
 out
 
 # Environment files
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
 
 # IDE
 .vscode
@@ -37,3 +36,8 @@ coverage
 
 # Cursor
 .cursor
+
+# Local deployment scripts
+scripts/deploy.sh
+scripts/deploy.mjs
+scripts/exclude-prebuilt-env.mjs

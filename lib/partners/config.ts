@@ -1,4 +1,5 @@
 import { orbsPartner } from "./orbs";
+import { createBrandPalette } from "./palette";
 import type { PartnerConfig, PartnerStyles } from "./types";
 
 type ThemeOverride = Partial<Omit<PartnerStyles, "colors" | "themeOverrides">> & {
@@ -42,6 +43,7 @@ export function getAppConfig(): PartnerConfig {
   const dark = readTheme(process.env.APP_THEME_DARK, "APP_THEME_DARK");
   const defaultTheme = process.env.APP_DEFAULT_THEME || "light";
   if (defaultTheme !== "light" && defaultTheme !== "dark") throw new Error("APP_DEFAULT_THEME must be light or dark");
+  const palette = process.env.APP_PRIMARY_COLOR ? createBrandPalette(process.env.APP_PRIMARY_COLOR) : undefined;
   const base = orbsPartner.styles;
   const darkBase = base.themeOverrides?.dark;
   const brandName = process.env.APP_NAME || orbsPartner.brand.name;
@@ -68,8 +70,8 @@ export function getAppConfig(): PartnerConfig {
     styles: {
       ...base,
       themeOverrides: {
-        light: { ...light, colors: { ...light.colors } },
-        dark: { ...darkBase, ...dark, colors: { ...darkBase?.colors, ...dark.colors } },
+        light: { ...palette?.light, ...light, colors: { ...palette?.light.colors, ...light.colors } },
+        dark: { ...darkBase, ...palette?.dark, ...dark, colors: { ...darkBase?.colors, ...palette?.dark.colors, ...dark.colors } },
       },
     },
     defaultTheme,

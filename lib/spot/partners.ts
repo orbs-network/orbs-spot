@@ -1,4 +1,5 @@
 import { Partners } from "@orbs-network/spot-ui";
+import { getActiveSpotPartner } from "@/lib/partners/spot";
 
 export const SPOT_PARTNERS_CONFIG_URL =
   "https://raw.githubusercontent.com/orbs-network/spot/master/config.json";
@@ -41,7 +42,7 @@ export function parseSpotPartners(value: unknown): SpotPartner[] {
     const chainId = Number(key);
     if (!Number.isSafeInteger(chainId) || chainId <= 0) return [];
     return Object.keys({ ...globalDex, ...dex })
-      .filter(name => partnerNames.has(name))
+      .filter(name => partnerNames.has(name) || name === getActiveSpotPartner())
       .map(name => ({ chainId, name: name as Partners }));
   }).sort((a, b) => a.name.localeCompare(b.name) || a.chainId - b.chainId);
 }

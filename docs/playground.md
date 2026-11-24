@@ -17,12 +17,10 @@ The default frontend uses Orbs branding. Forks can configure their identity,
 metadata, icons, default color mode and complete light/dark palettes using
 `.env.local`; see [white-label setup](../README.md#white-label-setup). The
 standard RainbowKit wallet picker remains available. The default Spot partner
-is `external` and can be configured with `NEXT_PUBLIC_SPOT_PARTNER`.
-Developer tools are available only inside `/dev`. The main trading UI
-keeps its normal review and execution flow, including with `debug=true`.
-Explicit `debug=true`, `api=dev`, `api=v1`, or `api=v2` enables partner testing without exposing developer controls,
-inspection buttons, demos, or the wizard outside `/dev`.
-
+is `external` and can be configured with `NEXT_PARTNER`.
+Developer tools and debug query overrides are available in local development and
+deployed builds. Developer tools are confined to `/dev`; `debug=true` and
+recognized `api` overrides enable partner testing on the main trading UI.
 Open `/dev` for the developer playground. This route enables the walkthrough,
 demos, step-by-step execution, SDK examples, and larger data panels without a
 `debug` query parameter. It reuses the main trading forms, validation, order clients,
@@ -48,8 +46,10 @@ Orders also show a Partner column in debug mode, using the partner retained
 with each fetched order.
 The selected Spot partner also applies to swaps;
 developer tools stay inside `/dev`, even when `debug=true` is passed.
-For a non-default configured partner or in debug mode, the network picker lists only chains supported by the selected
-partner. An incompatible connected network shows **Wrong network**, and the
+For a known non-default SDK partner or in debug mode, the network picker uses
+the published partner network list. Custom identifiers not represented by the
+SDK enum use the host-supported networks and rely on the SDK configuration and
+quote response for availability. An incompatible connected network shows **Wrong network**, and the
 order action offers a switch to a compatible network.
 
 Swap and advanced-order forms share the same 23 supported networks and partner filtering,
@@ -64,7 +64,7 @@ The default Spot service is `https://order-sink-v2.orbs.network`. Add `?api=dev`
 `https://order-sink-dev.orbs.network`, `?api=v1` to use `https://order-sink.orbs.network`,
 or `?api=v2` to select production v2 explicitly.
 An absent, empty, or unrecognized `api` value uses the default service without enabling implicit debug mode.
-The parameter works on the main app and `/dev` without `debug=true`.
+The parameter works on the main app and `/dev` without `debug=true`, including in deployed builds.
 `api=dev`, `api=v1`, and `api=v2` automatically enable debug partner testing: the partner selector,
 supported-network filtering, and the Partner column in order history. Developer inspectors,
 demos, and walkthroughs remain inside `/dev`. Internal links preserve the selected API and partner
@@ -87,7 +87,9 @@ yarn build
 
 ## WalletConnect
 
-WalletConnect uses `NEXT_PUBLIC_PROJECT_ID` as the Reown project id. The
+WalletConnect uses the optional `NEXT_PUBLIC_PROJECT_ID` as the Reown project id.
+Without it, browser-injected wallets and Safe apps remain available, but
+WalletConnect pairing is disabled. The
 current browser domain must be added to that project in Reown Dashboard under
 Project Domains, otherwise the WalletConnect modal can show
 `Invalid App Configuration`.
@@ -99,57 +101,20 @@ domain allowlist check.
 
 ## Deploy
 
-Build the main Orbs app locally and deploy directly to production with `yarn deploy` or
-[`scripts/deploy.sh`](../scripts/deploy.sh). It always targets production on
-Vercel project `prj_sIICLUBkrigIaJiTQMEPxfgqoRf4`, regardless of the locally linked project.
+Deploy to a hosting project you control using a workflow that supports Next.js
+server routes. Follow the [fork deployment steps](../README.md#deploy-your-fork).
+For self-hosting, place a reverse proxy in front of the app. Configure a shared
+per-client limit for `/api/rpc`, `/api/balances`, and `/api/transaction-receipt`
+at the proxy or hosting WAF. [An nginx snippet](rate-limit.nginx.conf) shows one
+starting point; tune it for expected traffic and configure trusted proxies.
 
-Install Vercel CLI (verified with 58.9.0) and authenticate once:
-
-```bash
-npm install --global vercel@58.9.0
-vercel login
-```
-
-Set `NEXT_PUBLIC_PROJECT_ID` (the Reown/WalletConnect ID, separate from the Vercel
-project ID) and `RPC_URL` in your local `.env` or `.env.local`. Optional public
-settings such as `NEXT_PUBLIC_APP_URL` are loaded too. The script uses Next.js's
-production environment order: exported
-shell values, `.env.production.local`, `.env.local`, `.env.production`, `.env`.
-Variables pulled from the selected Vercel environment fill any remaining gaps.
-The script discards the automatically pulled `VERCEL_OIDC_TOKEN`; deployment
-authentication uses `vercel login` or `VERCEL_TOKEN`.
-
-The script pulls production project settings, runs `vercel build --prod` locally to produce
-`.vercel/output`, then uploads that output with `vercel deploy --prebuilt --prod`.
-Application compilation happens locally; Vercel publishes the prebuilt artifacts.
-It stops before building if required variables are missing and never deploys after
-a failed build. `RPC_URL`, the documented branding `APP_*` variables, and `NEXT_PUBLIC_*` values are also
-forwarded as deployment runtime variables; other local secrets are not forwarded.
-Local `.env` files are not uploaded as source files or overwritten by the pull.
-Next.js tracing excludes `.env*` files. Because Vercel's builder also adds these
-files independently, the script removes their generated function manifest
-references before upload, including in build-only mode. Runtime variables are
-supplied separately. Rebuild with this script before retrying an older failed
-prebuilt deployment.
-
-```bash
-yarn deploy --dry-run     # Show the steps without building or deploying
-yarn deploy --build-only  # Pull settings and build locally, without deploying
-yarn deploy               # Build locally and deploy prebuilt production
-yarn deploy --prod        # Same production workflow; --prod is optional
-```
-
-The script uses the repository root even when invoked from another directory,
-waits for Vercel to finish, and returns its exit status. Run `yarn lint` and
-`yarn typecheck` before deploying. For CI, export `VERCEL_TOKEN` and the project's
-`VERCEL_ORG_ID`; the script supplies `VERCEL_PROJECT_ID` automatically.
-Credentials are never printed by the dry run.
-The script disables Vercel CLI telemetry for its commands to avoid telemetry
-subprocess crashes after successful local builds.
-
-See the [Vercel local build workflow](https://vercel.com/docs/cli/build),
-[deployment options](https://vercel.com/docs/cli/deploy), and
-[project selection options](https://vercel.com/docs/cli/global-options#project).
+`RPC_RATE_LIMIT_PER_MINUTE` controls a per-instance RPC ceiling (default 600
+requests per minute; `0` disables it). Depending on the host, isolated routes
+may each have their own counter. This limits an individual instance and returns HTTP 429
+with `Retry-After`, but it is not a per-client or distributed limit. Serverless
+and multi-instance deployments still require the shared host-level limit. Keep
+RPC endpoints and credentials server-side. RPC network IDs and the partner are
+selected at build time; supply matching RPC configuration at runtime.
 
 ## Production and developer boundaries
 
@@ -157,11 +122,11 @@ Trading components live in `components/advanced-order`, `features/swap`, and `fe
 
 Developer inspectors and simulations live in `features/developer-tools`, with copyable example generators in its `snippets` directory. Import their UI only through `@developer-tools`. ESLint enforces the production import boundary. Developer tools load only inside `/dev`; `debug=true` on the main UI enables partner testing without loading developer implementations.
 
-Before release, run `yarn lint`, `yarn typecheck`, and `yarn build`. Production hosting should enforce request rate limits for the public RPC endpoints and provide `RPC_URL` and `NEXT_PUBLIC_PROJECT_ID` through its environment configuration.
+Before release, run `yarn lint`, `yarn typecheck`, and `yarn build`. Production hosting must enforce shared request rate limits for the public RPC endpoints and provide `RPC_URLS` or `RPC_URL` through its environment configuration. Set `NEXT_PUBLIC_PROJECT_ID` at build time if WalletConnect is needed.
 
-Dependency security overrides in `package.json` keep Axios, viem's WebSocket client, Protobuf, browser mapping data, and MetaMask's UUID utility on patched releases. Remove these overrides when upstream dependency ranges include the fixes. MetaMask uses the compatible UUID v4 API; its override retains CommonJS support.
+Dependency overrides in `package.json` keep Axios, viem's WebSocket client, and MetaMask's UUID utility on patched releases. Remove these overrides when upstream dependency ranges include the fixes. MetaMask uses the compatible UUID v4 API; its override retains CommonJS support.
 
-The October 1, 2026 production dependency audit reports no known vulnerabilities. WalletConnect is on 2.25.0, within wagmi’s supported range; its dependency chain removes the vulnerable legacy URL decoder. Re-run `yarn audit --groups dependencies` before release.
+Run `yarn audit --groups dependencies` before release and assess the current advisories against the deployment. Wallet dependencies currently pin Zod 3, affected by [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5); Zod 4 cannot safely be forced into their incompatible dependency ranges without upstream updates.
 
 ## Spot SDK history endpoints
 

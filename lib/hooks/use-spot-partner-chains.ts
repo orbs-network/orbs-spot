@@ -7,14 +7,20 @@ import { getPartnerChains } from "@/lib/spot/partners";
 import { useSpotPartner } from "./use-spot-partner";
 import { useSpotPartners } from "./use-spot-partners";
 
-/** Non-default partners use only networks configured for that integration. */
+/** Known partners use the published network list; SDK configuration handles other identifiers. */
 export function useSpotPartnerChains(enabled = true) {
   const { partner, isDebugMode } = useSpotPartner();
-  const shouldFilter = enabled && (isDebugMode || partner !== Partners.External);
+  // The public partner list is incomplete for custom identifiers. Do not turn an
+  // absent list entry into a claim that the SDK cannot quote on any network.
+  const knownPartner = Object.values(Partners).includes(partner);
+  const shouldFilter = enabled && knownPartner && (isDebugMode || partner !== Partners.External);
   const query = useSpotPartners(shouldFilter);
-  const chains = useMemo(() => shouldFilter
-    ? getPartnerChains(SPOT_CHAINS, query.data ?? [], partner)
-    : SPOT_CHAINS, [shouldFilter, query.data, partner]);
+  const chains = useMemo(() => {
+    const ids = process.env.NEXT_PUBLIC_RPC_CHAIN_IDS;
+    const configured = ids ? new Set(ids.split(",").map(Number)) : undefined;
+    const available = configured ? SPOT_CHAINS.filter(chain => configured.has(chain.id)) : SPOT_CHAINS;
+    return shouldFilter ? getPartnerChains(available, query.data ?? [], partner) : available;
+  }, [shouldFilter, query.data, partner]);
 
   return {
     partner,
