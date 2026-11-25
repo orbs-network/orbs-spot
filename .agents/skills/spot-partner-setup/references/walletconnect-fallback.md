@@ -1,0 +1,7 @@
+# WalletConnect fallback for Spot
+
+Use this procedure if the shared WalletConnect skill is unavailable. A project ID is public and distinct from the Spot partner ID. Never invent one or use another partner's project. Missing optional WalletConnect setup does not block launch; report mobile/QR pairing as deferred rather than tested.
+
+For a requested setup, the user can sign in to their own [Reown Dashboard](https://dashboard.reown.com/) and create or reuse their app's project, checking [current pricing](https://reown.com/pricing) before accepting charges. They handle authentication themselves; never request passwords, tokens, private keys or recovery phrases. Add the actual verified production origin to the project allowlist, preserving needed entries, and add draft origins only if testing them. See the [Reown allowlist guide](https://docs.reown.com/cloud/relay#allowlist); changes may take time to propagate. Do not invent an origin or modify account settings without authorization.
+
+Configure the supplied ID as `NEXT_PUBLIC_PROJECT_ID` using the parent skill's Spot build and host environment instructions. Restart/rebuild, redeploy to the existing verified site if requested, and test QR/mobile pairing separately on the actual origin where reachable. Record the project ownership, configured/deferred status, origins and checks without secrets in `DEPLOYMENT.md`. WalletConnect setup does not confirm trading activation.

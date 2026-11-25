@@ -61,9 +61,9 @@ Partner sites must not expose the reference app's developer UI, unless the user 
 
 Only after approval and only if publication was requested. Use another provider if the user chose one, applying the same rules.
 
-1. **Account and cost.** Have the user sign in to Netlify in their own browser (`netlify login`). Check [current Netlify pricing](https://www.netlify.com/pricing/) and the account's actual plan, limits and overage/pause behavior. Explain material costs in one or two sentences. If terms or costs can't be verified, stop at a ready local build and report publication pending.
-2. **Site.** Reuse a site from `DEPLOYMENT.md` or an existing link after verifying its account, team and site ID. Otherwise ask for a `name.netlify.app` address (or offer a generated one), check availability, and create one site. Never deploy through a script or link that belongs to someone else's project.
-3. **Build settings.** Use Netlify's [Next.js runtime](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/) so route handlers deploy as functions — never a static export, `dist/` upload or SPA catch-all. Confirm Netlify supports the installed Next.js version. If no `netlify.toml` exists, add a minimal one:
+Read and follow the shared [Netlify hosting skill](https://github.com/orbs-network/agent-skills/blob/master/skills/netlify-hosting/SKILL.md) for account, cost, site, deployment and hosting verification. If it cannot be accessed, follow the checked-in [Netlify fallback](references/netlify-fallback.md) and report that the shared skill was unavailable. Apply these Spot-specific requirements in either case:
+
+1. **Build settings.** Use Netlify's [Next.js runtime](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/) so route handlers deploy as functions — never a static export, `dist/` upload or SPA catch-all. Confirm Netlify supports the installed Next.js version. If no `netlify.toml` exists, add a minimal one:
 
    ```toml
    [build]
@@ -72,9 +72,14 @@ Only after approval and only if publication was requested. Use another provider 
    ```
 
    Netlify reads `.nvmrc` for Node; set `YARN_VERSION=1.22.22` in site environment variables.
-4. **Environment.** `.env.local` is not uploaded and does not configure the site. Set every value from step 2 in Netlify's site environment for the production and deploy-preview contexts, with build **and** functions scopes (`APP_*` values are needed at runtime too). Mark `RPC_URL`/`RPC_URLS` as secret. See Netlify's [framework environment guide](https://docs.netlify.com/build/frameworks/use-environment-variables-with-frameworks/).
-5. **Rate limiting.** `/api/rpc`, `/api/balances` and `/api/transaction-receipt` spend the partner's RPC quota. Configure and verify a shared per-client rate limit for them using the host or a WAF. The app's `RPC_RATE_LIMIT_PER_MINUTE` (default 600) is per instance and is not a distributed limit. If shared protection is unavailable, finish the local build and draft where feasible, explain the remaining exposure and possible quota costs, and ask the user how to proceed before production publication. Record any explicit decision to proceed without it.
-6. **Draft, then production.** Check the current Netlify CLI documentation and use its framework-aware build and deployment workflow with the intended build environment and context. Confirm the generated deployment includes the Next.js route handlers as functions. Deploy a draft and verify it (step 6), then publish the reviewed source and settings to production. If source, build output, or relevant settings differ, rebuild and repeat the affected checks.
+2. **Environment.** `.env.local` is not uploaded and does not configure the site. Set every value from step 2 in Netlify's site environment for the production and deploy-preview contexts, with build **and** functions scopes (`APP_*` values are needed at runtime too). Mark `RPC_URL`/`RPC_URLS` as secret. See Netlify's [framework environment guide](https://docs.netlify.com/build/frameworks/use-environment-variables-with-frameworks/).
+3. **Rate limiting.** `/api/rpc`, `/api/balances` and `/api/transaction-receipt` spend the partner's RPC quota. Configure and verify a shared per-client rate limit for them using the host or a WAF. The app's `RPC_RATE_LIMIT_PER_MINUTE` (default 600) is per instance and is not a distributed limit. If shared protection is unavailable, finish the local build and draft where feasible, explain the remaining exposure and possible quota costs, and ask the user how to proceed before production publication. Record any explicit decision to proceed without it.
+
+Deploy a framework-aware draft and confirm the generated deployment includes the Next.js route handlers as functions. Verify the draft using step 6 before publishing the reviewed source and settings to production. If source, build output or relevant settings differ, rebuild and repeat the affected checks.
+
+## WalletConnect setup
+
+When configuring or handing off WalletConnect, read the shared [WalletConnect setup skill](https://github.com/orbs-network/agent-skills/blob/master/skills/walletconnect-setup/SKILL.md). Keep Spot's `NEXT_PUBLIC_PROJECT_ID` build-time configuration and the verification and handoff steps below. If the shared skill cannot be accessed, follow the [local WalletConnect fallback](references/walletconnect-fallback.md) and report that the shared skill was unavailable. WalletConnect is optional and must not block launch when no ID was supplied.
 
 ## 6. Verify
 
