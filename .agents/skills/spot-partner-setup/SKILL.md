@@ -1,11 +1,13 @@
 ---
 name: spot-partner-setup
-description: Configure a fork of the Spot app from a short partner brief, including branding, environment settings, local preview, and integration verification. Use when a user wants to launch, white-label, or set up their own Spot trading app.
+description: Configure, preview, publish, or update a partner-owned Spot app from a short brief, including branding, deployment, and a separate trading-activation handoff. Use when a user wants to launch, white-label, or set up their own Spot trading app.
 ---
 
 # Set up a Spot partner app
 
 Use this existing checkout and preserve the trading UI, wallet sequence, reviewed quote protections, and history. Read the repository `README.md`, `.env.example`, and the adjacent [spot-theme skill](../spot-theme/SKILL.md). Follow current source if these instructions become stale. Do not scaffold a replacement app.
+
+Use the partner's existing checkout and hosting project for updates; preserve local changes, Git history, branding, and unrelated configuration. Read the ignored `DEPLOYMENT.md` if present. Do not reset, reinitialize, switch branches, or silently create a replacement deployment. A request to launch or deploy authorizes publication to the user's intended account within their stated constraints; this skill alone does not authorize deployment, purchases, commits, pushes, or messages to third parties.
 
 The partner app must retain the reference app's layout, spacing, typography, responsive behavior, and components regardless of app or partner ID. Change only branding (name, logo, colors, and related metadata) unless the user explicitly requests another UI change. Developer-tool removal below is a separate cleanup and must not alter the production trading interface.
 
@@ -45,6 +47,24 @@ Compare the reference app and partner app side by side at the same desktop and m
 
 If changing SDK integration or partner behavior, follow the matching versioned SDK skill under `node_modules/@orbs-network/spot-ui/dist/integration-skills/` and its relevant references. Preserve the actual partner/chain identity; never switch partner or invent contracts to make a preview pass. A working UI or build does not establish live trading activation. Do not sign or submit real transactions without authorization.
 
-## Hosting and handoff
+## Publish to the partner's host
 
-Only deploy when the user requests it. This Next.js app has server routes and needs a host that supports them; a static-only upload is insufficient. Use a deployment workflow configured for the partner’s own project. For an authorized deployment, inspect the chosen host and project ownership, configure both build and server runtime values appropriately, set a shared host-level rate limit for all three RPC-backed API routes, and use the host's supported Next.js workflow. Report the URL, actual checks, wallet origin setup, and separately whether partner/chain activation was verified. Never infer activation from a published page.
+When publication is requested, reuse the verified provider, account and site from `DEPLOYMENT.md` or the local provider link. Resolve conflicting or stale links before uploading. Create a site only if no intended site exists. Default to Netlify if no provider is specified and its current plan and terms fit the partner's account; use their chosen provider otherwise. Guide login and MFA in the user's browser; never request passwords, tokens, or credentials in chat. Git-based deployment is optional.
+
+Before each deployment, check the [current Netlify pricing](https://www.netlify.com/pricing/) and the account's actual plan, eligibility, usage limits, pause/overage behavior, and possible charges. Explain material costs and record the sources and decision; do not assume a remembered quota. If terms or costs cannot be verified, complete local preparation and report publication pending. Obtain approval before spending, paid upgrades, auto-recharge, or DNS changes.
+
+Use Netlify's [Next.js integration](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/) and current [CLI guide](https://docs.netlify.com/api-and-cli-guides/cli-guides/get-started-with-cli/) or supported Git workflow. Confirm the installed Next.js and Node versions are supported, inspect provider configuration, and verify the account, team, linked site ID, and ownership before any upload. Use the app's actual `yarn build` and Netlify's framework-aware build/adapter so Next.js route handlers are deployed as functions. Do not use the Perpetual Hub static `dist/` upload, SPA catch-all redirect, or a plain static export for this app. Do not use an existing fixed-project deployment script without verifying its target belongs to the partner.
+
+Configure the actual partner's environment in the provider for the relevant deploy contexts. `NEXT_PARTNER`, `NEXT_PUBLIC_*`, branding, and the RPC network selection are resolved at build time; supply matching server-side settings at runtime. Set `RPC_URL` or `RPC_URLS` privately in the provider, including both build and function scopes where supported; never expose RPC credentials in browser variables, logs, source, or deployment notes. Netlify's [framework environment guide](https://docs.netlify.com/build/frameworks/use-environment-variables-with-frameworks/) explains scopes and runtime settings. Local `.env.local` values alone do not configure hosted functions. Set a shared host-level per-client rate limit for `/api/rpc`, `/api/balances`, and `/api/transaction-receipt`; the app's per-instance limit is not distributed. Verify that the chosen host and plan can enforce this before claiming the deployment is ready.
+
+Deploy a draft to the verified site and verify it before publishing. Use the same reviewed source and configuration for production; if either changes, rebuild and repeat the relevant checks. Verify the stable production URL after publishing. Preserve `/dev`, `debug=true`, and `api=` overrides whenever the user requests them. Do not send transactions, sign messages, approve tokens, or trade during verification without explicit authorization.
+
+## Verify and hand off
+
+Check the draft and stable production site for HTTPS, branding, metadata and assets, desktop and mobile layouts, keyboard access, direct routes and refreshes, and console/network errors. Check deployed server routes and enabled RPC networks with read-only requests, then check quotes and the wallet dialog. For WalletConnect, verify the exact origin is allowed and test pairing separately when configured. Report unavailable services or unverified checks rather than substituting mocks or another partner.
+
+Track publication and trading activation separately: provide the stable URL only once the production site is verified; otherwise say whether the draft or publication is pending. A working site or SDK client does not prove that the actual `NEXT_PARTNER`, its intended networks, or live trading are enabled; report what has and has not been confirmed.
+
+## Deployment record and future updates
+
+Keep the customized source in the partner's chosen permanent folder. Create or update the ignored `DEPLOYMENT.md` after publication or a blocked launch. Record the project and partner ID, source location and upstream revision, branding and asset paths, provider/account/team and verified site ID, draft and stable URLs, pricing sources and check date, environment variable names and configured/blank status, checks performed, and outstanding activation or hosting work. Never record secrets. Include a concise future-update prompt naming the source folder, this skill, the record, and the existing site. For later authorized updates, reuse that site and source, preserve the customization, rerun applicable checks, review a draft, and verify production; do not silently pull upstream or create a new site.
