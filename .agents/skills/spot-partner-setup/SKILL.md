@@ -7,13 +7,15 @@ description: Configure, preview, publish, or update a partner-owned Spot app fro
 
 Turn a partner's brief into a branded copy of this app, preview it, and (when asked) publish it to the partner's own host — Netlify by default. Work through the steps in order. Keep messages to the user short and non-technical; make routine technical choices yourself.
 
+The agent owns the technical setup: inspect existing configuration, choose sensible defaults, configure services and files, and troubleshoot. Ask the user only for information or actions that require their knowledge, account access, or explicit authorization. Explain each such request in everyday language and give one clear next step. Do not ask the user to edit files, run commands, choose technical settings, or diagnose errors. Continue independent work while waiting.
+
 ## Ground rules
 
-- **Customize, don't rebuild.** Work in this checkout. Do not scaffold a new app, reset, reinitialize, switch branches, or overwrite local changes. Follow current source and `README.md` if these instructions are stale.
+- **Customize, don't rebuild.** Work in this checkout on the currently checked-out branch. Do not propose or create a setup branch, switch branches, scaffold a new app, reset, reinitialize, or overwrite local changes unless the user explicitly requests it. Follow current source and `README.md` if these instructions are stale.
 - **Branding only.** Keep the reference layout, spacing, typography, components, responsive behavior, swap/advanced-order forms, quote protections, wallet guards, history, cancellation and settlement. Change other UI only on explicit request.
 - **Nothing invented.** Never fabricate logos, RPC or WalletConnect credentials, contracts, a partner ID, or activation. If something is missing, continue with what you can and report what it blocks.
-- **Secrets stay private.** Never ask for passwords, tokens, keys or seed phrases in chat; the user signs in to services in their own browser. Never put secrets in `NEXT_PUBLIC_*` values, source, logs or `DEPLOYMENT.md`.
-- **Authorization.** A request to launch or deploy authorizes publishing to the user's intended account within their stated limits. It does not authorize spending, paid upgrades, auto-recharge, DNS changes, custom-domain purchases, commits/pushes to others' repositories, messages to third parties, or signing/sending transactions. Ask first for any of these.
+- **Secrets stay private.** The user may provide an RPC endpoint URL, including its embedded provider credential, for the agent to configure; prefer a secure input method when available. Never ask for passwords, standalone tokens, private keys or seed phrases in chat; the user signs in to services in their own browser. Treat RPC URLs as secrets: never repeat or print them, and never put them in `NEXT_PUBLIC_*` values, source, logs or `DEPLOYMENT.md`.
+- **Authorization.** A request to launch or deploy authorizes publishing to the user's intended account within their stated limits. It does not authorize Git commits or pushes to any repository, spending, paid upgrades, auto-recharge, DNS changes, custom-domain purchases, messages to third parties, or signing/sending transactions. Perform these only when explicitly authorized.
 - **Publication ≠ activation.** A live site, a build, or SDK initialization does not prove the partner or its chains are enabled for trading. Always report the two separately.
 
 ## 1. Read and plan
@@ -27,14 +29,21 @@ Collect from the brief, asking only for what is missing and necessary:
 | App name, logo, light/dark default, primary color | `APP_*` (see spot-theme) | Ask once; offer text-only branding; choose reversible defaults if the user delegated design |
 | Spot partner ID | `NEXT_PARTNER` | Use the one supplied by the Portal; otherwise `external`. Don't ask about activation as a routine setup question; clarify or report uncertainty when it matters to the handoff |
 | Stable app ID | `APP_ID` | Derive a unique, non-`orbs` camelCase ID from the app name. Distinct from `NEXT_PARTNER` |
-| Chains and RPC | `RPC_URLS` (JSON chain ID → URL) or `RPC_URL` (chain-aware gateway) | **Required for a working preview.** Tell the user early; they can create free-tier keys with an RPC provider of their choice and paste them into `.env.local` themselves |
+| Chains and RPC | `RPC_URLS` (JSON chain ID → URL) or `RPC_URL` (chain-aware gateway) | **Required for live network data.** Reuse existing partner configuration when present. Otherwise ask early whether they already have an RPC service, briefly explaining that it connects the app to blockchain networks; help them set one up if not. The agent determines and configures the networks |
 | WalletConnect project | `NEXT_PUBLIC_PROJECT_ID` | Optional. Without it, injected wallets and Safe still work; explain setup at handoff |
+
+### Help with RPC
+
+- Infer intended networks from the brief, existing partner settings and available service information. Check which networks the app, partner and provider support; do not assume an endpoint for one network supports others. If the intended networks cannot be determined, ask a plain-language question such as which networks their customers should trade on, offering relevant choices. Do not ask for chain IDs or JSON.
+- If the user has a provider, help them locate the HTTP endpoint URLs and use a secure input method when available. If they do not, recommend one suitable provider (for example [Alchemy](https://www.alchemy.com/)) after checking its current network coverage, pricing, free-tier limits and payment requirements. Explain any meaningful limits or potential charges before signup; never promise a free plan without verifying it. Respect their preference for a different provider.
+- Guide them to sign up or sign in in their own browser, completing authentication themselves. With available tools and authorization, help create or select their project and obtain the endpoint URLs; otherwise give short, current step-by-step guidance using the provider's documentation. Ask the user to share the endpoint URLs only if the agent cannot retrieve them securely. Never request passwords, private keys or recovery phrases. Do not create a paid plan or enable billing without explicit authorization.
+- Configure the supplied endpoints yourself and verify their network identities with read-only checks without exposing URLs or credentials. If signup or access is blocked, continue branding and any available preview, explain what remains unavailable, and resume once access is provided. Never use another partner's credentials or substitute a public endpoint without checking its suitability and the user's constraints.
 
 ## 2. Configure
 
 1. Use Node and Yarn versions from `README.md` (currently Node 22.23.1 per `.nvmrc`, Yarn 1.22.22) and run `yarn install --frozen-lockfile`.
 2. Put assets in `public/` and reference them with root-relative paths (`/brand/logo.svg`).
-3. Write partner values into the ignored `.env.local`, keeping unrelated entries. Apply branding with the spot-theme skill. Do not print secret values.
+3. Write partner values, including supplied RPC endpoints, into the ignored `.env.local`, keeping unrelated entries. Map chain-specific endpoints to `RPC_URLS`, or use `RPC_URL` for a chain-aware gateway. Apply branding with the spot-theme skill. Do not print secret values or expose them in command output.
 4. Remember that `NEXT_PARTNER`, `NEXT_PUBLIC_*`, branding and the RPC network list are fixed at build time: restart `yarn dev` and rebuild after changes.
 
 ## 3. Turn off developer tools
@@ -54,14 +63,16 @@ Partner sites must not expose the reference app's developer UI, unless the user 
 
 1. Run `yarn typecheck`, `yarn lint` and `yarn build`; fix failures you introduced.
 2. Start `yarn dev` and check the real app at desktop and mobile widths in light and dark: branding, metadata/icons, swap and advanced-order forms (quotes and errors, no signing), history, menus and the wallet dialog.
-3. Compare against the unmodified reference at the same sizes and themes: use the reference deployment URL from `README.md` if one is listed; otherwise run the upstream revision from a temporary `git worktree` on another port. Fix unintended layout differences. If comparison is impossible, say so rather than claiming parity.
+3. Compare against the unmodified reference at the same sizes and themes: use the reference deployment URL from `README.md` if one is listed; otherwise run the upstream revision from a temporary detached `git worktree` on another port. This worktree is only for comparison; do not switch the partner checkout's branch or create a setup branch. Fix unintended layout differences. If comparison is impossible, say so rather than claiming parity.
 4. Show the user the preview. Wait for design approval unless they explicitly delegated design decisions. If RPC is missing, say the preview cannot show live quotes and why.
 
 ## 5. Publish to Netlify
 
-Only after approval and only if publication was requested. Use another provider if the user chose one, applying the same rules.
+Only after design approval (unless design decisions were delegated) and only if publication was requested. Use another provider if the user chose one, applying the same rules.
 
-Read and follow the shared [Netlify hosting skill](https://github.com/orbs-network/agent-skills/blob/master/skills/netlify-hosting/SKILL.md) for account, cost, site, deployment and hosting verification. If it cannot be accessed, follow the checked-in [Netlify fallback](references/netlify-fallback.md) and report that the shared skill was unavailable. Apply these Spot-specific requirements in either case:
+Help the user create or sign in to their own Netlify account if needed; explain that it hosts their app and guide them through authentication in their browser. Check the actual account, current plan, limits and potential charges. The agent handles the CLI, site selection or creation, settings, build, deployment and checks using available tools; do not ask the user to run commands or configure environment variables. Reuse the verified existing site when there is one. For a new site, pick an available reasonable address based on the app name unless the user supplied a preference, and explain that it can be changed later. Ask only when account ownership, a paid action, or another necessary decision cannot be determined or performed by the agent. If account access or pricing cannot be verified, prepare what is possible and explain what is pending.
+
+Read and follow the shared [Netlify hosting skill](https://github.com/orbs-network/agent-skills/blob/master/skills/netlify-hosting/SKILL.md) for account, cost, site, deployment and hosting verification. This skill delegates choosing an available site address to the agent, including when a suggested name is taken; that overrides the shared skill's instructions to ask for a name. If the shared skill cannot be accessed, follow the checked-in [Netlify fallback](references/netlify-fallback.md) and report that it was unavailable. Apply these Spot-specific requirements in either case:
 
 1. **Build settings.** Use Netlify's [Next.js runtime](https://docs.netlify.com/build/frameworks/framework-setup-guides/nextjs/overview/) so route handlers deploy as functions — never a static export, `dist/` upload or SPA catch-all. Confirm Netlify supports the installed Next.js version. If no `netlify.toml` exists, add a minimal one:
 
@@ -93,8 +104,8 @@ Tell the user, briefly:
 
 - the production URL (only once verified), or what is pending;
 - what was confirmed about trading activation for `NEXT_PARTNER` and each chain, and what was not;
-- optional next steps (WalletConnect, RPC limits, custom domain — which they set up themselves);
-- to return to the Partner Portal tab they started from.
+- optional next steps, including WalletConnect and a custom domain, with an offer to help configure them;
+- to return to the Partner Portal if they started there.
 
 ## Later updates
 
