@@ -4,7 +4,7 @@ Use this procedure only if the shared Netlify hosting skill cannot be accessed. 
 
 ## Publish to Netlify
 
-Only after design approval (unless design decisions were delegated) and only if publication was requested. Use another provider if the user chose one, applying the same rules.
+Publish only when requested or authorized by an established update workflow. Follow the parent skill's preview and provider-selection rules.
 
 1. **Account and cost.** Help the user create or sign in to their own Netlify account in their browser; the agent handles any CLI login initiation. Check [current Netlify pricing](https://www.netlify.com/pricing/) and the account's actual plan, limits and overage/pause behavior. Explain material costs in one or two sentences. If terms or costs can't be verified, stop at a ready local build and report publication pending.
 2. **Site.** Reuse a site from `DEPLOYMENT.md` or an existing link after verifying its account, team and site ID. Otherwise choose an available `name.netlify.app` address based on the app name unless the user supplied a preference, and create one site. Never deploy through a script or link that belongs to someone else's project. The agent handles setup and configuration; ask the user only for account access or necessary decisions they must make.

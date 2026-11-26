@@ -5,13 +5,13 @@ description: Configure, preview, publish, or update a partner-owned Spot app fro
 
 # Set up a Spot partner app
 
-Turn a partner's brief into a branded copy of this app, preview it, and (when asked) publish it to the partner's own host — Netlify by default. Work through the steps in order. Keep messages to the user short and non-technical; make routine technical choices yourself.
+Turn a partner's brief into a branded copy of this app, preview it, and (when asked) publish it to an authorized host. Keep messages to the user short and non-technical; make routine technical choices yourself.
 
-The agent owns the technical setup: inspect existing configuration, choose sensible defaults, configure services and files, and troubleshoot. Ask the user only for information or actions that require their knowledge, account access, or explicit authorization. Explain each such request in everyday language and give one clear next step. Do not ask the user to edit files, run commands, choose technical settings, or diagnose errors. Continue independent work while waiting.
+Assume no development experience. Inspect the checkout, configuration and available authenticated services before asking; infer branding from the brief, supplied website and authorized assets. The agent owns technical setup and troubleshooting. Avoid a questionnaire, don't repeat known information, and defer optional accounts until needed. Ask only for essential business information, account access, or decisions requiring authorization; group questions when useful and explain the next step in everyday language. Do not ask the user to edit files, run commands, choose technical settings, or diagnose errors. Continue independent work while waiting.
 
 ## Ground rules
 
-- **Customize, don't rebuild.** Work in this checkout on the currently checked-out branch. Do not propose or create a setup branch, switch branches, scaffold a new app, reset, reinitialize, or overwrite local changes unless the user explicitly requests it. Follow current source and `README.md` if these instructions are stale.
+- **Customize, don't rebuild.** Reuse a suitable checkout on its current branch, preserving unrelated changes. If none exists, obtain the official Orbs Spot source in a suitable local folder; a GitHub account or hosted fork is not required for local setup or direct deployment. Create a partner-owned hosted fork only when requested and authorized. Do not propose or create a setup branch, switch branches, scaffold a replacement, reset, reinitialize, or overwrite local changes unless the user explicitly requests it. Follow current source and `README.md` if these instructions are stale.
 - **Branding only.** Keep the reference layout, spacing, typography, components, responsive behavior, swap/advanced-order forms, quote protections, wallet guards, history, cancellation and settlement. Change other UI only on explicit request.
 - **Nothing invented.** Never fabricate logos, RPC or WalletConnect credentials, contracts, a partner ID, or activation. If something is missing, continue with what you can and report what it blocks.
 - **Secrets stay private.** The user may provide an RPC endpoint URL, including its embedded provider credential, for the agent to configure; prefer a secure input method when available. Never ask for passwords, standalone tokens, private keys or seed phrases in chat; the user signs in to services in their own browser. Treat RPC URLs as secrets: never repeat or print them, and never put them in `NEXT_PUBLIC_*` values, source, logs or `DEPLOYMENT.md`.
@@ -29,7 +29,7 @@ Collect from the brief, asking only for what is missing and necessary:
 | App name, logo, light/dark default, primary color | `APP_*` (see spot-theme) | Ask once; offer text-only branding; choose reversible defaults if the user delegated design |
 | Spot partner ID | `NEXT_PARTNER` | Use the one supplied by the Portal; otherwise `external`. Don't ask about activation as a routine setup question; clarify or report uncertainty when it matters to the handoff |
 | Stable app ID | `APP_ID` | Derive a unique, non-`orbs` camelCase ID from the app name. Distinct from `NEXT_PARTNER` |
-| Chains and RPC | `RPC_URLS` (JSON chain ID → URL) or `RPC_URL` (chain-aware gateway) | **Required for live network data.** Reuse existing partner configuration when present. Otherwise ask early whether they already have an RPC service, briefly explaining that it connects the app to blockchain networks; help them set one up if not. The agent determines and configures the networks |
+| Chains and RPC | `RPC_URLS` (JSON chain ID → URL) or `RPC_URL` (chain-aware gateway) | Reuse existing partner configuration when present. When needed, ask whether they already have an RPC service, briefly explaining that it connects the app to blockchain networks; help them set one up if not. The agent determines and configures the networks |
 | WalletConnect project | `NEXT_PUBLIC_PROJECT_ID` | Optional. Without it, injected wallets and Safe still work; explain setup at handoff |
 
 ### Help with RPC
@@ -41,7 +41,7 @@ Collect from the brief, asking only for what is missing and necessary:
 
 ## 2. Configure
 
-1. Use Node and Yarn versions from `README.md` (currently Node 22.23.1 per `.nvmrc`, Yarn 1.22.22) and run `yarn install --frozen-lockfile`.
+1. Use the Node version in `.nvmrc` and the versions documented in `README.md`; run `yarn install --frozen-lockfile`.
 2. Put assets in `public/` and reference them with root-relative paths (`/brand/logo.svg`).
 3. Write partner values, including supplied RPC endpoints, into the ignored `.env.local`, keeping unrelated entries. Map chain-specific endpoints to `RPC_URLS`, or use `RPC_URL` for a chain-aware gateway. Apply branding with the spot-theme skill. Do not print secret values or expose them in command output.
 4. Remember that `NEXT_PARTNER`, `NEXT_PUBLIC_*`, branding and the RPC network list are fixed at build time: restart `yarn dev` and rebuild after changes.
@@ -59,16 +59,22 @@ Partner sites must not expose the reference app's developer UI, unless the user 
 - **Do not touch:** real quotes, reviewed minimums, wallet/account/chain guards, order status, cancellation, settlement, `use-spot-partner-chains` network filtering, Orbs attribution and legal links. Before editing `lib/spot/order-link.ts` or `lib/swap/activity.ts`, make sure pending swaps referencing older backends still resolve — never silently drop a pending submission. Consult the SDK skills under `node_modules/@orbs-network/spot-ui/dist/integration-skills/` before touching trading paths.
 - Search for leftover `/dev`, `debug`, `mockorders`, inspector and alias references. Confirm `/dev`, its subroutes, the inspector and `?debug=true` no longer expose developer tools, and that old partner and `api=` query overrides cannot change the configured partner or production backend.
 
-## 4. Preview and get design approval
+## 4. Preview and validate
 
 1. Run `yarn typecheck`, `yarn lint` and `yarn build`; fix failures you introduced.
 2. Start `yarn dev` and check the real app at desktop and mobile widths in light and dark: branding, metadata/icons, swap and advanced-order forms (quotes and errors, no signing), history, menus and the wallet dialog.
 3. Compare against the unmodified reference at the same sizes and themes: use the reference deployment URL from `README.md` if one is listed; otherwise run the upstream revision from a temporary detached `git worktree` on another port. This worktree is only for comparison; do not switch the partner checkout's branch or create a setup branch. Fix unintended layout differences. If comparison is impossible, say so rather than claiming parity.
-4. Show the user the preview. Wait for design approval unless they explicitly delegated design decisions. If RPC is missing, say the preview cannot show live quotes and why.
+4. Show the user an accessible preview where the platform supports one. Do not assume a remote localhost URL is accessible or expose a development server through an insecure tunnel. The current root layout shows an incomplete-setup screen without RPC rather than the trading interface; report this limitation and continue independent work. Do not fabricate credentials or bypass production guards to imply trading works. If the user requested publication, continue to hosting without requesting approval again unless they requested a design review or a decision remains necessary.
 
-## 5. Publish to Netlify
+## 5. Select hosting and publish
 
-Only after design approval (unless design decisions were delegated) and only if publication was requested. Use another provider if the user chose one, applying the same rules.
+Publish only if requested or authorized by an established update workflow. First reuse a verified existing deployment, then honor the user's chosen provider, then consider a suitable authenticated account with clear ownership and plan eligibility. Otherwise recommend Netlify. Ask one ownership question if the account or team is ambiguous; never guess. If the chosen provider is incompatible or unavailable, explain and offer a compatible alternative. If no suitable account is available or signup is declined, finish independent local work and report what remains pending.
+
+For every host, confirm the installed Next.js version, server route support, build/runtime environment, account plan and current commercial-use terms. Use supported framework-aware builds, never a static export or SPA fallback. Confirm the intended source, configured partner, supported networks, server-only secrets, API input and method restrictions, and shared rate limiting. Verify the draft before production and the stable URL afterward. Preserve existing project linkage and record any available rollback path. Do not request paid changes without authorization. Git-connected deployment is optional and requires explicit authorization for commits and pushes.
+
+For Vercel, use the existing `vercel.json` where suitable and check [current Vercel terms](https://vercel.com/legal/terms) and [CLI guidance](https://vercel.com/docs/projects/deploy-from-cli); Hobby is restricted to personal, non-commercial use. For Cloudflare or another host, check its current official Next.js adapter and route-handler compatibility before choosing it. Do not claim a provider workflow is verified until the actual deployment checks pass.
+
+### Netlify
 
 Help the user create or sign in to their own Netlify account if needed; explain that it hosts their app and guide them through authentication in their browser. Check the actual account, current plan, limits and potential charges. The agent handles the CLI, site selection or creation, settings, build, deployment and checks using available tools; do not ask the user to run commands or configure environment variables. Reuse the verified existing site when there is one. For a new site, pick an available reasonable address based on the app name unless the user supplied a preference, and explain that it can be changed later. Ask only when account ownership, a paid action, or another necessary decision cannot be determined or performed by the agent. If account access or pricing cannot be verified, prepare what is possible and explain what is pending.
 
@@ -94,7 +100,7 @@ When configuring or handing off WalletConnect, read the shared [WalletConnect se
 
 ## 6. Verify
 
-On the draft and then the production URL: HTTPS, branding, metadata and assets, desktop and mobile, light and dark, keyboard access, direct loads and refreshes of routes, and console/network errors. Make read-only requests to the server routes for each enabled chain, then check quotes and the wallet dialog. Confirm developer tools stay removed. If WalletConnect is configured, the exact production origin must be allowed in its dashboard; test pairing separately. Do not sign, approve, send or trade without explicit authorization. Report unverified checks as unverified.
+On the draft and then the production URL: HTTPS, branding, metadata and assets, desktop and mobile, light and dark, keyboard access, direct loads and refreshes of routes, and console/network errors. Check that unsupported RPC methods, networks and malformed inputs are rejected without forwarding, and shared limits are enforced; make read-only requests to the server routes for each enabled chain, then check quotes and the wallet dialog. Confirm developer tools stay removed. If WalletConnect is configured, the exact production origin must be allowed in its dashboard; test pairing separately. Do not sign, approve, send or trade without explicit authorization. Report unverified checks as unverified.
 
 ## 7. Record and hand off
 

@@ -89,6 +89,9 @@ on your fork, you can start with a prompt such as:
 
 The partner setup skill removes developer tools from a partner fork by default,
 unless the user asks to retain them. This reference app keeps them when deployed.
+Without an RPC configuration the app displays an incomplete-setup screen, so a
+preview of the trading interface requires a suitable RPC endpoint. WalletConnect
+is optional and does not block the preview.
 
 Supply your actual Spot partner identifier and partner-owned WalletConnect and
 RPC configuration when available. Never paste private keys or seed phrases into
